@@ -90,19 +90,28 @@ export const datasetStore = createDatasetStore();
 // ========== Model Parameters Store ==========
 // Tracks the current model parameters (A and B)
 function createParametersStore() {
-  const { subscribe, set, update } = writable<ModelParameters>({
-    a: Math.random() * 2 - 1,  // Random initialization between -1 and 1
-    b: Math.random() * 2 - 1
-  });
+  // Initialize farther from optimal for better visualization
+  const initializeParameters = () => {
+    // Randomly choose a corner/edge region for initialization
+    const regions = [
+      () => ({ a: -6 + Math.random() * 2, b: -6 + Math.random() * 2 }), // Bottom-left corner
+      () => ({ a: -6 + Math.random() * 2, b: 4 + Math.random() * 2 }),  // Top-left corner
+      () => ({ a: 4 + Math.random() * 2, b: -6 + Math.random() * 2 }),  // Bottom-right corner
+      () => ({ a: -6 + Math.random() * 8, b: -6 + Math.random() }),     // Bottom edge
+      () => ({ a: -6 + Math.random(), b: -6 + Math.random() * 8 })      // Left edge
+    ];
+    
+    const randomRegion = regions[Math.floor(Math.random() * regions.length)];
+    return randomRegion();
+  };
+  
+  const { subscribe, set, update } = writable<ModelParameters>(initializeParameters());
 
   return {
     subscribe,
     set,
     update,
-    reset: () => set({
-      a: Math.random() * 2 - 1,
-      b: Math.random() * 2 - 1
-    })
+    reset: () => set(initializeParameters())
   };
 }
 
