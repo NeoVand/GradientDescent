@@ -249,6 +249,10 @@
       const cellWidth = innerWidth / heatmapResolution;
       const cellHeight = innerHeight / heatmapResolution;
       
+      // Get theme for gradient colors
+      const isDarkTheme = document.documentElement.getAttribute('data-theme') === 'dark';
+      const middleColor = isDarkTheme ? '#1e293b' : '#ffffff'; // Dark gray for dark mode, white for light mode
+      
       // Create all cells with exact sizing (no overlap, no gaps)
       for (let i = 0; i < heatmapResolution; i++) {
         for (let j = 0; j < heatmapResolution; j++) {
@@ -270,9 +274,18 @@
           const z = parameters.a * x + parameters.b * y;
           const probability = 1 / (1 + Math.exp(-z));
           
-          // Color based on probability
-          // probability near 0 = blue (class 0), near 1 = red (class 1)
-          const color = d3.interpolateRdBu(1 - probability);
+          // Color based on probability with theme-aware middle color
+          // Blue for class 0 (p near 0), middle color at p=0.5, green for class 1 (p near 1)
+          let color;
+          if (probability < 0.5) {
+            // Interpolate from blue to middle color
+            const t = probability * 2; // 0 to 1
+            color = d3.interpolateRgb('#3b82f6', middleColor)(t);
+          } else {
+            // Interpolate from middle color to green
+            const t = (probability - 0.5) * 2; // 0 to 1
+            color = d3.interpolateRgb(middleColor, '#10b981')(t);
+          }
           
           // Draw cell with exact dimensions - no overlap, no gaps
           g.append('rect')
@@ -281,7 +294,7 @@
             .attr('width', exactWidth)
             .attr('height', exactHeight)
             .attr('fill', color)
-            .style('opacity', 0.35);
+            .style('opacity', isDarkTheme ? 0.5 : 0.35);
         }
       }
       
@@ -302,6 +315,8 @@
         
         // Draw confidence bands as dashed lines
         const bandWidth = 0.25; // Distance from boundary
+        const isDarkTheme = document.documentElement.getAttribute('data-theme') === 'dark';
+        const bandColor = isDarkTheme ? '#94a3b8' : '#475569';
         
         // Upper confidence line (dashed)
         const upperBand = linePoints.map(p => ({ 
@@ -312,11 +327,11 @@
         g.append('path')
           .datum(upperBand)
           .attr('fill', 'none')
-          .attr('stroke', '#3b82f6')
+          .attr('stroke', bandColor)
           .attr('stroke-width', 1.5)
           .attr('stroke-dasharray', '4,3')
           .attr('d', lineGenerator)
-          .style('opacity', 0.5);
+          .style('opacity', 0.6);
         
         // Lower confidence line (dashed)
         const lowerBand = linePoints.map(p => ({ 
@@ -327,11 +342,11 @@
         g.append('path')
           .datum(lowerBand)
           .attr('fill', 'none')
-          .attr('stroke', '#3b82f6')
+          .attr('stroke', bandColor)
           .attr('stroke-width', 1.5)
           .attr('stroke-dasharray', '4,3')
           .attr('d', lineGenerator)
-          .style('opacity', 0.5);
+          .style('opacity', 0.6);
         
         // Draw current model decision boundary (solid line)
         g.append('path')
@@ -401,6 +416,10 @@
     
     const pointSize = 7;  // Slightly larger for better visibility
     
+    // Get theme for stroke colors
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const strokeColor = isDark ? '#fff' : '#000';
+    
     // Helper function to check if a classification point is correctly classified
     const isCorrectlyClassified = (point: DataPoint): boolean => {
       if (problemType !== 'logistic-regression' || point.label === undefined) return true;
@@ -410,9 +429,9 @@
     };
     
     if (problemType === 'logistic-regression') {
-      // For classification: use different shapes for classes, colors for correctness
+      // For classification: circles for class 0 (blue), squares for class 1 (green)
       
-      // Class 0 training points (circles - solid)
+      // Class 0 training points (circles - solid, blue)
       const class0Train = trainData.filter(d => d.label === 0);
       g.selectAll('.train-class0')
         .data(class0Train)
@@ -422,26 +441,28 @@
         .attr('cx', d => xScale(d.x))
         .attr('cy', d => yScale(d.y))
         .attr('r', pointSize)
-        .attr('fill', d => isCorrectlyClassified(d) ? '#6b7280' : '#ef4444')
-        .attr('stroke', '#fff')
+        .attr('fill', '#3b82f6')
+        .attr('stroke', strokeColor)
         .attr('stroke-width', 1.5)
         .style('opacity', 0.85);
       
-      // Class 1 training points (triangles - solid)
+      // Class 1 training points (squares - solid, green)
       const class1Train = trainData.filter(d => d.label === 1);
       g.selectAll('.train-class1')
         .data(class1Train)
         .enter()
-        .append('path')
+        .append('rect')
         .attr('class', 'train-class1')
-        .attr('d', d3.symbol().type(d3.symbolTriangle).size(pointSize * pointSize * 4.5))
-        .attr('transform', d => `translate(${xScale(d.x)},${yScale(d.y)})`)
-        .attr('fill', d => isCorrectlyClassified(d) ? '#6b7280' : '#ef4444')
-        .attr('stroke', '#fff')
+        .attr('x', d => xScale(d.x) - pointSize)
+        .attr('y', d => yScale(d.y) - pointSize)
+        .attr('width', pointSize * 2)
+        .attr('height', pointSize * 2)
+        .attr('fill', '#10b981')
+        .attr('stroke', strokeColor)
         .attr('stroke-width', 1.5)
         .style('opacity', 0.85);
       
-      // Class 0 test points (circles - dashed)
+      // Class 0 test points (circles - dashed, blue)
       const class0Test = testData.filter(d => d.label === 0);
       g.selectAll('.test-class0')
         .data(class0Test)
@@ -451,28 +472,61 @@
         .attr('cx', d => xScale(d.x))
         .attr('cy', d => yScale(d.y))
         .attr('r', pointSize)
-        .attr('fill', d => isCorrectlyClassified(d) ? '#6b7280' : '#ef4444')
-        .attr('stroke', '#fff')
+        .attr('fill', '#3b82f6')
+        .attr('stroke', strokeColor)
         .attr('stroke-width', 1.5)
         .attr('stroke-dasharray', '3,2')
         .style('opacity', 0.75);
       
-      // Class 1 test points (triangles - dashed)
+      // Class 1 test points (squares - dashed, green)
       const class1Test = testData.filter(d => d.label === 1);
       g.selectAll('.test-class1')
         .data(class1Test)
         .enter()
-        .append('path')
+        .append('rect')
         .attr('class', 'test-class1')
-        .attr('d', d3.symbol().type(d3.symbolTriangle).size(pointSize * pointSize * 4.5))
-        .attr('transform', d => `translate(${xScale(d.x)},${yScale(d.y)})`)
-        .attr('fill', d => isCorrectlyClassified(d) ? '#6b7280' : '#ef4444')
-        .attr('stroke', '#fff')
+        .attr('x', d => xScale(d.x) - pointSize)
+        .attr('y', d => yScale(d.y) - pointSize)
+        .attr('width', pointSize * 2)
+        .attr('height', pointSize * 2)
+        .attr('fill', '#10b981')
+        .attr('stroke', strokeColor)
         .attr('stroke-width', 1.5)
         .attr('stroke-dasharray', '3,2')
         .style('opacity', 0.75);
+      
+      // Mark misclassified points with red X
+      [...trainData, ...testData].forEach(d => {
+        if (!isCorrectlyClassified(d)) {
+          const gMark = g.append('g')
+            .attr('transform', `translate(${xScale(d.x)},${yScale(d.y)})`);
+          
+          // Red X marker
+          const xSize = 4;
+          gMark.append('line')
+            .attr('x1', -xSize)
+            .attr('y1', -xSize)
+            .attr('x2', xSize)
+            .attr('y2', xSize)
+            .attr('stroke', '#ef4444')
+            .attr('stroke-width', 2.5)
+            .attr('stroke-linecap', 'round');
+          
+          gMark.append('line')
+            .attr('x1', -xSize)
+            .attr('y1', xSize)
+            .attr('x2', xSize)
+            .attr('y2', -xSize)
+            .attr('stroke', '#ef4444')
+            .attr('stroke-width', 2.5)
+            .attr('stroke-linecap', 'round');
+        }
+      });
     } else {
       // For regression: traditional visualization
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      const strokeColor = isDark ? '#fff' : '#000';
+      
       // Draw training points (circles - solid)
       g.selectAll('.train-point')
         .data(trainData)
@@ -483,7 +537,7 @@
         .attr('cy', d => yScale(d.y))
         .attr('r', pointSize)
         .attr('fill', '#3b82f6')
-        .attr('stroke', '#fff')
+        .attr('stroke', strokeColor)
         .attr('stroke-width', 1.5)
         .style('opacity', 0.8);
       
@@ -497,7 +551,7 @@
         .attr('cy', d => yScale(d.y))
         .attr('r', pointSize)
         .attr('fill', '#10b981')
-        .attr('stroke', '#fff')
+        .attr('stroke', strokeColor)
         .attr('stroke-width', 1.5)
         .attr('stroke-dasharray', '3,2')
         .style('opacity', 0.7);
@@ -518,23 +572,24 @@
         <div class="legend-item">
           <div class="legend-symbol">
             <svg width="18" height="18" viewBox="0 0 18 18">
-              <circle cx="9" cy="9" r="6" fill="#6b7280" stroke="#fff" stroke-width="1.5" />
+              <circle cx="9" cy="9" r="6" fill="#3b82f6" stroke="currentColor" stroke-width="1.5" />
             </svg>
           </div>
-          <span>Solid</span>
+          <span>Class 0</span>
         </div>
         <div class="legend-item">
           <div class="legend-symbol">
             <svg width="18" height="18" viewBox="0 0 18 18">
-              <circle cx="9" cy="9" r="6" fill="#6b7280" stroke="#fff" stroke-width="1.5" stroke-dasharray="3,2" />
+              <rect x="3" y="3" width="12" height="12" fill="#10b981" stroke="currentColor" stroke-width="1.5" />
             </svg>
           </div>
-          <span>Dashed</span>
+          <span>Class 1</span>
         </div>
         <div class="legend-item">
           <div class="legend-symbol">
             <svg width="18" height="18" viewBox="0 0 18 18">
-              <circle cx="9" cy="9" r="6" fill="#ef4444" stroke="#fff" stroke-width="1.5" />
+              <line x1="5" y1="5" x2="13" y2="13" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" />
+              <line x1="5" y1="13" x2="13" y2="5" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" />
             </svg>
           </div>
           <span>Error</span>

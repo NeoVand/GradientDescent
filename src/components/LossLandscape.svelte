@@ -40,10 +40,12 @@
     drawGradientField();
   }
   
-  // Redraw when parameters change
-  $: if (svgElement && parameters) {
-    updateCurrentPosition();
+  // Redraw when history changes (for trail updates)
+  $: if (svgElement && history.length > 0 && !isDragging) {
+    updateTrail();
   }
+  
+  let isDragging = false;
   
   // Redraw when theme changes
   $: if (svgElement && theme) {
@@ -179,14 +181,72 @@
       .attr('transform', `translate(${-margin.left},${-margin.top})`);
     
     const plotGroup = clippedGroup.append('g')
+      .attr('class', 'plot-group')
       .attr('transform', `translate(${margin.left},${margin.top})`);
     
-    // Draw gradient field
+    // Draw gradient field (behind trail)
     drawGradients(plotGroup, xScale, yScale, innerWidth, innerHeight);
     
-    // Draw current position
+    // Draw training path with fade effect (in clipped group, above gradients, below marker)
+    drawTrainingPath(plotGroup, xScale, yScale);
+    
+    // Draw current position last (needs to be in main group, not clipped, on top)
     drawCurrentPosition(g, xScale, yScale, innerWidth, innerHeight);
+  }
+  
+  function drawTrainingPath(
+    g: d3.Selection<SVGGElement, unknown, null, undefined>,
+    xScale: d3.ScaleLinear<number, number>,
+    yScale: d3.ScaleLinear<number, number>
+  ) {
+    if (history.length < 2) return;
+    
+    // Get last 100 points
+    const windowSize = 100;
+    const fadeThreshold = 50; // Only fade when more than 50 points
+    const recentHistory = history.slice(Math.max(0, history.length - windowSize));
+    
+    // Draw path with conditional fade effect
+    for (let i = 0; i < recentHistory.length - 1; i++) {
+      const current = recentHistory[i];
+      const next = recentHistory[i + 1];
+      
+      let opacity, thickness;
+      
+      if (recentHistory.length <= fadeThreshold) {
+        // No fading when path is short - full visibility
+        opacity = 0.8;
+        thickness = 10;
+      } else {
+        // Calculate how far this segment is from the end
+        const distanceFromEnd = recentHistory.length - 1 - i;
+        
+        if (distanceFromEnd <= fadeThreshold) {
+          // Most recent 50 points: full visibility
+          opacity = 0.8;
+          thickness = 10;
+        } else {
+          // Older points: fade out
+          const fadeProgress = (i / (recentHistory.length - fadeThreshold - 1));
+          opacity = 0.05 + fadeProgress * 0.75; // 0.05 to 0.8
+          thickness = 2 + fadeProgress * 8; // 2 to 10
         }
+      }
+      
+      // Draw line segment
+      g.append('line')
+        .attr('class', 'path-segment')
+        .attr('x1', xScale(current.parameters.a))
+        .attr('y1', yScale(current.parameters.b))
+        .attr('x2', xScale(next.parameters.a))
+        .attr('y2', yScale(next.parameters.b))
+        .attr('stroke', '#ef4444')
+        .attr('stroke-width', thickness)
+        .attr('stroke-linecap', 'round')
+        .attr('stroke-linejoin', 'round')
+        .style('opacity', opacity);
+    }
+  }
   
   function drawGradients(
     g: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -304,6 +364,7 @@
     // Make draggable
     marker.call(d3.drag<SVGGElement, unknown>()
       .on('start', function() {
+        isDragging = true;
         d3.select(this).style('cursor', 'grabbing');
       })
       .on('drag', function(event) {
@@ -311,15 +372,17 @@
         const newA = xScale.invert(event.x);
         const newB = yScale.invert(event.y);
         
-        // Update position immediately
-        d3.select(this)
-          .attr('transform', `translate(${event.x}, ${event.y})`);
-        
         // Clamp to valid range
         const clampedA = Math.max(parameterRange.min, Math.min(parameterRange.max, newA));
         const clampedB = Math.max(parameterRange.min, Math.min(parameterRange.max, newB));
         
-        // Update parameters
+        // Update position immediately (visual feedback)
+        const clampedX = xScale(clampedA);
+        const clampedY = yScale(clampedB);
+        d3.select(this)
+          .attr('transform', `translate(${clampedX}, ${clampedY})`);
+        
+        // Update parameters store (will trigger other diagrams to update)
         parametersStore.set({ a: clampedA, b: clampedB });
         
         // Add to history
@@ -333,31 +396,53 @@
           testLoss: problemConfig.computeLoss(testData, { a: clampedA, b: clampedB }),
           parameters: { a: clampedA, b: clampedB }
         });
+        
+        // Manually update the trail during dragging
+        const svg = d3.select(svgElement);
+        const plotGroup = svg.select('.plot-group');
+        if (!plotGroup.empty()) {
+          plotGroup.selectAll('.path-segment').remove();
+          drawTrainingPath(plotGroup, xScale, yScale);
+        }
       })
       .on('end', function() {
+        isDragging = false;
         d3.select(this).style('cursor', 'grab');
       }));
   }
   
-  function updateCurrentPosition() {
-    const marker = d3.select(svgElement).select('.current-position');
-    if (!marker.empty()) {
+  function updateTrail() {
+    // Only update the trail without redrawing everything
+    const svg = d3.select(svgElement);
+    const plotGroup = svg.select('.plot-group');
+    
+    if (plotGroup.empty()) return;
+    
+    // Remove old trail
+    plotGroup.selectAll('.path-segment').remove();
+    
+    // Get scales
       const innerWidth = width - margin.left - margin.right;
       const innerHeight = height - margin.top - margin.bottom;
       
-      const xScale = d3.scaleLinear()
+    const xScale = d3.scaleLinear()
       .domain([parameterRange.min, parameterRange.max])
-        .range([0, innerWidth]);
-      
-      const yScale = d3.scaleLinear()
-        .domain([parameterRange.min, parameterRange.max])
-        .range([innerHeight, 0]);
+      .range([0, innerWidth]);
     
+    const yScale = d3.scaleLinear()
+      .domain([parameterRange.min, parameterRange.max])
+      .range([innerHeight, 0]);
+    
+    // Redraw trail
+    drawTrainingPath(plotGroup, xScale, yScale);
+    
+    // Update marker position
+    const marker = svg.select('.current-position');
+    if (!marker.empty()) {
       const x = xScale(parameters.a);
       const y = yScale(parameters.b);
-      
       marker.attr('transform', `translate(${x}, ${y})`);
-  }
+    }
   }
 </script>
 
