@@ -1,191 +1,108 @@
-# Gradient Descent Visualization
+# ∂ Gradient Descent Explorer
 
-An interactive educational tool for visualizing and understanding the gradient descent algorithm across different machine learning problems. Built with Svelte, TypeScript, and D3.js.
+[![Svelte](https://img.shields.io/badge/Svelte-5.39-FF3E00?style=flat&logo=svelte&logoColor=white)](https://svelte.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-7.1-646CFF?style=flat&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![D3.js](https://img.shields.io/badge/D3.js-7.9-F9A03C?style=flat&logo=d3.js&logoColor=white)](https://d3js.org/)
+[![License](https://img.shields.io/badge/License-MIT-10b981?style=flat)](LICENSE)
 
-![Gradient Descent Visualization Screenshot](public/screenshot.jpg)
+An interactive visualization tool for understanding gradient descent through beautiful, real-time animations and mathematical rigor.
 
+**[🚀 Live Demo](https://neovand.github.io/GradientDescent/)**
 
-## 🎯 Features
+![Gradient Descent Explorer](public/screenshot.png)
 
-### Interactive Loss Landscape
-- **2D Heatmap**: Visualize the loss function as a color-coded landscape
-- **3D Surface**: Explore the loss surface in three dimensions with interactive camera controls
-- **Contour Lines**: See level curves of constant loss values
-- **Gradient Field**: Vector arrows showing the direction of steepest descent
-- **Real-time Updates**: Watch the landscape change as you modify data or parameters
+## ✨ Features
 
-### Multiple Machine Learning Problems
-- **Linear Regression**: Learn how gradient descent finds the best-fit line
-- **Logistic Regression**: Understand classification with decision boundaries
-- **Polynomial Regression**: Explore non-linear relationships
-- More problems coming soon!
+- **Interactive Gradient Field**: Visualize loss landscapes with color-coded heatmaps and gradient vector fields
+- **Real-time Training**: Watch gradient descent optimize in real-time with animated parameter trails
+- **Multiple Problem Types**: Explore linear regression, logistic classification, and polynomial regression
+- **Beautiful LaTeX Formulas**: Professional mathematical notation rendered with KaTeX
+- **Dark/Light Themes**: Elegant emerald-themed interface with seamless theme switching
+- **Educational**: Comprehensive help modal with theory and suggested experiments
 
-### Training Visualization
-- **Optimization Path**: See the exact path gradient descent takes through parameter space
-- **Loss History**: Track training and test loss over time to understand overfitting
-- **Parameter Evolution**: Watch how model parameters A and B change during training
-- **Interactive Training**: Start, stop, and continue training from any point
+## 🎯 What It Does
 
-### Educational Controls
-- **Draggable Parameters**: Click and drag the current position to explore different starting points
-- **Data Generation**: Adjust the number of data points and train/test split
-- **Learning Rate**: Experiment with different learning rates and their effects
-- **Training Steps**: Control how many optimization steps to take
-- **Reset Functionality**: Start fresh with randomized parameters
+Gradient Descent Explorer helps you understand optimization algorithms through visual experimentation:
 
-## 🚀 Getting Started
+- **Drag** the orange marker to manually explore parameter space
+- **Train** the model to watch gradient descent find optimal solutions automatically
+- **Experiment** with learning rates, noise levels, and data splits
+- **Observe** how loss landscapes change with different configurations
+
+> **💡 Tip**: Drag the orange marker on the Loss & Gradient diagram to explore the connection between parameters, the model, and loss in real-time.
+
+## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js (v16 or higher)
-- npm or yarn
 
-### Installation
+- Node.js 20 or higher
+- npm
 
-1. Clone the repository:
+### Local Development
+
 ```bash
-git clone <repository-url>
-cd gradient-descent-visualization
-```
+# Clone the repository
+git clone https://github.com/neovand/GradientDescent.git
+cd GradientDescent
 
-2. Install dependencies:
-```bash
+# Install dependencies
 npm install
-```
 
-3. Start the development server:
-```bash
+# Start development server
 npm run dev
 ```
 
-4. Open your browser and navigate to `http://localhost:5173`
+The app will open at `http://localhost:5173`
 
-### Building for Production
+### Build for Production
 
 ```bash
 npm run build
+npm run preview
 ```
 
-The built files will be in the `dist` directory.
+## 🛠️ Built With
 
-## 🎮 How to Use
+- **[Svelte 5](https://svelte.dev/)** - Reactive UI framework
+- **[D3.js](https://d3js.org/)** - Data visualization and SVG rendering
+- **[KaTeX](https://katex.org/)** - Fast LaTeX math rendering
+- **[Lucide Icons](https://lucide.dev/)** - Beautiful icon library
+- **[Vite](https://vitejs.dev/)** - Lightning-fast build tool
 
-### Basic Workflow
-1. **Select a Problem**: Choose from Linear Regression, Logistic Regression, or Polynomial Regression
-2. **Adjust Data**: Set the number of data points and train/test split ratio
-3. **Explore the Landscape**: Toggle between 2D and 3D views, enable different visualizations
-4. **Set Training Parameters**: Choose learning rate and number of training steps
-5. **Train the Model**: Click "Train" to watch gradient descent in action
-6. **Experiment**: Drag the orange marker to different starting positions and continue training
+## 📐 Mathematical Foundation
 
-### Understanding the Visualizations
+The app visualizes the gradient descent update rule:
 
-#### Loss Landscape (Main Panel)
-- **Heatmap Colors**: Purple (high loss) → Green (low loss)
-- **Contour Lines**: White lines connecting points of equal loss
-- **Gradient Arrows**: White arrows showing steepest descent direction
-  - Arrow length indicates gradient magnitude
-  - All arrows point toward the minimum
-- **Orange Circle**: Current parameter values (A, B)
-- **Red Path**: Optimization trajectory showing where gradient descent has traveled
+**θ** ← **θ** - γ∇ℒ
 
-#### Data Visualization (Top Left)
-- **Blue Line**: Current model prediction
-- **Green Dashed Line**: True underlying model (for comparison)
-- **Circles**: Data points (blue = training, gray = test)
-- **For Classification**: Decision boundaries shown as vertical lines
+where **θ** = [α, β]ᵀ are the parameters, γ is the learning rate, and ∇ℒ is the gradient of the loss function.
 
-#### Loss History (Bottom Left)
-- **Blue Line**: Training loss over time
-- **Red Line**: Test loss over time
-- **Gap Between Lines**: Indicates overfitting when test loss is much higher
+## 🎨 Key Visualizations
 
-#### Parameter Display (Bottom Right)
-- **Current Values**: Numerical display of parameters A and B
-- **Loss Values**: Current training and test loss
-
-### Tips for Learning
-
-1. **Start Simple**: Begin with Linear Regression and few data points
-2. **Compare Learning Rates**: Try very small (0.01) vs large (0.5) learning rates
-3. **Watch Overfitting**: Use different train/test splits to see generalization
-4. **Explore Starting Points**: Drag the marker to different locations and observe convergence
-5. **3D Perspective**: Switch to 3D view to better understand the loss surface shape
-
-## 🛠 Technical Details
-
-### Architecture
-- **Frontend Framework**: Svelte with TypeScript
-- **Build Tool**: Vite
-- **Visualizations**: D3.js for 2D graphics, Three.js for 3D rendering
-- **Styling**: Modern CSS with Flexbox/Grid layouts
-- **State Management**: Svelte stores for reactive data flow
-
-### Key Components
-- `App.svelte`: Main application layout and orchestration
-- `Sidebar.svelte`: Control panel with all user interactions
-- `LossLandscape.svelte`: Core visualization component (2D/3D loss surface)
-- `DataVisualization.svelte`: Data points and model predictions
-- `LossHistory.svelte`: Training progress charts
-- `ParameterDisplay.svelte`: Numerical parameter and loss display
-
-### Performance Optimizations
-- **Efficient Gradient Computation**: Cached gradient field calculations
-- **Responsive Rendering**: Debounced resize handling and optimized re-renders
-- **Smart Updates**: Only recalculate visualizations when necessary
-- **Memory Management**: Proper cleanup of Three.js resources
-
-### Educational Design Principles
-- **Progressive Disclosure**: Start simple, add complexity gradually
-- **Multiple Representations**: Same concepts shown in different ways
-- **Interactive Exploration**: Learn by doing and experimenting
-- **Immediate Feedback**: Real-time updates show cause and effect
-- **Visual Consistency**: Coordinated colors and symbols across all panels
-
-## 🤝 Contributing
-
-Contributions are welcome! Here are some ways you can help:
-
-### Adding New Problems
-1. Create a new problem configuration in `src/utils/problems.ts`
-2. Implement the required functions: `generateData`, `predict`, `computeLoss`, `computeGradient`
-3. Add appropriate visualization logic if needed
-4. Update the problem selector in the sidebar
-
-### Improving Visualizations
-- Enhance the 3D rendering with better materials or lighting
-- Add new visualization modes (e.g., parameter sensitivity analysis)
-- Improve accessibility with better color schemes or keyboard navigation
-
-### Bug Reports and Feature Requests
-Please use the GitHub issue tracker to report bugs or request features.
-
-## 📚 Educational Context
-
-This tool is designed for:
-- **Students** learning machine learning fundamentals
-- **Educators** teaching optimization and gradient descent
-- **Practitioners** building intuition about hyperparameter effects
-- **Anyone curious** about how machine learning algorithms work
-
-### Learning Objectives
-After using this tool, learners should understand:
-- How gradient descent navigates parameter space to minimize loss
-- The relationship between learning rate and convergence behavior
-- Why different starting points can lead to different solutions
-- How training and test loss relate to overfitting
-- The geometric interpretation of loss functions and optimization
+- **Data Plot**: Training and test data with model predictions
+- **Loss & Gradient**: Combined heatmap and vector field showing the optimization landscape
+- **Loss History**: Training dynamics with sliding window display (last 500 steps)
+- **Formulas**: Real-time LaTeX-rendered equations
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+MIT License - see [LICENSE](LICENSE) for details
 
-## 🙏 Acknowledgments
+## 👨‍💻 Author
 
-- Built with [Svelte](https://svelte.dev/) and [Vite](https://vitejs.dev/)
-- Visualizations powered by [D3.js](https://d3js.org/) and [Three.js](https://threejs.org/)
-- Inspired by educational tools like [TensorFlow Playground](https://playground.tensorflow.org/)
-- Color schemes from [D3 Scale Chromatic](https://github.com/d3/d3-scale-chromatic)
+**Neo Mohsenvand**
+
+Developed with ∂ for educational purposes
 
 ---
 
-**Happy Learning!** 🎓 Explore the fascinating world of gradient descent and machine learning optimization.
+## ⭐ Show Your Support
+
+If you find this project helpful for learning or teaching gradient descent, please consider giving it a star! Your support helps make educational tools like this more visible to students and educators worldwide.
+
+[![Star History](https://img.shields.io/github/stars/neovand/GradientDescent?style=social)](https://github.com/neovand/GradientDescent/stargazers)
+
+---
+
+*Explore, experiment, and understand gradient descent like never before.*
