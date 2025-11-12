@@ -8,6 +8,7 @@
    */
   
   import { parametersStore, currentLosses, historyStore } from '../stores/stores';
+  import { Info } from 'lucide-svelte';
   
   // Reactive values
   $: parameters = $parametersStore;
@@ -36,94 +37,65 @@
 </script>
 
 <div class="parameter-display">
-  <h3>Values</h3>
+  <h3>
+    <Info size={18} strokeWidth={2} />
+    <span>Values</span>
+  </h3>
   
-  <div class="values-grid">
-    <!-- Before Update Column -->
-    <div class="column">
-      <h4>Before Update</h4>
-      
-      <div class="value-row">
-        <span class="label">train loss</span>
-        <span class="value">{formatNumber(history[history.length - 2]?.trainLoss || 0)}</span>
-      </div>
-      
-      <div class="value-row">
-        <span class="label">test loss</span>
-        <span class="value">{formatNumber(history[history.length - 2]?.testLoss || 0)}</span>
-      </div>
-      
-      <div class="value-row">
-        <span class="label">Parameter A</span>
-        <span class="value">{formatNumber(previousParams?.a || 0)}</span>
-      </div>
-      
-      <div class="value-row">
-        <span class="label">Parameter B</span>
-        <span class="value">{formatNumber(previousParams?.b || 0)}</span>
-      </div>
+  <div class="values-table">
+    <!-- Header Row -->
+    <div class="table-header">
+      <span class="col-label"></span>
+      <span class="col-value">Value</span>
+      <span class="col-delta">Δ</span>
     </div>
     
-    <!-- After Update Column -->
-    <div class="column">
-      <h4>After Update</h4>
-      
-      <div class="value-row">
-        <span class="label">train loss</span>
-        <span class="value current">{formatNumber(losses.trainLoss)}</span>
-        {#if history.length > 1}
-          <span class="change" class:positive={losses.trainLoss < history[history.length - 2].trainLoss}>
-            ({formatChange(losses.trainLoss - history[history.length - 2].trainLoss)})
-          </span>
-        {/if}
-      </div>
-      
-      <div class="value-row">
-        <span class="label">test loss</span>
-        <span class="value current">{formatNumber(losses.testLoss)}</span>
-        {#if history.length > 1}
-          <span class="change" class:positive={losses.testLoss < history[history.length - 2].testLoss}>
-            ({formatChange(losses.testLoss - history[history.length - 2].testLoss)})
-          </span>
-        {/if}
-      </div>
-      
-      <div class="value-row">
-        <span class="label">Parameter A</span>
-        <span class="value current">{formatNumber(parameters.a)}</span>
-        {#if paramChanges}
-          <span class="change neutral">
-            ({formatChange(paramChanges.a)})
-          </span>
-        {/if}
-      </div>
-      
-      <div class="value-row">
-        <span class="label">Parameter B</span>
-        <span class="value current">{formatNumber(parameters.b)}</span>
-        {#if paramChanges}
-          <span class="change neutral">
-            ({formatChange(paramChanges.b)})
-          </span>
-        {/if}
-      </div>
-    </div>
-  </div>
-  
-  <!-- Additional Statistics -->
-  <div class="stats-section">
-    <div class="stat">
-      <span class="stat-label">Loss Ratio (Train/Test)</span>
-      <span class="stat-value">
-        {losses.testLoss > 0 ? formatNumber(losses.trainLoss / losses.testLoss, 3) : '—'}
-      </span>
+    <!-- Train Loss -->
+    <div class="table-row">
+      <span class="label train-label">Train Loss</span>
+      <span class="value">{formatNumber(losses.trainLoss)}</span>
+      {#if history.length > 1}
+        <span class="delta" class:negative={losses.trainLoss - history[history.length - 2].trainLoss > 0} class:positive={losses.trainLoss - history[history.length - 2].trainLoss < 0}>
+          {formatChange(losses.trainLoss - history[history.length - 2].trainLoss)}
+        </span>
+      {:else}
+        <span class="delta">—</span>
+      {/if}
     </div>
     
-    <div class="stat">
-      <span class="stat-label">Parameter Magnitude</span>
-      <span class="stat-value">
-        {formatNumber(Math.sqrt(parameters.a ** 2 + parameters.b ** 2), 3)}
-      </span>
+    <!-- Test Loss -->
+    <div class="table-row">
+      <span class="label test-label">Test Loss</span>
+      <span class="value">{formatNumber(losses.testLoss)}</span>
+      {#if history.length > 1}
+        <span class="delta" class:negative={losses.testLoss - history[history.length - 2].testLoss > 0} class:positive={losses.testLoss - history[history.length - 2].testLoss < 0}>
+          {formatChange(losses.testLoss - history[history.length - 2].testLoss)}
+        </span>
+      {:else}
+        <span class="delta">—</span>
+      {/if}
+    </div>
+    
+    <!-- Parameter A -->
+    <div class="table-row">
+      <span class="label">A</span>
+      <span class="value">{formatNumber(parameters.a)}</span>
+      {#if paramChanges}
+        <span class="delta" class:negative={paramChanges.a < 0} class:positive={paramChanges.a > 0}>{formatChange(paramChanges.a)}</span>
+      {:else}
+        <span class="delta">—</span>
+      {/if}
+    </div>
+    
+    <!-- Parameter B -->
+    <div class="table-row">
+      <span class="label">B</span>
+      <span class="value">{formatNumber(parameters.b)}</span>
+      {#if paramChanges}
+        <span class="delta" class:negative={paramChanges.b < 0} class:positive={paramChanges.b > 0}>{formatChange(paramChanges.b)}</span>
+      {:else}
+        <span class="delta">—</span>
+      {/if}
     </div>
   </div>
 </div>
@@ -134,97 +106,98 @@
     height: 100%;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.75rem;
+    padding-bottom: 0.5rem;
+    overflow: hidden;
   }
   
   h3 {
-    margin: 0;
-    font-size: 1rem;
+    margin: 0 0 0.5rem 0;
+    font-size: 0.95rem;
     font-weight: 600;
-    color: #4a4a4a;
+    color: var(--color-text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    opacity: 0.9;
   }
   
-  .values-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
-    flex: 1;
-  }
-  
-  .column {
+  .values-table {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
   }
   
-  .column h4 {
-    margin: 0 0 0.5rem 0;
-    font-size: 0.75rem;
+  .table-header {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr;
+    gap: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--color-border);
+    font-size: 0.6875rem;
     font-weight: 600;
-    color: #666;
+    color: var(--color-text-tertiary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
   
-  .value-row {
-    display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
+  .col-label {
+    text-align: left;
+  }
+  
+  .col-value {
+    text-align: right;
+  }
+  
+  .col-delta {
+    text-align: center;
+  }
+  
+  .table-row {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr;
+    gap: 0.75rem;
+    align-items: center;
     font-size: 0.8125rem;
+    padding: 0.25rem 0;
   }
   
   .label {
-    flex: 1;
-    color: #666;
+    color: var(--color-text-tertiary);
+    text-align: left;
+    font-weight: 600;
+  }
+  
+  .label.train-label {
+    color: #3b82f6;
+  }
+  
+  .label.test-label {
+    color: #ef4444;
   }
   
   .value {
     font-weight: 600;
     font-family: 'SF Mono', Monaco, monospace;
-    color: #333;
+    color: var(--color-text-primary);
+    text-align: right;
   }
   
-  .value.current {
-    color: #1a1a1a;
-  }
-  
-  .change {
+  .delta {
     font-size: 0.75rem;
     font-family: 'SF Mono', Monaco, monospace;
-    color: #ef4444;
-  }
-  
-  .change.positive {
-    color: #10b981;
-  }
-  
-  .change.neutral {
-    color: #6b7280;
-  }
-  
-  .stats-section {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid #e0e0e0;
-  }
-  
-  .stat {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    font-size: 0.75rem;
-  }
-  
-  .stat-label {
-    color: #666;
-  }
-  
-  .stat-value {
+    color: var(--color-text-tertiary);
+    text-align: center;
     font-weight: 600;
-    font-family: 'SF Mono', Monaco, monospace;
-    color: #333;
   }
+  
+  .delta.positive {
+    color: var(--color-success);
+  }
+  
+  .delta.negative {
+    color: var(--color-danger);
+  }
+  
 </style>
 

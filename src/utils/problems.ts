@@ -23,11 +23,10 @@ const linearRegression: ProblemConfig = {
   trueParameters: { a: 1.5, b: 0.5 },
   
   // Generate synthetic data with some noise
-  generateData: (numPoints: number, trainRatio: number): DataPoint[] => {
+  generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
     // True underlying function: y = 1.5x + 0.5 + noise
     const trueA = linearRegression.trueParameters.a;
     const trueB = linearRegression.trueParameters.b;
-    const noiseLevel = 0.3;
     
     const data: DataPoint[] = [];
     const numTrain = Math.floor(numPoints * trainRatio);
@@ -36,7 +35,7 @@ const linearRegression: ProblemConfig = {
       // Generate x values evenly spaced with some jitter
       const x = (i / (numPoints - 1)) * 4 - 2 + (Math.random() - 0.5) * 0.2;
       // Generate y with noise
-      const noise = (Math.random() - 0.5) * noiseLevel;
+      const noise = (Math.random() - 0.5) * noiseLevel * 2;  // Scale noise
       const y = trueA * x + trueB + noise;
       
       data.push({
@@ -102,48 +101,54 @@ const logisticRegression: ProblemConfig = {
   type: 'logistic-regression',
   name: 'Logistic Regression',
   description: 'Classify points into two categories',
-  trueParameters: { a: 0.7, b: 0.3 },
+  trueParameters: { a: 1.2, b: 0.2 },
   
-  // Generate linearly separable data
-  generateData: (numPoints: number, trainRatio: number): DataPoint[] => {
+  // Generate linearly separable data with clear clusters
+  generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
     const data: DataPoint[] = [];
     const numTrain = Math.floor(numPoints * trainRatio);
+    const numClass0 = Math.floor(numPoints / 2);
+    const numClass1 = numPoints - numClass0;
     
-    // True decision boundary: y = 0.7x + 0.3 (we'll use x as feature)
+    // True decision boundary: a*x + b*y = 0
+    // We'll generate data on opposite sides of this line
     const trueA = logisticRegression.trueParameters.a;
     const trueB = logisticRegression.trueParameters.b;
-    const margin = 0.5;
-    const noise = 0.3;
     
-    for (let i = 0; i < numPoints; i++) {
-      // Generate x uniformly
-      const x = (i / (numPoints - 1)) * 4 - 2 + (Math.random() - 0.5) * 0.2;
+    // Base spread controlled by noise level
+    const baseSpread = 0.4;
+    const spread = baseSpread + noiseLevel * 0.5;
+    
+    // Generate Class 0 points (left/below the boundary)
+    for (let i = 0; i < numClass0; i++) {
+      // Generate points in a cluster
+      const centerX = -0.8;
+      const centerY = -0.5;
       
-      // Decide class based on true boundary with some margin
-      const trueBoundary = trueA * x + trueB;
-      const randomOffset = (Math.random() - 0.5) * 2 * margin;
-      
-      // Add some noise to make it more realistic
-      let label: number;
-      if (randomOffset > 0) {
-        label = 1;
-      } else {
-        label = 0;
-      }
-      
-      // Generate y based on the label with some scatter
-      let y: number;
-      if (label === 1) {
-        y = trueBoundary + margin/2 + (Math.random() - 0.5) * noise;
-      } else {
-        y = trueBoundary - margin/2 + (Math.random() - 0.5) * noise;
-      }
+      const x = centerX + (Math.random() - 0.5) * spread;
+      const y = centerY + (Math.random() - 0.5) * spread;
       
       data.push({
         x,
         y,
-        isTraining: i < numTrain,
-        label
+        isTraining: i < Math.floor(numClass0 * trainRatio),
+        label: 0
+      });
+    }
+    
+    // Generate Class 1 points (right/above the boundary)
+    for (let i = 0; i < numClass1; i++) {
+      const centerX = 0.8;
+      const centerY = 0.5;
+      
+      const x = centerX + (Math.random() - 0.5) * spread;
+      const y = centerY + (Math.random() - 0.5) * spread;
+      
+      data.push({
+        x,
+        y,
+        isTraining: i < Math.floor(numClass1 * trainRatio),
+        label: 1
       });
     }
     
@@ -151,9 +156,12 @@ const logisticRegression: ProblemConfig = {
   },
   
   // Logistic model prediction (probability of class 1)
+  // For 2D classification: decision boundary is a*x + b*y = 0
   predict: (x: number, params: ModelParameters): number => {
-    const z = params.a * x + params.b;
-    return 1 / (1 + Math.exp(-z));  // Sigmoid function
+    // This is used for plotting lines - we return y value for given x on decision boundary
+    // a*x + b*y = 0 => y = -a*x / b
+    if (params.b === 0) return 0;
+    return -params.a * x / params.b;
   },
   
   // Binary Cross-Entropy loss
@@ -164,9 +172,9 @@ const logisticRegression: ProblemConfig = {
     const epsilon = 1e-7; // Small value to prevent log(0)
     
     for (const point of data) {
-      // For visualization, we use x as the feature
-      // The decision boundary is where ax + b = 0, so points where ax + b > 0 are class 1
-      const z = params.a * point.x + params.b;
+      // For 2D classification: decision function is a*x + b*y
+      // Points where a*x + b*y > 0 are predicted as class 1
+      const z = params.a * point.x + params.b * point.y;
       const prediction = 1 / (1 + Math.exp(-z));
       const clampedPred = Math.max(epsilon, Math.min(1 - epsilon, prediction));
       
@@ -188,13 +196,13 @@ const logisticRegression: ProblemConfig = {
     let gradB = 0;
     
     for (const point of data) {
-      const z = params.a * point.x + params.b;
+      const z = params.a * point.x + params.b * point.y;
       const prediction = 1 / (1 + Math.exp(-z));
       const error = prediction - (point.label || 0);
       
       // Gradient with respect to parameters
       gradA += error * point.x;
-      gradB += error;
+      gradB += error * point.y;
     }
     
     return {
@@ -215,18 +223,17 @@ const polynomialRegression: ProblemConfig = {
   description: 'Fit a polynomial curve to data',
   trueParameters: { a: 0.5, b: -0.3 },
   
-  generateData: (numPoints: number, trainRatio: number): DataPoint[] => {
+  generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
     // True function: y = 0.5x² - 0.3x + noise
     const trueA = polynomialRegression.trueParameters.a;
     const trueB = polynomialRegression.trueParameters.b;
-    const noiseLevel = 0.2;
     
     const data: DataPoint[] = [];
     const numTrain = Math.floor(numPoints * trainRatio);
     
     for (let i = 0; i < numPoints; i++) {
       const x = (i / (numPoints - 1)) * 4 - 2;
-      const noise = (Math.random() - 0.5) * noiseLevel;
+      const noise = (Math.random() - 0.5) * noiseLevel * 2;  // Scale noise
       const y = trueA * x * x + trueB * x + noise;
       
       data.push({

@@ -9,19 +9,26 @@
   
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
-  import { historyStore, trainingStore } from '../stores/stores';
+  import { historyStore, trainingStore, themeStore } from '../stores/stores';
+  import { Activity } from 'lucide-svelte';
   
   let svgElement: SVGSVGElement;
   let width = 400;
   let height = 150;
-  const margin = { top: 20, right: 60, bottom: 30, left: 50 };
+  const margin = { top: 20, right: 20, bottom: 40, left: 50 };
   
   // Reactive data
   $: history = $historyStore;
   $: currentStep = $trainingStore.currentStep;
+  $: theme = $themeStore;
   
   // Redraw when history updates
   $: if (svgElement && history) {
+    drawChart();
+  }
+  
+  // Redraw when theme changes
+  $: if (svgElement && theme) {
     drawChart();
   }
   
@@ -76,31 +83,37 @@
     const innerWidth = width - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
     
-    // Prepare data
+    // Implement sliding window for EEG-style visualization
+    const windowSize = 500; // Show last 500 steps
     const maxStep = Math.max(...history.map(d => d.step));
-    const allLosses = history.flatMap(d => [d.trainLoss, d.testLoss]);
+    const minStep = Math.max(0, maxStep - windowSize);
+    
+    // Filter data to window
+    const windowedHistory = history.filter(d => d.step >= minStep);
+    
+    const allLosses = windowedHistory.flatMap(d => [d.trainLoss, d.testLoss]);
     const minLoss = Math.min(...allLosses) * 0.9;
     const maxLoss = Math.max(...allLosses) * 1.1;
     
-    // Create scales
+    // Create scales with sliding window
     const xScale = d3.scaleLinear()
-      .domain([0, Math.max(maxStep, 10)])
+      .domain([minStep, Math.max(maxStep, minStep + 10)])
       .range([0, innerWidth]);
     
     const yScale = d3.scaleLinear()
       .domain([minLoss, maxLoss])
       .range([innerHeight, 0]);
     
-    // Create line generators
+    // Create line generators with smooth curves
     const trainLine = d3.line<typeof history[0]>()
       .x(d => xScale(d.step))
       .y(d => yScale(d.trainLoss))
-      .curve(d3.curveMonotoneX);
+      .curve(d3.curveCatmullRom.alpha(0.5));
     
     const testLine = d3.line<typeof history[0]>()
       .x(d => xScale(d.step))
       .y(d => yScale(d.testLoss))
-      .curve(d3.curveMonotoneX);
+      .curve(d3.curveCatmullRom.alpha(0.5));
     
     // Add axes
     const xAxis = d3.axisBottom(xScale)
@@ -111,83 +124,113 @@
       .ticks(5)
       .tickFormat(d3.format('.3f'));
     
+    // Get theme-aware colors
+    const axisColor = getComputedStyle(document.documentElement).getPropertyValue('--color-text-tertiary').trim();
+    
+    // Bottom axis
     g.append('g')
+      .attr('class', 'x-axis')
       .attr('transform', `translate(0,${innerHeight})`)
       .call(xAxis)
-      .append('text')
+      .call(g => g.selectAll('line, path').attr('stroke', axisColor))
+      .call(g => g.selectAll('text').attr('fill', axisColor));
+    
+    // Left axis
+    g.append('g')
+      .attr('class', 'y-axis')
+      .call(yAxis)
+      .call(g => g.selectAll('line, path').attr('stroke', axisColor))
+      .call(g => g.selectAll('text').attr('fill', axisColor));
+    
+    // Top axis (frame)
+    g.append('g')
+      .attr('class', 'x-axis-top')
+      .call(d3.axisTop(xScale).tickSizeOuter(0).tickFormat(() => ''))
+      .call(g => g.selectAll('line').remove())
+      .call(g => g.select('.domain').attr('stroke', axisColor));
+    
+    // Right axis (frame)
+    g.append('g')
+      .attr('class', 'y-axis-right')
+      .attr('transform', `translate(${innerWidth},0)`)
+      .call(d3.axisRight(yScale).tickSizeOuter(0).tickFormat(() => ''))
+      .call(g => g.selectAll('line').remove())
+      .call(g => g.select('.domain').attr('stroke', axisColor));
+    
+    // Add axis labels
+    g.append('text')
       .attr('x', innerWidth / 2)
-      .attr('y', 28)
-      .attr('fill', '#666')
+      .attr('y', innerHeight + 28)
+      .attr('fill', axisColor)
       .style('text-anchor', 'middle')
+      .attr('font-size', '12px')
       .text('Step');
     
-    g.append('g')
-      .call(yAxis)
-      .append('text')
+    g.append('text')
       .attr('transform', 'rotate(-90)')
       .attr('y', -35)
       .attr('x', -innerHeight / 2)
-      .attr('fill', '#666')
+      .attr('fill', axisColor)
       .style('text-anchor', 'middle')
+      .attr('font-size', '12px')
       .text('Loss');
     
-    // Add grid lines
+    // Add background for the plot area
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    g.insert('rect', ':first-child')
+      .attr('x', 0)
+      .attr('y', 0)
+      .attr('width', innerWidth)
+      .attr('height', innerHeight)
+      .attr('fill', isDark ? '#060913' : '#ffffff')
+      .attr('rx', 4);
+    
+    // Add grid lines with theme-aware color (isDark already declared above)
+    const gridColor = isDark ? '#64748b' : '#e0e0e0';
+    
     g.append('g')
       .attr('class', 'grid')
       .attr('transform', `translate(0,${innerHeight})`)
       .call(xAxis.tickSize(-innerHeight).tickFormat(() => ''))
-      .style('stroke-dasharray', '3,3')
-      .style('opacity', 0.3);
+      .call(g => g.selectAll('line').attr('stroke', gridColor))
+      .call(g => g.selectAll('path').attr('stroke', 'none'))
+      .style('stroke-dasharray', '2,4')
+      .style('opacity', isDark ? 0.35 : 0.2);
     
     g.append('g')
       .attr('class', 'grid')
       .call(yAxis.tickSize(-innerWidth).tickFormat(() => ''))
-      .style('stroke-dasharray', '3,3')
-      .style('opacity', 0.3);
+      .call(g => g.selectAll('line').attr('stroke', gridColor))
+      .call(g => g.selectAll('path').attr('stroke', 'none'))
+      .style('stroke-dasharray', '2,4')
+      .style('opacity', isDark ? 0.35 : 0.2);
     
-    // Draw lines
-    if (history.length > 1) {
-      // Training loss line
+    // Draw smooth lines without circles
+    if (windowedHistory.length > 1) {
+      // Training loss line - thicker and smoother
       g.append('path')
-        .datum(history)
+        .datum(windowedHistory)
         .attr('class', 'loss-line train-loss')
         .attr('fill', 'none')
         .attr('stroke', '#3b82f6')
-        .attr('stroke-width', 2.5)
-        .attr('d', trainLine);
+        .attr('stroke-width', 3)
+        .attr('stroke-linecap', 'round')
+        .attr('stroke-linejoin', 'round')
+        .attr('d', trainLine)
+        .style('opacity', 0.9);
       
-      // Test loss line
+      // Test loss line - thicker and smoother
       g.append('path')
-        .datum(history)
+        .datum(windowedHistory)
         .attr('class', 'loss-line test-loss')
         .attr('fill', 'none')
         .attr('stroke', '#ef4444')
-        .attr('stroke-width', 2.5)
-        .attr('d', testLine);
+        .attr('stroke-width', 3)
+        .attr('stroke-linecap', 'round')
+        .attr('stroke-linejoin', 'round')
+        .attr('d', testLine)
+        .style('opacity', 0.9);
     }
-    
-    // Add points
-    g.selectAll('.train-point')
-      .data(history)
-      .enter()
-      .append('circle')
-      .attr('class', 'train-point')
-      .attr('cx', d => xScale(d.step))
-      .attr('cy', d => yScale(d.trainLoss))
-      .attr('r', 3)
-      .attr('fill', '#3b82f6')
-      .style('opacity', 0.8);
-    
-    g.selectAll('.test-point')
-      .data(history)
-      .enter()
-      .append('circle')
-      .attr('class', 'test-point')
-      .attr('cx', d => xScale(d.step))
-      .attr('cy', d => yScale(d.testLoss))
-      .attr('r', 3)
-      .attr('fill', '#ef4444')
-      .style('opacity', 0.8);
     
     // Add current step indicator
     if (currentStep > 0 && currentStep <= maxStep) {
@@ -202,47 +245,6 @@
         .attr('stroke-dasharray', '5,5')
         .style('opacity', 0.5);
     }
-    
-    // Add legend
-    const legend = g.append('g')
-      .attr('class', 'legend')
-      .attr('transform', `translate(${innerWidth - 80}, 0)`);
-    
-    // Train loss legend
-    const trainLegend = legend.append('g');
-    trainLegend.append('line')
-      .attr('x1', 0)
-      .attr('y1', 0)
-      .attr('x2', 20)
-      .attr('y2', 0)
-      .attr('stroke', '#3b82f6')
-      .attr('stroke-width', 2.5);
-    
-    trainLegend.append('text')
-      .attr('x', 25)
-      .attr('y', 4)
-      .attr('font-size', '12px')
-      .attr('fill', '#666')
-      .text('Train');
-    
-    // Test loss legend
-    const testLegend = legend.append('g')
-      .attr('transform', 'translate(0, 20)');
-    
-    testLegend.append('line')
-      .attr('x1', 0)
-      .attr('y1', 0)
-      .attr('x2', 20)
-      .attr('y2', 0)
-      .attr('stroke', '#ef4444')
-      .attr('stroke-width', 2.5);
-    
-    testLegend.append('text')
-      .attr('x', 25)
-      .attr('y', 4)
-      .attr('font-size', '12px')
-      .attr('fill', '#666')
-      .text('Test');
     
     // Add hover interaction
     const bisect = d3.bisector<typeof history[0], number>(d => d.step).left;
@@ -287,9 +289,9 @@
       .on('mouseout', () => focus.style('display', 'none'))
       .on('mousemove', function(event) {
         const x0 = xScale.invert(d3.pointer(event, this)[0]);
-        const i = bisect(history, x0, 1);
-        const d0 = history[i - 1];
-        const d1 = history[i];
+        const i = bisect(windowedHistory, x0, 1);
+        const d0 = windowedHistory[i - 1];
+        const d1 = windowedHistory[i];
         
         if (!d0 || !d1) return;
         
@@ -313,7 +315,22 @@
 </script>
 
 <div class="chart-container">
-  <h3>Loss during training</h3>
+  <div class="header">
+    <h3>
+      <Activity size={18} strokeWidth={2} />
+      <span>Loss during training</span>
+    </h3>
+    <div class="legend-controls">
+      <div class="legend-item">
+        <div class="legend-line train"></div>
+        <span>Train</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-line test"></div>
+        <span>Test</span>
+      </div>
+    </div>
+  </div>
   <div class="svg-container">
     <svg bind:this={svgElement} {width} {height}></svg>
   </div>
@@ -326,32 +343,71 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
+    overflow: hidden;
+  }
+  
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.625rem;
+    flex-shrink: 0;
   }
   
   h3 {
-    margin: 0 0 0.5rem 0;
-    font-size: 1rem;
+    margin: 0;
+    font-size: 0.95rem;
     font-weight: 600;
-    color: #4a4a4a;
-    flex-shrink: 0;
+    color: var(--color-text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    opacity: 0.9;
+  }
+  
+  .legend-controls {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+  }
+  
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.8125rem;
+    color: var(--color-text-tertiary);
+    font-weight: 500;
+  }
+  
+  .legend-line {
+    width: 24px;
+    height: 3px;
+  }
+  
+  .legend-line.train {
+    background: #3b82f6;
+  }
+  
+  .legend-line.test {
+    background: #ef4444;
   }
   
   .svg-container {
     flex: 1;
     min-height: 0;
+    max-height: 100%;
     position: relative;
+    overflow: hidden;
   }
   
   svg {
     display: block;
+    background: transparent;
+    border-radius: 0;
+    max-width: 100%;
+    max-height: 100%;
   }
   
-  :global(.grid line) {
-    stroke: #e0e0e0;
-  }
-  
-  :global(.grid path) {
-    stroke-width: 0;
-  }
 </style>
 

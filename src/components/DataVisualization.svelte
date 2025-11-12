@@ -12,22 +12,29 @@
   
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
-  import { datasetStore, parametersStore, currentProblemConfig, selectedProblem } from '../stores/stores';
+  import { datasetStore, parametersStore, currentProblemConfig, selectedProblem, themeStore } from '../stores/stores';
   import type { DataPoint, ModelParameters } from '../types/types';
+  import { ScatterChart } from 'lucide-svelte';
   
   let svgElement: SVGSVGElement;
   let width = 400;
   let height = 400;
-  const margin = { top: 20, right: 20, bottom: 40, left: 40 };
+  const margin = { top: 20, right: 20, bottom: 50, left: 50 };
   
   // Reactive declarations
   $: data = $datasetStore.data;
   $: parameters = $parametersStore;
   $: problemConfig = $currentProblemConfig;
   $: problemType = $selectedProblem;
+  $: theme = $themeStore;
   
-  // Redraw when data changes
+  // Redraw when data or theme changes
   $: if (svgElement && data && parameters && problemConfig) {
+    drawVisualization();
+  }
+  
+  // Redraw when theme changes
+  $: if (svgElement && theme) {
     drawVisualization();
   }
   
@@ -71,6 +78,16 @@
     const innerWidth = width - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
     
+    // Create clipping path to keep everything within frame
+    svg.append('defs')
+      .append('clipPath')
+      .attr('id', 'data-clip-path')
+      .append('rect')
+      .attr('x', margin.left)
+      .attr('y', margin.top)
+      .attr('width', innerWidth)
+      .attr('height', innerHeight);
+    
     // Create scales
     const xExtent = d3.extent(data, d => d.x) as [number, number];
     const yExtent = d3.extent(data, d => d.y) as [number, number];
@@ -87,52 +104,130 @@
       .domain([yExtent[0] - yPadding, yExtent[1] + yPadding])
       .range([innerHeight, 0]);
     
-    // Add axes
+    // Create axes
     const xAxis = d3.axisBottom(xScale).tickSizeOuter(0);
     const yAxis = d3.axisLeft(yScale).tickSizeOuter(0);
     
+    // Style axes
+    const axisColor = getComputedStyle(document.documentElement).getPropertyValue('--color-text-tertiary').trim();
+    
+    // Bottom axis
     g.append('g')
+      .attr('class', 'x-axis')
       .attr('transform', `translate(0,${innerHeight})`)
       .call(xAxis)
-      .append('text')
+      .call(g => g.selectAll('line, path').attr('stroke', axisColor))
+      .call(g => g.selectAll('text').attr('fill', axisColor));
+    
+    // Left axis
+    g.append('g')
+      .attr('class', 'y-axis')
+      .call(yAxis)
+      .call(g => g.selectAll('line, path').attr('stroke', axisColor))
+      .call(g => g.selectAll('text').attr('fill', axisColor));
+    
+    // Top axis (frame - no ticks)
+    g.append('g')
+      .attr('class', 'x-axis-top')
+      .call(d3.axisTop(xScale).tickSizeOuter(0).tickSize(0).tickFormat(() => ''))
+      .call(g => g.selectAll('line').remove())
+      .call(g => g.select('.domain').attr('stroke', axisColor));
+    
+    // Right axis (frame - no ticks)
+    g.append('g')
+      .attr('class', 'y-axis-right')
+      .attr('transform', `translate(${innerWidth},0)`)
+      .call(d3.axisRight(yScale).tickSizeOuter(0).tickSize(0).tickFormat(() => ''))
+      .call(g => g.selectAll('line').remove())
+      .call(g => g.select('.domain').attr('stroke', axisColor));
+    
+    // Add axis labels
+    g.append('text')
       .attr('x', innerWidth / 2)
-      .attr('y', 35)
-      .attr('fill', '#666')
+      .attr('y', innerHeight + 35)
+      .attr('fill', axisColor)
       .style('text-anchor', 'middle')
+      .attr('font-size', '12px')
       .text('X');
     
-    g.append('g')
-      .call(yAxis)
-      .append('text')
+    g.append('text')
       .attr('transform', 'rotate(-90)')
       .attr('y', -30)
       .attr('x', -innerHeight / 2)
-      .attr('fill', '#666')
+      .attr('fill', axisColor)
       .style('text-anchor', 'middle')
+      .attr('font-size', '12px')
       .text('Y');
     
-    // Add grid lines
-    g.append('g')
+    // Add background for the plot area
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    g.insert('rect', ':first-child')
+      .attr('x', 0)
+      .attr('y', 0)
+      .attr('width', innerWidth)
+      .attr('height', innerHeight)
+      .attr('fill', isDark ? '#060913' : '#ffffff')
+      .attr('rx', 4);
+    
+    // Create a group with clipping for all plot content
+    const clippedGroup = g.append('g')
+      .attr('clip-path', 'url(#data-clip-path)')
+      .attr('transform', `translate(${-margin.left},${-margin.top})`);
+    
+    const plotGroup = clippedGroup.append('g')
+      .attr('transform', `translate(${margin.left},${margin.top})`);
+    
+    // Add grid lines to clipped group (isDark already declared above)
+    const gridColor = isDark ? '#64748b' : '#e0e0e0';
+    
+    // Regular grid lines
+    plotGroup.append('g')
       .attr('class', 'grid')
       .attr('transform', `translate(0,${innerHeight})`)
       .call(xAxis.tickSize(-innerHeight).tickFormat(() => ''))
-      .style('stroke-dasharray', '3,3')
-      .style('opacity', 0.3);
+      .call(g => g.selectAll('line').attr('stroke', gridColor))
+      .call(g => g.selectAll('path').attr('stroke', 'none'))
+      .style('stroke-dasharray', '2,4')
+      .style('opacity', isDark ? 0.3 : 0.2);
     
-    g.append('g')
+    plotGroup.append('g')
       .attr('class', 'grid')
       .call(yAxis.tickSize(-innerWidth).tickFormat(() => ''))
-      .style('stroke-dasharray', '3,3')
-      .style('opacity', 0.3);
+      .call(g => g.selectAll('line').attr('stroke', gridColor))
+      .call(g => g.selectAll('path').attr('stroke', 'none'))
+      .style('stroke-dasharray', '2,4')
+      .style('opacity', isDark ? 0.3 : 0.2);
     
-    // Draw the model prediction line/curve
-    drawModelPrediction(g, xScale, yScale, innerWidth);
+    // Emphasize X=0 and Y=0 axes
+    if (xScale(0) >= 0 && xScale(0) <= innerWidth) {
+      plotGroup.append('line')
+        .attr('class', 'zero-axis')
+        .attr('x1', xScale(0))
+        .attr('y1', 0)
+        .attr('x2', xScale(0))
+        .attr('y2', innerHeight)
+        .attr('stroke', axisColor)
+        .attr('stroke-width', 1.5)
+        .style('opacity', 0.4);
+    }
     
-    // Draw data points
-    drawDataPoints(g, xScale, yScale);
+    if (yScale(0) >= 0 && yScale(0) <= innerHeight) {
+      plotGroup.append('line')
+        .attr('class', 'zero-axis')
+        .attr('x1', 0)
+        .attr('y1', yScale(0))
+        .attr('x2', innerWidth)
+        .attr('y2', yScale(0))
+        .attr('stroke', axisColor)
+        .attr('stroke-width', 1.5)
+        .style('opacity', 0.4);
+    }
     
-    // Add legend
-    drawLegend(g, innerWidth);
+    // Draw the model prediction line/curve (will be clipped)
+    drawModelPrediction(plotGroup, xScale, yScale, innerWidth);
+    
+    // Draw data points (will be clipped)
+    drawDataPoints(plotGroup, xScale, yScale);
   }
   
   function drawModelPrediction(
@@ -141,79 +236,101 @@
     yScale: d3.ScaleLinear<number, number>,
     innerWidth: number
   ) {
-    const numPoints = 100;
-    const xDomain = xScale.domain();
-    const step = (xDomain[1] - xDomain[0]) / numPoints;
-    
-    // Generate points for current model
-    const modelData = [];
-    for (let i = 0; i <= numPoints; i++) {
-      const x = xDomain[0] + i * step;
-      const y = problemConfig.predict(x, parameters);
-      modelData.push({ x, y });
-    }
-    
-    // Generate points for true model
-    const trueModelData = [];
-    for (let i = 0; i <= numPoints; i++) {
-      const x = xDomain[0] + i * step;
-      const y = problemConfig.predict(x, problemConfig.trueParameters);
-      trueModelData.push({ x, y });
-    }
-    
-    const line = d3.line<{ x: number; y: number }>()
-      .x(d => xScale(d.x))
-      .y(d => yScale(d.y))
-      .curve(d3.curveMonotoneX);
-    
-    // Draw the true model line (dashed)
-    g.append('path')
-      .datum(trueModelData)
-      .attr('fill', 'none')
-      .attr('stroke', '#10b981')
-      .attr('stroke-width', 2)
-      .attr('stroke-dasharray', '8,4')
-      .attr('d', line)
-      .style('opacity', 0.6);
-    
-    // Draw the current model prediction line
-    g.append('path')
-      .datum(modelData)
-      .attr('fill', 'none')
-      .attr('stroke', '#3b82f6')
-      .attr('stroke-width', 3)
-      .attr('d', line)
-      .style('opacity', 1);
-    
-    // For classification problems, add decision boundaries
+    // For classification, draw decision boundary lines
     if (problemType === 'logistic-regression') {
-      // True decision boundary
-      const trueDecisionX = -problemConfig.trueParameters.b / problemConfig.trueParameters.a;
-      if (trueDecisionX >= xDomain[0] && trueDecisionX <= xDomain[1]) {
-        g.append('line')
-          .attr('x1', xScale(trueDecisionX))
-          .attr('y1', 0)
-          .attr('x2', xScale(trueDecisionX))
-          .attr('y2', yScale.range()[0])
+      const xDomain = xScale.domain();
+      const yDomain = yScale.domain();
+      
+      // True decision boundary: a*x + b*y = 0 => y = -a*x / b
+      const trueA = problemConfig.trueParameters.a;
+      const trueB = problemConfig.trueParameters.b;
+      
+      if (trueB !== 0) {
+        const trueLine = [
+          { x: xDomain[0], y: -trueA * xDomain[0] / trueB },
+          { x: xDomain[1], y: -trueA * xDomain[1] / trueB }
+        ];
+        
+        const lineGenerator = d3.line<{x: number, y: number}>()
+          .x(d => xScale(d.x))
+          .y(d => yScale(d.y));
+        
+        // Draw true decision boundary (dashed green)
+        g.append('path')
+          .datum(trueLine)
+          .attr('fill', 'none')
           .attr('stroke', '#10b981')
-          .attr('stroke-width', 2)
-          .attr('stroke-dasharray', '5,5')
-          .style('opacity', 0.4);
+          .attr('stroke-width', 2.5)
+          .attr('stroke-dasharray', '8,4')
+          .attr('d', lineGenerator)
+          .style('opacity', 0.7);
       }
       
       // Current model decision boundary
-      const decisionX = -parameters.b / parameters.a;
-      if (decisionX >= xDomain[0] && decisionX <= xDomain[1]) {
-        g.append('line')
-          .attr('x1', xScale(decisionX))
-          .attr('y1', 0)
-          .attr('x2', xScale(decisionX))
-          .attr('y2', yScale.range()[0])
+      if (parameters.b !== 0) {
+        const modelLine = [
+          { x: xDomain[0], y: -parameters.a * xDomain[0] / parameters.b },
+          { x: xDomain[1], y: -parameters.a * xDomain[1] / parameters.b }
+        ];
+        
+        const lineGenerator = d3.line<{x: number, y: number}>()
+          .x(d => xScale(d.x))
+          .y(d => yScale(d.y));
+        
+        // Draw current model decision boundary (solid blue)
+        g.append('path')
+          .datum(modelLine)
+          .attr('fill', 'none')
           .attr('stroke', '#3b82f6')
-          .attr('stroke-width', 2)
-          .attr('stroke-dasharray', '5,5')
-          .style('opacity', 0.5);
+          .attr('stroke-width', 3)
+          .attr('d', lineGenerator)
+          .style('opacity', 1);
       }
+    } else {
+      // For regression, draw prediction curves
+      const numPoints = 100;
+      const xDomain = xScale.domain();
+      const step = (xDomain[1] - xDomain[0]) / numPoints;
+      
+      // Generate points for current model
+      const modelData = [];
+      for (let i = 0; i <= numPoints; i++) {
+        const x = xDomain[0] + i * step;
+        const y = problemConfig.predict(x, parameters);
+        modelData.push({ x, y });
+      }
+      
+      // Generate points for true model
+      const trueModelData = [];
+      for (let i = 0; i <= numPoints; i++) {
+        const x = xDomain[0] + i * step;
+        const y = problemConfig.predict(x, problemConfig.trueParameters);
+        trueModelData.push({ x, y });
+      }
+      
+      const line = d3.line<{ x: number; y: number }>()
+        .x(d => xScale(d.x))
+        .y(d => yScale(d.y))
+        .curve(d3.curveMonotoneX);
+      
+      // Draw the true model line (dashed)
+      g.append('path')
+        .datum(trueModelData)
+        .attr('fill', 'none')
+        .attr('stroke', '#10b981')
+        .attr('stroke-width', 2)
+        .attr('stroke-dasharray', '8,4')
+        .attr('d', line)
+        .style('opacity', 0.6);
+      
+      // Draw the current model prediction line
+      g.append('path')
+        .datum(modelData)
+        .attr('fill', 'none')
+        .attr('stroke', '#3b82f6')
+        .attr('stroke-width', 3)
+        .attr('d', line)
+        .style('opacity', 1);
     }
   }
   
@@ -226,169 +343,166 @@
     const trainData = data.filter(d => d.isTraining);
     const testData = data.filter(d => !d.isTraining);
     
-    // Define shapes for different data types
-    const circleRadius = 6;
+    const pointSize = 7;  // Slightly larger for better visibility
     
-    // Draw training points
-    g.selectAll('.train-point')
-      .data(trainData)
-      .enter()
-      .append('circle')
-      .attr('class', 'train-point')
-      .attr('cx', d => xScale(d.x))
-      .attr('cy', d => yScale(d.y))
-      .attr('r', circleRadius)
-      .attr('fill', d => {
-        if (problemType === 'logistic-regression') {
-          return d.label === 1 ? '#ef4444' : '#3b82f6';
-        }
-        return '#3b82f6';
-      })
-      .attr('stroke', '#fff')
-      .attr('stroke-width', 2)
-      .style('opacity', 0.8);
+    // Helper function to check if a classification point is correctly classified
+    const isCorrectlyClassified = (point: DataPoint): boolean => {
+      if (problemType !== 'logistic-regression' || point.label === undefined) return true;
+      const z = parameters.a * point.x + parameters.b * point.y;
+      const predicted = z > 0 ? 1 : 0;
+      return predicted === point.label;
+    };
     
-    // Draw test points with different shape (squares)
-    g.selectAll('.test-point')
-      .data(testData)
-      .enter()
-      .append('rect')
-      .attr('class', 'test-point')
-      .attr('x', d => xScale(d.x) - circleRadius)
-      .attr('y', d => yScale(d.y) - circleRadius)
-      .attr('width', circleRadius * 2)
-      .attr('height', circleRadius * 2)
-      .attr('fill', d => {
-        if (problemType === 'logistic-regression') {
-          return d.label === 1 ? '#ef4444' : '#3b82f6';
-        }
-        return '#10b981';
-      })
-      .attr('stroke', '#fff')
-      .attr('stroke-width', 2)
-      .style('opacity', 0.6);
+    if (problemType === 'logistic-regression') {
+      // For classification: use different shapes for classes, colors for correctness
+      
+      // Class 0 training points (circles - solid)
+      const class0Train = trainData.filter(d => d.label === 0);
+      g.selectAll('.train-class0')
+        .data(class0Train)
+        .enter()
+        .append('circle')
+        .attr('class', 'train-class0')
+        .attr('cx', d => xScale(d.x))
+        .attr('cy', d => yScale(d.y))
+        .attr('r', pointSize)
+        .attr('fill', d => isCorrectlyClassified(d) ? '#6b7280' : '#ef4444')
+        .attr('stroke', '#fff')
+        .attr('stroke-width', 1.5)
+        .style('opacity', 0.85);
+      
+      // Class 1 training points (triangles - solid)
+      const class1Train = trainData.filter(d => d.label === 1);
+      g.selectAll('.train-class1')
+        .data(class1Train)
+        .enter()
+        .append('path')
+        .attr('class', 'train-class1')
+        .attr('d', d3.symbol().type(d3.symbolTriangle).size(pointSize * pointSize * 4.5))
+        .attr('transform', d => `translate(${xScale(d.x)},${yScale(d.y)})`)
+        .attr('fill', d => isCorrectlyClassified(d) ? '#6b7280' : '#ef4444')
+        .attr('stroke', '#fff')
+        .attr('stroke-width', 1.5)
+        .style('opacity', 0.85);
+      
+      // Class 0 test points (circles - dashed)
+      const class0Test = testData.filter(d => d.label === 0);
+      g.selectAll('.test-class0')
+        .data(class0Test)
+        .enter()
+        .append('circle')
+        .attr('class', 'test-class0')
+        .attr('cx', d => xScale(d.x))
+        .attr('cy', d => yScale(d.y))
+        .attr('r', pointSize)
+        .attr('fill', d => isCorrectlyClassified(d) ? '#6b7280' : '#ef4444')
+        .attr('stroke', '#fff')
+        .attr('stroke-width', 1.5)
+        .attr('stroke-dasharray', '3,2')
+        .style('opacity', 0.75);
+      
+      // Class 1 test points (triangles - dashed)
+      const class1Test = testData.filter(d => d.label === 1);
+      g.selectAll('.test-class1')
+        .data(class1Test)
+        .enter()
+        .append('path')
+        .attr('class', 'test-class1')
+        .attr('d', d3.symbol().type(d3.symbolTriangle).size(pointSize * pointSize * 4.5))
+        .attr('transform', d => `translate(${xScale(d.x)},${yScale(d.y)})`)
+        .attr('fill', d => isCorrectlyClassified(d) ? '#6b7280' : '#ef4444')
+        .attr('stroke', '#fff')
+        .attr('stroke-width', 1.5)
+        .attr('stroke-dasharray', '3,2')
+        .style('opacity', 0.75);
+    } else {
+      // For regression: traditional visualization
+      // Draw training points (circles - solid)
+      g.selectAll('.train-point')
+        .data(trainData)
+        .enter()
+        .append('circle')
+        .attr('class', 'train-point')
+        .attr('cx', d => xScale(d.x))
+        .attr('cy', d => yScale(d.y))
+        .attr('r', pointSize)
+        .attr('fill', '#3b82f6')
+        .attr('stroke', '#fff')
+        .attr('stroke-width', 1.5)
+        .style('opacity', 0.8);
+      
+      // Draw test points (circles - dashed)
+      g.selectAll('.test-point')
+        .data(testData)
+        .enter()
+        .append('circle')
+        .attr('class', 'test-point')
+        .attr('cx', d => xScale(d.x))
+        .attr('cy', d => yScale(d.y))
+        .attr('r', pointSize)
+        .attr('fill', '#10b981')
+        .attr('stroke', '#fff')
+        .attr('stroke-width', 1.5)
+        .attr('stroke-dasharray', '3,2')
+        .style('opacity', 0.7);
+    }
     
-    // Add hover effects
-    g.selectAll('.train-point, .test-point')
-      .on('mouseover', function(event, d) {
-        const point = d as DataPoint;
-        d3.select(this)
-          .attr('r', circleRadius * 1.5)
-          .style('opacity', 1);
-        
-        // Show tooltip
-        const tooltip = g.append('g')
-          .attr('class', 'tooltip');
-        
-        const rect = tooltip.append('rect')
-          .attr('x', xScale(point.x) + 10)
-          .attr('y', yScale(point.y) - 30)
-          .attr('rx', 4)
-          .attr('ry', 4)
-          .attr('fill', 'rgba(0, 0, 0, 0.8)')
-          .attr('width', 80)
-          .attr('height', 25);
-        
-        tooltip.append('text')
-          .attr('x', xScale(point.x) + 50)
-          .attr('y', yScale(point.y) - 12)
-          .attr('text-anchor', 'middle')
-          .attr('fill', 'white')
-          .attr('font-size', '12px')
-          .text(`(${point.x.toFixed(2)}, ${point.y.toFixed(2)})`);
-      })
-      .on('mouseout', function() {
-        d3.select(this)
-          .attr('r', circleRadius)
-          .style('opacity', (d: any) => {
-            const point = d as DataPoint;
-            return point.isTraining ? 0.8 : 0.6;
-          });
-        
-        g.selectAll('.tooltip').remove();
-      });
   }
   
-  function drawLegend(
-    g: d3.Selection<SVGGElement, unknown, null, undefined>,
-    innerWidth: number
-  ) {
-    const legend = g.append('g')
-      .attr('class', 'legend')
-      .attr('transform', `translate(${innerWidth - 100}, 0)`);
-    
-    // True model line
-    legend.append('line')
-      .attr('x1', 0)
-      .attr('y1', 10)
-      .attr('x2', 20)
-      .attr('y2', 10)
-      .attr('stroke', '#10b981')
-      .attr('stroke-width', 2)
-      .attr('stroke-dasharray', '8,4');
-    
-    legend.append('text')
-      .attr('x', 25)
-      .attr('y', 14)
-      .attr('font-size', '11px')
-      .attr('fill', '#666')
-      .text('True');
-    
-    // Current model line
-    legend.append('line')
-      .attr('x1', 0)
-      .attr('y1', 26)
-      .attr('x2', 20)
-      .attr('y2', 26)
-      .attr('stroke', '#3b82f6')
-      .attr('stroke-width', 3);
-    
-    legend.append('text')
-      .attr('x', 25)
-      .attr('y', 30)
-      .attr('font-size', '11px')
-      .attr('fill', '#666')
-      .text('Model');
-    
-    // Training points
-    legend.append('circle')
-      .attr('cx', 10)
-      .attr('cy', 46)
-      .attr('r', 5)
-      .attr('fill', '#3b82f6')
-      .attr('stroke', '#fff')
-      .attr('stroke-width', 2)
-      .style('opacity', 0.8);
-    
-    legend.append('text')
-      .attr('x', 25)
-      .attr('y', 50)
-      .attr('font-size', '11px')
-      .attr('fill', '#666')
-      .text('Train');
-    
-    // Test points
-    legend.append('rect')
-      .attr('x', 5)
-      .attr('y', 58)
-      .attr('width', 10)
-      .attr('height', 10)
-      .attr('fill', '#10b981')
-      .attr('stroke', '#fff')
-      .attr('stroke-width', 2)
-      .style('opacity', 0.6);
-    
-    legend.append('text')
-      .attr('x', 25)
-      .attr('y', 67)
-      .attr('font-size', '11px')
-      .attr('fill', '#666')
-      .text('Test');
-  }
 </script>
 
 <div class="visualization-container">
-  <h2>Data</h2>
+  <div class="header">
+    <h2>
+      <ScatterChart size={20} strokeWidth={2} />
+      <span>Data</span>
+    </h2>
+    <div class="legend-controls">
+      {#if problemType === 'logistic-regression'}
+        <div class="legend-item">
+          <div class="legend-symbol">
+            <svg width="18" height="18" viewBox="0 0 18 18">
+              <circle cx="9" cy="9" r="6" fill="#6b7280" stroke="#fff" stroke-width="1.5" />
+            </svg>
+          </div>
+          <span>Solid</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-symbol">
+            <svg width="18" height="18" viewBox="0 0 18 18">
+              <circle cx="9" cy="9" r="6" fill="#6b7280" stroke="#fff" stroke-width="1.5" stroke-dasharray="3,2" />
+            </svg>
+          </div>
+          <span>Dashed</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-symbol">
+            <svg width="18" height="18" viewBox="0 0 18 18">
+              <circle cx="9" cy="9" r="6" fill="#ef4444" stroke="#fff" stroke-width="1.5" />
+            </svg>
+          </div>
+          <span>Error</span>
+        </div>
+      {:else}
+        <div class="legend-item">
+          <div class="legend-symbol">
+            <svg width="18" height="18" viewBox="0 0 18 18">
+              <circle cx="9" cy="9" r="6" fill="#3b82f6" stroke="#fff" stroke-width="1.5" />
+            </svg>
+          </div>
+          <span>Train</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-symbol">
+            <svg width="18" height="18" viewBox="0 0 18 18">
+              <circle cx="9" cy="9" r="6" fill="#10b981" stroke="#fff" stroke-width="1.5" stroke-dasharray="3,2" />
+            </svg>
+          </div>
+          <span>Test</span>
+        </div>
+      {/if}
+    </div>
+  </div>
   <div class="svg-container">
     <svg bind:this={svgElement} width={width} height={height}></svg>
   </div>
@@ -401,33 +515,65 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
+    overflow: hidden;
+  }
+  
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    flex-shrink: 0;
   }
   
   h2 {
-    margin: 0 0 1rem 0;
-    font-size: 1.25rem;
+    margin: 0;
+    font-size: 1.125rem;
     font-weight: 600;
-    color: #1a1a1a;
-    flex-shrink: 0;
+    color: var(--color-text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    opacity: 0.9;
+  }
+  
+  .legend-controls {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+  }
+  
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.8125rem;
+    color: var(--color-text-tertiary);
+    font-weight: 500;
+  }
+  
+  .legend-symbol {
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   
   .svg-container {
     flex: 1;
     min-height: 0;
+    max-height: 100%;
     position: relative;
+    overflow: hidden;
   }
   
   svg {
     display: block;
-    background: #fafafa;
-    border-radius: 8px;
+    background: transparent;
+    border-radius: 0;
+    max-width: 100%;
+    max-height: 100%;
   }
   
-  :global(.grid line) {
-    stroke: #e0e0e0;
-  }
-  
-  :global(.grid path) {
-    stroke-width: 0;
-  }
 </style>

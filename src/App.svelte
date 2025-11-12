@@ -10,13 +10,19 @@
   import LossLandscape from './components/LossLandscape.svelte';
   import LossHistory from './components/LossHistory.svelte';
   import ParameterDisplay from './components/ParameterDisplay.svelte';
-  import { datasetStore, parametersStore, historyStore, currentProblemConfig } from './stores/stores';
+  import { datasetStore, parametersStore, historyStore, currentProblemConfig, themeStore } from './stores/stores';
+  import { Sun, Moon } from 'lucide-svelte';
   
   // The main app orchestrates all our components and manages the overall layout.
   // We use CSS Grid for a responsive, flexible layout that adapts to different screen sizes.
   
+  $: theme = $themeStore;
+  
   // Initialize data when app starts
   onMount(() => {
+    // Set initial theme on mount
+    document.documentElement.setAttribute('data-theme', theme);
+    
     datasetStore.initialize();
     
     // Add initial point to history
@@ -36,9 +42,22 @@
       });
     }
   });
+  
+  function toggleTheme() {
+    themeStore.toggle();
+  }
 </script>
 
 <main>
+  <!-- Theme toggle button - top right corner -->
+  <button class="theme-toggle" on:click={() => themeStore.toggle()} title="Toggle theme">
+    {#if theme === 'light'}
+      <Moon size={22} strokeWidth={2.5} />
+    {:else}
+      <Sun size={22} strokeWidth={2.5} />
+    {/if}
+  </button>
+
   <div class="app-container">
     <!-- Left sidebar contains problem selection and training controls -->
     <aside class="sidebar">
@@ -78,6 +97,49 @@
     padding: 0;
   }
   
+  /* CSS Variables for Theming */
+  :global(:root) {
+    /* Light theme colors */
+    --color-bg-primary: #f5f5f5;
+    --color-bg-secondary: #ffffff;
+    --color-bg-tertiary: #fafafa;
+    --color-text-primary: #1a1a1a;
+    --color-text-secondary: #4a4a4a;
+    --color-text-tertiary: #666666;
+    --color-border: #e0e0e0;
+    --color-border-hover: #3b82f6;
+    --color-shadow: rgba(0, 0, 0, 0.1);
+    
+    /* Brand colors */
+    --color-primary: #3b82f6;
+    --color-primary-hover: #2563eb;
+    --color-success: #10b981;
+    --color-danger: #ef4444;
+    --color-warning: #f59e0b;
+    --color-accent: #e11d48;
+  }
+  
+  :global([data-theme='dark']) {
+    /* Dark theme colors */
+    --color-bg-primary: #0a0f1e;
+    --color-bg-secondary: #141f2e;
+    --color-bg-tertiary: #0a0f1e;  /* Darker for better diagram contrast */
+    --color-text-primary: #f1f5f9;
+    --color-text-secondary: #cbd5e1;
+    --color-text-tertiary: #94a3b8;
+    --color-border: #475569;  /* Lighter for better grid visibility */
+    --color-border-hover: #60a5fa;
+    --color-shadow: rgba(0, 0, 0, 0.5);
+    
+    /* Brand colors (adjusted for dark theme - more saturated) */
+    --color-primary: #3b82f6;
+    --color-primary-hover: #2563eb;
+    --color-success: #34d399;
+    --color-danger: #f87171;
+    --color-warning: #fbbf24;
+    --color-accent: #fb7185;
+  }
+  
   :global(html), :global(body) {
     height: 100%;
     margin: 0;
@@ -87,13 +149,41 @@
   
   :global(body) {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background-color: #f5f5f5;
-    color: #333;
+    background-color: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
   
   main {
     height: 100vh;
     overflow: hidden;
+    position: relative;
+  }
+  
+  /* Theme toggle button - top right */
+  .theme-toggle {
+    position: fixed;
+    top: 1.5rem;
+    right: 1.5rem;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    border: 2px solid var(--color-border);
+    background: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    z-index: 100;
+    padding: 0;
+  }
+  
+  .theme-toggle:hover {
+    border-color: #667eea;
+    transform: scale(1.08);
+    color: #667eea;
   }
   
   /* Main app container using CSS Grid for layout */
@@ -101,19 +191,19 @@
     display: grid;
     grid-template-columns: 300px 1fr;
     height: 100vh;
-    gap: 1rem;
-    padding: 1rem;
-    background-color: #f5f5f5;
+    gap: 1.5rem;
+    padding: 1.5rem;
+    background-color: var(--color-bg-primary);
     box-sizing: border-box;
   }
   
   /* Sidebar styling */
   .sidebar {
-    background-color: white;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    padding: 1.5rem;
-    overflow-y: auto;
+    background-color: var(--color-bg-secondary);
+    border-radius: 16px;
+    box-shadow: none;
+    padding: 1.25rem;
+    overflow: hidden;
     min-height: 0;
   }
   
@@ -121,7 +211,7 @@
   .main-content {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.5rem;
     min-height: 0;
   }
   
@@ -129,7 +219,7 @@
   .top-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1rem;
+    gap: 1.5rem;
     flex: 1;
     min-height: 0;
   }
@@ -137,9 +227,9 @@
   /* Bottom row with loss history and parameters */
   .bottom-row {
     display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 1rem;
-    height: 200px;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    height: 260px;
     flex-shrink: 0;
   }
   
@@ -148,12 +238,13 @@
   .loss-landscape-container,
   .loss-history-container,
   .parameter-display-container {
-    background-color: white;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    padding: 1.5rem;
+    background-color: transparent;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0.75rem 1rem 1.25rem 1rem;
     position: relative;
     overflow: hidden;
+    min-height: 0;
   }
   
   /* Responsive design for smaller screens */

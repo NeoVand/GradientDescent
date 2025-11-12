@@ -28,7 +28,7 @@ export interface ProblemConfig {
   name: string;
   description: string;
   trueParameters: ModelParameters; // The true underlying model parameters
-  generateData: (numPoints: number, trainRatio: number) => DataPoint[];
+  generateData: (numPoints: number, trainRatio: number, noiseLevel?: number) => DataPoint[];
   predict: (x: number, params: ModelParameters) => number;
   computeLoss: (data: DataPoint[], params: ModelParameters) => number;
   computeGradient: (data: DataPoint[], params: ModelParameters) => ModelParameters;

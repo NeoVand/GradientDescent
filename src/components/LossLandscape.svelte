@@ -20,16 +20,20 @@
     currentProblemConfig
   } from '../stores/stores';
   import type { ModelParameters } from '../types/types';
+  import { Thermometer, ArrowRight, Circle, TrendingUp, Box, Layers, Mountain } from 'lucide-svelte';
+  import { themeStore } from '../stores/stores';
   
   // Component DOM references
   let container: HTMLDivElement;
   let svg2D: SVGSVGElement;
   let canvas3D: HTMLCanvasElement;
   
-  // Dimensions
+  $: theme = $themeStore;
+  
+  // Dimensions - match Data diagram exactly
   let width = 400;
   let height = 400;
-  const margin = { top: 40, right: 40, bottom: 50, left: 50 };
+  const margin = { top: 20, right: 20, bottom: 50, left: 50 };
   
   // Three.js objects
   let renderer: THREE.WebGLRenderer;
@@ -74,14 +78,24 @@
     gradientFieldVersion++;
   }
   
-  // Render appropriate visualization
+  // Render appropriate visualization when mode or data changes
   $: if (lossGrid.length > 0) {
-    if (mode === '2d' && svg2D) {
-      render2D();
-    } else if (mode === '3d' && canvas3D) {
-      render3D();
-    }
+    // Use setTimeout to ensure DOM is ready
+    setTimeout(() => {
+      if (mode === '2d' && svg2D) {
+        render2D();
+      } else if (mode === '3d' && canvas3D) {
+        // Stop any existing animation
+        if (animationId) {
+          cancelAnimationFrame(animationId);
+          animationId = 0;
+        }
+        render3D();
+      }
+    }, 0);
   }
+  
+  // 3D scene uses transparent background now
   
   // Re-render when visuals change
   $: if (visuals && lossGrid.length > 0) {
@@ -104,9 +118,17 @@
   onDestroy(() => {
     if (animationId) {
       cancelAnimationFrame(animationId);
+      animationId = 0;
     }
     if (renderer) {
       renderer.dispose();
+      renderer = null as any;
+    }
+    if (scene) {
+      // Clean up scene
+      while(scene.children.length > 0) {
+        scene.remove(scene.children[0]);
+      }
     }
   });
   
@@ -183,10 +205,10 @@
   function render2D() {
     if (!svg2D || lossGrid.length === 0) return;
     
-    // Clear previous content
-    d3.select(svg2D).selectAll('*').remove();
-    
+    // Clear previous content completely
     const svg = d3.select(svg2D);
+    svg.selectAll('*').remove();
+    
     const g = svg.append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
     
@@ -220,11 +242,6 @@
     // Draw gradient vectors
     if (visuals.gradientField) {
       drawGradientField(plotArea, innerWidth, innerHeight);
-    }
-    
-    // Draw optimization path
-    if (visuals.trainingPath && history.length > 1) {
-      drawOptimizationPath(plotArea);
     }
     
     // Draw current position
@@ -444,53 +461,6 @@
     }
   }
   
-  function drawOptimizationPath(g: d3.Selection<SVGGElement, unknown, null, undefined>) {
-    const innerWidth = width - margin.left - margin.right;
-    const innerHeight = height - margin.top - margin.bottom;
-    
-    const pathData = history.map(h => {
-      // Convert parameters to grid coordinates, then to pixel coordinates
-      // to match heatmap coordinate system exactly
-      const gridI = (h.parameters.a - parameterRange.min) / (parameterRange.max - parameterRange.min) * (gridResolution - 1);
-      const gridJ = (h.parameters.b - parameterRange.min) / (parameterRange.max - parameterRange.min) * (gridResolution - 1);
-      
-      const cellWidth = innerWidth / gridResolution;
-      const cellHeight = innerHeight / gridResolution;
-      
-      return {
-        x: gridI * cellWidth,
-        y: gridJ * cellHeight
-      };
-    });
-    
-    // Draw path
-    const line = d3.line<{x: number, y: number}>()
-      .x(d => d.x)
-      .y(d => d.y)
-      .curve(d3.curveLinear);
-    
-    g.append('path')
-      .datum(pathData)
-      .attr('class', 'optimization-path')
-      .attr('fill', 'none')
-      .attr('stroke', '#e11d48')
-      .attr('stroke-width', 2.5)
-      .attr('d', line);
-    
-    // Draw points
-    g.selectAll('.path-point')
-      .data(pathData)
-      .enter()
-      .append('circle')
-      .attr('class', 'path-point')
-      .attr('cx', d => d.x)
-      .attr('cy', d => d.y)
-      .attr('r', 3)
-      .attr('fill', '#e11d48')
-      .attr('stroke', '#fff')
-      .attr('stroke-width', 1);
-  }
-  
   function drawCurrentPosition(g: d3.Selection<SVGGElement, unknown, null, undefined>) {
     const innerWidth = width - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
@@ -554,12 +524,13 @@
         // Update parameters
         parametersStore.set({ a: clampedA, b: clampedB });
         
-        // Add to history
+        // Add to history - use the last step + 1 to continue from where we left off
         const trainData = data.filter(d => d.isTraining);
         const testData = data.filter(d => !d.isTraining);
+        const nextStep = history.length > 0 ? history[history.length - 1].step + 1 : 0;
         
         historyStore.addPoint({
-          step: history.length,
+          step: nextStep,
           trainLoss: problemConfig.computeLoss(trainData, { a: clampedA, b: clampedB }),
           testLoss: problemConfig.computeLoss(testData, { a: clampedA, b: clampedB }),
           parameters: { a: clampedA, b: clampedB }
@@ -593,43 +564,49 @@
   }
   
   function drawAxes(g: d3.Selection<SVGGElement, unknown, null, undefined>, width: number, height: number) {
-    // X axis
-    g.append('g')
+    // Get theme-aware colors
+    const axisColor = getComputedStyle(document.documentElement).getPropertyValue('--color-text-tertiary').trim();
+    
+    // X axis with label
+    const xAxisGroup = g.append('g')
       .attr('transform', `translate(0,${height})`)
       .call(d3.axisBottom(xScale).ticks(7))
-      .append('text')
+      .call(g => g.selectAll('line, path').attr('stroke', axisColor))
+      .call(g => g.selectAll('text').attr('fill', axisColor));
+    
+    xAxisGroup.append('text')
       .attr('x', width / 2)
-      .attr('y', 40)
-      .attr('fill', '#333')
+      .attr('y', 38)
+      .attr('fill', axisColor)
+      .attr('font-size', '13px')
+      .attr('font-weight', '600')
       .style('text-anchor', 'middle')
-      .text('Parameter A');
+      .text('A');
     
     // Y axis - with inverted scale for display
     const yAxisScale = d3.scaleLinear()
       .domain([parameterRange.min, parameterRange.max])
       .range([height, 0]);
     
-    g.append('g')
+    const yAxisGroup = g.append('g')
       .call(d3.axisLeft(yAxisScale).ticks(7))
-      .append('text')
+      .call(g => g.selectAll('line, path').attr('stroke', axisColor))
+      .call(g => g.selectAll('text').attr('fill', axisColor));
+    
+    yAxisGroup.append('text')
       .attr('transform', 'rotate(-90)')
       .attr('y', -35)
       .attr('x', -height / 2)
-      .attr('fill', '#333')
+      .attr('fill', axisColor)
+      .attr('font-size', '13px')
+      .attr('font-weight', '600')
       .style('text-anchor', 'middle')
-      .text('Parameter B');
-    
-    // Style axes
-    g.selectAll('.domain')
-      .style('stroke', '#333');
-    
-    g.selectAll('.tick line')
-      .style('stroke', '#999')
-      .style('opacity', 0.5);
+      .text('B');
   }
   
   function addGridLines(g: d3.Selection<SVGGElement, unknown, null, undefined>, width: number, height: number) {
-    // Add subtle grid lines
+    // Add subtle grid lines with theme-aware color
+    const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--color-text-tertiary').trim();
     const xTicks = xScale.ticks(10);
     const yTicks = yScale.ticks(10);
     
@@ -643,9 +620,9 @@
       .attr('x2', d => xScale(d))
       .attr('y1', 0)
       .attr('y2', height)
-      .attr('stroke', '#ffffff')
+      .attr('stroke', gridColor)
       .attr('stroke-width', 0.5)
-      .attr('opacity', 0.2);
+      .attr('opacity', 0.15);
     
     // Horizontal grid lines
     g.selectAll('.grid-line-h')
@@ -657,9 +634,9 @@
       .attr('x2', width)
       .attr('y1', d => yScale(d))
       .attr('y2', d => yScale(d))
-      .attr('stroke', '#ffffff')
+      .attr('stroke', gridColor)
       .attr('stroke-width', 0.5)
-      .attr('opacity', 0.2);
+      .attr('opacity', 0.15);
   }
   
   function render3D() {
@@ -670,9 +647,21 @@
       initThreeJS();
     }
     
-    // Clear scene
+    // Clear scene completely
     while(scene.children.length > 0) {
-      scene.remove(scene.children[0]);
+      const child = scene.children[0];
+      scene.remove(child);
+      // Dispose of geometries and materials
+      if (child instanceof THREE.Mesh) {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+          if (Array.isArray(child.material)) {
+            child.material.forEach(m => m.dispose());
+          } else {
+            child.material.dispose();
+          }
+        }
+      }
     }
     
     // Add lights
@@ -696,11 +685,6 @@
     // Create landscape mesh
     createLandscapeMesh();
     
-    // Draw optimization path in 3D
-    if (visuals.trainingPath && history.length > 1) {
-      draw3DPath();
-    }
-    
     // Draw current position
     draw3DCurrentPosition();
     
@@ -714,7 +698,8 @@
   function initThreeJS() {
     // Scene
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf5f5f5);
+    // Transparent background - will show container background
+    scene.background = null;
     
     // Camera
     camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
@@ -725,8 +710,9 @@
     renderer = new THREE.WebGLRenderer({ 
       canvas: canvas3D, 
       antialias: true,
-      alpha: true 
+      alpha: true  // Enable transparency
     });
+    renderer.setClearColor(0x000000, 0);  // Transparent background
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(width, height);
     
@@ -752,24 +738,48 @@
   }
   
   function createLandscapeMesh() {
+    // Create geometry with correct resolution
     const geometry = new THREE.PlaneGeometry(10, 10, gridResolution - 1, gridResolution - 1);
     const vertices = geometry.attributes.position.array as Float32Array;
     
     // Update vertices with loss values
+    // PlaneGeometry creates vertices in this order: along width (x), then along height (y)
+    // After rotation by -90 degrees on X axis:
+    // - geometry x becomes world x (Parameter A)
+    // - geometry y becomes world -z (Parameter B, inverted)
+    // - geometry z becomes world y (height)
+    
     let minLoss = Infinity;
     let maxLoss = -Infinity;
     
+    // First pass: find min/max
     for (let i = 0; i < gridResolution; i++) {
       for (let j = 0; j < gridResolution; j++) {
-        const index = (i * gridResolution + j) * 3;
         const loss = lossGrid[i][j];
-        
         minLoss = Math.min(minLoss, loss);
         maxLoss = Math.max(maxLoss, loss);
+      }
+    }
+    
+    // Second pass: set vertices
+    // PlaneGeometry vertices are indexed as: vertexIndex = row * (widthSegments + 1) + col
+    // where row goes along height (0 to heightSegments), col goes along width (0 to widthSegments)
+    for (let row = 0; row < gridResolution; row++) {
+      for (let col = 0; col < gridResolution; col++) {
+        const vertexIndex = (row * gridResolution + col) * 3;
         
-        vertices[index] = (i / (gridResolution - 1) - 0.5) * 10;
-        vertices[index + 1] = (j / (gridResolution - 1) - 0.5) * 10;
-        vertices[index + 2] = Math.log(loss + 1) * 1.5; // Log scale for height
+        // Map grid to mesh: i=col (A parameter), j=row (B parameter)
+        const i = col;
+        const j = row;
+        const loss = lossGrid[i][j];
+        
+        // Set geometry positions (before rotation)
+        // x: -5 to 5 (Parameter A)
+        // y: -5 to 5 (Parameter B) 
+        // z: height (loss)
+        vertices[vertexIndex] = (i / (gridResolution - 1) - 0.5) * 10;      // x
+        vertices[vertexIndex + 1] = (j / (gridResolution - 1) - 0.5) * 10;  // y
+        vertices[vertexIndex + 2] = Math.log(loss + 1) * 1.5;                // z (height)
       }
     }
     
@@ -777,17 +787,19 @@
     
     // Create colors based on height
     const colors = new Float32Array(vertices.length);
-    for (let i = 0; i < gridResolution; i++) {
-      for (let j = 0; j < gridResolution; j++) {
-        const index = (i * gridResolution + j) * 3;
+    for (let row = 0; row < gridResolution; row++) {
+      for (let col = 0; col < gridResolution; col++) {
+        const vertexIndex = (row * gridResolution + col) * 3;
+        const i = col;
+        const j = row;
         const loss = lossGrid[i][j];
         const normalized = (Math.log(loss + 1) - Math.log(minLoss + 1)) / 
                           (Math.log(maxLoss + 1) - Math.log(minLoss + 1));
         
         const color = new THREE.Color(interpolateViridis(1 - normalized));
-        colors[index] = color.r;
-        colors[index + 1] = color.g;
-        colors[index + 2] = color.b;
+        colors[vertexIndex] = color.r;
+        colors[vertexIndex + 1] = color.g;
+        colors[vertexIndex + 2] = color.b;
       }
     }
     
@@ -800,48 +812,23 @@
     });
     
     const mesh = new THREE.Mesh(geometry, material);
-    mesh.rotation.x = -Math.PI / 2;
+    mesh.rotation.x = -Math.PI / 2;  // Rotate to make it horizontal
     scene.add(mesh);
   }
   
-  function draw3DPath() {
-    const points = history.map(h => {
-      const x = ((h.parameters.a - parameterRange.min) / (parameterRange.max - parameterRange.min) - 0.5) * 10;
-      const y = ((h.parameters.b - parameterRange.min) / (parameterRange.max - parameterRange.min) - 0.5) * 10;
-      const z = Math.log(h.trainLoss + 1) * 1.5 + 0.1;
-      return new THREE.Vector3(x, z, y);
-    });
-    
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    const material = new THREE.LineBasicMaterial({ 
-      color: 0xe11d48,
-      linewidth: 3
-    });
-    
-    const line = new THREE.Line(geometry, material);
-    scene.add(line);
-    
-    // Add spheres at each point
-    points.forEach(point => {
-      const sphereGeometry = new THREE.SphereGeometry(0.05);
-      const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0xe11d48 });
-      const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-      sphere.position.copy(point);
-      scene.add(sphere);
-    });
-  }
-  
   function draw3DCurrentPosition() {
-    const x = ((parameters.a - parameterRange.min) / (parameterRange.max - parameterRange.min) - 0.5) * 10;
-    const y = ((parameters.b - parameterRange.min) / (parameterRange.max - parameterRange.min) - 0.5) * 10;
     const trainData = data.filter(d => d.isTraining);
     const currentLoss = problemConfig.computeLoss(trainData, parameters);
-    const z = Math.log(currentLoss + 1) * 1.5 + 0.1;
     
-    const geometry = new THREE.SphereGeometry(0.1);
+    // Map parameters to world coordinates (matching the mesh)
+    const worldX = ((parameters.a - parameterRange.min) / (parameterRange.max - parameterRange.min) - 0.5) * 10;
+    const worldZ = ((parameters.b - parameterRange.min) / (parameterRange.max - parameterRange.min) - 0.5) * 10;
+    const worldY = Math.log(currentLoss + 1) * 1.5 + 0.15; // Slightly above surface
+    
+    const geometry = new THREE.SphereGeometry(0.15);
     const material = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
     const sphere = new THREE.Mesh(geometry, material);
-    sphere.position.set(x, z, y);
+    sphere.position.set(worldX, worldY, worldZ);
     scene.add(sphere);
   }
   
@@ -881,7 +868,13 @@
   }
   
   function animate() {
-    if (!renderer || !scene || !camera) return;
+    if (!renderer || !scene || !camera || mode !== '3d') {
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = 0;
+      }
+      return;
+    }
     
     animationId = requestAnimationFrame(animate);
     renderer.render(scene, camera);
@@ -900,53 +893,10 @@
 </script>
 
 <div class="landscape-container" bind:this={container}>
-  <div class="header">
-    <h2>Loss Landscape</h2>
-    <div class="controls">
-      <button 
-        class="mode-toggle"
-        on:click={toggleMode}
-        title="Toggle 2D/3D view"
-      >
-        {mode === '2d' ? '3D' : '2D'}
-      </button>
-      
-      <div class="visual-toggles">
-        <button
-          class="visual-toggle"
-          class:active={visuals.heatmap}
-          on:click={() => toggleVisual('heatmap')}
-          title="Toggle heatmap"
-        >
-          🌡️
-        </button>
-        <button
-          class="visual-toggle"
-          class:active={visuals.gradientField}
-          on:click={() => toggleVisual('gradientField')}
-          title="Toggle gradient field"
-        >
-          ➡️
-        </button>
-        <button
-          class="visual-toggle"
-          class:active={visuals.contours}
-          on:click={() => toggleVisual('contours')}
-          title="Toggle contours"
-        >
-          ⭕
-        </button>
-        <button
-          class="visual-toggle"
-          class:active={visuals.trainingPath}
-          on:click={() => toggleVisual('trainingPath')}
-          title="Toggle training path"
-        >
-          〰️
-        </button>
-      </div>
-    </div>
-  </div>
+  <h2>
+    <Mountain size={20} strokeWidth={2} />
+    <span>Loss Landscape</span>
+  </h2>
   
   <div class="viz-container">
     {#if mode === '2d'}
@@ -954,6 +904,46 @@
     {:else}
       <canvas bind:this={canvas3D} class="landscape-canvas"></canvas>
     {/if}
+    
+    <!-- Floating controls - visible on hover -->
+    <div class="floating-controls">
+      <button 
+        class="visual-toggle mode-toggle-btn"
+        on:click={toggleMode}
+        title="Toggle 2D/3D view"
+      >
+        {#if mode === '2d'}
+          <Box size={16} strokeWidth={2.5} />
+        {:else}
+          <Layers size={16} strokeWidth={2.5} />
+        {/if}
+      </button>
+      
+      <button
+        class="visual-toggle"
+        class:active={visuals.heatmap}
+        on:click={() => toggleVisual('heatmap')}
+        title="Toggle heatmap"
+      >
+        <Thermometer size={16} strokeWidth={2.5} />
+      </button>
+      <button
+        class="visual-toggle"
+        class:active={visuals.gradientField}
+        on:click={() => toggleVisual('gradientField')}
+        title="Toggle gradient field"
+      >
+        <ArrowRight size={16} strokeWidth={2.5} />
+      </button>
+      <button
+        class="visual-toggle"
+        class:active={visuals.contours}
+        on:click={() => toggleVisual('contours')}
+        title="Toggle contours"
+      >
+        <Circle size={16} strokeWidth={2.5} />
+      </button>
+    </div>
   </div>
 </div>
 
@@ -964,85 +954,103 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
-  }
-  
-  .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-    flex-shrink: 0;
+    overflow: hidden;
   }
   
   h2 {
-    margin: 0;
-    font-size: 1.25rem;
+    margin: 0 0 0.75rem 0;
+    font-size: 1.125rem;
     font-weight: 600;
-    color: #1a1a1a;
-  }
-  
-  .controls {
+    color: var(--color-text-primary);
     display: flex;
-    gap: 0.5rem;
     align-items: center;
-  }
-  
-  .mode-toggle {
-    padding: 0.25rem 0.75rem;
-    border: 2px solid #e0e0e0;
-    border-radius: 6px;
-    background: white;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-  
-  .mode-toggle:hover {
-    border-color: #3b82f6;
-    color: #3b82f6;
-  }
-  
-  .visual-toggles {
-    display: flex;
-    gap: 0.25rem;
+    gap: 0.5rem;
+    opacity: 0.9;
+    flex-shrink: 0;
   }
   
   .visual-toggle {
     width: 32px;
     height: 32px;
-    border: 2px solid #e0e0e0;
-    border-radius: 6px;
-    background: white;
+    border: none;
+    border-radius: 8px;
+    background: rgba(30, 41, 59, 0.75);
+    backdrop-filter: blur(8px);
+    color: rgba(255, 255, 255, 0.8);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 16px;
     transition: all 0.2s;
+    padding: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   }
   
   .visual-toggle:hover {
-    border-color: #3b82f6;
+    color: white;
+    background: rgba(30, 41, 59, 0.9);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   }
   
   .visual-toggle.active {
-    background: #3b82f6;
-    border-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.9);
+    color: white;
+  }
+  
+  .visual-toggle.active:hover {
+    background: rgba(59, 130, 246, 1);
   }
   
   .viz-container {
     flex: 1;
     min-height: 0;
+    max-height: 100%;
     position: relative;
+    overflow: hidden;
   }
   
-  .landscape-svg,
+  /* Floating controls */
+  .floating-controls {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    z-index: 10;
+  }
+  
+  .viz-container:hover .floating-controls {
+    opacity: 1;
+    pointer-events: all;
+  }
+  
+  .floating-controls:hover {
+    opacity: 1;
+  }
+  
+  .landscape-svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    background: transparent;
+    border-radius: 0;
+  }
+  
   .landscape-canvas {
     display: block;
     width: 100%;
     height: 100%;
-    background: #fafafa;
-    border-radius: 8px;
+    max-width: 100%;
+    max-height: 100%;
+    background: transparent;
+    border-radius: 0;
   }
   
   .landscape-canvas {

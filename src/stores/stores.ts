@@ -27,6 +27,8 @@ export const selectedProblem = writable<ProblemType>('linear-regression');
 interface DatasetState {
   numPoints: number;
   trainRatio: number;  // Value between 0 and 1
+  randomSplit: boolean;  // Whether to randomly split or use first N for training
+  noiseLevel: number;  // Noise level for data generation (0 to 1)
   data: DataPoint[];
 }
 
@@ -34,6 +36,8 @@ function createDatasetStore() {
   const { subscribe, set, update } = writable<DatasetState>({
     numPoints: 20,
     trainRatio: 0.8,
+    randomSplit: true,  // Default to random split
+    noiseLevel: 0.3,  // Default noise level
     data: []
   });
 
@@ -41,10 +45,24 @@ function createDatasetStore() {
     subscribe,
     setNumPoints: (numPoints: number) => update(state => ({ ...state, numPoints })),
     setTrainRatio: (trainRatio: number) => update(state => ({ ...state, trainRatio })),
+    setRandomSplit: (randomSplit: boolean) => update(state => ({ ...state, randomSplit })),
+    setNoiseLevel: (noiseLevel: number) => update(state => ({ ...state, noiseLevel })),
     regenerateData: () => update(state => {
       const currentProblem = get(selectedProblem);
       const problemConfig = problemConfigs[currentProblem];
-      const data = problemConfig.generateData(state.numPoints, state.trainRatio);
+      let data = problemConfig.generateData(state.numPoints, state.trainRatio, state.noiseLevel);
+      
+      // Apply random split if enabled
+      if (state.randomSplit) {
+        // Shuffle and reassign training flags
+        const shuffled = [...data].sort(() => Math.random() - 0.5);
+        const numTrain = Math.floor(state.numPoints * state.trainRatio);
+        shuffled.forEach((point, idx) => {
+          point.isTraining = idx < numTrain;
+        });
+        data = shuffled;
+      }
+      
       return { ...state, data };
     }),
     setData: (data: DataPoint[]) => update(state => ({ ...state, data })),
@@ -52,7 +70,18 @@ function createDatasetStore() {
       const state = get(datasetStore);
       const currentProblem = get(selectedProblem);
       const problemConfig = problemConfigs[currentProblem];
-      const data = problemConfig.generateData(state.numPoints, state.trainRatio);
+      let data = problemConfig.generateData(state.numPoints, state.trainRatio, state.noiseLevel);
+      
+      // Apply random split if enabled
+      if (state.randomSplit) {
+        const shuffled = [...data].sort(() => Math.random() - 0.5);
+        const numTrain = Math.floor(state.numPoints * state.trainRatio);
+        shuffled.forEach((point, idx) => {
+          point.isTraining = idx < numTrain;
+        });
+        data = shuffled;
+      }
+      
       update(s => ({ ...s, data }));
     }
   };
@@ -113,7 +142,7 @@ export const lossLandscapeVisuals = writable<LossLandscapeVisuals>({
   heatmap: true,
   gradientField: false,
   contours: true,
-  trainingPath: true
+  trainingPath: false
 });
 
 // ========== Derived Stores ==========
@@ -149,6 +178,50 @@ export const currentLosses = derived(
     };
   }
 );
+
+// ========== Theme Store ==========
+// Manages the current theme (light or dark)
+export type Theme = 'light' | 'dark';
+
+function createThemeStore() {
+  // Check if user has a saved preference, otherwise use system preference
+  const getInitialTheme = (): Theme => {
+    if (typeof window === 'undefined') return 'light';
+    
+    const saved = localStorage.getItem('theme') as Theme | null;
+    if (saved) return saved;
+    
+    // Check system preference
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      return 'dark';
+    }
+    
+    return 'light';
+  };
+
+  const { subscribe, set, update } = writable<Theme>(getInitialTheme());
+
+  return {
+    subscribe,
+    toggle: () => update(theme => {
+      const newTheme = theme === 'light' ? 'dark' : 'light';
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('theme', newTheme);
+        document.documentElement.setAttribute('data-theme', newTheme);
+      }
+      return newTheme;
+    }),
+    set: (theme: Theme) => {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('theme', theme);
+        document.documentElement.setAttribute('data-theme', theme);
+      }
+      set(theme);
+    }
+  };
+}
+
+export const themeStore = createThemeStore();
 
 // ========== Utility Functions ==========
 // Helper function to perform one gradient descent step
