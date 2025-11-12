@@ -25,7 +25,7 @@
     RotateCcw,
     Activity,
     Droplets,
-    TrendingDown,
+    Mountain,
     Brain,
     Info
   } from 'lucide-svelte';
@@ -36,6 +36,14 @@
   
   // Problem selection state
   let showProblemDropdown = false;
+  
+  // Edit state for number steppers
+  let editingNumPoints = false;
+  let editingTrainingSteps = false;
+  let editingLearningRate = false;
+  let draftNumPoints = '';
+  let draftTrainingSteps = '';
+  let draftLearningRate = '';
   const problems: { type: ProblemType; name: string; icon: any; customIcon?: string }[] = [
     { type: 'linear-regression', name: 'Linear Regression', icon: TrendingUp },
     { type: 'logistic-regression', name: 'Logistic Regression', icon: Percent },
@@ -60,8 +68,12 @@
   let startingStepForProgress = 0;
   
   // Update CSS variable for slider gradient
+  // Properly map slider value (0.1-0.9) to track position (0%-100%)
   $: if (typeof document !== 'undefined') {
-    document.documentElement.style.setProperty('--train-percentage', `${trainRatio * 100}%`);
+    const minValue = 0.1;
+    const maxValue = 0.9;
+    const normalizedPosition = ((trainRatio - minValue) / (maxValue - minValue)) * 100;
+    document.documentElement.style.setProperty('--train-percentage', `${normalizedPosition}%`);
   }
   
   // Handle problem selection
@@ -205,11 +217,19 @@
     if (rate >= 0.01) return rate.toFixed(3);
     return rate.toExponential(1);
   }
+  
+  // Focus action for inputs
+  function focusOnMount(node: HTMLElement) {
+    node.focus();
+    return {};
+  }
 </script>
 
 <div class="sidebar-content">
   <h1>
-    <TrendingDown size={22} strokeWidth={2.5} />
+    <span class="app-icon">
+      <Mountain size={24} strokeWidth={0} fill="currentColor" />
+    </span>
     <span>Gradient Descent</span>
   </h1>
   
@@ -272,26 +292,75 @@
         <Info size={14} strokeWidth={2} />
       </button>
     </div>
-    <div class="control-input">
-      <button on:click={() => {
-        datasetStore.setNumPoints(Math.max(10, numPoints - 5));
-        datasetStore.regenerateData();
-      }}>
+    <div class="number-stepper">
+      <button 
+        class="stepper-btn"
+        disabled={numPoints <= 10}
+        on:click={() => {
+          datasetStore.setNumPoints(Math.max(10, numPoints - 5));
+          if (numPointsDebounce) clearTimeout(numPointsDebounce);
+          numPointsDebounce = window.setTimeout(() => {
+            requestAnimationFrame(() => {
+              datasetStore.regenerateData();
+            });
+          }, 200);
+        }}
+      >
         −
       </button>
-      <input
-        id="num-points"
-        type="number"
-        min="10"
-        max="100"
-        step="5"
-        value={numPoints}
-        on:change={handleNumPointsChange}
-      />
-      <button on:click={() => {
-        datasetStore.setNumPoints(Math.min(100, numPoints + 5));
-        datasetStore.regenerateData();
-      }}>
+      {#if editingNumPoints}
+        <input
+          class="stepper-input"
+          type="text"
+          value={draftNumPoints}
+          on:input={(e) => draftNumPoints = e.target.value.replace(/[^0-9]/g, '')}
+          on:blur={() => {
+            const parsed = parseInt(draftNumPoints, 10);
+            if (!isNaN(parsed)) {
+              const clamped = Math.max(10, Math.min(100, parsed));
+              datasetStore.setNumPoints(clamped);
+              if (numPointsDebounce) clearTimeout(numPointsDebounce);
+              numPointsDebounce = window.setTimeout(() => {
+                requestAnimationFrame(() => {
+                  datasetStore.regenerateData();
+                });
+              }, 200);
+            }
+            editingNumPoints = false;
+          }}
+          on:keydown={(e) => {
+            if (e.key === 'Enter') e.target.blur();
+            if (e.key === 'Escape') {
+              editingNumPoints = false;
+              draftNumPoints = String(numPoints);
+            }
+          }}
+          use:focusOnMount
+        />
+      {:else}
+        <button
+          class="stepper-value"
+          on:click={() => {
+            editingNumPoints = true;
+            draftNumPoints = String(numPoints);
+          }}
+        >
+          {numPoints}
+        </button>
+      {/if}
+      <button 
+        class="stepper-btn"
+        disabled={numPoints >= 100}
+        on:click={() => {
+          datasetStore.setNumPoints(Math.min(100, numPoints + 5));
+          if (numPointsDebounce) clearTimeout(numPointsDebounce);
+          numPointsDebounce = window.setTimeout(() => {
+            requestAnimationFrame(() => {
+              datasetStore.regenerateData();
+            });
+          }, 200);
+        }}
+      >
         +
       </button>
     </div>
@@ -383,21 +452,57 @@
         <Info size={14} strokeWidth={2} />
       </button>
     </div>
-    <div class="control-input">
-      <button on:click={() => {
-        trainingStore.update(store => ({ ...store, learningRate: learningRate / 10 }));
-      }}>
+    <div class="number-stepper">
+      <button 
+        class="stepper-btn"
+        disabled={learningRate <= 0.0001}
+        on:click={() => {
+          trainingStore.update(store => ({ ...store, learningRate: Math.max(0.0001, learningRate / 10) }));
+        }}
+      >
         −
       </button>
-      <input
-        id="learning-rate"
-        type="text"
-        value={formatLearningRate(learningRate)}
-        readonly
-      />
-      <button on:click={() => {
-        trainingStore.update(store => ({ ...store, learningRate: Math.min(1, learningRate * 10) }));
-      }}>
+      {#if editingLearningRate}
+        <input
+          class="stepper-input"
+          type="text"
+          value={draftLearningRate}
+          on:input={(e) => draftLearningRate = e.target.value.replace(/[^0-9.eE\-]/g, '')}
+          on:blur={() => {
+            const parsed = parseFloat(draftLearningRate);
+            if (!isNaN(parsed)) {
+              const clamped = Math.max(0.0001, Math.min(1, parsed));
+              trainingStore.update(store => ({ ...store, learningRate: clamped }));
+            }
+            editingLearningRate = false;
+          }}
+          on:keydown={(e) => {
+            if (e.key === 'Enter') e.target.blur();
+            if (e.key === 'Escape') {
+              editingLearningRate = false;
+              draftLearningRate = formatLearningRate(learningRate);
+            }
+          }}
+          use:focusOnMount
+        />
+      {:else}
+        <button
+          class="stepper-value"
+          on:click={() => {
+            editingLearningRate = true;
+            draftLearningRate = formatLearningRate(learningRate);
+          }}
+        >
+          {formatLearningRate(learningRate)}
+        </button>
+      {/if}
+      <button 
+        class="stepper-btn"
+        disabled={learningRate >= 1}
+        on:click={() => {
+          trainingStore.update(store => ({ ...store, learningRate: Math.min(1, learningRate * 10) }));
+        }}
+      >
         +
       </button>
     </div>
@@ -412,24 +517,57 @@
         <Info size={14} strokeWidth={2} />
       </button>
     </div>
-    <div class="control-input">
-      <button on:click={() => {
-        trainingStore.update(store => ({ ...store, totalSteps: Math.max(10, totalSteps - 10) }));
-      }}>
+    <div class="number-stepper">
+      <button 
+        class="stepper-btn"
+        disabled={totalSteps <= 10}
+        on:click={() => {
+          trainingStore.update(store => ({ ...store, totalSteps: Math.max(10, totalSteps - 10) }));
+        }}
+      >
         −
       </button>
-      <input
-        id="training-steps"
-        type="number"
-        min="10"
-        max="1000"
-        step="10"
-        value={totalSteps}
-        on:change={handleTotalStepsChange}
-      />
-      <button on:click={() => {
-        trainingStore.update(store => ({ ...store, totalSteps: Math.min(1000, totalSteps + 10) }));
-      }}>
+      {#if editingTrainingSteps}
+        <input
+          class="stepper-input"
+          type="text"
+          value={draftTrainingSteps}
+          on:input={(e) => draftTrainingSteps = e.target.value.replace(/[^0-9]/g, '')}
+          on:blur={() => {
+            const parsed = parseInt(draftTrainingSteps, 10);
+            if (!isNaN(parsed)) {
+              const clamped = Math.max(10, Math.min(1000, parsed));
+              trainingStore.update(store => ({ ...store, totalSteps: clamped }));
+            }
+            editingTrainingSteps = false;
+          }}
+          on:keydown={(e) => {
+            if (e.key === 'Enter') e.target.blur();
+            if (e.key === 'Escape') {
+              editingTrainingSteps = false;
+              draftTrainingSteps = String(totalSteps);
+            }
+          }}
+          use:focusOnMount
+        />
+      {:else}
+        <button
+          class="stepper-value"
+          on:click={() => {
+            editingTrainingSteps = true;
+            draftTrainingSteps = String(totalSteps);
+          }}
+        >
+          {totalSteps}
+        </button>
+      {/if}
+      <button 
+        class="stepper-btn"
+        disabled={totalSteps >= 1000}
+        on:click={() => {
+          trainingStore.update(store => ({ ...store, totalSteps: Math.min(1000, totalSteps + 10) }));
+        }}
+      >
         +
       </button>
     </div>
@@ -441,7 +579,7 @@
   <!-- Action Buttons - pinned to bottom -->
   <div class="action-buttons">
     <button 
-      class="train-button"
+      class="train-button" 
       class:training={isTraining}
       on:click={isTraining ? stopTraining : startTraining}
       style="--progress: {trainingProgress}%;"
@@ -483,7 +621,14 @@
     color: var(--color-text-primary);
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.625rem;
+  }
+  
+  .app-icon {
+    color: #10b981;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   
   .control-group {
@@ -535,7 +680,7 @@
   
   .info-btn:hover {
     opacity: 1;
-    color: #667eea;
+    color: #10b981;
     transform: scale(1.15);
   }
   
@@ -546,35 +691,38 @@
   
   .problem-button {
     width: 100%;
-    padding: 0.625rem;
+    padding: 0.625rem 0.75rem;
     border: 2px solid var(--color-border);
     border-radius: 8px;
     background: var(--color-bg-secondary);
     color: var(--color-text-primary);
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    justify-content: flex-start;
+    gap: 0.625rem;
     cursor: pointer;
     transition: all 0.2s;
     font-size: 0.875rem;
+    outline: none;
   }
   
   .problem-button:hover {
-    border-color: #667eea;
+    border-color: #10b981;
   }
   
   .problem-button:focus {
     outline: none;
-    border-color: #667eea;
+    border-color: #10b981;
   }
   
   .problem-selector.open .problem-button {
-    border-color: #667eea;
+    border-color: #10b981;
   }
   
   .problem-preview {
     display: flex;
     align-items: center;
+    color: #10b981;
   }
   
   .problem-name {
@@ -608,21 +756,29 @@
   
   .problem-option {
     width: 100%;
-    padding: 0.625rem;
+    padding: 0.625rem 0.75rem;
     border: none;
+    border-radius: 0;
     background: var(--color-bg-secondary);
     color: var(--color-text-primary);
     display: flex;
     align-items: center;
+    justify-content: flex-start;
     gap: 0.625rem;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: all 0.2s;
     text-align: left;
     font-size: 0.875rem;
+    outline: none;
+  }
+  
+  .problem-option .problem-icon {
+    color: var(--color-text-tertiary);
+    transition: color 0.2s;
   }
   
   .problem-option:hover {
-    background: rgba(102, 126, 234, 0.12);
+    background: rgba(16, 185, 129, 0.1);
     outline: none;
   }
   
@@ -631,56 +787,91 @@
   }
   
   .problem-option.selected {
-    background: rgba(102, 126, 234, 0.15);
+    background: rgba(16, 185, 129, 0.15);
     color: var(--color-text-primary);
-    border-left: 3px solid #667eea;
-    padding-left: calc(0.75rem - 3px);
+  }
+  
+  .problem-option.selected .problem-icon {
+    color: #10b981;
   }
   
   .problem-option.selected:hover {
-    background: rgba(102, 126, 234, 0.2);
+    background: rgba(16, 185, 129, 0.2);
   }
   
-  /* Control Inputs */
-  .control-input {
-    display: flex;
+  /* Number Stepper */
+  .number-stepper {
+    display: grid;
+    grid-template-columns: 32px 1fr 32px;
     align-items: center;
     gap: 0.5rem;
+    padding: 0.375rem;
+    border-radius: 8px;
+    background: rgba(16, 185, 129, 0.06);
   }
   
-  .control-input button {
-    width: 28px;
-    height: 28px;
-    border: 2px solid var(--color-border);
+  .stepper-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
     border-radius: 6px;
-    background: var(--color-bg-secondary);
-    color: var(--color-text-primary);
+    background: rgba(16, 185, 129, 0.12);
+    color: #10b981;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 600;
-    font-size: 0.875rem;
+    font-weight: 700;
+    font-size: 1rem;
     transition: all 0.2s;
     flex-shrink: 0;
   }
   
-  .control-input button:hover {
-    border-color: #667eea;
-    color: #667eea;
+  .stepper-btn:hover:not(:disabled) {
+    background: rgba(16, 185, 129, 0.2);
+    transform: scale(1.05);
   }
   
-  .control-input input {
-    flex: 1;
-    padding: 0.25rem 0.5rem;
-    border: 2px solid var(--color-border);
-    border-radius: 6px;
+  .stepper-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+  
+  .stepper-value {
+    min-width: 60px;
+    padding: 0.375rem;
+    border: none;
+    background: transparent;
+    color: var(--color-text-primary);
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: text;
+    border-radius: 4px;
+    transition: background 0.2s;
+  }
+  
+  .stepper-value:hover {
+    background: rgba(16, 185, 129, 0.08);
+  }
+  
+  .stepper-input {
+    min-width: 60px;
+    padding: 0.375rem;
+    border: 2px solid #10b981;
+    border-radius: 4px;
     background: var(--color-bg-secondary);
     color: var(--color-text-primary);
     text-align: center;
-    font-weight: 500;
+    font-weight: 600;
     font-size: 0.875rem;
-    min-width: 0;
+    outline: none;
+  }
+  
+  .stepper-input::-webkit-inner-spin-button,
+  .stepper-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
   }
   
   /* Slider */
@@ -820,10 +1011,20 @@
     cursor: pointer;
     transition: all 0.2s;
     min-height: 38px;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
     position: relative;
     overflow: hidden;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+  
+  /* Light mode train button */
+  :global([data-theme='light']) .train-button {
+    background: linear-gradient(135deg, #a7f3d0 0%, #6ee7b7 100%);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
+  }
+  
+  /* Dark mode train button */
+  :global([data-theme='dark']) .train-button {
+    background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
   }
   
   .train-button::before {
@@ -845,13 +1046,32 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    color: white;
     padding: 0.625rem 0.75rem;
   }
   
-  .train-button:hover {
+  /* Light mode button text */
+  :global([data-theme='light']) .button-content {
+    color: #000000;
+  }
+  
+  /* Dark mode button text */
+  :global([data-theme='dark']) .button-content {
+    color: #d1fae5;
+  }
+  
+  /* Training state always uses white text */
+  .train-button.training .button-content {
+    color: white !important;
+  }
+  
+  :global([data-theme='light']) .train-button:hover {
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  }
+  
+  :global([data-theme='dark']) .train-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.5);
   }
   
   .train-button.training {

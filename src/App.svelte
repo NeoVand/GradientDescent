@@ -99,8 +99,8 @@
   
   /* CSS Variables for Theming */
   :global(:root) {
-    /* Light theme colors */
-    --color-bg-primary: #f5f5f5;
+    /* Light theme colors with subtle emerald tint */
+    --color-bg-primary: #f0f4f3;
     --color-bg-secondary: #ffffff;
     --color-bg-tertiary: #fafafa;
     --color-text-primary: #1a1a1a;
@@ -120,10 +120,10 @@
   }
   
   :global([data-theme='dark']) {
-    /* Dark theme colors */
-    --color-bg-primary: #0a0f1e;
+    /* Dark theme colors with blue-green balance */
+    --color-bg-primary: #0a1218;
     --color-bg-secondary: #141f2e;
-    --color-bg-tertiary: #0a0f1e;  /* Darker for better diagram contrast */
+    --color-bg-tertiary: #0a1218;  /* Darker for better diagram contrast */
     --color-text-primary: #f1f5f9;
     --color-text-secondary: #cbd5e1;
     --color-text-tertiary: #94a3b8;
@@ -181,9 +181,9 @@
   }
   
   .theme-toggle:hover {
-    border-color: #667eea;
+    border-color: #10b981;
     transform: scale(1.08);
-    color: #667eea;
+    color: #10b981;
   }
   
   /* Main app container using CSS Grid for layout */

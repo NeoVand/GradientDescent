@@ -8,6 +8,7 @@
   
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
+  import { interpolateViridis } from 'd3-scale-chromatic';
   import { 
     datasetStore,
     parametersStore,
@@ -184,7 +185,10 @@
       .attr('class', 'plot-group')
       .attr('transform', `translate(${margin.left},${margin.top})`);
     
-    // Draw gradient field (behind trail)
+    // Draw loss heatmap first (behind everything)
+    drawLossHeatmap(plotGroup, xScale, yScale, innerWidth, innerHeight);
+    
+    // Draw gradient field (above heatmap, behind trail)
     drawGradients(plotGroup, xScale, yScale, innerWidth, innerHeight);
     
     // Draw training path with fade effect (in clipped group, above gradients, below marker)
@@ -192,6 +196,76 @@
     
     // Draw current position last (needs to be in main group, not clipped, on top)
     drawCurrentPosition(g, xScale, yScale, innerWidth, innerHeight);
+  }
+  
+  function drawLossHeatmap(
+    g: d3.Selection<SVGGElement, unknown, null, undefined>,
+    xScale: d3.ScaleLinear<number, number>,
+    yScale: d3.ScaleLinear<number, number>,
+    innerWidth: number,
+    innerHeight: number
+  ) {
+    const trainData = data.filter(d => d.isTraining);
+    if (trainData.length === 0) return;
+    
+    // Create loss heatmap
+    const heatmapResolution = 60;
+    const cellWidth = innerWidth / heatmapResolution;
+    const cellHeight = innerHeight / heatmapResolution;
+    
+    // Compute loss at all grid points first to find min/max
+    const lossValues: number[][] = [];
+    let minLoss = Infinity;
+    let maxLoss = -Infinity;
+    
+    for (let i = 0; i < heatmapResolution; i++) {
+      lossValues[i] = [];
+      for (let j = 0; j < heatmapResolution; j++) {
+        const pixelX = Math.round(i * cellWidth);
+        const pixelY = Math.round(j * cellHeight);
+        
+        const a = xScale.invert(pixelX + cellWidth / 2);
+        const b = yScale.invert(pixelY + cellHeight / 2);
+        
+        const loss = problemConfig.computeLoss(trainData, { a, b });
+        lossValues[i][j] = loss;
+        minLoss = Math.min(minLoss, loss);
+        maxLoss = Math.max(maxLoss, loss);
+      }
+    }
+    
+    // Use log scale for better color distribution
+    const logMin = Math.log(minLoss + 0.001);
+    const logMax = Math.log(maxLoss + 0.001);
+    
+    // Draw cells with color based on loss
+    for (let i = 0; i < heatmapResolution; i++) {
+      for (let j = 0; j < heatmapResolution; j++) {
+        const pixelX = Math.round(i * cellWidth);
+        const pixelY = Math.round(j * cellHeight);
+        const nextPixelX = Math.round((i + 1) * cellWidth);
+        const nextPixelY = Math.round((j + 1) * cellHeight);
+        const exactWidth = nextPixelX - pixelX;
+        const exactHeight = nextPixelY - pixelY;
+        
+        const loss = lossValues[i][j];
+        
+        // Normalize loss using log scale (0 = low loss, 1 = high loss)
+        const logLoss = Math.log(loss + 0.001);
+        const normalized = (logLoss - logMin) / (logMax - logMin);
+        
+        // Color: blue (low loss) to red (high loss)
+        const color = d3.interpolateViridis(1 - normalized);
+        
+        g.append('rect')
+          .attr('x', pixelX)
+          .attr('y', pixelY)
+          .attr('width', exactWidth)
+          .attr('height', exactHeight)
+          .attr('fill', color)
+          .style('opacity', 0.85);
+      }
+    }
   }
   
   function drawTrainingPath(
@@ -304,7 +378,7 @@
       const x2 = x + normGradA * arrowLength;
       const y2 = y - normGradB * arrowLength; // Negative because SVG y is inverted
       
-      // Draw arrow
+      // Draw arrow with reduced thickness scale
       g.append('line')
         .attr('class', 'gradient-arrow')
         .attr('x1', x)
@@ -312,7 +386,7 @@
         .attr('x2', x2)
         .attr('y2', y2)
         .attr('stroke', arrowColor)
-        .attr('stroke-width', 1 + normalizedMagnitude * 1.5)
+        .attr('stroke-width', 0.8 + normalizedMagnitude * 1.2)
         .attr('marker-end', 'url(#arrowhead)')
         .style('opacity', isDark ? 0.7 + normalizedMagnitude * 0.2 : 0.5 + normalizedMagnitude * 0.3);
     }
