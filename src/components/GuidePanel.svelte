@@ -16,16 +16,17 @@
   let modelFormulaElement: HTMLSpanElement;
   let parametersFormulaElement: HTMLSpanElement;
   let lossFormulaElement: HTMLSpanElement;
+  let gradientFormulaElement: HTMLSpanElement;
   let updateFormulaElement: HTMLSpanElement;
   
   // LaTeX formulas for each problem
   const modelFormulas: Record<string, string> = {
     'linear-regression': String.raw`Y = \alpha X + \beta`,
-    'logistic-regression': String.raw`P(Y\!=\!1) = \sigma(\alpha X + \beta Y) = \frac{1}{1 + \exp(-(\alpha X + \beta Y))}`,
+    'logistic-regression': String.raw`P(Y\!=\!1) = \frac{1}{1 + \exp(-(\alpha X + \beta Y))}`,
     'polynomial-regression': String.raw`Y = \alpha X^2 + \beta X`
   };
   
-  const parametersFormula = String.raw`\boldsymbol{\theta} = \begin{bmatrix} \alpha & \beta \end{bmatrix}^T`;
+  const parametersFormula = String.raw`(\boldsymbol{\theta} = [\alpha, \beta]^\top)`;
   
   const lossFormulas: Record<string, string> = {
     'linear-regression': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`,
@@ -33,10 +34,17 @@
     'polynomial-regression': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`
   };
   
-  const updateFormula = String.raw`\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma \nabla \mathcal{L}`;
+  const gradientFormulas: Record<string, string> = {
+    'linear-regression': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} X_i & 1 \end{bmatrix}^\top`,
+    'logistic-regression': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} X_i & Y_i \end{bmatrix}^\top`,
+    'polynomial-regression': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} X_i^2 & X_i \end{bmatrix}^\top`
+  };
+  
+  const updateFormula = String.raw`\boldsymbol{\theta}^{(t+1)} \leftarrow \boldsymbol{\theta}^{(t)} - \gamma \nabla_{\boldsymbol{\theta}} \mathcal{L}`;
   
   $: currentModelLatex = modelFormulas[problemType];
   $: currentLossLatex = lossFormulas[problemType];
+  $: currentGradientLatex = gradientFormulas[problemType];
   
   // Render LaTeX when component mounts or problem changes
   function renderLatex() {
@@ -65,6 +73,17 @@
     if (lossFormulaElement && currentLossLatex) {
       try {
         katex.render(currentLossLatex, lossFormulaElement, {
+          throwOnError: false,
+          displayMode: false
+        });
+      } catch (e) {
+        console.error('KaTeX rendering error:', e);
+      }
+    }
+    
+    if (gradientFormulaElement && currentGradientLatex) {
+      try {
+        katex.render(currentGradientLatex, gradientFormulaElement, {
           throwOnError: false,
           displayMode: false
         });
@@ -102,17 +121,20 @@
   
   <div class="equation-row">
     <span class="equation-label">Model:</span>
-    <span class="latex-inline" bind:this={modelFormulaElement}></span>
-  </div>
-  
-  <div class="equation-row">
-    <span class="equation-label">Parameters:</span>
-    <span class="latex-inline" bind:this={parametersFormulaElement}></span>
+    <div class="equation-content">
+      <span class="latex-inline" bind:this={modelFormulaElement}></span>
+      <span class="latex-inline parameters" bind:this={parametersFormulaElement}></span>
+    </div>
   </div>
   
   <div class="equation-row">
     <span class="equation-label">Loss:</span>
     <span class="latex-inline" bind:this={lossFormulaElement}></span>
+  </div>
+  
+  <div class="equation-row">
+    <span class="equation-label">Gradient:</span>
+    <span class="latex-inline" bind:this={gradientFormulaElement}></span>
   </div>
   
   <div class="equation-row">
@@ -169,13 +191,48 @@
     color: #10b981;
   }
   
-  .latex-inline {
-    color: var(--color-text-primary);
+  .equation-content {
     flex: 1;
-    overflow-x: auto;
-    overflow-y: hidden;
     display: flex;
     align-items: center;
+    gap: 0.5rem;
+    overflow-x: auto;
+  }
+  
+  .latex-inline {
+    color: var(--color-text-primary);
+    display: flex;
+    align-items: center;
+    overflow-x: auto;
+  }
+  
+  /* Hide scrollbar */
+  .latex-inline::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .latex-inline {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .latex-inline.parameters {
+    opacity: 0.7;
+    font-size: 0.9em;
+  }
+  
+  .equation-content {
+    overflow-x: auto;
+  }
+  
+  /* Hide scrollbar for equation content */
+  .equation-content::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .equation-content {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
   
   /* Style KaTeX output */
