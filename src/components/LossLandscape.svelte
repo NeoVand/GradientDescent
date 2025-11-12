@@ -8,6 +8,7 @@
   
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
+  import { contours } from 'd3-contour';
   import { interpolateViridis } from 'd3-scale-chromatic';
   import { 
     datasetStore,
@@ -195,12 +196,17 @@
       .attr('transform', `translate(${margin.left},${margin.top})`);
     
     // Draw loss heatmap first (behind everything)
-    drawLossHeatmap(plotGroup, xScale, yScale, innerWidth, innerHeight);
+    const lossData = drawLossHeatmap(plotGroup, xScale, yScale, innerWidth, innerHeight);
     
-    // Draw gradient field (above heatmap, behind trail)
+    // Draw gradient field (above heatmap, below contours)
     drawGradients(plotGroup, xScale, yScale, innerWidth, innerHeight);
     
-    // Draw training path with fade effect (in clipped group, above gradients, below marker)
+    // Draw contour lines (above gradient field, below trail)
+    if (lossData) {
+      drawContours(plotGroup, lossData, innerWidth, innerHeight);
+    }
+    
+    // Draw training path with fade effect (in clipped group, above contours, below marker)
     drawTrainingPath(plotGroup, xScale, yScale);
     
     // Draw current position last (needs to be in main group, not clipped, on top)
@@ -213,9 +219,9 @@
     yScale: d3.ScaleLinear<number, number>,
     innerWidth: number,
     innerHeight: number
-  ) {
+  ): { values: number[][], minLoss: number, maxLoss: number, resolution: number } | null {
     const trainData = data.filter(d => d.isTraining);
-    if (trainData.length === 0) return;
+    if (trainData.length === 0) return null;
     
     // Create loss heatmap
     const heatmapResolution = 60;
@@ -279,6 +285,76 @@
           .style('opacity', 0.85);
       }
     }
+    
+    // Return data for contour generation
+    return {
+      values: lossValues,
+      minLoss,
+      maxLoss,
+      resolution: heatmapResolution
+    };
+  }
+  
+  function drawContours(
+    g: d3.Selection<SVGGElement, unknown, null, undefined>,
+    lossData: { values: number[][], minLoss: number, maxLoss: number, resolution: number },
+    innerWidth: number,
+    innerHeight: number
+  ) {
+    const { values, minLoss, maxLoss, resolution } = lossData;
+    
+    // Transpose the grid for d3.contours (expects [row][col] = [y][x])
+    const transposed: number[] = [];
+    for (let j = 0; j < resolution; j++) {
+      for (let i = 0; i < resolution; i++) {
+        transposed.push(values[i][j]);
+      }
+    }
+    
+    // Generate contour levels using log scale
+    const logMin = Math.log(minLoss + 0.001);
+    const logMax = Math.log(maxLoss + 0.001);
+    const numContours = 12;
+    const thresholds: number[] = [];
+    
+    for (let i = 1; i < numContours; i++) {
+      const logValue = logMin + (i / numContours) * (logMax - logMin);
+      thresholds.push(Math.exp(logValue) - 0.001);
+    }
+    
+    // Generate contours
+    const contourGenerator = contours()
+      .size([resolution, resolution])
+      .smooth(true)
+      .thresholds(thresholds);
+    
+    const contourData = contourGenerator(transposed);
+    
+    // Create path generator
+    const cellWidth = innerWidth / resolution;
+    const cellHeight = innerHeight / resolution;
+    
+    const pathGenerator = d3.geoPath()
+      .projection(d3.geoTransform({
+        point: function(x, y) {
+          this.stream.point(x * cellWidth, y * cellHeight);
+        }
+      }));
+    
+    // Draw contours - reversed colors for better contrast with arrows
+    const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
+    const contourColor = isDarkMode ? '#0a0a0a' : '#ffffff';
+    
+    g.selectAll('.contour')
+      .data(contourData)
+      .enter()
+      .append('path')
+      .attr('class', 'contour')
+      .attr('d', pathGenerator)
+      .attr('fill', 'none')
+      .attr('stroke', contourColor)
+      .attr('stroke-width', 1.5)
+      .style('opacity', 0.5);
   }
   
   function drawTrainingPath(
@@ -401,7 +477,7 @@
         .attr('stroke', arrowColor)
         .attr('stroke-width', 0.8 + normalizedMagnitude * 1.2)
         .attr('marker-end', 'url(#arrowhead)')
-        .style('opacity', isDark ? 0.7 + normalizedMagnitude * 0.2 : 0.5 + normalizedMagnitude * 0.3);
+        .style('opacity', isDark ? 0.5 + normalizedMagnitude * 0.15 : 0.35 + normalizedMagnitude * 0.25);
     }
   }
   

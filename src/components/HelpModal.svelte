@@ -199,9 +199,9 @@
           <h3>Understanding the Visualizations</h3>
           <ul>
             <li><strong>Data Plot:</strong> Your training (solid) and test (dashed) data points with the current model fit</li>
-            <li><strong>Gradient Field:</strong> Loss heatmap (colors show loss magnitude) with gradient arrows showing steepest descent directions</li>
-            <li><strong>Loss History:</strong> How training and test loss evolve over time - watch for convergence or overfitting</li>
-            <li><strong>Formulas:</strong> The mathematical foundation of what you're observing</li>
+            <li><strong>Loss & Gradient:</strong> Color-coded loss heatmap showing the optimization landscape, white contour lines connecting points of equal loss, and gradient arrows showing steepest descent directions at each point</li>
+            <li><strong>Loss History:</strong> How training and test loss evolve over time - watch for convergence or overfitting. The current position is marked with colored dots at the end of each line</li>
+            <li><strong>Formulas:</strong> The mathematical foundation of what you're observing, rendered with proper LaTeX typesetting</li>
           </ul>
         </section>
         

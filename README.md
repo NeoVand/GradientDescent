@@ -14,8 +14,8 @@ An interactive visualization tool for understanding gradient descent through bea
 
 ## ✨ Features
 
-- **Interactive Gradient Field**: Visualize loss landscapes with color-coded heatmaps and gradient vector fields
-- **Real-time Training**: Watch gradient descent optimize in real-time with animated parameter trails
+- **Interactive Loss Landscape**: Color-coded heatmap, smooth contour lines, and gradient vector field all in one view
+- **Real-time Training**: Watch gradient descent optimize with animated parameter trails that fade over time
 - **Multiple Problem Types**: Explore linear regression, logistic classification, and polynomial regression
 - **Beautiful LaTeX Formulas**: Professional mathematical notation rendered with KaTeX
 - **Dark/Light Themes**: Elegant emerald-themed interface with seamless theme switching
@@ -80,10 +80,10 @@ where **θ** = [α, β]ᵀ are the parameters, γ is the learning rate, and ∇�
 
 ## 🎨 Key Visualizations
 
-- **Data Plot**: Training and test data with model predictions
-- **Loss & Gradient**: Combined heatmap and vector field showing the optimization landscape
-- **Loss History**: Training dynamics with sliding window display (last 500 steps)
-- **Formulas**: Real-time LaTeX-rendered equations
+- **Data Plot**: Training and test data with model predictions and decision boundaries (for classification)
+- **Loss & Gradient**: Color-coded loss heatmap with iso-loss contour lines and gradient vector field
+- **Loss History**: Training dynamics with sliding window display (last 500 steps) and current position markers
+- **Formulas**: Real-time LaTeX-rendered equations showing model, parameters, loss, and update rules
 
 ## 📄 License
 
