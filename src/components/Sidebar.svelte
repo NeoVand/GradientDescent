@@ -44,6 +44,9 @@
   let draftNumPoints = '';
   let draftTrainingSteps = '';
   let draftLearningRate = '';
+  
+  // Tooltip state
+  let activeTooltip: string | null = null;
   const problems: { type: ProblemType; name: string; icon: any; customIcon?: string }[] = [
     { type: 'linear-regression', name: 'Linear Regression', icon: TrendingUp },
     { type: 'logistic-regression', name: 'Logistic Regression', icon: Percent },
@@ -227,9 +230,7 @@
 
 <div class="sidebar-content">
   <h1>
-    <span class="app-icon">
-      <Mountain size={24} strokeWidth={0} fill="currentColor" />
-    </span>
+    <span class="app-icon">∂</span>
     <span>Gradient Descent</span>
   </h1>
   
@@ -238,9 +239,20 @@
     <div class="control-header">
       <span class="icon"><Brain size={18} strokeWidth={2} /></span>
       <span class="control-label">Problem</span>
-      <button class="info-btn" title="Select the machine learning problem type to explore">
-        <Info size={14} strokeWidth={2} />
-      </button>
+      <div class="tooltip-container">
+        <button 
+          class="info-btn" 
+          on:mouseenter={() => activeTooltip = 'problem'}
+          on:mouseleave={() => activeTooltip = null}
+        >
+          <Info size={14} strokeWidth={2} />
+        </button>
+        {#if activeTooltip === 'problem'}
+          <div class="tooltip">
+            Select the machine learning problem type to explore
+          </div>
+        {/if}
+      </div>
     </div>
     <div class="problem-selector" class:open={showProblemDropdown}>
       <button 
@@ -288,9 +300,20 @@
     <div class="control-header">
       <span class="icon"><MapPin size={18} strokeWidth={2} /></span>
       <label for="num-points">Data Points</label>
-      <button class="info-btn" title="Number of synthetic data points to generate">
-        <Info size={14} strokeWidth={2} />
-      </button>
+      <div class="tooltip-container">
+        <button 
+          class="info-btn"
+          on:mouseenter={() => activeTooltip = 'dataPoints'}
+          on:mouseleave={() => activeTooltip = null}
+        >
+          <Info size={14} strokeWidth={2} />
+        </button>
+        {#if activeTooltip === 'dataPoints'}
+          <div class="tooltip">
+            Number of synthetic data points to generate
+          </div>
+        {/if}
+      </div>
     </div>
     <div class="number-stepper">
       <button 
@@ -371,9 +394,20 @@
     <div class="control-header">
       <span class="icon"><PieChart size={18} strokeWidth={2} /></span>
       <label for="train-ratio">Train/Test Split</label>
-      <button class="info-btn" title="Ratio of data used for training vs. testing the model">
-        <Info size={14} strokeWidth={2} />
-      </button>
+      <div class="tooltip-container">
+        <button 
+          class="info-btn"
+          on:mouseenter={() => activeTooltip = 'trainTest'}
+          on:mouseleave={() => activeTooltip = null}
+        >
+          <Info size={14} strokeWidth={2} />
+        </button>
+        {#if activeTooltip === 'trainTest'}
+          <div class="tooltip">
+            Ratio of data used for training vs. testing the model
+          </div>
+        {/if}
+      </div>
     </div>
     <div class="slider-container">
       <div class="slider-value-display">
@@ -415,9 +449,21 @@
     <div class="control-header">
       <span class="icon"><Droplets size={18} strokeWidth={2} /></span>
       <label for="noise-level">Noise Level</label>
-      <button class="info-btn" title="Amount of random noise added to synthetic data (0=clean, 2=very noisy)">
-        <Info size={14} strokeWidth={2} />
-      </button>
+      <div class="tooltip-container">
+        <button 
+          class="info-btn"
+          on:mouseenter={() => activeTooltip = 'noise'}
+          on:mouseleave={() => activeTooltip = null}
+        >
+          <Info size={14} strokeWidth={2} />
+        </button>
+        {#if activeTooltip === 'noise'}
+          <div class="tooltip">
+            Amount of random noise added to synthetic data<br/>
+            <span style="opacity: 0.8; font-size: 0.7rem;">0 = clean, 2 = very noisy</span>
+          </div>
+        {/if}
+      </div>
     </div>
     <div class="slider-container">
       <div class="slider-value-display">
@@ -448,9 +494,21 @@
     <div class="control-header">
       <span class="icon"><Zap size={18} strokeWidth={2} /></span>
       <label for="learning-rate">Learning Rate</label>
-      <button class="info-btn" title="Step size for gradient descent updates (higher=faster but less stable)">
-        <Info size={14} strokeWidth={2} />
-      </button>
+      <div class="tooltip-container">
+        <button 
+          class="info-btn"
+          on:mouseenter={() => activeTooltip = 'learningRate'}
+          on:mouseleave={() => activeTooltip = null}
+        >
+          <Info size={14} strokeWidth={2} />
+        </button>
+        {#if activeTooltip === 'learningRate'}
+          <div class="tooltip">
+            Step size for gradient descent updates<br/>
+            <span style="opacity: 0.8; font-size: 0.7rem;">Higher = faster but less stable</span>
+          </div>
+        {/if}
+      </div>
     </div>
     <div class="number-stepper">
       <button 
@@ -513,9 +571,20 @@
     <div class="control-header">
       <span class="icon"><RefreshCw size={18} strokeWidth={2} /></span>
       <label for="training-steps">Training Steps</label>
-      <button class="info-btn" title="Number of gradient descent iterations to perform when training">
-        <Info size={14} strokeWidth={2} />
-      </button>
+      <div class="tooltip-container">
+        <button 
+          class="info-btn"
+          on:mouseenter={() => activeTooltip = 'steps'}
+          on:mouseleave={() => activeTooltip = null}
+        >
+          <Info size={14} strokeWidth={2} />
+        </button>
+        {#if activeTooltip === 'steps'}
+          <div class="tooltip">
+            Number of gradient descent iterations to perform when training
+          </div>
+        {/if}
+      </div>
     </div>
     <div class="number-stepper">
       <button 
@@ -629,6 +698,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    font-family: 'Times New Roman', 'Georgia', serif;
+    font-size: 1.75rem;
+    font-weight: 400;
+    font-style: italic;
+    line-height: 1;
   }
   
   .control-group {
@@ -682,6 +756,52 @@
     opacity: 1;
     color: #10b981;
     transform: scale(1.15);
+  }
+  
+  .tooltip-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  
+  .tooltip {
+    position: fixed;
+    left: 330px;
+    transform: translateY(-50%);
+    padding: 0.625rem 0.875rem;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    white-space: nowrap;
+    z-index: 10000;
+    pointer-events: none;
+    animation: tooltipFadeIn 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+  
+  /* Light mode tooltip */
+  :global([data-theme='light']) .tooltip {
+    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+    border: 1px solid #a7f3d0;
+    color: #064e3b;
+  }
+  
+  /* Dark mode tooltip */
+  :global([data-theme='dark']) .tooltip {
+    background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+    border: 1px solid #047857;
+    color: #d1fae5;
+  }
+  
+  @keyframes tooltipFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-50%) translateX(-5px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(-50%) translateX(0);
+    }
   }
   
   /* Problem Selector */
