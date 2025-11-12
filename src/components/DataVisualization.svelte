@@ -178,25 +178,28 @@
       .attr('transform', `translate(${margin.left},${margin.top})`);
     
     // Add grid lines to clipped group (isDark already declared above)
-    const gridColor = isDark ? '#64748b' : '#9ca3af';
-    
-    // Regular grid lines
-    plotGroup.append('g')
-      .attr('class', 'grid')
-      .attr('transform', `translate(0,${innerHeight})`)
-      .call(xAxis.tickSize(-innerHeight).tickFormat(() => ''))
-      .call(g => g.selectAll('line').attr('stroke', gridColor))
-      .call(g => g.selectAll('path').attr('stroke', 'none'))
-      .style('stroke-dasharray', '2,4')
-      .style('opacity', isDark ? 0.3 : 0.35);
-    
-    plotGroup.append('g')
-      .attr('class', 'grid')
-      .call(yAxis.tickSize(-innerWidth).tickFormat(() => ''))
-      .call(g => g.selectAll('line').attr('stroke', gridColor))
-      .call(g => g.selectAll('path').attr('stroke', 'none'))
-      .style('stroke-dasharray', '2,4')
-      .style('opacity', isDark ? 0.3 : 0.35);
+    // Skip grid for logistic regression (heatmap is enough)
+    if (problemType !== 'logistic-regression') {
+      const gridColor = isDark ? '#64748b' : '#9ca3af';
+      
+      // Regular grid lines
+      plotGroup.append('g')
+        .attr('class', 'grid')
+        .attr('transform', `translate(0,${innerHeight})`)
+        .call(xAxis.tickSize(-innerHeight).tickFormat(() => ''))
+        .call(g => g.selectAll('line').attr('stroke', gridColor))
+        .call(g => g.selectAll('path').attr('stroke', 'none'))
+        .style('stroke-dasharray', '2,4')
+        .style('opacity', isDark ? 0.3 : 0.35);
+      
+      plotGroup.append('g')
+        .attr('class', 'grid')
+        .call(yAxis.tickSize(-innerWidth).tickFormat(() => ''))
+        .call(g => g.selectAll('line').attr('stroke', gridColor))
+        .call(g => g.selectAll('path').attr('stroke', 'none'))
+        .style('stroke-dasharray', '2,4')
+        .style('opacity', isDark ? 0.3 : 0.35);
+    }
     
     // Emphasize X=0 and Y=0 axes
     if (xScale(0) >= 0 && xScale(0) <= innerWidth) {
@@ -236,53 +239,106 @@
     yScale: d3.ScaleLinear<number, number>,
     innerWidth: number
   ) {
-    // For classification, draw decision boundary lines
+    // For classification, draw probability heatmap with decision boundary
     if (problemType === 'logistic-regression') {
       const xDomain = xScale.domain();
       const yDomain = yScale.domain();
       
-      // True decision boundary: a*x + b*y = 0 => y = -a*x / b
-      const trueA = problemConfig.trueParameters.a;
-      const trueB = problemConfig.trueParameters.b;
+      // Create probability heatmap - draw as single image for smooth appearance
+      const heatmapResolution = 60;
+      const cellWidth = innerWidth / heatmapResolution;
+      const cellHeight = innerHeight / heatmapResolution;
       
-      if (trueB !== 0) {
-        const trueLine = [
-          { x: xDomain[0], y: -trueA * xDomain[0] / trueB },
-          { x: xDomain[1], y: -trueA * xDomain[1] / trueB }
-        ];
-        
-        const lineGenerator = d3.line<{x: number, y: number}>()
-          .x(d => xScale(d.x))
-          .y(d => yScale(d.y));
-        
-        // Draw true decision boundary (dashed green)
-        g.append('path')
-          .datum(trueLine)
-          .attr('fill', 'none')
-          .attr('stroke', '#10b981')
-          .attr('stroke-width', 2.5)
-          .attr('stroke-dasharray', '8,4')
-          .attr('d', lineGenerator)
-          .style('opacity', 0.7);
+      // Create all cells with exact sizing (no overlap, no gaps)
+      for (let i = 0; i < heatmapResolution; i++) {
+        for (let j = 0; j < heatmapResolution; j++) {
+          // Calculate exact pixel position
+          const pixelX = Math.round(i * cellWidth);
+          const pixelY = Math.round(j * cellHeight);
+          
+          // Calculate exact cell dimensions
+          const nextPixelX = Math.round((i + 1) * cellWidth);
+          const nextPixelY = Math.round((j + 1) * cellHeight);
+          const exactWidth = nextPixelX - pixelX;
+          const exactHeight = nextPixelY - pixelY;
+          
+          // Convert pixel position back to data space for center of cell
+          const x = xScale.invert(pixelX + exactWidth / 2);
+          const y = yScale.invert(pixelY + exactHeight / 2);
+          
+          // Calculate probability at this point
+          const z = parameters.a * x + parameters.b * y;
+          const probability = 1 / (1 + Math.exp(-z));
+          
+          // Color based on probability
+          // probability near 0 = blue (class 0), near 1 = red (class 1)
+          const color = d3.interpolateRdBu(1 - probability);
+          
+          // Draw cell with exact dimensions - no overlap, no gaps
+          g.append('rect')
+            .attr('x', pixelX)
+            .attr('y', pixelY)
+            .attr('width', exactWidth)
+            .attr('height', exactHeight)
+            .attr('fill', color)
+            .style('opacity', 0.35);
+        }
       }
       
-      // Current model decision boundary
+      // Current model decision boundary with confidence bands
       if (parameters.b !== 0) {
-        const modelLine = [
-          { x: xDomain[0], y: -parameters.a * xDomain[0] / parameters.b },
-          { x: xDomain[1], y: -parameters.a * xDomain[1] / parameters.b }
-        ];
+        const linePoints = [];
+        const numPoints = 100;
+        
+        for (let i = 0; i <= numPoints; i++) {
+          const x = xDomain[0] + (i / numPoints) * (xDomain[1] - xDomain[0]);
+          const y = -parameters.a * x / parameters.b;
+          linePoints.push({ x, y });
+        }
         
         const lineGenerator = d3.line<{x: number, y: number}>()
           .x(d => xScale(d.x))
           .y(d => yScale(d.y));
         
-        // Draw current model decision boundary (solid blue)
+        // Draw confidence bands as dashed lines
+        const bandWidth = 0.25; // Distance from boundary
+        
+        // Upper confidence line (dashed)
+        const upperBand = linePoints.map(p => ({ 
+          x: p.x, 
+          y: p.y + bandWidth 
+        }));
+        
         g.append('path')
-          .datum(modelLine)
+          .datum(upperBand)
           .attr('fill', 'none')
           .attr('stroke', '#3b82f6')
-          .attr('stroke-width', 3)
+          .attr('stroke-width', 1.5)
+          .attr('stroke-dasharray', '4,3')
+          .attr('d', lineGenerator)
+          .style('opacity', 0.5);
+        
+        // Lower confidence line (dashed)
+        const lowerBand = linePoints.map(p => ({ 
+          x: p.x, 
+          y: p.y - bandWidth 
+        }));
+        
+        g.append('path')
+          .datum(lowerBand)
+          .attr('fill', 'none')
+          .attr('stroke', '#3b82f6')
+          .attr('stroke-width', 1.5)
+          .attr('stroke-dasharray', '4,3')
+          .attr('d', lineGenerator)
+          .style('opacity', 0.5);
+        
+        // Draw current model decision boundary (solid line)
+        g.append('path')
+          .datum(linePoints)
+          .attr('fill', 'none')
+          .attr('stroke', '#3b82f6')
+          .attr('stroke-width', 2.5)
           .attr('d', lineGenerator)
           .style('opacity', 1);
       }

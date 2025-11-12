@@ -48,7 +48,7 @@
   // Redraw when theme changes
   $: if (svgElement && theme) {
     drawGradientField();
-  }
+    }
   
   let resizeTimer: number | null = null;
   
@@ -186,7 +186,7 @@
     
     // Draw current position
     drawCurrentPosition(g, xScale, yScale, innerWidth, innerHeight);
-  }
+        }
   
   function drawGradients(
     g: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -346,18 +346,18 @@
       const innerHeight = height - margin.top - margin.bottom;
       
       const xScale = d3.scaleLinear()
-        .domain([parameterRange.min, parameterRange.max])
+      .domain([parameterRange.min, parameterRange.max])
         .range([0, innerWidth]);
       
       const yScale = d3.scaleLinear()
         .domain([parameterRange.min, parameterRange.max])
         .range([innerHeight, 0]);
-      
+    
       const x = xScale(parameters.a);
       const y = yScale(parameters.b);
       
       marker.attr('transform', `translate(${x}, ${y})`);
-    }
+  }
   }
 </script>
 
