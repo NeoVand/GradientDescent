@@ -782,7 +782,7 @@
   
   .tooltip {
     position: fixed;
-    left: 330px;
+    left: 312px;
     transform: translateY(-50%);
     padding: 0.625rem 0.875rem;
     border-radius: 8px;

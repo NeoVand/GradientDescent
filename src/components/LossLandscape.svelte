@@ -27,7 +27,7 @@
   const margin = { top: 20, right: 20, bottom: 50, left: 50 };
   
   // Parameter range for visualization
-  const parameterRange = { min: -5, max: 5 };
+  const parameterRange = { min: -7, max: 7 };
   const gridResolution = 24; // 24x24 grid for gradient arrows
   
   // Loss range for legend
@@ -618,9 +618,9 @@
     <div class="color-legend">
       <span class="legend-label">Loss:</span>
       <div class="legend-scale">
-        <span class="scale-value">{minLossValue.toFixed(2)}</span>
-        <div class="color-bar"></div>
         <span class="scale-value">{maxLossValue.toFixed(2)}</span>
+        <div class="color-bar"></div>
+        <span class="scale-value">{minLossValue.toFixed(2)}</span>
       </div>
     </div>
   </div>
