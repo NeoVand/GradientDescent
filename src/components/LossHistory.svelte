@@ -193,7 +193,7 @@
       .attr('rx', 4);
     
     // Add grid lines with theme-aware color (isDark already declared above)
-    const gridColor = isDark ? '#64748b' : '#e0e0e0';
+    const gridColor = isDark ? '#64748b' : '#9ca3af';
     
     g.append('g')
       .attr('class', 'grid')
@@ -202,7 +202,7 @@
       .call(g => g.selectAll('line').attr('stroke', gridColor))
       .call(g => g.selectAll('path').attr('stroke', 'none'))
       .style('stroke-dasharray', '2,4')
-      .style('opacity', isDark ? 0.35 : 0.2);
+      .style('opacity', isDark ? 0.35 : 0.35);
     
     g.append('g')
       .attr('class', 'grid')
@@ -210,7 +210,7 @@
       .call(g => g.selectAll('line').attr('stroke', gridColor))
       .call(g => g.selectAll('path').attr('stroke', 'none'))
       .style('stroke-dasharray', '2,4')
-      .style('opacity', isDark ? 0.35 : 0.2);
+      .style('opacity', isDark ? 0.35 : 0.35);
     
     // Draw smooth lines without circles
     if (windowedHistory.length > 1) {
@@ -239,19 +239,7 @@
         .style('opacity', 0.9);
     }
     
-    // Add current step indicator
-    if (currentStep > 0 && currentStep <= maxStep) {
-      g.append('line')
-        .attr('class', 'current-step-line')
-        .attr('x1', xScale(currentStep))
-        .attr('y1', 0)
-        .attr('x2', xScale(currentStep))
-        .attr('y2', innerHeight)
-        .attr('stroke', '#666')
-        .attr('stroke-width', 1)
-        .attr('stroke-dasharray', '5,5')
-        .style('opacity', 0.5);
-    }
+    // Current step indicator removed - not needed
     
     // Add hover interaction
     const bisect = d3.bisector<typeof history[0], number>(d => d.step).left;

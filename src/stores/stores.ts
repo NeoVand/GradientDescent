@@ -111,8 +111,8 @@ export const parametersStore = createParametersStore();
 // ========== Training Configuration Store ==========
 // Manages training hyperparameters and state
 export const trainingStore = writable<TrainingConfig>({
-  learningRate: 0.001,
-  totalSteps: 20,
+  learningRate: 0.01,
+  totalSteps: 100,
   currentStep: 0,
   isTraining: false
 });

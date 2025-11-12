@@ -178,7 +178,7 @@
       .attr('transform', `translate(${margin.left},${margin.top})`);
     
     // Add grid lines to clipped group (isDark already declared above)
-    const gridColor = isDark ? '#64748b' : '#e0e0e0';
+    const gridColor = isDark ? '#64748b' : '#9ca3af';
     
     // Regular grid lines
     plotGroup.append('g')
@@ -188,7 +188,7 @@
       .call(g => g.selectAll('line').attr('stroke', gridColor))
       .call(g => g.selectAll('path').attr('stroke', 'none'))
       .style('stroke-dasharray', '2,4')
-      .style('opacity', isDark ? 0.3 : 0.2);
+      .style('opacity', isDark ? 0.3 : 0.35);
     
     plotGroup.append('g')
       .attr('class', 'grid')
@@ -196,7 +196,7 @@
       .call(g => g.selectAll('line').attr('stroke', gridColor))
       .call(g => g.selectAll('path').attr('stroke', 'none'))
       .style('stroke-dasharray', '2,4')
-      .style('opacity', isDark ? 0.3 : 0.2);
+      .style('opacity', isDark ? 0.3 : 0.35);
     
     // Emphasize X=0 and Y=0 axes
     if (xScale(0) >= 0 && xScale(0) <= innerWidth) {
