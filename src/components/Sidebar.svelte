@@ -483,7 +483,7 @@
   <div class="control-group">
     <div class="control-header">
       <span class="icon"><Zap size={18} strokeWidth={2} /></span>
-      <label for="learning-rate">Learning Rate <span class="greek-label">(γ)</span></label>
+      <label for="learning-rate">Learning Rate <span class="greek-label"> (γ)</span></label>
       <div class="tooltip-container">
         <button 
           class="info-btn"
@@ -1122,7 +1122,7 @@
     width: 16px;
     height: 16px;
     cursor: pointer;
-    accent-color: var(--color-primary);
+    accent-color: #10b981;
   }
   
   .checkbox-text {

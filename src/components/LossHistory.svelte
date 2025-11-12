@@ -241,20 +241,16 @@
       g.append('circle')
         .attr('cx', xScale(lastPoint.step))
         .attr('cy', yScale(lastPoint.trainLoss))
-        .attr('r', 5)
+        .attr('r', 4)
         .attr('fill', '#3b82f6')
-        .attr('stroke', '#fff')
-        .attr('stroke-width', 2)
         .style('opacity', 1);
       
       // Test loss current position
       g.append('circle')
         .attr('cx', xScale(lastPoint.step))
         .attr('cy', yScale(lastPoint.testLoss))
-        .attr('r', 5)
+        .attr('r', 4)
         .attr('fill', '#10b981')
-        .attr('stroke', '#fff')
-        .attr('stroke-width', 2)
         .style('opacity', 1);
     }
     

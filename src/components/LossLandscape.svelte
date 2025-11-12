@@ -17,7 +17,7 @@
     themeStore
   } from '../stores/stores';
   import type { ModelParameters } from '../types/types';
-  import { TrendingDown } from 'lucide-svelte';
+  import { Mountain } from 'lucide-svelte';
   
   // Component references
   let svgElement: SVGSVGElement;
@@ -522,7 +522,7 @@
 <div class="gradient-container">
   <div class="header">
     <h2>
-      <TrendingDown size={20} strokeWidth={2} />
+      <Mountain size={20} strokeWidth={2} />
       <span>Loss & Gradient</span>
     </h2>
     <div class="color-legend">
