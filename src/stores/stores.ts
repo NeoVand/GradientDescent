@@ -12,9 +12,7 @@ import type {
   DataPoint, 
   ModelParameters, 
   TrainingConfig, 
-  TrainingHistoryPoint,
-  LossLandscapeMode,
-  LossLandscapeVisuals 
+  TrainingHistoryPoint
 } from '../types/types';
 import { problemConfigs } from '../utils/problems';
 
@@ -134,16 +132,7 @@ function createHistoryStore() {
 
 export const historyStore = createHistoryStore();
 
-// ========== Loss Landscape Visualization Store ==========
-// Controls how the loss landscape is displayed
-export const lossLandscapeMode = writable<LossLandscapeMode>('2d');
-
-export const lossLandscapeVisuals = writable<LossLandscapeVisuals>({
-  heatmap: true,
-  gradientField: false,
-  contours: true,
-  trainingPath: false
-});
+// Removed old loss landscape visualization stores - now just a simple gradient field
 
 // ========== Derived Stores ==========
 // These automatically update when their dependencies change

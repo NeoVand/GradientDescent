@@ -50,14 +50,5 @@ export interface TrainingHistoryPoint {
   parameters: ModelParameters;
 }
 
-// Visualization modes for the loss landscape
-export type LossLandscapeMode = '2d' | '3d';
-
-// Visual elements that can be toggled on the loss landscape
-export interface LossLandscapeVisuals {
-  heatmap: boolean;
-  gradientField: boolean;
-  contours: boolean;
-  trainingPath: boolean;
-}
+// Removed old loss landscape types - simplified to gradient field only
 
