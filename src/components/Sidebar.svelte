@@ -493,7 +493,7 @@
   <div class="control-group">
     <div class="control-header">
       <span class="icon"><Zap size={18} strokeWidth={2} /></span>
-      <label for="learning-rate">Learning Rate</label>
+      <label for="learning-rate">Learning Rate <span class="greek-label">(γ)</span></label>
       <div class="tooltip-container">
         <button 
           class="info-btn"
@@ -756,6 +756,13 @@
     opacity: 1;
     color: #10b981;
     transform: scale(1.15);
+  }
+  
+  .greek-label {
+    font-family: 'Georgia', serif;
+    font-style: italic;
+    font-weight: 400;
+    opacity: 0.7;
   }
   
   .tooltip-container {

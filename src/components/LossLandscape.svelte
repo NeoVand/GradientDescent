@@ -146,25 +146,29 @@
       .call(g => g.selectAll('line').remove())
       .call(g => g.select('.domain').attr('stroke', axisColor));
     
-    // Add axis labels
+    // Add axis labels (Greek letters)
     g.append('text')
       .attr('x', innerWidth / 2)
       .attr('y', innerHeight + 38)
       .attr('fill', axisColor)
-      .attr('font-size', '13px')
-      .attr('font-weight', '600')
+      .attr('font-size', '14px')
+      .attr('font-weight', '400')
+      .attr('font-style', 'italic')
+      .attr('font-family', 'Georgia, serif')
       .style('text-anchor', 'middle')
-      .text('A');
+      .text('α');
     
     g.append('text')
       .attr('transform', 'rotate(-90)')
       .attr('y', -35)
       .attr('x', -innerHeight / 2)
       .attr('fill', axisColor)
-      .attr('font-size', '13px')
-      .attr('font-weight', '600')
+      .attr('font-size', '14px')
+      .attr('font-weight', '400')
+      .attr('font-style', 'italic')
+      .attr('font-family', 'Georgia, serif')
       .style('text-anchor', 'middle')
-      .text('B');
+      .text('β');
     
     // Add background
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';

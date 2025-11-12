@@ -9,14 +9,17 @@
   import DataVisualization from './components/DataVisualization.svelte';
   import LossLandscape from './components/LossLandscape.svelte';
   import LossHistory from './components/LossHistory.svelte';
-  import ParameterDisplay from './components/ParameterDisplay.svelte';
+  import GuidePanel from './components/GuidePanel.svelte';
+  import HelpModal from './components/HelpModal.svelte';
   import { datasetStore, parametersStore, historyStore, currentProblemConfig, themeStore } from './stores/stores';
-  import { Sun, Moon } from 'lucide-svelte';
+  import { Sun, Moon, HelpCircle } from 'lucide-svelte';
   
   // The main app orchestrates all our components and manages the overall layout.
   // We use CSS Grid for a responsive, flexible layout that adapts to different screen sizes.
   
   $: theme = $themeStore;
+  
+  let showHelpModal = false;
   
   // Initialize data when app starts
   onMount(() => {
@@ -49,14 +52,22 @@
 </script>
 
 <main>
-  <!-- Theme toggle button - top right corner -->
-  <button class="theme-toggle" on:click={() => themeStore.toggle()} title="Toggle theme">
-    {#if theme === 'light'}
-      <Moon size={22} strokeWidth={2.5} />
-    {:else}
-      <Sun size={22} strokeWidth={2.5} />
-    {/if}
-  </button>
+  <!-- Help and theme buttons - bottom right corner -->
+  <div class="floating-buttons">
+    <button class="help-btn" on:click={() => showHelpModal = true} title="Help & Guide">
+      <HelpCircle size={20} strokeWidth={2.5} />
+    </button>
+    <button class="theme-toggle" on:click={() => themeStore.toggle()} title="Toggle theme">
+      {#if theme === 'light'}
+        <Moon size={20} strokeWidth={2.5} />
+      {:else}
+        <Sun size={20} strokeWidth={2.5} />
+      {/if}
+    </button>
+  </div>
+  
+  <!-- Help Modal -->
+  <HelpModal isOpen={showHelpModal} onClose={() => showHelpModal = false} />
 
   <div class="app-container">
     <!-- Left sidebar contains problem selection and training controls -->
@@ -81,8 +92,8 @@
         <div class="loss-history-container">
           <LossHistory />
         </div>
-        <div class="parameter-display-container">
-          <ParameterDisplay />
+        <div class="guide-panel-container">
+          <GuidePanel />
         </div>
       </div>
     </div>
@@ -160,13 +171,21 @@
     position: relative;
   }
   
-  /* Theme toggle button - top right */
-  .theme-toggle {
+  /* Floating buttons - bottom right */
+  .floating-buttons {
     position: fixed;
-    top: 1.5rem;
+    bottom: 1.5rem;
     right: 1.5rem;
-    width: 46px;
-    height: 46px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    z-index: 100;
+  }
+  
+  .help-btn,
+  .theme-toggle {
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     border: 2px solid var(--color-border);
     background: var(--color-bg-secondary);
@@ -176,14 +195,16 @@
     align-items: center;
     justify-content: center;
     transition: all 0.2s;
-    z-index: 100;
     padding: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
   
+  .help-btn:hover,
   .theme-toggle:hover {
     border-color: #10b981;
     transform: scale(1.08);
     color: #10b981;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
   }
   
   /* Main app container using CSS Grid for layout */
@@ -237,7 +258,7 @@
   .data-viz-container,
   .loss-landscape-container,
   .loss-history-container,
-  .parameter-display-container {
+  .guide-panel-container {
     background-color: transparent;
     border-radius: 0;
     box-shadow: none;
