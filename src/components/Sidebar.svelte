@@ -102,6 +102,13 @@
     datasetStore.regenerateData();
   }
   
+  // Handle noise level change
+  function handleNoiseLevelChange(e: Event) {
+    const value = parseFloat((e.target as HTMLInputElement).value);
+    datasetStore.setNoiseLevel(value);
+    datasetStore.regenerateData();
+  }
+  
   // Handle learning rate change
   function handleLearningRateChange(e: Event) {
     const value = parseFloat((e.target as HTMLInputElement).value);
@@ -320,13 +327,9 @@
         class="stepper-btn"
         disabled={numPoints <= 10}
         on:click={() => {
-          datasetStore.setNumPoints(Math.max(10, numPoints - 5));
-          if (numPointsDebounce) clearTimeout(numPointsDebounce);
-          numPointsDebounce = window.setTimeout(() => {
-            requestAnimationFrame(() => {
-              datasetStore.regenerateData();
-            });
-          }, 200);
+          const newValue = Math.max(10, numPoints - 5);
+          datasetStore.setNumPoints(newValue);
+          datasetStore.regenerateData();
         }}
       >
         −
@@ -342,12 +345,7 @@
             if (!isNaN(parsed)) {
               const clamped = Math.max(10, Math.min(100, parsed));
               datasetStore.setNumPoints(clamped);
-              if (numPointsDebounce) clearTimeout(numPointsDebounce);
-              numPointsDebounce = window.setTimeout(() => {
-                requestAnimationFrame(() => {
-                  datasetStore.regenerateData();
-                });
-              }, 200);
+              datasetStore.regenerateData();
             }
             editingNumPoints = false;
           }}
@@ -375,13 +373,9 @@
         class="stepper-btn"
         disabled={numPoints >= 100}
         on:click={() => {
-          datasetStore.setNumPoints(Math.min(100, numPoints + 5));
-          if (numPointsDebounce) clearTimeout(numPointsDebounce);
-          numPointsDebounce = window.setTimeout(() => {
-            requestAnimationFrame(() => {
-              datasetStore.regenerateData();
-            });
-          }, 200);
+          const newValue = Math.min(100, numPoints + 5);
+          datasetStore.setNumPoints(newValue);
+          datasetStore.regenerateData();
         }}
       >
         +
@@ -473,14 +467,10 @@
         id="noise-level"
         type="range"
         min="0"
-        max="1"
+        max="2"
         step="0.05"
         value={noiseLevel}
-        on:input={(e) => {
-          const value = parseFloat((e.target as HTMLInputElement).value);
-          datasetStore.setNoiseLevel(value);
-          datasetStore.regenerateData();
-        }}
+        on:input={handleNoiseLevelChange}
       />
       <div class="slider-labels">
         <span>Low</span>
