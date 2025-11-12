@@ -152,9 +152,8 @@
       .text('X');
     
     g.append('text')
-      .attr('transform', 'rotate(-90)')
-      .attr('y', -30)
-      .attr('x', -innerHeight / 2)
+      .attr('x', -35)
+      .attr('y', innerHeight / 2)
       .attr('fill', axisColor)
       .style('text-anchor', 'middle')
       .attr('font-size', '12px')

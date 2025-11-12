@@ -120,7 +120,7 @@
     
     const yAxis = d3.axisLeft(yScale)
       .ticks(5)
-      .tickFormat(d3.format('.2f'))
+      .tickFormat(d3.format('.1f'))
       .tickSizeOuter(0);
     
     // Get theme-aware colors

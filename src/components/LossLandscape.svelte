@@ -127,14 +127,16 @@
       .attr('class', 'x-axis')
       .attr('transform', `translate(0,${innerHeight})`)
       .call(xAxis)
-      .call(g => g.selectAll('line, path').attr('stroke', axisColor))
+      .call(g => g.selectAll('line').attr('stroke', axisColor))
+      .call(g => g.selectAll('path').attr('stroke', axisColor).attr('stroke-width', 1))
       .call(g => g.selectAll('text').attr('fill', axisColor));
     
     // Left axis
     g.append('g')
       .attr('class', 'y-axis')
       .call(yAxis)
-      .call(g => g.selectAll('line, path').attr('stroke', axisColor))
+      .call(g => g.selectAll('line').attr('stroke', axisColor))
+      .call(g => g.selectAll('path').attr('stroke', axisColor).attr('stroke-width', 1))
       .call(g => g.selectAll('text').attr('fill', axisColor));
     
     // Top axis (frame - no ticks)
@@ -142,7 +144,7 @@
       .attr('class', 'x-axis-top')
       .call(d3.axisTop(xScale).tickSizeOuter(0).tickSize(0).tickFormat(() => ''))
       .call(g => g.selectAll('line').remove())
-      .call(g => g.select('.domain').attr('stroke', axisColor));
+      .call(g => g.select('.domain').attr('stroke', axisColor).attr('stroke-width', 1));
     
     // Right axis (frame - no ticks)
     g.append('g')
@@ -150,7 +152,7 @@
       .attr('transform', `translate(${innerWidth},0)`)
       .call(d3.axisRight(yScale).tickSizeOuter(0).tickSize(0).tickFormat(() => ''))
       .call(g => g.selectAll('line').remove())
-      .call(g => g.select('.domain').attr('stroke', axisColor));
+      .call(g => g.select('.domain').attr('stroke', axisColor).attr('stroke-width', 1));
     
     // Add axis labels (Greek letters)
     g.append('text')
@@ -165,9 +167,8 @@
       .text('α');
     
     g.append('text')
-      .attr('transform', 'rotate(-90)')
-      .attr('y', -35)
-      .attr('x', -innerHeight / 2)
+      .attr('x', -35)
+      .attr('y', innerHeight / 2)
       .attr('fill', axisColor)
       .attr('font-size', '14px')
       .attr('font-weight', '400')
