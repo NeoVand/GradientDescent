@@ -92,16 +92,21 @@
     const windowedHistory = history.filter(d => d.step >= minStep);
     
     const allLosses = windowedHistory.flatMap(d => [d.trainLoss, d.testLoss]);
-    const minLoss = Math.min(...allLosses) * 0.9;
-    const maxLoss = Math.max(...allLosses) * 1.1;
+    const minLoss = Math.min(...allLosses);
+    const maxLoss = Math.max(...allLosses);
     
-    // Create scales with sliding window
+    // Add padding to prevent edge bleeding (especially important for stroke width)
+    const lossRange = maxLoss - minLoss;
+    const lossPadding = lossRange * 0.08;  // 8% padding
+    const stepPadding = Math.max((maxStep - minStep) * 0.02, 1);  // 2% padding or at least 1 step
+    
+    // Create scales with sliding window and padding
     const xScale = d3.scaleLinear()
-      .domain([minStep, Math.max(maxStep, minStep + 10)])
+      .domain([minStep - stepPadding, Math.max(maxStep, minStep + 10) + stepPadding])
       .range([0, innerWidth]);
     
     const yScale = d3.scaleLinear()
-      .domain([minLoss, maxLoss])
+      .domain([minLoss - lossPadding, maxLoss + lossPadding])
       .range([innerHeight, 0]);
     
     // Create line generators with smooth curves
@@ -115,14 +120,16 @@
       .y(d => yScale(d.testLoss))
       .curve(d3.curveCatmullRom.alpha(0.5));
     
-    // Add axes
+    // Create axes
     const xAxis = d3.axisBottom(xScale)
       .ticks(5)
-      .tickFormat(d3.format('d'));
+      .tickFormat(d3.format('d'))
+      .tickSizeOuter(0);
     
     const yAxis = d3.axisLeft(yScale)
       .ticks(5)
-      .tickFormat(d3.format('.3f'));
+      .tickFormat(d3.format('.2f'))
+      .tickSizeOuter(0);
     
     // Get theme-aware colors
     const axisColor = getComputedStyle(document.documentElement).getPropertyValue('--color-text-tertiary').trim();
@@ -142,18 +149,18 @@
       .call(g => g.selectAll('line, path').attr('stroke', axisColor))
       .call(g => g.selectAll('text').attr('fill', axisColor));
     
-    // Top axis (frame)
+    // Top axis (frame - no ticks)
     g.append('g')
       .attr('class', 'x-axis-top')
-      .call(d3.axisTop(xScale).tickSizeOuter(0).tickFormat(() => ''))
+      .call(d3.axisTop(xScale).tickSizeOuter(0).tickSize(0).tickFormat(() => ''))
       .call(g => g.selectAll('line').remove())
       .call(g => g.select('.domain').attr('stroke', axisColor));
     
-    // Right axis (frame)
+    // Right axis (frame - no ticks)
     g.append('g')
       .attr('class', 'y-axis-right')
       .attr('transform', `translate(${innerWidth},0)`)
-      .call(d3.axisRight(yScale).tickSizeOuter(0).tickFormat(() => ''))
+      .call(d3.axisRight(yScale).tickSizeOuter(0).tickSize(0).tickFormat(() => ''))
       .call(g => g.selectAll('line').remove())
       .call(g => g.select('.domain').attr('stroke', axisColor));
     
