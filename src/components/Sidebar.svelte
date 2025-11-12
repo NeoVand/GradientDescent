@@ -17,15 +17,17 @@
     TrendingUp, 
     Percent,
     MapPin, 
-    BarChart3, 
+    PieChart, 
     Zap, 
     RefreshCw,
     Play,
     Pause,
     RotateCcw,
     Activity,
-    Sparkles,
-    TrendingDown
+    Droplets,
+    TrendingDown,
+    Brain,
+    Info
   } from 'lucide-svelte';
   
   // Component state
@@ -214,8 +216,11 @@
   <!-- Problem Selection -->
   <div class="control-group">
     <div class="control-header">
-      <span class="icon"><BarChart3 size={18} strokeWidth={2} /></span>
+      <span class="icon"><Brain size={18} strokeWidth={2} /></span>
       <span class="control-label">Problem</span>
+      <button class="info-btn" title="Select the machine learning problem type to explore">
+        <Info size={14} strokeWidth={2} />
+      </button>
     </div>
     <div class="problem-selector" class:open={showProblemDropdown}>
       <button 
@@ -263,6 +268,9 @@
     <div class="control-header">
       <span class="icon"><MapPin size={18} strokeWidth={2} /></span>
       <label for="num-points">Data Points</label>
+      <button class="info-btn" title="Number of synthetic data points to generate">
+        <Info size={14} strokeWidth={2} />
+      </button>
     </div>
     <div class="control-input">
       <button on:click={() => {
@@ -292,8 +300,11 @@
   <!-- Train/Test Ratio -->
   <div class="control-group">
     <div class="control-header">
-      <span class="icon"><BarChart3 size={18} strokeWidth={2} /></span>
+      <span class="icon"><PieChart size={18} strokeWidth={2} /></span>
       <label for="train-ratio">Train/Test Split</label>
+      <button class="info-btn" title="Ratio of data used for training vs. testing the model">
+        <Info size={14} strokeWidth={2} />
+      </button>
     </div>
     <div class="slider-container">
       <div class="slider-value-display">
@@ -333,8 +344,11 @@
   <!-- Noise Level -->
   <div class="control-group">
     <div class="control-header">
-      <span class="icon"><Sparkles size={18} strokeWidth={2} /></span>
+      <span class="icon"><Droplets size={18} strokeWidth={2} /></span>
       <label for="noise-level">Noise Level</label>
+      <button class="info-btn" title="Amount of random noise added to synthetic data (0=clean, 2=very noisy)">
+        <Info size={14} strokeWidth={2} />
+      </button>
     </div>
     <div class="slider-container">
       <div class="slider-value-display">
@@ -365,6 +379,9 @@
     <div class="control-header">
       <span class="icon"><Zap size={18} strokeWidth={2} /></span>
       <label for="learning-rate">Learning Rate</label>
+      <button class="info-btn" title="Step size for gradient descent updates (higher=faster but less stable)">
+        <Info size={14} strokeWidth={2} />
+      </button>
     </div>
     <div class="control-input">
       <button on:click={() => {
@@ -391,6 +408,9 @@
     <div class="control-header">
       <span class="icon"><RefreshCw size={18} strokeWidth={2} /></span>
       <label for="training-steps">Training Steps</label>
+      <button class="info-btn" title="Number of gradient descent iterations to perform when training">
+        <Info size={14} strokeWidth={2} />
+      </button>
     </div>
     <div class="control-input">
       <button on:click={() => {
@@ -480,6 +500,9 @@
   
   .control-header .icon {
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   
   .control-header label,
@@ -487,6 +510,33 @@
     font-weight: 600;
     color: var(--color-text-secondary);
     font-size: 0.8125rem;
+    flex: 1;
+    line-height: 1.2;
+    display: flex;
+    align-items: center;
+  }
+  
+  .info-btn {
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--color-text-tertiary);
+    cursor: help;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    opacity: 0.35;
+    margin-left: auto;
+  }
+  
+  .info-btn:hover {
+    opacity: 1;
+    color: #667eea;
+    transform: scale(1.15);
   }
   
   /* Problem Selector */

@@ -203,35 +203,21 @@
     
     // Get last 100 points
     const windowSize = 100;
-    const fadeThreshold = 50; // Only fade when more than 50 points
     const recentHistory = history.slice(Math.max(0, history.length - windowSize));
     
-    // Draw path with conditional fade effect
+    // Draw path with gradient fade effect (always fades from old to new)
     for (let i = 0; i < recentHistory.length - 1; i++) {
       const current = recentHistory[i];
       const next = recentHistory[i + 1];
       
-      let opacity, thickness;
+      // Calculate progress (0 = oldest, 1 = newest)
+      const progress = i / (recentHistory.length - 1);
       
-      if (recentHistory.length <= fadeThreshold) {
-        // No fading when path is short - full visibility
-        opacity = 0.8;
-        thickness = 10;
-      } else {
-        // Calculate how far this segment is from the end
-        const distanceFromEnd = recentHistory.length - 1 - i;
-        
-        if (distanceFromEnd <= fadeThreshold) {
-          // Most recent 50 points: full visibility
-          opacity = 0.8;
-          thickness = 10;
-        } else {
-          // Older points: fade out
-          const fadeProgress = (i / (recentHistory.length - fadeThreshold - 1));
-          opacity = 0.05 + fadeProgress * 0.75; // 0.05 to 0.8
-          thickness = 2 + fadeProgress * 8; // 2 to 10
-        }
-      }
+      // Opacity fades from nearly invisible to visible
+      const opacity = 0.05 + progress * 0.75; // 0.05 to 0.8
+      
+      // Thickness increases from thin to thick (almost as thick as handle)
+      const thickness = 2 + progress * 10; // 2 to 12 (handle is ~20px diameter)
       
       // Draw line segment
       g.append('line')
