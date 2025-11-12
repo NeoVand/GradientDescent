@@ -203,7 +203,7 @@
     
     // Draw contour lines (above gradient field, below trail)
     if (lossData) {
-      drawContours(plotGroup, lossData, innerWidth, innerHeight);
+      drawContours(plotGroup, lossData, xScale, yScale, innerWidth, innerHeight);
     }
     
     // Draw training path with fade effect (in clipped group, above contours, below marker)
@@ -219,22 +219,20 @@
     yScale: d3.ScaleLinear<number, number>,
     innerWidth: number,
     innerHeight: number
-  ): { values: number[][], minLoss: number, maxLoss: number, resolution: number } | null {
+  ): { trainData: any[], minLoss: number, maxLoss: number } | null {
     const trainData = data.filter(d => d.isTraining);
     if (trainData.length === 0) return null;
     
-    // Create loss heatmap
+    // Create loss heatmap for display (visible range only)
     const heatmapResolution = 60;
     const cellWidth = innerWidth / heatmapResolution;
     const cellHeight = innerHeight / heatmapResolution;
     
-    // Compute loss at all grid points first to find min/max
-    const lossValues: number[][] = [];
     let minLoss = Infinity;
     let maxLoss = -Infinity;
     
+    // First pass: compute min/max loss in visible range
     for (let i = 0; i < heatmapResolution; i++) {
-      lossValues[i] = [];
       for (let j = 0; j < heatmapResolution; j++) {
         const pixelX = Math.round(i * cellWidth);
         const pixelY = Math.round(j * cellHeight);
@@ -243,7 +241,6 @@
         const b = yScale.invert(pixelY + cellHeight / 2);
         
         const loss = problemConfig.computeLoss(trainData, { a, b });
-        lossValues[i][j] = loss;
         minLoss = Math.min(minLoss, loss);
         maxLoss = Math.max(maxLoss, loss);
       }
@@ -257,7 +254,7 @@
     const logMin = Math.log(minLoss + 0.001);
     const logMax = Math.log(maxLoss + 0.001);
     
-    // Draw cells with color based on loss
+    // Second pass: draw cells with color based on loss
     for (let i = 0; i < heatmapResolution; i++) {
       for (let j = 0; j < heatmapResolution; j++) {
         const pixelX = Math.round(i * cellWidth);
@@ -267,7 +264,10 @@
         const exactWidth = nextPixelX - pixelX;
         const exactHeight = nextPixelY - pixelY;
         
-        const loss = lossValues[i][j];
+        // Recompute loss for this cell
+        const a = xScale.invert(pixelX + cellWidth / 2);
+        const b = yScale.invert(pixelY + cellHeight / 2);
+        const loss = problemConfig.computeLoss(trainData, { a, b });
         
         // Normalize loss using log scale (0 = low loss, 1 = high loss)
         const logLoss = Math.log(loss + 0.001);
@@ -288,26 +288,37 @@
     
     // Return data for contour generation
     return {
-      values: lossValues,
+      trainData,
       minLoss,
-      maxLoss,
-      resolution: heatmapResolution
+      maxLoss
     };
   }
   
   function drawContours(
     g: d3.Selection<SVGGElement, unknown, null, undefined>,
-    lossData: { values: number[][], minLoss: number, maxLoss: number, resolution: number },
+    lossData: { trainData: any[], minLoss: number, maxLoss: number },
+    xScale: d3.ScaleLinear<number, number>,
+    yScale: d3.ScaleLinear<number, number>,
     innerWidth: number,
     innerHeight: number
   ) {
-    const { values, minLoss, maxLoss, resolution } = lossData;
+    const { trainData, minLoss, maxLoss } = lossData;
     
-    // Transpose the grid for d3.contours (expects [row][col] = [y][x])
-    const transposed: number[] = [];
-    for (let j = 0; j < resolution; j++) {
-      for (let i = 0; i < resolution; i++) {
-        transposed.push(values[i][j]);
+    // Compute loss on extended grid (20% larger) for smooth contours beyond frame
+    const contourResolution = 50;
+    const paramRange = parameterRange.max - parameterRange.min;
+    const extension = paramRange * 0.2; // 20% extension
+    const extendedMin = parameterRange.min - extension;
+    const extendedMax = parameterRange.max + extension;
+    
+    // Compute loss values on extended grid
+    const lossGrid: number[] = [];
+    for (let j = 0; j < contourResolution; j++) {
+      for (let i = 0; i < contourResolution; i++) {
+        const a = extendedMin + (i / (contourResolution - 1)) * (extendedMax - extendedMin);
+        const b = extendedMin + (j / (contourResolution - 1)) * (extendedMax - extendedMin);
+        const loss = problemConfig.computeLoss(trainData, { a, b });
+        lossGrid.push(loss);
       }
     }
     
@@ -322,28 +333,32 @@
       thresholds.push(Math.exp(logValue) - 0.001);
     }
     
-    // Generate contours
+    // Generate contours on extended grid
     const contourGenerator = contours()
-      .size([resolution, resolution])
+      .size([contourResolution, contourResolution])
       .smooth(true)
       .thresholds(thresholds);
     
-    const contourData = contourGenerator(transposed);
-    
-    // Create path generator
-    const cellWidth = innerWidth / resolution;
-    const cellHeight = innerHeight / resolution;
+    const contourData = contourGenerator(lossGrid);
     
     const pathGenerator = d3.geoPath()
       .projection(d3.geoTransform({
         point: function(x, y) {
-          this.stream.point(x * cellWidth, y * cellHeight);
+          // d3.contours treats x, y as continuous coordinates in grid space
+          // Map grid coordinates directly to parameter space, accounting for the extended range
+          const paramA = extendedMin + (x / contourResolution) * (extendedMax - extendedMin);
+          const paramB = extendedMin + (y / contourResolution) * (extendedMax - extendedMin);
+          
+          // Map to pixels using the SAME scales as heatmap (xScale, yScale)
+          const pixelX = xScale(paramA);
+          const pixelY = yScale(paramB);
+          
+          this.stream.point(pixelX, pixelY);
         }
       }));
     
-    // Draw contours - reversed colors for better contrast with arrows
-    const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
-    const contourColor = isDarkMode ? '#0a0a0a' : '#ffffff';
+    // Draw contours - always white for best visibility
+    const contourColor = '#ffffff';
     
     g.selectAll('.contour')
       .data(contourData)
@@ -407,9 +422,8 @@
     const trainData = data.filter(d => d.isTraining);
     if (trainData.length === 0) return;
     
-    // Get theme
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    const arrowColor = isDark ? '#ffffff' : '#000000';
+    // Keep arrows black (light mode style) for better contour visibility
+    const arrowColor = '#000000';
     
     // Compute gradients at grid points
     const gradients = [];
@@ -477,7 +491,7 @@
         .attr('stroke', arrowColor)
         .attr('stroke-width', 0.8 + normalizedMagnitude * 1.2)
         .attr('marker-end', 'url(#arrowhead)')
-        .style('opacity', isDark ? 0.5 + normalizedMagnitude * 0.15 : 0.35 + normalizedMagnitude * 0.25);
+        .style('opacity', 0.35 + normalizedMagnitude * 0.25);
     }
   }
   

@@ -10,7 +10,7 @@ An interactive visualization tool for understanding gradient descent through bea
 
 **[🚀 Live Demo](https://neovand.github.io/GradientDescent/)**
 
-![Gradient Descent Explorer](public/screenshot.png)
+![Gradient Descent Explorer](public/screenshot.gif)
 
 ## ✨ Features
 
