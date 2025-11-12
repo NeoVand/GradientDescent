@@ -65,14 +65,6 @@
     d3.select(svgElement).selectAll('*').remove();
     
     if (history.length === 0) {
-      // Show placeholder text
-      d3.select(svgElement)
-        .append('text')
-        .attr('x', width / 2)
-        .attr('y', height / 2)
-        .attr('text-anchor', 'middle')
-        .attr('fill', '#999')
-        .text('Press "Train" to start');
       return;
     }
     
@@ -132,7 +124,8 @@
       .tickSizeOuter(0);
     
     // Get theme-aware colors
-    const axisColor = getComputedStyle(document.documentElement).getPropertyValue('--color-text-tertiary').trim();
+    const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
+    const axisColor = isDarkMode ? '#527a75' : '#064e3b';
     
     // Bottom axis
     g.append('g')
@@ -212,7 +205,7 @@
       .style('stroke-dasharray', '2,4')
       .style('opacity', isDark ? 0.35 : 0.35);
     
-    // Draw smooth lines without circles
+    // Draw smooth lines
     if (windowedHistory.length > 1) {
       // Training loss line - thicker and smoother
       g.append('path')
@@ -226,86 +219,45 @@
         .attr('d', trainLine)
         .style('opacity', 0.9);
       
-      // Test loss line - thicker and smoother
+      // Test loss line - emerald dashed
       g.append('path')
         .datum(windowedHistory)
         .attr('class', 'loss-line test-loss')
         .attr('fill', 'none')
-        .attr('stroke', '#ef4444')
+        .attr('stroke', '#10b981')
         .attr('stroke-width', 3)
+        .attr('stroke-dasharray', '10,6')
         .attr('stroke-linecap', 'round')
         .attr('stroke-linejoin', 'round')
         .attr('d', testLine)
         .style('opacity', 0.9);
     }
     
-    // Current step indicator removed - not needed
+    // Always draw current position markers (last point in history)
+    if (windowedHistory.length > 0) {
+      const lastPoint = windowedHistory[windowedHistory.length - 1];
+      
+      // Train loss current position
+      g.append('circle')
+        .attr('cx', xScale(lastPoint.step))
+        .attr('cy', yScale(lastPoint.trainLoss))
+        .attr('r', 5)
+        .attr('fill', '#3b82f6')
+        .attr('stroke', '#fff')
+        .attr('stroke-width', 2)
+        .style('opacity', 1);
+      
+      // Test loss current position
+      g.append('circle')
+        .attr('cx', xScale(lastPoint.step))
+        .attr('cy', yScale(lastPoint.testLoss))
+        .attr('r', 5)
+        .attr('fill', '#10b981')
+        .attr('stroke', '#fff')
+        .attr('stroke-width', 2)
+        .style('opacity', 1);
+    }
     
-    // Add hover interaction
-    const bisect = d3.bisector<typeof history[0], number>(d => d.step).left;
-    
-    const focus = g.append('g')
-      .style('display', 'none');
-    
-    focus.append('circle')
-      .attr('class', 'hover-circle-train')
-      .attr('r', 4)
-      .attr('fill', '#3b82f6');
-    
-    focus.append('circle')
-      .attr('class', 'hover-circle-test')
-      .attr('r', 4)
-      .attr('fill', '#ef4444');
-    
-    const tooltip = focus.append('g')
-      .attr('class', 'tooltip');
-    
-    tooltip.append('rect')
-      .attr('x', -40)
-      .attr('y', -30)
-      .attr('width', 80)
-      .attr('height', 25)
-      .attr('fill', 'rgba(0, 0, 0, 0.8)')
-      .attr('rx', 4);
-    
-    tooltip.append('text')
-      .attr('text-anchor', 'middle')
-      .attr('y', -12)
-      .attr('fill', 'white')
-      .attr('font-size', '12px');
-    
-    svg.append('rect')
-      .attr('transform', `translate(${margin.left},${margin.top})`)
-      .attr('width', innerWidth)
-      .attr('height', innerHeight)
-      .style('fill', 'none')
-      .style('pointer-events', 'all')
-      .on('mouseover', () => focus.style('display', null))
-      .on('mouseout', () => focus.style('display', 'none'))
-      .on('mousemove', function(event) {
-        const x0 = xScale.invert(d3.pointer(event, this)[0]);
-        const i = bisect(windowedHistory, x0, 1);
-        const d0 = windowedHistory[i - 1];
-        const d1 = windowedHistory[i];
-        
-        if (!d0 || !d1) return;
-        
-        const d = x0 - d0.step > d1.step - x0 ? d1 : d0;
-        
-        focus.select('.hover-circle-train')
-          .attr('cx', xScale(d.step))
-          .attr('cy', yScale(d.trainLoss));
-        
-        focus.select('.hover-circle-test')
-          .attr('cx', xScale(d.step))
-          .attr('cy', yScale(d.testLoss));
-        
-        tooltip
-          .attr('transform', `translate(${xScale(d.step)}, ${yScale((d.trainLoss + d.testLoss) / 2)})`);
-        
-        tooltip.select('text')
-          .text(`Step ${d.step}`);
-      });
   }
 </script>
 
@@ -317,11 +269,15 @@
     </h3>
     <div class="legend-controls">
       <div class="legend-item">
-        <div class="legend-line train"></div>
+        <svg width="24" height="3" viewBox="0 0 24 3">
+          <line x1="0" y1="1.5" x2="24" y2="1.5" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
+        </svg>
         <span>Train</span>
       </div>
       <div class="legend-item">
-        <div class="legend-line test"></div>
+        <svg width="24" height="3" viewBox="0 0 24 3">
+          <line x1="0" y1="1.5" x2="24" y2="1.5" stroke="#10b981" stroke-width="3" stroke-dasharray="8,4" stroke-linecap="round" />
+        </svg>
         <span>Test</span>
       </div>
     </div>
@@ -345,12 +301,13 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.625rem;
+    margin-bottom: 0.375rem;
+    margin-right: 20px;
     flex-shrink: 0;
   }
   
   h3 {
-    margin: 0;
+    margin: 0 0 0 50px;
     font-size: 0.95rem;
     font-weight: 600;
     color: var(--color-text-primary);
@@ -373,19 +330,6 @@
     font-size: 0.8125rem;
     color: var(--color-text-tertiary);
     font-weight: 500;
-  }
-  
-  .legend-line {
-    width: 24px;
-    height: 3px;
-  }
-  
-  .legend-line.train {
-    background: #3b82f6;
-  }
-  
-  .legend-line.test {
-    background: #ef4444;
   }
   
   .svg-container {

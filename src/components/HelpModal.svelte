@@ -6,7 +6,7 @@
    */
   
   import { onMount, afterUpdate } from 'svelte';
-  import { X } from 'lucide-svelte';
+  import { X, Target, BarChart2, Shuffle, Grid3x3, Navigation } from 'lucide-svelte';
   import katex from 'katex';
   import 'katex/dist/katex.min.css';
   
@@ -70,7 +70,10 @@
   <div class="modal-backdrop" on:click={handleBackdropClick}>
     <div class="modal-content">
       <div class="modal-header">
-        <h2>Gradient Descent Explorer</h2>
+        <div class="modal-title">
+          <span class="modal-icon">∂</span>
+          <h2>Gradient Descent Explorer</h2>
+        </div>
         <button class="close-btn" on:click={onClose}>
           <X size={24} strokeWidth={2} />
         </button>
@@ -132,7 +135,7 @@
           <h3>Experiments to Try</h3>
           
           <div class="experiment">
-            <h4>🎯 Experiment 1: Learning Rate Effects</h4>
+            <h4><Target size={16} strokeWidth={2} /> Experiment 1: Learning Rate Effects</h4>
             <p>
               <strong>Try different learning rates</strong> (0.001, 0.01, 0.1) and observe:
             </p>
@@ -144,7 +147,7 @@
           </div>
           
           <div class="experiment">
-            <h4>📊 Experiment 2: Data Noise Impact</h4>
+            <h4><BarChart2 size={16} strokeWidth={2} /> Experiment 2: Data Noise Impact</h4>
             <p>
               <strong>Increase the noise level</strong> from 0 to 2 and observe:
             </p>
@@ -156,7 +159,7 @@
           </div>
           
           <div class="experiment">
-            <h4>🔀 Experiment 3: Train/Test Split</h4>
+            <h4><Shuffle size={16} strokeWidth={2} /> Experiment 3: Train/Test Split</h4>
             <p>
               <strong>Adjust the train/test ratio</strong> and toggle randomization:
             </p>
@@ -168,7 +171,7 @@
           </div>
           
           <div class="experiment">
-            <h4>🎨 Experiment 4: Problem Comparison</h4>
+            <h4><Grid3x3 size={16} strokeWidth={2} /> Experiment 4: Problem Comparison</h4>
             <p>
               <strong>Switch between problem types</strong> to see different loss landscapes:
             </p>
@@ -180,7 +183,7 @@
           </div>
           
           <div class="experiment">
-            <h4>🚀 Experiment 5: Starting Points</h4>
+            <h4><Navigation size={16} strokeWidth={2} /> Experiment 5: Starting Points</h4>
             <p>
               <strong>Drag the marker to different starting positions</strong> and train:
             </p>
@@ -204,8 +207,7 @@
         
         <footer class="modal-footer">
           <p>
-            Developed with ∂ by <strong>Neo Mohsenvand</strong><br/>
-            For educational purposes • Made with love
+            Developed with ∂ by <strong>Neo Mohsenvand</strong>
           </p>
         </footer>
       </div>
@@ -271,6 +273,20 @@
     flex-shrink: 0;
   }
   
+  .modal-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  
+  .modal-icon {
+    font-family: 'Times New Roman', 'Georgia', serif;
+    font-size: 2rem;
+    font-style: italic;
+    color: #10b981;
+    line-height: 1;
+  }
+  
   .modal-header h2 {
     margin: 0;
     font-size: 1.5rem;
@@ -303,6 +319,25 @@
     flex: 1;
   }
   
+  /* Custom scrollbar for modal */
+  .modal-body::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .modal-body::-webkit-scrollbar-track {
+    background: var(--color-bg-tertiary);
+    border-radius: 4px;
+  }
+  
+  .modal-body::-webkit-scrollbar-thumb {
+    background: rgba(16, 185, 129, 0.3);
+    border-radius: 4px;
+  }
+  
+  .modal-body::-webkit-scrollbar-thumb:hover {
+    background: rgba(16, 185, 129, 0.5);
+  }
+  
   section {
     margin-bottom: 2rem;
   }
@@ -326,6 +361,9 @@
     font-size: 0.9375rem;
     font-weight: 600;
     color: #10b981;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
   }
   
   p {

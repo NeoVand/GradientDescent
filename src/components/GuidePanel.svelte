@@ -129,6 +129,7 @@
     flex-direction: column;
     gap: 0.75rem;
     padding-bottom: 0.5rem;
+    padding-left: 50px;
     overflow: hidden;
   }
   
@@ -141,6 +142,7 @@
     align-items: center;
     gap: 0.5rem;
     opacity: 0.9;
+    flex-shrink: 0;
   }
   
   .equation-row {
@@ -151,11 +153,20 @@
   }
   
   .equation-label {
-    font-size: 0.75rem;
+    font-size: 0.825rem;
     font-weight: 600;
-    color: #10b981;
     flex-shrink: 0;
     min-width: 5.5rem;
+  }
+  
+  /* Light mode labels */
+  :global([data-theme='light']) .equation-label {
+    color: #059669;
+  }
+  
+  /* Dark mode labels */
+  :global([data-theme='dark']) .equation-label {
+    color: #10b981;
   }
   
   .latex-inline {
@@ -169,7 +180,7 @@
   
   /* Style KaTeX output */
   .latex-inline :global(.katex) {
-    font-size: 1rem;
+    font-size: 1.1rem;
   }
   
   .latex-inline :global(.katex-html) {

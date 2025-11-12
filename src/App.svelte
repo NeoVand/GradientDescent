@@ -52,23 +52,6 @@
 </script>
 
 <main>
-  <!-- Help and theme buttons - bottom right corner -->
-  <div class="floating-buttons">
-    <button class="help-btn" on:click={() => showHelpModal = true} title="Help & Guide">
-      <HelpCircle size={20} strokeWidth={2.5} />
-    </button>
-    <button class="theme-toggle" on:click={() => themeStore.toggle()} title="Toggle theme">
-      {#if theme === 'light'}
-        <Moon size={20} strokeWidth={2.5} />
-      {:else}
-        <Sun size={20} strokeWidth={2.5} />
-      {/if}
-    </button>
-  </div>
-  
-  <!-- Help Modal -->
-  <HelpModal isOpen={showHelpModal} onClose={() => showHelpModal = false} />
-
   <div class="app-container">
     <!-- Left sidebar contains problem selection and training controls -->
     <aside class="sidebar">
@@ -99,6 +82,23 @@
     </div>
   </div>
 </main>
+
+<!-- Help and theme buttons - bottom right corner (outside main) -->
+<div class="floating-buttons">
+  <button class="help-btn" on:click={() => showHelpModal = true} title="Help & Guide">
+    <HelpCircle size={20} strokeWidth={2.5} />
+  </button>
+  <button class="theme-toggle" on:click={() => themeStore.toggle()} title="Toggle theme">
+    {#if theme === 'light'}
+      <Moon size={20} strokeWidth={2.5} />
+    {:else}
+      <Sun size={20} strokeWidth={2.5} />
+    {/if}
+  </button>
+</div>
+
+<!-- Help Modal (outside main) -->
+<HelpModal isOpen={showHelpModal} onClose={() => showHelpModal = false} />
 
 <style>
   /* Reset and base styles */
@@ -177,34 +177,55 @@
     bottom: 1.5rem;
     right: 1.5rem;
     display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    z-index: 100;
+    flex-direction: row;
+    gap: 0.5rem;
+    z-index: 99;
   }
   
   .help-btn,
   .theme-toggle {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
-    border: 2px solid var(--color-border);
-    background: var(--color-bg-secondary);
-    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.2s;
     padding: 0;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: none;
+  }
+  
+  /* Light mode buttons */
+  :global([data-theme='light']) .help-btn,
+  :global([data-theme='light']) .theme-toggle {
+    background: rgba(255, 255, 255, 0.7);
+    color: rgba(0, 0, 0, 0.5);
+  }
+  
+  /* Dark mode buttons */
+  :global([data-theme='dark']) .help-btn,
+  :global([data-theme='dark']) .theme-toggle {
+    background: rgba(30, 41, 59, 0.6);
+    color: rgba(255, 255, 255, 0.5);
   }
   
   .help-btn:hover,
   .theme-toggle:hover {
     border-color: #10b981;
-    transform: scale(1.08);
+    transform: scale(1.05);
     color: #10b981;
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  }
+  
+  :global([data-theme='light']) .help-btn:hover,
+  :global([data-theme='light']) .theme-toggle:hover {
+    background: rgba(255, 255, 255, 0.9);
+  }
+  
+  :global([data-theme='dark']) .help-btn:hover,
+  :global([data-theme='dark']) .theme-toggle:hover {
+    background: rgba(30, 41, 59, 0.8);
   }
   
   /* Main app container using CSS Grid for layout */
@@ -212,8 +233,8 @@
     display: grid;
     grid-template-columns: 300px 1fr;
     height: 100vh;
-    gap: 1.5rem;
-    padding: 1.5rem;
+    gap: 1.25rem;
+    padding: 1.25rem;
     background-color: var(--color-bg-primary);
     box-sizing: border-box;
   }
@@ -232,7 +253,7 @@
   .main-content {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 1.25rem;
     min-height: 0;
   }
   
@@ -240,18 +261,19 @@
   .top-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
+    gap: 1.25rem;
     flex: 1;
     min-height: 0;
   }
   
-  /* Bottom row with loss history and parameters */
+  /* Bottom row with loss history and guide panel */
   .bottom-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
+    gap: 1.25rem;
     height: 260px;
     flex-shrink: 0;
+    position: relative;
   }
   
   /* Individual containers for components */
@@ -262,7 +284,7 @@
     background-color: transparent;
     border-radius: 0;
     box-shadow: none;
-    padding: 0.75rem 1rem 1.25rem 1rem;
+    padding: 0 0 0 0.75rem;
     position: relative;
     overflow: hidden;
     min-height: 0;

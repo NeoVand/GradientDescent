@@ -29,6 +29,10 @@
   const parameterRange = { min: -5, max: 5 };
   const gridResolution = 24; // 24x24 grid for gradient arrows
   
+  // Loss range for legend
+  let minLossValue = 0;
+  let maxLossValue = 1;
+  
   // Reactive data
   $: data = $datasetStore.data;
   $: parameters = $parametersStore;
@@ -114,7 +118,8 @@
     const xAxis = d3.axisBottom(xScale).tickSizeOuter(0);
     const yAxis = d3.axisLeft(yScale).tickSizeOuter(0);
     
-    const axisColor = getComputedStyle(document.documentElement).getPropertyValue('--color-text-tertiary').trim();
+    const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
+    const axisColor = isDarkMode ? '#527a75' : '#064e3b';
     
     // Bottom axis
     g.append('g')
@@ -238,6 +243,10 @@
       }
     }
     
+    // Store min/max for legend
+    minLossValue = minLoss;
+    maxLossValue = maxLoss;
+    
     // Use log scale for better color distribution
     const logMin = Math.log(minLoss + 0.001);
     const logMax = Math.log(maxLoss + 0.001);
@@ -336,7 +345,7 @@
         const b = parameterRange.min + (j / (gridResolution - 1)) * (parameterRange.max - parameterRange.min);
         
         const gradient = problemConfig.computeGradient(trainData, { a, b });
-        const magnitude = Math.sqrt(gradient.a * gradient.a + gradient.b * gradient.b);
+      const magnitude = Math.sqrt(gradient.a * gradient.a + gradient.b * gradient.b);
         
         if (magnitude > 0.001) {
           gradients.push({ a, b, gradient, magnitude });
@@ -514,8 +523,16 @@
   <div class="header">
     <h2>
       <TrendingDown size={20} strokeWidth={2} />
-      <span>Gradient Field</span>
+      <span>Loss & Gradient</span>
     </h2>
+    <div class="color-legend">
+      <span class="legend-label">Loss:</span>
+      <div class="legend-scale">
+        <span class="scale-value">{minLossValue.toFixed(2)}</span>
+        <div class="color-bar"></div>
+        <span class="scale-value">{maxLossValue.toFixed(2)}</span>
+      </div>
+    </div>
   </div>
   <div class="svg-container">
     <svg bind:this={svgElement} {width} {height}></svg>
@@ -536,12 +553,13 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.375rem;
+    margin-right: 20px;
     flex-shrink: 0;
   }
   
   h2 {
-    margin: 0;
+    margin: 0 0 0 50px;
     font-size: 1.125rem;
     font-weight: 600;
     color: var(--color-text-primary);
@@ -549,6 +567,42 @@
     align-items: center;
     gap: 0.5rem;
     opacity: 0.9;
+  }
+  
+  .color-legend {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .legend-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-tertiary);
+  }
+  
+  .legend-scale {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+  
+  .color-bar {
+    width: 80px;
+    height: 12px;
+    border-radius: 6px;
+    background: linear-gradient(to right, 
+      #440154, #31688e, #35b779, #fde724);
+    border: 1px solid var(--color-border);
+  }
+  
+  .scale-value {
+    font-size: 0.625rem;
+    font-weight: 600;
+    font-family: 'SF Mono', Monaco, monospace;
+    color: var(--color-text-tertiary);
+    min-width: 2.5rem;
+    text-align: center;
   }
   
   .svg-container {

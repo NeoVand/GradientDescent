@@ -108,8 +108,9 @@
     const xAxis = d3.axisBottom(xScale).tickSizeOuter(0);
     const yAxis = d3.axisLeft(yScale).tickSizeOuter(0);
     
-    // Style axes
-    const axisColor = getComputedStyle(document.documentElement).getPropertyValue('--color-text-tertiary').trim();
+    // Style axes with theme-aware colors
+    const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
+    const axisColor = isDarkMode ? '#527a75' : '#064e3b';
     
     // Bottom axis
     g.append('g')
@@ -184,17 +185,17 @@
       
       // Regular grid lines
       plotGroup.append('g')
-        .attr('class', 'grid')
-        .attr('transform', `translate(0,${innerHeight})`)
-        .call(xAxis.tickSize(-innerHeight).tickFormat(() => ''))
+      .attr('class', 'grid')
+      .attr('transform', `translate(0,${innerHeight})`)
+      .call(xAxis.tickSize(-innerHeight).tickFormat(() => ''))
         .call(g => g.selectAll('line').attr('stroke', gridColor))
         .call(g => g.selectAll('path').attr('stroke', 'none'))
         .style('stroke-dasharray', '2,4')
         .style('opacity', isDark ? 0.3 : 0.35);
       
       plotGroup.append('g')
-        .attr('class', 'grid')
-        .call(yAxis.tickSize(-innerWidth).tickFormat(() => ''))
+      .attr('class', 'grid')
+      .call(yAxis.tickSize(-innerWidth).tickFormat(() => ''))
         .call(g => g.selectAll('line').attr('stroke', gridColor))
         .call(g => g.selectAll('path').attr('stroke', 'none'))
         .style('stroke-dasharray', '2,4')
@@ -359,49 +360,49 @@
       }
     } else {
       // For regression, draw prediction curves
-      const numPoints = 100;
-      const xDomain = xScale.domain();
-      const step = (xDomain[1] - xDomain[0]) / numPoints;
-      
-      // Generate points for current model
-      const modelData = [];
-      for (let i = 0; i <= numPoints; i++) {
-        const x = xDomain[0] + i * step;
-        const y = problemConfig.predict(x, parameters);
-        modelData.push({ x, y });
-      }
-      
-      // Generate points for true model
-      const trueModelData = [];
-      for (let i = 0; i <= numPoints; i++) {
-        const x = xDomain[0] + i * step;
-        const y = problemConfig.predict(x, problemConfig.trueParameters);
-        trueModelData.push({ x, y });
-      }
-      
-      const line = d3.line<{ x: number; y: number }>()
-        .x(d => xScale(d.x))
-        .y(d => yScale(d.y))
-        .curve(d3.curveMonotoneX);
-      
-      // Draw the true model line (dashed)
-      g.append('path')
-        .datum(trueModelData)
-        .attr('fill', 'none')
-        .attr('stroke', '#10b981')
-        .attr('stroke-width', 2)
-        .attr('stroke-dasharray', '8,4')
-        .attr('d', line)
-        .style('opacity', 0.6);
-      
-      // Draw the current model prediction line
-      g.append('path')
-        .datum(modelData)
-        .attr('fill', 'none')
-        .attr('stroke', '#3b82f6')
-        .attr('stroke-width', 3)
-        .attr('d', line)
-        .style('opacity', 1);
+    const numPoints = 100;
+    const xDomain = xScale.domain();
+    const step = (xDomain[1] - xDomain[0]) / numPoints;
+    
+    // Generate points for current model
+    const modelData = [];
+    for (let i = 0; i <= numPoints; i++) {
+      const x = xDomain[0] + i * step;
+      const y = problemConfig.predict(x, parameters);
+      modelData.push({ x, y });
+    }
+    
+    // Generate points for true model
+    const trueModelData = [];
+    for (let i = 0; i <= numPoints; i++) {
+      const x = xDomain[0] + i * step;
+      const y = problemConfig.predict(x, problemConfig.trueParameters);
+      trueModelData.push({ x, y });
+    }
+    
+    const line = d3.line<{ x: number; y: number }>()
+      .x(d => xScale(d.x))
+      .y(d => yScale(d.y))
+      .curve(d3.curveMonotoneX);
+    
+    // Draw the true model line (dashed)
+    g.append('path')
+      .datum(trueModelData)
+      .attr('fill', 'none')
+      .attr('stroke', '#10b981')
+      .attr('stroke-width', 2)
+      .attr('stroke-dasharray', '8,4')
+      .attr('d', line)
+      .style('opacity', 0.6);
+    
+    // Draw the current model prediction line
+    g.append('path')
+      .datum(modelData)
+      .attr('fill', 'none')
+      .attr('stroke', '#3b82f6')
+      .attr('stroke-width', 3)
+      .attr('d', line)
+      .style('opacity', 1);
     }
   }
   
@@ -528,25 +529,25 @@
       const strokeColor = isDark ? '#fff' : '#000';
       
       // Draw training points (circles - solid)
-      g.selectAll('.train-point')
-        .data(trainData)
-        .enter()
-        .append('circle')
-        .attr('class', 'train-point')
-        .attr('cx', d => xScale(d.x))
-        .attr('cy', d => yScale(d.y))
+    g.selectAll('.train-point')
+      .data(trainData)
+      .enter()
+      .append('circle')
+      .attr('class', 'train-point')
+      .attr('cx', d => xScale(d.x))
+      .attr('cy', d => yScale(d.y))
         .attr('r', pointSize)
         .attr('fill', '#3b82f6')
         .attr('stroke', strokeColor)
         .attr('stroke-width', 1.5)
-        .style('opacity', 0.8);
-      
+      .style('opacity', 0.8);
+    
       // Draw test points (circles - dashed)
-      g.selectAll('.test-point')
-        .data(testData)
-        .enter()
+    g.selectAll('.test-point')
+      .data(testData)
+      .enter()
         .append('circle')
-        .attr('class', 'test-point')
+      .attr('class', 'test-point')
         .attr('cx', d => xScale(d.x))
         .attr('cy', d => yScale(d.y))
         .attr('r', pointSize)
@@ -633,12 +634,13 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.375rem;
+    margin-right: 20px;
     flex-shrink: 0;
   }
   
   h2 {
-    margin: 0;
+    margin: 0 0 0 50px;
     font-size: 1.125rem;
     font-weight: 600;
     color: var(--color-text-primary);
