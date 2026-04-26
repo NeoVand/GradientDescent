@@ -15,7 +15,13 @@
   let svgElement: SVGSVGElement;
   let width = 400;
   let height = 150;
-  const margin = { top: 20, right: 20, bottom: 40, left: 50 };
+  // Margins shrink on narrow viewports to claw back vertical space
+  $: compact = width < 480;
+  $: margin = compact
+    ? { top: 6, right: 10, bottom: 36, left: 38 }
+    : { top: 20, right: 20, bottom: 40, left: 50 };
+  $: xLabelOffset = compact ? 30 : 28;
+  $: yLabelOffset = compact ? 28 : 35;
   
   // Reactive data
   $: history = $historyStore;
@@ -119,8 +125,8 @@
       .tickSizeOuter(0);
     
     const yAxis = d3.axisLeft(yScale)
-      .ticks(5)
-      .tickFormat(d3.format('.1f'))
+      .ticks(compact ? 4 : 5)
+      .tickFormat(d3.format(compact ? 'd' : '.1f'))
       .tickSizeOuter(0);
     
     // Get theme-aware colors
@@ -160,15 +166,15 @@
     // Add axis labels
     g.append('text')
       .attr('x', innerWidth / 2)
-      .attr('y', innerHeight + 28)
+      .attr('y', innerHeight + xLabelOffset)
       .attr('fill', axisColor)
       .style('text-anchor', 'middle')
       .attr('font-size', '12px')
       .text('Step');
-    
+
     g.append('text')
       .attr('transform', 'rotate(-90)')
-      .attr('y', -35)
+      .attr('y', -yLabelOffset)
       .attr('x', -innerHeight / 2)
       .attr('fill', axisColor)
       .style('text-anchor', 'middle')
@@ -343,6 +349,16 @@
     max-width: 100%;
     max-height: 100%;
   }
-  
+
+  @media (max-width: 768px) {
+    h3 {
+      margin-left: 0;
+      font-size: 0.8125rem;
+      gap: 0.375rem;
+    }
+    .header { margin-right: 0; margin-bottom: 0.125rem; }
+    .legend-item { font-size: 0.6875rem; }
+  }
+
 </style>
 

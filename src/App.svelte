@@ -12,14 +12,23 @@
   import GuidePanel from './components/GuidePanel.svelte';
   import HelpModal from './components/HelpModal.svelte';
   import { datasetStore, parametersStore, historyStore, currentProblemConfig, themeStore } from './stores/stores';
-  import { Sun, Moon, HelpCircle } from 'lucide-svelte';
-  
+  import { Sun, Moon, HelpCircle, Menu, X } from 'lucide-svelte';
+
   // The main app orchestrates all our components and manages the overall layout.
   // We use CSS Grid for a responsive, flexible layout that adapts to different screen sizes.
-  
+
   $: theme = $themeStore;
-  
+
   let showHelpModal = false;
+  let drawerOpen = false;
+
+  function closeDrawer() { drawerOpen = false; }
+  function openDrawer() { drawerOpen = true; }
+
+  // Lock body scroll while the drawer is open on mobile
+  $: if (typeof document !== 'undefined') {
+    document.body.style.overflow = drawerOpen ? 'hidden' : '';
+  }
   
   // Initialize data when app starts
   onMount(() => {
@@ -51,13 +60,38 @@
   }
 </script>
 
+<!-- Mobile top bar: only visible on small screens -->
+<header class="mobile-topbar">
+  <button class="topbar-btn menu-btn" on:click={openDrawer} aria-label="Open controls">
+    <Menu size={22} strokeWidth={2.5} />
+  </button>
+  <h1 class="topbar-title"><span class="topbar-mark">∂</span> Gradient Descent</h1>
+  <button class="topbar-btn" on:click={() => showHelpModal = true} aria-label="Help">
+    <HelpCircle size={20} strokeWidth={2.5} />
+  </button>
+  <button class="topbar-btn" on:click={() => themeStore.toggle()} aria-label="Toggle theme">
+    {#if theme === 'light'}
+      <Moon size={20} strokeWidth={2.5} />
+    {:else}
+      <Sun size={20} strokeWidth={2.5} />
+    {/if}
+  </button>
+</header>
+
 <main>
   <div class="app-container">
-    <!-- Left sidebar contains problem selection and training controls -->
-    <aside class="sidebar">
+    <!-- Sidebar: in-grid on desktop, slide-in drawer on mobile -->
+    <aside class="sidebar" class:drawer-open={drawerOpen}>
+      <button class="drawer-close" on:click={closeDrawer} aria-label="Close controls">
+        <X size={20} strokeWidth={2.5} />
+      </button>
       <Sidebar />
     </aside>
-    
+
+    {#if drawerOpen}
+      <div class="drawer-backdrop" on:click={closeDrawer} on:keydown={(e) => e.key === 'Escape' && closeDrawer()} role="button" tabindex="-1" aria-label="Close controls"></div>
+    {/if}
+
     <!-- Main content area with our visualizations -->
     <div class="main-content">
       <!-- Top row: Data visualization and Loss landscape -->
@@ -69,7 +103,7 @@
           <LossLandscape />
         </div>
       </div>
-      
+
       <!-- Bottom row: Loss history chart and parameter values -->
       <div class="bottom-row">
         <div class="loss-history-container">
@@ -83,7 +117,7 @@
   </div>
 </main>
 
-<!-- Help and theme buttons - bottom right corner (outside main) -->
+<!-- Desktop floating buttons (hidden on mobile, replaced by topbar) -->
 <div class="floating-buttons">
   <button class="help-btn" on:click={() => showHelpModal = true} title="Help & Guide">
     <HelpCircle size={20} strokeWidth={2.5} />
@@ -290,28 +324,211 @@
     min-height: 0;
   }
   
+  /* Mobile top bar: hidden on desktop */
+  .mobile-topbar { display: none; }
+  .drawer-close { display: none; }
+  .drawer-backdrop { display: none; }
+
   /* Responsive design for smaller screens */
   @media (max-width: 1200px) {
     .app-container {
       grid-template-columns: 250px 1fr;
     }
   }
-  
+
+  /* ---------- Mobile (≤768px) ---------- */
   @media (max-width: 768px) {
-    .app-container {
-      grid-template-columns: 1fr;
-      grid-template-rows: auto 1fr;
+    :global(html), :global(body) {
+      overflow: auto;
+      height: auto;
+      overscroll-behavior-y: none;
     }
-    
-    .sidebar {
+    /* Svelte mounts everything inside <div id="app">, so the flex column
+       lives there — that lets <main> grow into the remaining viewport
+       after the sticky top bar. */
+    :global(#app) {
+      display: flex;
+      flex-direction: column;
+      min-height: 100dvh;
+    }
+
+    main {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      height: auto;
+      overflow: visible;
+    }
+
+    /* Sticky top bar */
+    .mobile-topbar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
       position: sticky;
       top: 0;
-      z-index: 10;
+      z-index: 50;
+      padding: 0.4rem 0.625rem;
+      background-color: var(--color-bg-primary);
+      border-bottom: 1px solid var(--color-border);
     }
-    
-    .top-row,
+
+    .topbar-title {
+      flex: 1;
+      margin: 0;
+      font-size: 1.0625rem;
+      font-weight: 700;
+      color: var(--color-text-primary);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      min-width: 0;
+    }
+
+    .topbar-mark {
+      color: #10b981;
+      font-family: 'Times New Roman', 'Georgia', serif;
+      font-size: 1.5rem;
+      font-style: italic;
+      line-height: 1;
+    }
+
+    .topbar-btn {
+      width: 40px;
+      height: 40px;
+      border: none;
+      background: none;
+      color: var(--color-text-tertiary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      flex-shrink: 0;
+      transition: color 0.15s ease;
+    }
+    .topbar-btn:active {
+      transform: scale(0.92);
+      color: #10b981;
+    }
+
+    /* Mobile is a flex column that fills the available viewport. Each plot
+       gets a flex-grow weight so they distribute the leftover space
+       proportionally — no empty room on tall phones, min-heights on short
+       ones. */
+    .app-container {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      height: auto;
+      padding: 0.25rem 0.5rem 0.4rem;
+      gap: 0;
+    }
+
+    .main-content {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .top-row {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
     .bottom-row {
-      grid-template-columns: 1fr;
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      height: auto;
     }
+
+    /* Plots flex-grow proportionally; landscape gets the most weight since
+       it's the most interactive viz. Min-heights keep them readable on
+       short phones. */
+    .data-viz-container {
+      flex: 4 1 0;
+      min-height: 180px;
+      padding: 0;
+    }
+
+    .loss-landscape-container {
+      flex: 6 1 0;
+      min-height: 240px;
+      padding: 0;
+    }
+
+    .loss-history-container {
+      flex: 0 0 auto;
+      height: clamp(160px, 24vh, 220px);
+      padding: 0;
+    }
+
+    .guide-panel-container {
+      display: none;
+    }
+
+    /* Sidebar becomes an off-canvas drawer */
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100dvh;
+      width: 86%;
+      max-width: 340px;
+      transform: translateX(-100%);
+      transition: transform 0.25s ease;
+      z-index: 100;
+      border-radius: 0 16px 16px 0;
+      box-shadow: 8px 0 24px rgba(0, 0, 0, 0.25);
+      padding-top: 3rem;
+    }
+    .sidebar.drawer-open {
+      transform: translateX(0);
+    }
+
+    .drawer-close {
+      display: flex;
+      position: absolute;
+      top: 0.625rem;
+      right: 0.625rem;
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      border: 1px solid var(--color-border);
+      background: var(--color-bg-secondary);
+      color: var(--color-text-secondary);
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      z-index: 1;
+    }
+
+    .drawer-backdrop {
+      display: block;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      z-index: 90;
+      animation: fadeIn 0.2s ease;
+      border: none;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    /* Hide desktop floating buttons on mobile (replaced by top-bar buttons) */
+    .floating-buttons { display: none; }
   }
 </style>

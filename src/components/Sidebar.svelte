@@ -794,6 +794,11 @@
     animation: tooltipFadeIn 0.2s ease;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   }
+
+  /* Hover-only tooltips: hide on small screens (no real hover) */
+  @media (hover: none), (max-width: 768px) {
+    .tooltip { display: none; }
+  }
   
   /* Light mode tooltip */
   :global([data-theme='light']) .tooltip {

@@ -19,7 +19,13 @@
   let svgElement: SVGSVGElement;
   let width = 400;
   let height = 400;
-  const margin = { top: 20, right: 20, bottom: 50, left: 50 };
+  // Margins shrink on narrow viewports to claw back vertical space
+  $: compact = width < 480;
+  $: margin = compact
+    ? { top: 8, right: 12, bottom: 32, left: 38 }
+    : { top: 20, right: 20, bottom: 50, left: 50 };
+  $: xLabelOffset = compact ? 26 : 35;
+  $: yLabelOffset = compact ? 28 : 35;
   
   // Reactive declarations
   $: data = $datasetStore.data;
@@ -145,14 +151,14 @@
     // Add axis labels
     g.append('text')
       .attr('x', innerWidth / 2)
-      .attr('y', innerHeight + 35)
+      .attr('y', innerHeight + xLabelOffset)
       .attr('fill', axisColor)
       .style('text-anchor', 'middle')
       .attr('font-size', '12px')
       .text('X');
-    
+
     g.append('text')
-      .attr('x', -35)
+      .attr('x', -yLabelOffset)
       .attr('y', innerHeight / 2)
       .attr('fill', axisColor)
       .style('text-anchor', 'middle')
@@ -647,6 +653,16 @@
     align-items: center;
     gap: 0.5rem;
     opacity: 0.9;
+  }
+
+  @media (max-width: 768px) {
+    h2 {
+      margin-left: 0;
+      font-size: 0.875rem;
+      gap: 0.375rem;
+    }
+    .header { margin-right: 0; margin-bottom: 0.125rem; }
+    .legend-item { font-size: 0.75rem; }
   }
   
   .legend-controls {

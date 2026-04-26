@@ -24,7 +24,13 @@
   let svgElement: SVGSVGElement;
   let width = 400;
   let height = 400;
-  const margin = { top: 20, right: 20, bottom: 50, left: 50 };
+  // Margins shrink on narrow viewports to claw back vertical space
+  $: compact = width < 480;
+  $: margin = compact
+    ? { top: 8, right: 12, bottom: 32, left: 38 }
+    : { top: 20, right: 20, bottom: 50, left: 50 };
+  $: xLabelOffset = compact ? 26 : 38;
+  $: yLabelOffset = compact ? 26 : 35;
   
   // Parameter range for visualization
   const parameterRange = { min: -7, max: 7 };
@@ -157,7 +163,7 @@
     // Add axis labels (Greek letters)
     g.append('text')
       .attr('x', innerWidth / 2)
-      .attr('y', innerHeight + 38)
+      .attr('y', innerHeight + xLabelOffset)
       .attr('fill', axisColor)
       .attr('font-size', '14px')
       .attr('font-weight', '400')
@@ -165,9 +171,9 @@
       .attr('font-family', 'Georgia, serif')
       .style('text-anchor', 'middle')
       .text('α');
-    
+
     g.append('text')
-      .attr('x', -35)
+      .attr('x', -yLabelOffset)
       .attr('y', innerHeight / 2)
       .attr('fill', axisColor)
       .attr('font-size', '14px')
@@ -508,25 +514,37 @@
     
     const marker = g.append('g')
       .attr('class', 'current-position')
-      .attr('transform', `translate(${x}, ${y})`);
-    
+      .attr('transform', `translate(${x}, ${y})`)
+      .style('touch-action', 'none');
+
+    // Invisible hit area: makes the marker tappable on touch screens (≈44px)
+    marker.append('circle')
+      .attr('class', 'hit-area')
+      .attr('r', 22)
+      .attr('fill', 'transparent')
+      .style('cursor', 'grab')
+      .style('touch-action', 'none');
+
     // Outer ring
     marker.append('circle')
       .attr('r', 10)
       .attr('fill', 'none')
       .attr('stroke', '#f59e0b')
-      .attr('stroke-width', 2);
-    
+      .attr('stroke-width', 2)
+      .style('pointer-events', 'none');
+
     // Inner circle
     marker.append('circle')
       .attr('r', 6)
       .attr('fill', '#f59e0b')
       .attr('stroke', '#fff')
       .attr('stroke-width', 2)
-      .style('cursor', 'grab');
+      .style('pointer-events', 'none');
     
-    // Make draggable
+    // Make draggable (force touch support so it works on mobile regardless
+    // of the viewport's touch detection at render time)
     marker.call(d3.drag<SVGGElement, unknown>()
+      .touchable(() => true)
       .on('start', function() {
         isDragging = true;
         d3.select(this).style('cursor', 'grabbing');
@@ -694,6 +712,18 @@
     color: var(--color-text-tertiary);
     min-width: 2.5rem;
     text-align: center;
+  }
+
+  @media (max-width: 768px) {
+    h2 {
+      margin-left: 0;
+      font-size: 0.875rem;
+      gap: 0.375rem;
+    }
+    .header { margin-right: 0; margin-bottom: 0.125rem; }
+    .color-bar { width: 50px; height: 10px; }
+    .legend-label { font-size: 0.6875rem; }
+    .scale-value { font-size: 0.5625rem; min-width: 2rem; }
   }
   
   .svg-container {
