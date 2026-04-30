@@ -15,6 +15,7 @@
   import { gradientDescentStep } from '../utils/gradientDescent';
   import {
     TrendingUp,
+    TrendingDown,
     Percent,
     MapPin,
     PieChart,
@@ -53,7 +54,8 @@
     { type: 'logistic-regression', name: 'Logistic Regression', icon: Percent },
     { type: 'polynomial-regression', name: 'Polynomial Regression', icon: null, customIcon: 'x²' },
     { type: 'sine-wave', name: 'Sine Wave', icon: Activity },
-    { type: 'gaussian-peak', name: 'Gaussian Peak', icon: Mountain }
+    { type: 'gaussian-peak', name: 'Gaussian Peak', icon: Mountain },
+    { type: 'exponential-decay', name: 'Exponential Decay', icon: TrendingDown }
   ];
   
   // Subscribe to stores
@@ -92,10 +94,18 @@
   function selectProblem(type: ProblemType) {
     selectedProblem.set(type);
     showProblemDropdown = false;
-    // Apply per-problem default learning rate if specified
-    const defaultLr = problemConfigs[type]?.defaultLearningRate;
-    if (defaultLr !== undefined) {
-      trainingStore.update(store => ({ ...store, learningRate: defaultLr }));
+    // Apply per-problem defaults if specified (otherwise leave user value alone)
+    const cfg = problemConfigs[type];
+    const defaultLr = cfg?.defaultLearningRate;
+    const defaultMu = cfg?.defaultMomentum;
+    if (defaultLr !== undefined || defaultMu !== undefined) {
+      trainingStore.update(store => ({
+        ...store,
+        ...(defaultLr !== undefined ? { learningRate: defaultLr } : {}),
+        ...(defaultMu !== undefined ? { momentum: defaultMu } : {})
+      }));
+      // Reset velocity so the new μ takes effect cleanly
+      velocityStore.set({ a: 0, b: 0 });
     }
     resetTraining();
     // Regenerate data for the new problem
@@ -517,52 +527,6 @@
       <div class="slider-labels">
         <span>Low</span>
         <span>High</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Momentum -->
-  <div class="control-group">
-    <div class="control-header">
-      <span class="icon"><Rocket size={18} strokeWidth={2} /></span>
-      <label for="momentum">Momentum <span class="greek-label"> (μ)</span></label>
-      <div class="tooltip-container">
-        <button
-          class="info-btn"
-          on:mouseenter={() => activeTooltip = 'momentum'}
-          on:mouseleave={() => activeTooltip = null}
-        >
-          <Info size={14} strokeWidth={2} />
-        </button>
-        {#if activeTooltip === 'momentum'}
-          <div class="tooltip">
-            Heavy-ball momentum carries the marker through flat regions<br/>
-            <span style="opacity: 0.8; font-size: 0.7rem;">v ← μ·v + ∇L,&nbsp; θ ← θ − γ·v &nbsp;(μ = 0 → plain GD)</span>
-          </div>
-        {/if}
-      </div>
-    </div>
-    <div class="slider-container">
-      <div class="slider-value-display">
-        <span class="momentum-value">{$trainingStore.momentum.toFixed(2)}</span>
-      </div>
-      <input
-        id="momentum"
-        type="range"
-        min="0"
-        max="0.99"
-        step="0.01"
-        value={$trainingStore.momentum}
-        on:input={(e) => {
-          const v = parseFloat((e.target as HTMLInputElement).value);
-          trainingStore.update(s => ({ ...s, momentum: v }));
-          // Reset accumulated velocity so the new μ takes effect cleanly
-          velocityStore.set({ a: 0, b: 0 });
-        }}
-      />
-      <div class="slider-labels">
-        <span>Off</span>
-        <span>0.99</span>
       </div>
     </div>
   </div>

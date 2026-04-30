@@ -5,7 +5,7 @@
  */
 
 // Supported machine learning problems
-export type ProblemType = 'linear-regression' | 'logistic-regression' | 'polynomial-regression' | 'sine-wave' | 'gaussian-peak';
+export type ProblemType = 'linear-regression' | 'logistic-regression' | 'polynomial-regression' | 'sine-wave' | 'gaussian-peak' | 'exponential-decay';
 
 // A single data point in our dataset
 export interface DataPoint {
@@ -40,6 +40,9 @@ export interface ProblemConfig {
   // peak) need a much larger step than the global default to converge in a
   // reasonable number of steps.
   defaultLearningRate?: number;
+  // Optional per-problem default momentum. Problems with anisotropic loss
+  // surfaces (e.g. exponential decay) converge much faster with momentum.
+  defaultMomentum?: number;
   // Optional per-problem visible parameter range for the loss landscape.
   // Used for problems whose useful basin is much smaller than the default
   // [-7, 7]; e.g. Gaussian peak's basin sits in roughly |α|, |β| < 3 and

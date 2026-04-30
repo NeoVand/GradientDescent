@@ -443,12 +443,91 @@ const gaussianPeak: ProblemConfig = {
   parameterRange: { min: -3, max: 3 }
 };
 
+/**
+ * Exponential Decay Fit
+ * Fitting y = α · exp(-β · x): amplitude α, rate β.
+ * Loss is sharply anisotropic — one direction is gentle, the other steep —
+ * which makes this a natural showcase for momentum (try μ ≈ 0.9).
+ * Outside roughly |α|, |β| < 2 the model explodes and gradients are
+ * astronomical, so the visible range is tightened.
+ */
+const exponentialDecay: ProblemConfig = {
+  type: 'exponential-decay',
+  name: 'Exponential Decay',
+  description: 'Fit y = α·exp(−β·X): amplitude and rate',
+  trueParameters: { a: 1, b: 0.5 },
+
+  generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
+    const trueA = exponentialDecay.trueParameters.a;
+    const trueB = exponentialDecay.trueParameters.b;
+
+    const data: DataPoint[] = [];
+    const numTrain = Math.floor(numPoints * trainRatio);
+
+    for (let i = 0; i < numPoints; i++) {
+      const x = (i / (numPoints - 1)) * 4 - 2 + (Math.random() - 0.5) * 0.05;
+      const noise = (Math.random() - 0.5) * noiseLevel * 0.5;
+      const y = trueA * Math.exp(-trueB * x) + noise;
+      data.push({ x, y, isTraining: i < numTrain });
+    }
+
+    return data.sort(() => Math.random() - 0.5);
+  },
+
+  predict: (x: number, params: ModelParameters): number => {
+    return params.a * Math.exp(-params.b * x);
+  },
+
+  computeLoss: (data: DataPoint[], params: ModelParameters): number => {
+    if (data.length === 0) return 0;
+    let total = 0;
+    for (const p of data) {
+      const pred = params.a * Math.exp(-params.b * p.x);
+      const err = pred - p.y;
+      total += err * err;
+    }
+    return total / data.length;
+  },
+
+  computeGradient: (data: DataPoint[], params: ModelParameters): ModelParameters => {
+    if (data.length === 0) return { a: 0, b: 0 };
+    let gA = 0, gB = 0;
+    for (const p of data) {
+      const e = Math.exp(-params.b * p.x);
+      const pred = params.a * e;
+      const err = pred - p.y;
+      // d(pred)/d(α) = exp(-β·x)
+      gA += 2 * err * e;
+      // d(pred)/d(β) = -x · α · exp(-β·x) = -x · pred
+      gB += -2 * err * p.x * pred;
+    }
+    return { a: gA / data.length, b: gB / data.length };
+  },
+
+  // Init from one of the four corners of the visible square so the descent
+  // path is long and visible. lr=0.002 + μ=0.9 reliably converges from any.
+  getInitialParameters: () => {
+    const corners = [
+      () => ({ a: -1.2 - Math.random() * 0.3, b: -1.2 - Math.random() * 0.3 }),
+      () => ({ a: -1.2 - Math.random() * 0.3, b: 1.2 + Math.random() * 0.3 }),
+      () => ({ a: 1.2 + Math.random() * 0.3, b: -1.2 - Math.random() * 0.3 }),
+      () => ({ a: 1.2 + Math.random() * 0.3, b: 1.2 + Math.random() * 0.3 })
+    ];
+    return corners[Math.floor(Math.random() * 4)]();
+  },
+
+  defaultLearningRate: 0.002,
+  defaultMomentum: 0.9,
+  parameterRange: { min: -2, max: 2 }
+};
+
 // Export all problem configurations
 export const problemConfigs: Record<string, ProblemConfig> = {
   'linear-regression': linearRegression,
   'logistic-regression': logisticRegression,
   'polynomial-regression': polynomialRegression,
   'sine-wave': sineWave,
-  'gaussian-peak': gaussianPeak
+  'gaussian-peak': gaussianPeak,
+  'exponential-decay': exponentialDecay
 };
 
