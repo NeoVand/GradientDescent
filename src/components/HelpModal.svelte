@@ -51,41 +51,44 @@
     if (e.target === e.currentTarget) onClose();
   }
 
-  // ----- Gradient concept SVG: a real vector field -----
-  // Render a dense arrow grid using the gradient of a synthetic quadratic
-  // loss L(α, β) = (α − cα)² + (β − cβ)². Negative gradient at every grid
-  // cell points toward (cα, cβ). Same idea as the Loss Landscape panel,
-  // shrunk for the modal.
-  const gradVizCx = 130;
-  const gradVizCy = 60;
+  // ----- Gradient concept SVG: a real vector field that fills the whole card -----
+  // Same loss as the Loss Landscape panel: L(α, β) = (α − cα)² + (β − cβ)².
+  // Negative gradient at every grid cell points toward (cα, cβ).
+  // The viewBox is intentionally wide (3:1) so the SVG can stretch across
+  // the entire concept card; the basin is placed in the left third so the
+  // most informative part of the field stays visible while a gradient
+  // overlay on the right side carries the explanatory text.
+  const gradVizW = 300;
+  const gradVizH = 100;
+  const gradVizCx = 75;
+  const gradVizCy = 50;
   type Arrow = { x1: number; y1: number; x2: number; y2: number; w: number; o: number };
   const gradFieldArrows: Arrow[] = (() => {
     const arrows: Arrow[] = [];
-    const cols = 13, rows = 7;
-    const stepX = 200 / (cols + 1);
-    const stepY = 120 / (rows + 1);
+    const cols = 18, rows = 7;
+    const stepX = gradVizW / (cols + 1);
+    const stepY = gradVizH / (rows + 1);
     let maxMag = 0;
-    // First pass: collect raw vectors and find max magnitude for normalisation
     const raw: { gx: number; gy: number; ox: number; oy: number; m: number }[] = [];
     for (let j = 1; j <= rows; j++) {
       for (let i = 1; i <= cols; i++) {
         const ox = i * stepX, oy = j * stepY;
         const dx = gradVizCx - ox, dy = gradVizCy - oy;
         const m = Math.sqrt(dx * dx + dy * dy);
-        if (m < 4) { raw.push({ gx: 0, gy: 0, ox, oy, m: 0 }); continue; }
+        if (m < 5) { raw.push({ gx: 0, gy: 0, ox, oy, m: 0 }); continue; }
         raw.push({ gx: dx / m, gy: dy / m, ox, oy, m });
         if (m > maxMag) maxMag = m;
       }
     }
     for (const r of raw) {
       if (r.m === 0) continue;
-      const lenScale = 0.4 + 0.6 * (r.m / maxMag);  // base + magnitude ramp
-      const len = 7.5 * lenScale;
+      const lenScale = 0.45 + 0.55 * (r.m / maxMag);
+      const len = 9 * lenScale;
       arrows.push({
         x1: r.ox, y1: r.oy,
         x2: r.ox + r.gx * len, y2: r.oy + r.gy * len,
         w: 0.7 + 0.6 * lenScale,
-        o: 0.45 + 0.4 * lenScale
+        o: 0.5 + 0.4 * lenScale
       });
     }
     return arrows;
@@ -221,12 +224,12 @@
             </svg>
           </div>
 
-          <div class="concept">
-            <svg class="concept-svg concept-svg-left" viewBox="0 0 200 120">
+          <div class="concept concept-bg-overlay">
+            <svg class="concept-bg-svg" viewBox={`0 0 ${gradVizW} ${gradVizH}`} preserveAspectRatio="xMidYMid slice">
               <defs>
-                <radialGradient id="grad-bowl-bg" cx="65%" cy="50%" r="55%">
-                  <stop offset="0%" stop-color="#fde047" stop-opacity="0.45" />
-                  <stop offset="45%" stop-color="#10b981" stop-opacity="0.18" />
+                <radialGradient id="grad-bowl-bg" cx="25%" cy="50%" r="55%">
+                  <stop offset="0%" stop-color="#fde047" stop-opacity="0.55" />
+                  <stop offset="45%" stop-color="#10b981" stop-opacity="0.22" />
                   <stop offset="100%" stop-color="#10b981" stop-opacity="0" />
                 </radialGradient>
                 <marker id="grad-arrowhead" viewBox="0 -5 10 10"
@@ -235,17 +238,14 @@
                 </marker>
               </defs>
 
-              <!-- Background tint hinting at the loss heatmap -->
-              <rect x="0" y="0" width="200" height="120" fill="url(#grad-bowl-bg)" />
+              <rect x="0" y="0" width={gradVizW} height={gradVizH} fill="url(#grad-bowl-bg)" />
 
-              <!-- Vector field (matches the LossLandscape arrow style) -->
               {#each gradFieldArrows as a}
                 <line x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2}
                       stroke="currentColor" stroke-width={a.w}
                       opacity={a.o} marker-end="url(#grad-arrowhead)" />
               {/each}
 
-              <!-- A few thin contours over the field for context -->
               <ellipse cx={gradVizCx} cy={gradVizCy} rx="10" ry="7"
                        fill="none" stroke="#fff" stroke-opacity="0.55" stroke-width="1" />
               <ellipse cx={gradVizCx} cy={gradVizCy} rx="28" ry="20"
@@ -253,13 +253,13 @@
               <ellipse cx={gradVizCx} cy={gradVizCy} rx="55" ry="40"
                        fill="none" stroke="#fff" stroke-opacity="0.18" stroke-width="1" />
 
-              <!-- The "current parameters" marker, same colour as the app's -->
               <circle cx={gradVizCx} cy={gradVizCy} r="6" fill="none"
                       stroke="#f59e0b" stroke-width="1.5" />
               <circle cx={gradVizCx} cy={gradVizCy} r="3.5" fill="#f59e0b"
                       stroke="#fff" stroke-width="1.5" />
             </svg>
-            <div class="concept-text">
+            <div class="concept-fade"></div>
+            <div class="concept-text concept-text-overlay">
               <h4>Gradient — which way is steepest?</h4>
               <p>
                 At every point in parameter space, the gradient is the direction in which
@@ -690,6 +690,53 @@
     font-family: inherit;
   }
 
+  /* Overlay variant: the SVG fills the whole card and the text sits on
+     the right with a left-to-right fade hiding the field underneath it. */
+  .concept-bg-overlay {
+    display: block;
+    position: relative;
+    padding: 0;
+    overflow: hidden;
+    min-height: 220px;
+  }
+  .concept-bg-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    color: var(--color-text-secondary);
+    pointer-events: none;
+  }
+  /* The fade overlay: transparent on the left so the field shows through,
+     opaque on the right so the text is fully readable. */
+  .concept-fade {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      to right,
+      transparent 0%,
+      transparent 32%,
+      var(--color-bg-tertiary) 56%,
+      var(--color-bg-tertiary) 100%
+    );
+  }
+  .concept-text-overlay {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 50%;
+    padding: 1.5rem 1.5rem 1.5rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    z-index: 1;
+  }
+  .concept-text-overlay h4 {
+    margin-top: 0;
+  }
+
   /* ---------- Formulas ---------- */
   .formula-display {
     background: rgba(16, 185, 129, 0.08);
@@ -893,6 +940,24 @@
     }
     .concept-svg { height: 100px; }
     .concept-svg-left { order: 0; }
+
+    /* On mobile, drop the overlay layout: stack SVG on top, text below. */
+    .concept-bg-overlay {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .concept-bg-svg {
+      position: relative;
+      height: 110px;
+      flex-shrink: 0;
+    }
+    .concept-fade { display: none; }
+    .concept-text-overlay {
+      position: relative;
+      width: 100%;
+      padding: 1rem 1.25rem;
+    }
 
     .problem-grid {
       grid-template-columns: 1fr;
