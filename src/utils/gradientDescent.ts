@@ -8,23 +8,36 @@
 import type { DataPoint, ModelParameters, ProblemConfig } from '../types/types';
 
 /**
- * Perform one step of gradient descent
- * Returns the updated parameters
+ * Perform one step of gradient descent (with optional heavy-ball momentum).
+ *
+ * Plain GD:    θ ← θ - lr · ∇L
+ * Momentum GD: v ← μ·v + ∇L ;   θ ← θ - lr · v
+ *
+ * Returns the updated parameters and the new velocity. When momentum is 0
+ * (or disabled by passing 0), this reduces exactly to plain GD and the
+ * velocity equals the current gradient.
  */
 export function gradientDescentStep(
   data: DataPoint[],
   currentParams: ModelParameters,
+  velocity: ModelParameters,
   learningRate: number,
+  momentum: number,
   problemConfig: ProblemConfig
-): ModelParameters {
-  // Compute the gradient at current parameters
+): { params: ModelParameters; velocity: ModelParameters } {
   const gradient = problemConfig.computeGradient(data, currentParams);
-  
-  // Update parameters in the negative gradient direction
-  // This is the core of gradient descent: params = params - learningRate * gradient
+
+  const newVelocity: ModelParameters = {
+    a: momentum * velocity.a + gradient.a,
+    b: momentum * velocity.b + gradient.b
+  };
+
   return {
-    a: currentParams.a - learningRate * gradient.a,
-    b: currentParams.b - learningRate * gradient.b
+    params: {
+      a: currentParams.a - learningRate * newVelocity.a,
+      b: currentParams.b - learningRate * newVelocity.b
+    },
+    velocity: newVelocity
   };
 }
 

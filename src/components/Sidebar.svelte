@@ -9,16 +9,16 @@
    * - Action buttons (Train and Reset)
    */
   
-  import { selectedProblem, datasetStore, trainingStore, parametersStore, historyStore } from '../stores/stores';
+  import { selectedProblem, datasetStore, trainingStore, parametersStore, historyStore, velocityStore } from '../stores/stores';
   import type { ProblemType } from '../types/types';
   import { problemConfigs } from '../utils/problems';
   import { gradientDescentStep } from '../utils/gradientDescent';
-  import { 
-    TrendingUp, 
+  import {
+    TrendingUp,
     Percent,
-    MapPin, 
-    PieChart, 
-    Zap, 
+    MapPin,
+    PieChart,
+    Zap,
     RefreshCw,
     Play,
     Pause,
@@ -27,7 +27,8 @@
     Droplets,
     Mountain,
     Brain,
-    Info
+    Info,
+    Rocket
   } from 'lucide-svelte';
   
   // Component state
@@ -79,6 +80,12 @@
     const maxValue = 0.9;
     const normalizedPosition = ((trainRatio - minValue) / (maxValue - minValue)) * 100;
     document.documentElement.style.setProperty('--train-percentage', `${normalizedPosition}%`);
+  }
+
+  // Same idea for the momentum slider (range 0..0.99)
+  $: if (typeof document !== 'undefined') {
+    const muPct = ($trainingStore.momentum / 0.99) * 100;
+    document.documentElement.style.setProperty('--mu-percentage', `${muPct}%`);
   }
   
   // Handle problem selection
@@ -160,16 +167,20 @@
       // Get current parameters
       const currentParams = $parametersStore;
 
-      // Perform gradient descent
-      const newParams = gradientDescentStep(
+      // Perform gradient descent (μ = 0 falls back to plain GD)
+      const stepResult = gradientDescentStep(
         trainData,
         currentParams,
+        $velocityStore,
         $trainingStore.learningRate,
+        $trainingStore.momentum,
         config
       );
 
-      // Update parameters
-      parametersStore.set(newParams);
+      // Update parameters and velocity
+      parametersStore.set(stepResult.params);
+      velocityStore.set(stepResult.velocity);
+      const newParams = stepResult.params;
       
       // Calculate next step number (continue from where we left off)
       const nextStepNumber = startingStep + stepsCompleted + 1;
@@ -205,6 +216,7 @@
     stopTraining();
     parametersStore.reset();
     historyStore.reset();
+    velocityStore.set({ a: 0, b: 0 });
     trainingStore.update(store => ({
       ...store,
       currentStep: 0,
@@ -508,7 +520,53 @@
       </div>
     </div>
   </div>
-  
+
+  <!-- Momentum -->
+  <div class="control-group">
+    <div class="control-header">
+      <span class="icon"><Rocket size={18} strokeWidth={2} /></span>
+      <label for="momentum">Momentum <span class="greek-label"> (μ)</span></label>
+      <div class="tooltip-container">
+        <button
+          class="info-btn"
+          on:mouseenter={() => activeTooltip = 'momentum'}
+          on:mouseleave={() => activeTooltip = null}
+        >
+          <Info size={14} strokeWidth={2} />
+        </button>
+        {#if activeTooltip === 'momentum'}
+          <div class="tooltip">
+            Heavy-ball momentum carries the marker through flat regions<br/>
+            <span style="opacity: 0.8; font-size: 0.7rem;">v ← μ·v + ∇L,&nbsp; θ ← θ − γ·v &nbsp;(μ = 0 → plain GD)</span>
+          </div>
+        {/if}
+      </div>
+    </div>
+    <div class="slider-container">
+      <div class="slider-value-display">
+        <span class="momentum-value">{$trainingStore.momentum.toFixed(2)}</span>
+      </div>
+      <input
+        id="momentum"
+        type="range"
+        min="0"
+        max="0.99"
+        step="0.01"
+        value={$trainingStore.momentum}
+        on:input={(e) => {
+          const v = parseFloat((e.target as HTMLInputElement).value);
+          trainingStore.update(s => ({ ...s, momentum: v }));
+          // Reset accumulated velocity so the new μ takes effect cleanly
+          velocityStore.set({ a: 0, b: 0 });
+        }}
+      />
+      <div class="slider-labels">
+        <span>Off</span>
+        <span>0.99</span>
+      </div>
+    </div>
+  </div>
+
   <!-- Learning Rate -->
   <div class="control-group">
     <div class="control-header">
@@ -650,7 +708,7 @@
           {totalSteps}
         </button>
       {/if}
-      <button 
+      <button
         class="stepper-btn"
         disabled={totalSteps >= 1000}
         on:click={() => {
@@ -661,7 +719,7 @@
       </button>
     </div>
   </div>
-  
+
   <!-- Spacer to push buttons to bottom -->
   <div class="spacer"></div>
   
@@ -1289,6 +1347,21 @@
     font-family: 'SF Mono', Monaco, monospace;
     color: var(--color-warning);
     font-weight: 600;
+  }
+
+  .momentum-value {
+    font-family: 'SF Mono', Monaco, monospace;
+    color: #10b981;
+    font-weight: 600;
+  }
+
+  /* Momentum slider — solid green track */
+  #momentum {
+    background: linear-gradient(to right,
+      var(--color-text-tertiary) 0%,
+      var(--color-text-tertiary) calc(var(--mu-percentage, 0%)),
+      #10b981 calc(var(--mu-percentage, 0%)),
+      #10b981 100%);
   }
   
   .custom-icon {

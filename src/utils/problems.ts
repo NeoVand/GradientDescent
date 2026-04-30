@@ -423,17 +423,24 @@ const gaussianPeak: ProblemConfig = {
   },
 
   // Far from the optimum the Gaussian's gradient vanishes (model is ~constant),
-  // so we initialize inside the basin of attraction. Random sign on b reveals
-  // the symmetric pair of global minima at (0, +1) and (0, -1).
+  // so we initialize inside the basin of attraction. We always start with
+  // β > 0 so the marker converges to the labeled true minimum (0, +1); the
+  // symmetric copy at (0, -1) is still visible in the landscape and reachable
+  // by dragging the marker manually.
   getInitialParameters: () => ({
     a: (Math.random() - 0.5) * 2,
-    b: (Math.random() < 0.5 ? -1 : 1) * (1.5 + Math.random())
+    b: 1.5 + Math.random()
   }),
 
   // Gradients near the basin are small (model already nearly fits), so we
   // need a much bigger step than the global 0.01 default for visible
   // convergence within a couple hundred steps.
-  defaultLearningRate: 0.5
+  defaultLearningRate: 0.5,
+
+  // Outside |α|, |β| ≈ 3 the model becomes effectively constant and gradients
+  // vanish — anything wider would just be flat dead space the user can drag
+  // into and get permanently stuck.
+  parameterRange: { min: -3, max: 3 }
 };
 
 // Export all problem configurations

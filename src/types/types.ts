@@ -40,6 +40,11 @@ export interface ProblemConfig {
   // peak) need a much larger step than the global default to converge in a
   // reasonable number of steps.
   defaultLearningRate?: number;
+  // Optional per-problem visible parameter range for the loss landscape.
+  // Used for problems whose useful basin is much smaller than the default
+  // [-7, 7]; e.g. Gaussian peak's basin sits in roughly |α|, |β| < 3 and
+  // outside it gradients vanish so a wider view is just dead space.
+  parameterRange?: { min: number; max: number };
 }
 
 // Training configuration
@@ -48,6 +53,7 @@ export interface TrainingConfig {
   totalSteps: number;
   currentStep: number;
   isTraining: boolean;
+  momentum: number;  // Heavy-ball momentum coefficient (μ). 0 = plain GD.
 }
 
 // A single point in our training history

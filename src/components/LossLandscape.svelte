@@ -10,12 +10,13 @@
   import * as d3 from 'd3';
   import { contours } from 'd3-contour';
   import { interpolateViridis } from 'd3-scale-chromatic';
-  import { 
+  import {
     datasetStore,
     parametersStore,
     historyStore,
     currentProblemConfig,
-    themeStore
+    themeStore,
+    velocityStore
   } from '../stores/stores';
   import type { ModelParameters } from '../types/types';
   import { Mountain } from 'lucide-svelte';
@@ -32,9 +33,12 @@
   $: xLabelOffset = compact ? 26 : 38;
   $: yLabelOffset = compact ? 26 : 35;
   
-  // Parameter range for visualization
-  const parameterRange = { min: -7, max: 7 };
+  // Default parameter range for visualization. Problems can override via
+  // problemConfig.parameterRange to focus on the useful region.
+  const defaultParameterRange = { min: -7, max: 7 };
   const gridResolution = 24; // 24x24 grid for gradient arrows
+  // Reactive: pulls the per-problem range when one is provided.
+  $: parameterRange = problemConfig?.parameterRange ?? defaultParameterRange;
   
   // Loss range for legend
   let minLossValue = 0;
@@ -547,6 +551,9 @@
       .touchable(() => true)
       .on('start', function() {
         isDragging = true;
+        // Drag means the user is restarting from a new position, so any
+        // accumulated momentum from prior steps shouldn't carry over.
+        velocityStore.set({ a: 0, b: 0 });
         d3.select(this).style('cursor', 'grabbing');
       })
       .on('drag', function(event) {

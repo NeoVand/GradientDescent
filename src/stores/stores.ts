@@ -127,8 +127,15 @@ export const trainingStore = writable<TrainingConfig>({
   learningRate: 0.01,
   totalSteps: 200,
   currentStep: 0,
-  isTraining: false
+  isTraining: false,
+  momentum: 0
 });
+
+// ========== Velocity Store ==========
+// Heavy-ball momentum carries an exponentially-weighted average of past
+// gradients. We keep it in its own store so it can be reset independently
+// (training reset, problem switch, manual marker drag).
+export const velocityStore = writable<ModelParameters>({ a: 0, b: 0 });
 
 // ========== Training History Store ==========
 // Keeps track of all parameter updates and losses during training
