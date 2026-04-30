@@ -90,9 +90,9 @@ export const datasetStore = createDatasetStore();
 // ========== Model Parameters Store ==========
 // Tracks the current model parameters (A and B)
 function createParametersStore() {
-  // Initialize farther from optimal for better visualization
-  const initializeParameters = () => {
-    // Randomly choose a corner/edge region for initialization
+  // Default corner/edge init — works for problems whose basin of attraction
+  // covers most of the visible parameter range (linear, polynomial, sine, ...).
+  const initializeDefault = (): ModelParameters => {
     const regions = [
       () => ({ a: -6 + Math.random() * 2, b: -6 + Math.random() * 2 }), // Bottom-left corner
       () => ({ a: -6 + Math.random() * 2, b: 4 + Math.random() * 2 }),  // Top-left corner
@@ -100,18 +100,22 @@ function createParametersStore() {
       () => ({ a: -6 + Math.random() * 8, b: -6 + Math.random() }),     // Bottom edge
       () => ({ a: -6 + Math.random(), b: -6 + Math.random() * 8 })      // Left edge
     ];
-    
-    const randomRegion = regions[Math.floor(Math.random() * regions.length)];
-    return randomRegion();
+    return regions[Math.floor(Math.random() * regions.length)]();
   };
-  
-  const { subscribe, set, update } = writable<ModelParameters>(initializeParameters());
+
+  // Resolve init for the current problem (uses problem-specific override if any).
+  const initializeForCurrentProblem = (): ModelParameters => {
+    const config = problemConfigs[get(selectedProblem)];
+    return config?.getInitialParameters ? config.getInitialParameters() : initializeDefault();
+  };
+
+  const { subscribe, set, update } = writable<ModelParameters>(initializeDefault());
 
   return {
     subscribe,
     set,
     update,
-    reset: () => set(initializeParameters())
+    reset: () => set(initializeForCurrentProblem())
   };
 }
 

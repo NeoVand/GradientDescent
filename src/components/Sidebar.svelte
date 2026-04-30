@@ -51,7 +51,8 @@
     { type: 'linear-regression', name: 'Linear Regression', icon: TrendingUp },
     { type: 'logistic-regression', name: 'Logistic Regression', icon: Percent },
     { type: 'polynomial-regression', name: 'Polynomial Regression', icon: null, customIcon: 'x²' },
-    { type: 'sine-wave', name: 'Sine Wave', icon: Activity }
+    { type: 'sine-wave', name: 'Sine Wave', icon: Activity },
+    { type: 'gaussian-peak', name: 'Gaussian Peak', icon: Mountain }
   ];
   
   // Subscribe to stores
@@ -84,6 +85,11 @@
   function selectProblem(type: ProblemType) {
     selectedProblem.set(type);
     showProblemDropdown = false;
+    // Apply per-problem default learning rate if specified
+    const defaultLr = problemConfigs[type]?.defaultLearningRate;
+    if (defaultLr !== undefined) {
+      trainingStore.update(store => ({ ...store, learningRate: defaultLr }));
+    }
     resetTraining();
     // Regenerate data for the new problem
     datasetStore.regenerateData();

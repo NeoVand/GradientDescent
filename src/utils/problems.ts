@@ -354,11 +354,94 @@ const sineWave: ProblemConfig = {
   }
 };
 
+/**
+ * Gaussian Peak Fit
+ * Fitting y = exp(-(x - a)^2 / (2 b^2)): center a, width b.
+ * Because the model depends on b only through b^2, the loss surface is
+ * symmetric in b — two equivalent global minima at (a*, ±b*).
+ */
+const gaussianPeak: ProblemConfig = {
+  type: 'gaussian-peak',
+  name: 'Gaussian Peak',
+  description: 'Fit a Gaussian: center and width',
+  trueParameters: { a: 0, b: 1 },
+
+  generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
+    const trueA = gaussianPeak.trueParameters.a;
+    const trueB = gaussianPeak.trueParameters.b;
+
+    const data: DataPoint[] = [];
+    const numTrain = Math.floor(numPoints * trainRatio);
+
+    for (let i = 0; i < numPoints; i++) {
+      const x = (i / (numPoints - 1)) * 4 - 2 + (Math.random() - 0.5) * 0.05;
+      const peak = Math.exp(-((x - trueA) ** 2) / (2 * trueB * trueB));
+      const noise = (Math.random() - 0.5) * noiseLevel * 0.5;
+      data.push({ x, y: peak + noise, isTraining: i < numTrain });
+    }
+
+    return data.sort(() => Math.random() - 0.5);
+  },
+
+  predict: (x: number, params: ModelParameters): number => {
+    const b2 = Math.max(params.b * params.b, 1e-6);
+    return Math.exp(-((x - params.a) ** 2) / (2 * b2));
+  },
+
+  computeLoss: (data: DataPoint[], params: ModelParameters): number => {
+    if (data.length === 0) return 0;
+    const b2 = Math.max(params.b * params.b, 1e-6);
+
+    let total = 0;
+    for (const p of data) {
+      const dx = p.x - params.a;
+      const pred = Math.exp(-(dx * dx) / (2 * b2));
+      const err = pred - p.y;
+      total += err * err;
+    }
+    return total / data.length;
+  },
+
+  computeGradient: (data: DataPoint[], params: ModelParameters): ModelParameters => {
+    if (data.length === 0) return { a: 0, b: 0 };
+    const b2 = Math.max(params.b * params.b, 1e-6);
+    // Preserve sign of b in b^3 so the gradient flips correctly across b = 0
+    const bSafe = Math.abs(params.b) < 1e-3 ? (params.b >= 0 ? 1e-3 : -1e-3) : params.b;
+    const b3 = bSafe * b2;
+
+    let gA = 0, gB = 0;
+    for (const p of data) {
+      const dx = p.x - params.a;
+      const pred = Math.exp(-(dx * dx) / (2 * b2));
+      const err = pred - p.y;
+      // d(pred)/d(a) = pred * (x - a) / b^2
+      gA += 2 * err * pred * dx / b2;
+      // d(pred)/d(b) = pred * (x - a)^2 / b^3
+      gB += 2 * err * pred * (dx * dx) / b3;
+    }
+    return { a: gA / data.length, b: gB / data.length };
+  },
+
+  // Far from the optimum the Gaussian's gradient vanishes (model is ~constant),
+  // so we initialize inside the basin of attraction. Random sign on b reveals
+  // the symmetric pair of global minima at (0, +1) and (0, -1).
+  getInitialParameters: () => ({
+    a: (Math.random() - 0.5) * 2,
+    b: (Math.random() < 0.5 ? -1 : 1) * (1.5 + Math.random())
+  }),
+
+  // Gradients near the basin are small (model already nearly fits), so we
+  // need a much bigger step than the global 0.01 default for visible
+  // convergence within a couple hundred steps.
+  defaultLearningRate: 0.5
+};
+
 // Export all problem configurations
 export const problemConfigs: Record<string, ProblemConfig> = {
   'linear-regression': linearRegression,
   'logistic-regression': logisticRegression,
   'polynomial-regression': polynomialRegression,
-  'sine-wave': sineWave
+  'sine-wave': sineWave,
+  'gaussian-peak': gaussianPeak
 };
 

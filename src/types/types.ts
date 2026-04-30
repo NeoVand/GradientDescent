@@ -5,7 +5,7 @@
  */
 
 // Supported machine learning problems
-export type ProblemType = 'linear-regression' | 'logistic-regression' | 'polynomial-regression' | 'sine-wave';
+export type ProblemType = 'linear-regression' | 'logistic-regression' | 'polynomial-regression' | 'sine-wave' | 'gaussian-peak';
 
 // A single data point in our dataset
 export interface DataPoint {
@@ -32,6 +32,14 @@ export interface ProblemConfig {
   predict: (x: number, params: ModelParameters) => number;
   computeLoss: (data: DataPoint[], params: ModelParameters) => number;
   computeGradient: (data: DataPoint[], params: ModelParameters) => ModelParameters;
+  // Optional per-problem initial parameter sampler. Used when the default
+  // corner-based init is outside the basin of attraction for a problem
+  // (e.g. Gaussian peak suffers from vanishing gradients far from the optimum).
+  getInitialParameters?: () => ModelParameters;
+  // Optional per-problem default learning rate. Some problems (e.g. Gaussian
+  // peak) need a much larger step than the global default to converge in a
+  // reasonable number of steps.
+  defaultLearningRate?: number;
 }
 
 // Training configuration
