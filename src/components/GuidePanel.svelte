@@ -26,7 +26,11 @@
     'polynomial-regression': String.raw`Y = \alpha X^2 + \beta X`,
     'sine-wave': String.raw`Y = \alpha \sin(\beta X)`,
     'gaussian-peak': String.raw`Y = \exp\!\left(-\frac{(X - \alpha)^2}{2\beta^2}\right)`,
-    'exponential-decay': String.raw`Y = \alpha \, e^{-\beta X}`
+    'exponential-decay': String.raw`Y = \alpha \, e^{-\beta X}`,
+    'damped-oscillator': String.raw`Y = e^{-\alpha X} \cos(\beta X)`,
+    'logistic-growth': String.raw`Y = \frac{1}{1 + \exp(-(\alpha X + \beta))}`,
+    'power-law': String.raw`Y = \alpha \, X^{\beta}`,
+    'gaussian-mixture': String.raw`Y = e^{-(X - \alpha)^2} + e^{-(X - \beta)^2}`
   };
   
   const parametersFormula = String.raw`(\boldsymbol{\theta} = [\alpha, \beta]^\top)`;
@@ -37,7 +41,11 @@
     'polynomial-regression': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`,
     'sine-wave': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`,
     'gaussian-peak': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`,
-    'exponential-decay': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`
+    'exponential-decay': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`,
+    'damped-oscillator': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`,
+    'logistic-growth': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`,
+    'power-law': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`,
+    'gaussian-mixture': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`
   };
 
   const gradientFormulas: Record<string, string> = {
@@ -46,7 +54,11 @@
     'polynomial-regression': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} X_i^2 & X_i \end{bmatrix}^\top`,
     'sine-wave': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} \sin(\beta X_i) & \alpha X_i \cos(\beta X_i) \end{bmatrix}^\top`,
     'gaussian-peak': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \hat{Y}_i \begin{bmatrix} \dfrac{X_i - \alpha}{\beta^2} & \dfrac{(X_i - \alpha)^2}{\beta^3} \end{bmatrix}^\top`,
-    'exponential-decay': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} e^{-\beta X_i} & -X_i \, \hat{Y}_i \end{bmatrix}^\top`
+    'exponential-decay': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} e^{-\beta X_i} & -X_i \, \hat{Y}_i \end{bmatrix}^\top`,
+    'damped-oscillator': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} -X_i \, \hat{Y}_i & -X_i \, e^{-\alpha X_i} \sin(\beta X_i) \end{bmatrix}^\top`,
+    'logistic-growth': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \, \hat{Y}_i (1 - \hat{Y}_i) \begin{bmatrix} X_i & 1 \end{bmatrix}^\top`,
+    'power-law': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} X_i^{\beta} & \hat{Y}_i \ln X_i \end{bmatrix}^\top`,
+    'gaussian-mixture': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{4}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} (X_i - \alpha)\, e^{-(X_i-\alpha)^2} & (X_i - \beta)\, e^{-(X_i-\beta)^2} \end{bmatrix}^\top`
   };
   
   const updateFormula = String.raw`\boldsymbol{\theta}^{(t+1)} \leftarrow \boldsymbol{\theta}^{(t)} - \gamma \nabla_{\boldsymbol{\theta}} \mathcal{L}`;

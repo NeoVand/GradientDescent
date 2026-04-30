@@ -5,7 +5,17 @@
  */
 
 // Supported machine learning problems
-export type ProblemType = 'linear-regression' | 'logistic-regression' | 'polynomial-regression' | 'sine-wave' | 'gaussian-peak' | 'exponential-decay';
+export type ProblemType =
+  | 'linear-regression'
+  | 'logistic-regression'
+  | 'polynomial-regression'
+  | 'sine-wave'
+  | 'gaussian-peak'
+  | 'exponential-decay'
+  | 'damped-oscillator'
+  | 'logistic-growth'
+  | 'power-law'
+  | 'gaussian-mixture';
 
 // A single data point in our dataset
 export interface DataPoint {

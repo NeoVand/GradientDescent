@@ -521,6 +521,309 @@ const exponentialDecay: ProblemConfig = {
   parameterRange: { min: -2, max: 2 }
 };
 
+/**
+ * Damped Oscillator
+ * y = exp(-α·t)·cos(β·t) — physics-y waveform with both decay and ringing.
+ * α controls how fast the envelope shrinks; β is angular frequency.
+ * Model is even in β so the loss surface has a symmetric pair of global
+ * minima at (α*, ±β*). Loss in β is also multimodal from cos aliasing.
+ * Time t ∈ [0, 4] so the envelope decays left→right, the canonical look.
+ */
+const dampedOscillator: ProblemConfig = {
+  type: 'damped-oscillator',
+  name: 'Damped Oscillator',
+  description: 'Fit y = e^(−α·t)·cos(β·t): damping and frequency',
+  trueParameters: { a: 0.5, b: 3 },
+
+  generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
+    const trueA = dampedOscillator.trueParameters.a;
+    const trueB = dampedOscillator.trueParameters.b;
+
+    const data: DataPoint[] = [];
+    const numTrain = Math.floor(numPoints * trainRatio);
+
+    for (let i = 0; i < numPoints; i++) {
+      // t in [0, 4]: standard damped-oscillator time-axis appearance
+      const x = (i / (numPoints - 1)) * 4 + (Math.random() - 0.5) * 0.05;
+      const noise = (Math.random() - 0.5) * noiseLevel * 0.5;
+      const y = Math.exp(-trueA * x) * Math.cos(trueB * x) + noise;
+      data.push({ x, y, isTraining: i < numTrain });
+    }
+
+    return data.sort(() => Math.random() - 0.5);
+  },
+
+  predict: (x: number, params: ModelParameters): number => {
+    return Math.exp(-params.a * x) * Math.cos(params.b * x);
+  },
+
+  computeLoss: (data: DataPoint[], params: ModelParameters): number => {
+    if (data.length === 0) return 0;
+    let total = 0;
+    for (const p of data) {
+      const env = Math.exp(-params.a * p.x);
+      const pred = env * Math.cos(params.b * p.x);
+      const err = pred - p.y;
+      total += err * err;
+    }
+    return total / data.length;
+  },
+
+  computeGradient: (data: DataPoint[], params: ModelParameters): ModelParameters => {
+    if (data.length === 0) return { a: 0, b: 0 };
+    let gA = 0, gB = 0;
+    for (const p of data) {
+      const env = Math.exp(-params.a * p.x);
+      const c = Math.cos(params.b * p.x);
+      const s = Math.sin(params.b * p.x);
+      const pred = env * c;
+      const err = pred - p.y;
+      // d(pred)/d(α) = -t · pred
+      gA += 2 * err * (-p.x * pred);
+      // d(pred)/d(β) = -t · env · sin(β·t)
+      gB += 2 * err * (-p.x * env * s);
+    }
+    return { a: gA / data.length, b: gB / data.length };
+  },
+
+  // α stays positive (decay) so exp(-α·t) doesn't blow up; β is given a
+  // random sign so the symmetric pair of minima at (α*, ±β*) both surface.
+  getInitialParameters: () => ({
+    a: 1 + Math.random() * 1.2,
+    b: (Math.random() < 0.5 ? -1 : 1) * (3 + Math.random() * 1.3)
+  }),
+
+  defaultLearningRate: 0.05,
+  defaultMomentum: 0.9,
+  parameterRange: { min: -3, max: 5 }
+};
+
+/**
+ * Logistic Growth (sigmoid regression)
+ * y = 1 / (1 + exp(-(α·X + β))) — continuous y in (0, 1).
+ * α is steepness, β is horizontal shift. Different from logistic regression
+ * (which is 2D classification): here y is a continuous target.
+ */
+const logisticGrowth: ProblemConfig = {
+  type: 'logistic-growth',
+  name: 'Logistic Growth',
+  description: 'Fit a sigmoid: steepness and shift',
+  trueParameters: { a: 2, b: 0 },
+
+  generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
+    const trueA = logisticGrowth.trueParameters.a;
+    const trueB = logisticGrowth.trueParameters.b;
+
+    const data: DataPoint[] = [];
+    const numTrain = Math.floor(numPoints * trainRatio);
+
+    for (let i = 0; i < numPoints; i++) {
+      const x = (i / (numPoints - 1)) * 4 - 2 + (Math.random() - 0.5) * 0.05;
+      const noise = (Math.random() - 0.5) * noiseLevel * 0.3;
+      const z = trueA * x + trueB;
+      const y = 1 / (1 + Math.exp(-z)) + noise;
+      data.push({ x, y, isTraining: i < numTrain });
+    }
+
+    return data.sort(() => Math.random() - 0.5);
+  },
+
+  predict: (x: number, params: ModelParameters): number => {
+    const z = params.a * x + params.b;
+    return 1 / (1 + Math.exp(-z));
+  },
+
+  computeLoss: (data: DataPoint[], params: ModelParameters): number => {
+    if (data.length === 0) return 0;
+    let total = 0;
+    for (const p of data) {
+      const z = params.a * p.x + params.b;
+      const pred = 1 / (1 + Math.exp(-z));
+      const err = pred - p.y;
+      total += err * err;
+    }
+    return total / data.length;
+  },
+
+  computeGradient: (data: DataPoint[], params: ModelParameters): ModelParameters => {
+    if (data.length === 0) return { a: 0, b: 0 };
+    let gA = 0, gB = 0;
+    for (const p of data) {
+      const z = params.a * p.x + params.b;
+      const pred = 1 / (1 + Math.exp(-z));
+      const err = pred - p.y;
+      const dPredDz = pred * (1 - pred);
+      // d(pred)/d(α) = σ(1-σ) · x;   d(pred)/d(β) = σ(1-σ)
+      gA += 2 * err * dPredDz * p.x;
+      gB += 2 * err * dPredDz;
+    }
+    return { a: gA / data.length, b: gB / data.length };
+  },
+
+  // α negative is a separate local-minimum basin (inverted sigmoid), so we
+  // initialize with α > 0 to land in the correct one. Sigmoid saturates at
+  // large |α·x+β| which kills the gradient, so we keep init non-saturating.
+  getInitialParameters: () => ({
+    a: 0.3 + Math.random() * 1.2,
+    b: -1.5 + Math.random() * 3
+  }),
+
+  defaultLearningRate: 1,
+  defaultMomentum: 0.5
+};
+
+/**
+ * Power Law
+ * y = α · x^β  (x > 0). Scale α and exponent β.
+ * Loss is sharply ill-conditioned because β lives in an exponent — cranking
+ * up momentum is the natural fix to escape the long, narrow valley.
+ */
+const powerLaw: ProblemConfig = {
+  type: 'power-law',
+  name: 'Power Law',
+  description: 'Fit y = α·X^β: scale and exponent',
+  trueParameters: { a: 1, b: 1.5 },
+
+  generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
+    const trueA = powerLaw.trueParameters.a;
+    const trueB = powerLaw.trueParameters.b;
+
+    const data: DataPoint[] = [];
+    const numTrain = Math.floor(numPoints * trainRatio);
+
+    for (let i = 0; i < numPoints; i++) {
+      // x in [0.3, 3.5] — strictly positive
+      const x = 0.3 + (i / (numPoints - 1)) * 3.2 + (Math.random() - 0.5) * 0.05;
+      const noise = (Math.random() - 0.5) * noiseLevel * 0.6;
+      const y = trueA * Math.pow(x, trueB) + noise;
+      data.push({ x, y, isTraining: i < numTrain });
+    }
+
+    return data.sort(() => Math.random() - 0.5);
+  },
+
+  predict: (x: number, params: ModelParameters): number => {
+    if (x <= 0) return 0;
+    return params.a * Math.pow(x, params.b);
+  },
+
+  computeLoss: (data: DataPoint[], params: ModelParameters): number => {
+    if (data.length === 0) return 0;
+    let total = 0;
+    for (const p of data) {
+      if (p.x <= 0) continue;
+      const pred = params.a * Math.pow(p.x, params.b);
+      const err = pred - p.y;
+      total += err * err;
+    }
+    return total / data.length;
+  },
+
+  computeGradient: (data: DataPoint[], params: ModelParameters): ModelParameters => {
+    if (data.length === 0) return { a: 0, b: 0 };
+    let gA = 0, gB = 0;
+    for (const p of data) {
+      if (p.x <= 0) continue;
+      const xb = Math.pow(p.x, params.b);
+      const pred = params.a * xb;
+      const err = pred - p.y;
+      // d(pred)/d(α) = x^β
+      gA += 2 * err * xb;
+      // d(pred)/d(β) = α·x^β·ln(x) = pred · ln(x)
+      gB += 2 * err * pred * Math.log(p.x);
+    }
+    return { a: gA / data.length, b: gB / data.length };
+  },
+
+  // Stay inside the basin where model values don't explode for x ≤ 3.5.
+  // High α with high β makes y huge and gradients overflow.
+  getInitialParameters: () => ({
+    a: 0.3 + Math.random() * 1.5,
+    b: 0.3 + Math.random() * 1.4
+  }),
+
+  defaultLearningRate: 0.005,
+  defaultMomentum: 0.9,
+  parameterRange: { min: -2, max: 3 }
+};
+
+/**
+ * Two-Gaussian Mixture
+ * y = exp(-(X-α)²) + exp(-(X-β)²) — two unit-width peaks.
+ * The model is symmetric in α↔β, so the loss surface has *two* equivalent
+ * global minima (true peaks at -1, +1, so basins at (-1, +1) and (+1, -1)).
+ * A textbook identifiability / label-switching demo.
+ */
+const gaussianMixture: ProblemConfig = {
+  type: 'gaussian-mixture',
+  name: 'Gaussian Mixture',
+  description: 'Fit two Gaussian peaks: locations α and β',
+  trueParameters: { a: -1, b: 1 },
+
+  generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
+    const trueA = gaussianMixture.trueParameters.a;
+    const trueB = gaussianMixture.trueParameters.b;
+
+    const data: DataPoint[] = [];
+    const numTrain = Math.floor(numPoints * trainRatio);
+
+    for (let i = 0; i < numPoints; i++) {
+      const x = (i / (numPoints - 1)) * 4 - 2 + (Math.random() - 0.5) * 0.05;
+      const noise = (Math.random() - 0.5) * noiseLevel * 0.4;
+      const y = Math.exp(-Math.pow(x - trueA, 2)) + Math.exp(-Math.pow(x - trueB, 2)) + noise;
+      data.push({ x, y, isTraining: i < numTrain });
+    }
+
+    return data.sort(() => Math.random() - 0.5);
+  },
+
+  predict: (x: number, params: ModelParameters): number => {
+    return Math.exp(-Math.pow(x - params.a, 2)) + Math.exp(-Math.pow(x - params.b, 2));
+  },
+
+  computeLoss: (data: DataPoint[], params: ModelParameters): number => {
+    if (data.length === 0) return 0;
+    let total = 0;
+    for (const p of data) {
+      const pred =
+        Math.exp(-Math.pow(p.x - params.a, 2)) +
+        Math.exp(-Math.pow(p.x - params.b, 2));
+      const err = pred - p.y;
+      total += err * err;
+    }
+    return total / data.length;
+  },
+
+  computeGradient: (data: DataPoint[], params: ModelParameters): ModelParameters => {
+    if (data.length === 0) return { a: 0, b: 0 };
+    let gA = 0, gB = 0;
+    for (const p of data) {
+      const eA = Math.exp(-Math.pow(p.x - params.a, 2));
+      const eB = Math.exp(-Math.pow(p.x - params.b, 2));
+      const err = eA + eB - p.y;
+      // d(pred)/d(α) = 2·(x-α)·exp(-(x-α)²)
+      gA += 2 * err * 2 * (p.x - params.a) * eA;
+      // d(pred)/d(β) = 2·(x-β)·exp(-(x-β)²)
+      gB += 2 * err * 2 * (p.x - params.b) * eB;
+    }
+    return { a: gA / data.length, b: gB / data.length };
+  },
+
+  // Initialize off-diagonal so the marker isn't on the saddle a=b. Random
+  // sign pairing surfaces the symmetric pair of global minima.
+  getInitialParameters: () => {
+    const flip = Math.random() < 0.5;
+    const aMag = 1.8 + Math.random() * 0.6;
+    const bMag = 1.8 + Math.random() * 0.6;
+    return flip
+      ? { a: -aMag, b: bMag }
+      : { a: aMag, b: -bMag };
+  },
+
+  defaultLearningRate: 0.3,
+  parameterRange: { min: -3, max: 3 }
+};
+
 // Export all problem configurations
 export const problemConfigs: Record<string, ProblemConfig> = {
   'linear-regression': linearRegression,
@@ -528,6 +831,10 @@ export const problemConfigs: Record<string, ProblemConfig> = {
   'polynomial-regression': polynomialRegression,
   'sine-wave': sineWave,
   'gaussian-peak': gaussianPeak,
-  'exponential-decay': exponentialDecay
+  'exponential-decay': exponentialDecay,
+  'damped-oscillator': dampedOscillator,
+  'logistic-growth': logisticGrowth,
+  'power-law': powerLaw,
+  'gaussian-mixture': gaussianMixture
 };
 

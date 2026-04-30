@@ -29,7 +29,9 @@
     Mountain,
     Brain,
     Info,
-    Rocket
+    Rocket,
+    Waves,
+    Sigma
   } from 'lucide-svelte';
   
   // Component state
@@ -55,7 +57,11 @@
     { type: 'polynomial-regression', name: 'Polynomial Regression', icon: null, customIcon: 'x²' },
     { type: 'sine-wave', name: 'Sine Wave', icon: Activity },
     { type: 'gaussian-peak', name: 'Gaussian Peak', icon: Mountain },
-    { type: 'exponential-decay', name: 'Exponential Decay', icon: TrendingDown }
+    { type: 'exponential-decay', name: 'Exponential Decay', icon: TrendingDown },
+    { type: 'damped-oscillator', name: 'Damped Oscillator', icon: Waves },
+    { type: 'logistic-growth', name: 'Logistic Growth', icon: null, customIcon: 'σ' },
+    { type: 'power-law', name: 'Power Law', icon: null, customIcon: 'xⁿ' },
+    { type: 'gaussian-mixture', name: 'Gaussian Mixture', icon: null, customIcon: 'ΛΛ' }
   ];
   
   // Subscribe to stores
@@ -94,19 +100,19 @@
   function selectProblem(type: ProblemType) {
     selectedProblem.set(type);
     showProblemDropdown = false;
-    // Apply per-problem defaults if specified (otherwise leave user value alone)
+    // Apply per-problem defaults. Momentum always resets (to the problem's
+    // default or 0) so a high-μ value from a previous problem doesn't bleed
+    // into one that prefers plain GD. Learning rate only resets if the
+    // problem explicitly specifies one — otherwise the user keeps theirs.
     const cfg = problemConfigs[type];
     const defaultLr = cfg?.defaultLearningRate;
-    const defaultMu = cfg?.defaultMomentum;
-    if (defaultLr !== undefined || defaultMu !== undefined) {
-      trainingStore.update(store => ({
-        ...store,
-        ...(defaultLr !== undefined ? { learningRate: defaultLr } : {}),
-        ...(defaultMu !== undefined ? { momentum: defaultMu } : {})
-      }));
-      // Reset velocity so the new μ takes effect cleanly
-      velocityStore.set({ a: 0, b: 0 });
-    }
+    const targetMu = cfg?.defaultMomentum ?? 0;
+    trainingStore.update(store => ({
+      ...store,
+      momentum: targetMu,
+      ...(defaultLr !== undefined ? { learningRate: defaultLr } : {})
+    }));
+    velocityStore.set({ a: 0, b: 0 });
     resetTraining();
     // Regenerate data for the new problem
     datasetStore.regenerateData();
