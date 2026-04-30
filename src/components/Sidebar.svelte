@@ -608,6 +608,52 @@
     </div>
   </div>
   
+  <!-- Momentum -->
+  <div class="control-group">
+    <div class="control-header">
+      <span class="icon"><Rocket size={18} strokeWidth={2} /></span>
+      <label for="momentum">Momentum <span class="greek-label"> (μ)</span></label>
+      <div class="tooltip-container">
+        <button
+          class="info-btn"
+          on:mouseenter={() => activeTooltip = 'momentum'}
+          on:mouseleave={() => activeTooltip = null}
+        >
+          <Info size={14} strokeWidth={2} />
+        </button>
+        {#if activeTooltip === 'momentum'}
+          <div class="tooltip">
+            Heavy-ball momentum carries the marker through flat regions<br/>
+            <span style="opacity: 0.8; font-size: 0.7rem;">v ← μ·v + ∇L,&nbsp; θ ← θ − γ·v &nbsp;(μ = 0 → plain GD)</span>
+          </div>
+        {/if}
+      </div>
+    </div>
+    <div class="slider-container">
+      <div class="slider-value-display">
+        <span class="momentum-value">{$trainingStore.momentum.toFixed(2)}</span>
+      </div>
+      <input
+        id="momentum"
+        type="range"
+        min="0"
+        max="0.99"
+        step="0.01"
+        value={$trainingStore.momentum}
+        on:input={(e) => {
+          const v = parseFloat((e.target as HTMLInputElement).value);
+          trainingStore.update(s => ({ ...s, momentum: v }));
+          // Reset accumulated velocity so the new μ takes effect cleanly
+          velocityStore.set({ a: 0, b: 0 });
+        }}
+      />
+      <div class="slider-labels">
+        <span>Off</span>
+        <span>0.99</span>
+      </div>
+    </div>
+  </div>
+
   <!-- Training Steps -->
   <div class="control-group">
     <div class="control-header">
@@ -1319,13 +1365,25 @@
     font-weight: 600;
   }
 
-  /* Momentum slider — solid green track */
+  /* Momentum slider — left (active) side fills with a soft-to-vibrant green
+     gradient as μ grows, suggesting accumulating momentum. The unfilled side
+     is muted so the eye reads the slider value at a glance. */
   #momentum {
-    background: linear-gradient(to right,
-      var(--color-text-tertiary) 0%,
-      var(--color-text-tertiary) calc(var(--mu-percentage, 0%)),
-      #10b981 calc(var(--mu-percentage, 0%)),
-      #10b981 100%);
+    background:
+      linear-gradient(to right,
+        rgba(16, 185, 129, 0.25) 0%,
+        rgba(16, 185, 129, 1.0) var(--mu-percentage, 0%),
+        rgba(127, 127, 127, 0.25) var(--mu-percentage, 0%),
+        rgba(127, 127, 127, 0.25) 100%);
+  }
+
+  /* Momentum thumb gets a green glow that intensifies with μ — visual cue
+     that the slider is doing something energetic. */
+  #momentum::-webkit-slider-thumb {
+    border-color: #10b981;
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.2),
+      0 0 calc(var(--mu-percentage, 0%) * 0.12) rgba(16, 185, 129, 0.7);
   }
   
   .custom-icon {
