@@ -24,24 +24,25 @@
   let updateRuleEl: HTMLSpanElement;
   let momentumEl: HTMLSpanElement;
   let lossDefinitionEl: HTMLSpanElement;
+  let gradientDefinitionEl: HTMLSpanElement;
 
   const formulas = {
     updateRule: String.raw`\boldsymbol{\theta}^{(t+1)} \leftarrow \boldsymbol{\theta}^{(t)} - \gamma\, \nabla \mathcal{L}(\boldsymbol{\theta}^{(t)})`,
     momentum: String.raw`\mathbf{v}^{(t+1)} \leftarrow \mu\, \mathbf{v}^{(t)} + \nabla \mathcal{L},\quad \boldsymbol{\theta}^{(t+1)} \leftarrow \boldsymbol{\theta}^{(t)} - \gamma\, \mathbf{v}^{(t+1)}`,
-    lossDefinition: String.raw`\mathcal{L}(\boldsymbol{\theta}) = \tfrac{1}{n}\sum_{i=1}^{n} \big(\hat{y}_i - y_i\big)^{2}`
+    lossDefinition: String.raw`\mathcal{L}(\boldsymbol{\theta}) = \tfrac{1}{n}\sum_{i=1}^{n} \big(\hat{y}_i - y_i\big)^{2}`,
+    gradientDefinition: String.raw`\nabla \mathcal{L} = \begin{bmatrix} \tfrac{\partial \mathcal{L}}{\partial \alpha} \\[2pt] \tfrac{\partial \mathcal{L}}{\partial \beta} \end{bmatrix}`
   };
 
   function renderLatex() {
     const opts = { throwOnError: false, displayMode: false };
-    if (updateRuleEl) {
-      try { katex.render(formulas.updateRule, updateRuleEl, opts); } catch (e) { console.error(e); }
-    }
-    if (momentumEl) {
-      try { katex.render(formulas.momentum, momentumEl, opts); } catch (e) { console.error(e); }
-    }
-    if (lossDefinitionEl) {
-      try { katex.render(formulas.lossDefinition, lossDefinitionEl, opts); } catch (e) { console.error(e); }
-    }
+    const safe = (el: HTMLElement | undefined, src: string) => {
+      if (!el) return;
+      try { katex.render(src, el, opts); } catch (e) { console.error(e); }
+    };
+    safe(updateRuleEl, formulas.updateRule);
+    safe(momentumEl, formulas.momentum);
+    safe(lossDefinitionEl, formulas.lossDefinition);
+    safe(gradientDefinitionEl, formulas.gradientDefinition);
   }
 
   onMount(renderLatex);
@@ -260,16 +261,18 @@
             </svg>
             <div class="concept-fade"></div>
             <div class="concept-text concept-text-overlay">
-              <h4>Gradient — which way is steepest?</h4>
+              <h4>Gradient — the slope of the loss</h4>
               <p>
-                At every point in parameter space, the gradient is the direction in which
-                loss <em>grows</em> the fastest. To minimize loss, you walk the
-                <strong>opposite</strong> way.
+                The gradient <strong>∇ℒ</strong> is a vector with one component
+                per parameter. Each component measures how loss changes when you
+                nudge that parameter:
               </p>
+              <div class="overlay-formula" bind:this={gradientDefinitionEl}></div>
               <p>
-                The black arrows on the loss landscape are exactly that: tiny vectors
-                pointing in the <em>negative</em> gradient direction at each grid cell.
-                Longer arrow = steeper loss surface there.
+                It points <em>uphill</em> — the direction of steepest ascent.
+                To minimize loss you walk the <strong>opposite</strong> way; the
+                arrows here are exactly that <em>negative gradient</em>, longer
+                where the surface is steeper.
               </p>
             </div>
           </div>
@@ -693,11 +696,16 @@
   /* Overlay variant: the SVG fills the whole card and the text sits on
      the right with a left-to-right fade hiding the field underneath it. */
   .concept-bg-overlay {
-    display: block;
+    display: grid;
+    /* Two columns: vector field on the left, text on the right. The right
+       column's exact width must match the fade-to-opaque stop in the
+       overlay so the text always sits on a fully-opaque background. */
+    grid-template-columns: 1fr 50%;
     position: relative;
     padding: 0;
     overflow: hidden;
-    min-height: 220px;
+    /* No min-height — the card grows with the (right-column) text content
+       and the SVG stretches to fill via background positioning. */
   }
   .concept-bg-svg {
     position: absolute;
@@ -716,25 +724,31 @@
     background: linear-gradient(
       to right,
       transparent 0%,
-      transparent 32%,
-      var(--color-bg-tertiary) 56%,
+      transparent 35%,
+      var(--color-bg-tertiary) 50%,
       var(--color-bg-tertiary) 100%
     );
   }
+  /* The text sits in the second grid column so the card height tracks the
+     text — no clipping. The fade lines up because the column starts at 50%. */
   .concept-text-overlay {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 50%;
-    padding: 1.5rem 1.5rem 1.5rem 1.5rem;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
+    grid-column: 2;
+    position: relative;
+    padding: 1.25rem 1.5rem 1.25rem 1.25rem;
     z-index: 1;
+    align-self: center;
   }
-  .concept-text-overlay h4 {
-    margin-top: 0;
+  .concept-text-overlay h4 { margin-top: 0; }
+  .concept-text-overlay p { margin-bottom: 0.6rem; }
+  .concept-text-overlay p:last-child { margin-bottom: 0; }
+  .overlay-formula {
+    display: block;
+    margin: 0.5rem 0;
+    text-align: center;
+  }
+  .overlay-formula :global(.katex) {
+    font-size: 1rem;
+    color: var(--color-text-primary);
   }
 
   /* ---------- Formulas ---------- */
