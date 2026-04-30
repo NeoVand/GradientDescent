@@ -51,6 +51,46 @@
     if (e.target === e.currentTarget) onClose();
   }
 
+  // ----- Gradient concept SVG: a real vector field -----
+  // Render a dense arrow grid using the gradient of a synthetic quadratic
+  // loss L(α, β) = (α − cα)² + (β − cβ)². Negative gradient at every grid
+  // cell points toward (cα, cβ). Same idea as the Loss Landscape panel,
+  // shrunk for the modal.
+  const gradVizCx = 130;
+  const gradVizCy = 60;
+  type Arrow = { x1: number; y1: number; x2: number; y2: number; w: number; o: number };
+  const gradFieldArrows: Arrow[] = (() => {
+    const arrows: Arrow[] = [];
+    const cols = 13, rows = 7;
+    const stepX = 200 / (cols + 1);
+    const stepY = 120 / (rows + 1);
+    let maxMag = 0;
+    // First pass: collect raw vectors and find max magnitude for normalisation
+    const raw: { gx: number; gy: number; ox: number; oy: number; m: number }[] = [];
+    for (let j = 1; j <= rows; j++) {
+      for (let i = 1; i <= cols; i++) {
+        const ox = i * stepX, oy = j * stepY;
+        const dx = gradVizCx - ox, dy = gradVizCy - oy;
+        const m = Math.sqrt(dx * dx + dy * dy);
+        if (m < 4) { raw.push({ gx: 0, gy: 0, ox, oy, m: 0 }); continue; }
+        raw.push({ gx: dx / m, gy: dy / m, ox, oy, m });
+        if (m > maxMag) maxMag = m;
+      }
+    }
+    for (const r of raw) {
+      if (r.m === 0) continue;
+      const lenScale = 0.4 + 0.6 * (r.m / maxMag);  // base + magnitude ramp
+      const len = 7.5 * lenScale;
+      arrows.push({
+        x1: r.ox, y1: r.oy,
+        x2: r.ox + r.gx * len, y2: r.oy + r.gy * len,
+        w: 0.7 + 0.6 * lenScale,
+        o: 0.45 + 0.4 * lenScale
+      });
+    }
+    return arrows;
+  })();
+
   // The 13 problems, grouped — formulas kept tiny so they fit in card layout.
   const problems = {
     'Curve fitting': [
@@ -91,27 +131,33 @@
         <div class="hero">
           <svg class="hero-svg" viewBox="0 0 460 200" preserveAspectRatio="xMidYMid meet">
             <defs>
-              <radialGradient id="bowl-glow" cx="68%" cy="62%" r="46%">
+              <radialGradient id="bowl-glow" cx="60%" cy="55%" r="42%">
                 <stop offset="0%" stop-color="#fde047" stop-opacity="0.55" />
                 <stop offset="35%" stop-color="#10b981" stop-opacity="0.30" />
                 <stop offset="100%" stop-color="#10b981" stop-opacity="0" />
               </radialGradient>
+              <clipPath id="hero-clip">
+                <rect x="0" y="0" width="460" height="200" rx="10" />
+              </clipPath>
               <!-- Curved descent path: starts upper-left, curves into the basin -->
               <path id="descent-path"
-                    d="M 35,30 Q 80,40 130,80 T 230,120 Q 280,140 312,124"
+                    d="M 50,30 Q 110,45 170,85 T 250,118 Q 285,128 296,116"
                     fill="none" />
             </defs>
 
-            <!-- Subtle bowl background -->
-            <rect x="0" y="0" width="460" height="200" fill="url(#bowl-glow)" rx="10" />
+            <g clip-path="url(#hero-clip)">
+              <!-- Subtle bowl background -->
+              <rect x="0" y="0" width="460" height="200" fill="url(#bowl-glow)" rx="10" />
 
-            <!-- Concentric contours around the basin (312, 124) -->
-            <ellipse cx="312" cy="124" rx="14" ry="10"  class="contour" style="stroke-opacity: 0.55" />
-            <ellipse cx="312" cy="124" rx="38" ry="26"  class="contour" style="stroke-opacity: 0.42" />
-            <ellipse cx="312" cy="124" rx="70" ry="48"  class="contour" style="stroke-opacity: 0.30" />
-            <ellipse cx="312" cy="124" rx="108" ry="74" class="contour" style="stroke-opacity: 0.20" />
-            <ellipse cx="312" cy="124" rx="150" ry="100" class="contour" style="stroke-opacity: 0.13" />
-            <ellipse cx="312" cy="124" rx="195" ry="130" class="contour" style="stroke-opacity: 0.07" />
+              <!-- Concentric contours around the basin (296, 116). Sized so the
+                   biggest one still fits inside the 460-wide viewBox. -->
+              <ellipse cx="296" cy="116" rx="14"  ry="10"  class="contour" style="stroke-opacity: 0.55" />
+              <ellipse cx="296" cy="116" rx="36"  ry="26"  class="contour" style="stroke-opacity: 0.42" />
+              <ellipse cx="296" cy="116" rx="64"  ry="46"  class="contour" style="stroke-opacity: 0.30" />
+              <ellipse cx="296" cy="116" rx="98"  ry="68"  class="contour" style="stroke-opacity: 0.20" />
+              <ellipse cx="296" cy="116" rx="135" ry="92"  class="contour" style="stroke-opacity: 0.13" />
+              <ellipse cx="296" cy="116" rx="160" ry="108" class="contour" style="stroke-opacity: 0.07" />
+            </g>
 
             <!-- Comet trail: dots sliding along the same path with offsets -->
             <g class="trail">
@@ -177,25 +223,41 @@
 
           <div class="concept">
             <svg class="concept-svg concept-svg-left" viewBox="0 0 200 120">
-              <!-- Contour ellipses centered at right -->
-              <ellipse cx="135" cy="60" rx="12" ry="9" fill="none" stroke="#10b981" stroke-opacity="0.7" stroke-width="1.5" />
-              <ellipse cx="135" cy="60" rx="30" ry="22" fill="none" stroke="#10b981" stroke-opacity="0.5" stroke-width="1.5" />
-              <ellipse cx="135" cy="60" rx="55" ry="40" fill="none" stroke="#10b981" stroke-opacity="0.35" stroke-width="1.5" />
-              <ellipse cx="135" cy="60" rx="85" ry="58" fill="none" stroke="#10b981" stroke-opacity="0.22" stroke-width="1.5" />
-              <!-- Arrows pointing inward (descent direction) -->
-              {#each [
-                { x: 50, y: 40, dx: 18, dy: 6 },
-                { x: 60, y: 90, dx: 15, dy: -8 },
-                { x: 175, y: 25, dx: -14, dy: 10 },
-                { x: 180, y: 100, dx: -16, dy: -10 }
-              ] as a}
-                <line x1={a.x} y1={a.y} x2={a.x + a.dx} y2={a.y + a.dy}
-                      stroke="currentColor" stroke-width="1.5" opacity="0.7" />
-                <polygon points="{a.x + a.dx},{a.y + a.dy} {a.x + a.dx - 5*Math.cos(Math.atan2(a.dy, a.dx) - 0.4)},{a.y + a.dy - 5*Math.sin(Math.atan2(a.dy, a.dx) - 0.4)} {a.x + a.dx - 5*Math.cos(Math.atan2(a.dy, a.dx) + 0.4)},{a.y + a.dy - 5*Math.sin(Math.atan2(a.dy, a.dx) + 0.4)}"
-                         fill="currentColor" opacity="0.7" />
+              <defs>
+                <radialGradient id="grad-bowl-bg" cx="65%" cy="50%" r="55%">
+                  <stop offset="0%" stop-color="#fde047" stop-opacity="0.45" />
+                  <stop offset="45%" stop-color="#10b981" stop-opacity="0.18" />
+                  <stop offset="100%" stop-color="#10b981" stop-opacity="0" />
+                </radialGradient>
+                <marker id="grad-arrowhead" viewBox="0 -5 10 10"
+                        refX="8" refY="0" markerWidth="4" markerHeight="4" orient="auto">
+                  <path d="M0,-5L10,0L0,5" fill="currentColor" />
+                </marker>
+              </defs>
+
+              <!-- Background tint hinting at the loss heatmap -->
+              <rect x="0" y="0" width="200" height="120" fill="url(#grad-bowl-bg)" />
+
+              <!-- Vector field (matches the LossLandscape arrow style) -->
+              {#each gradFieldArrows as a}
+                <line x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2}
+                      stroke="currentColor" stroke-width={a.w}
+                      opacity={a.o} marker-end="url(#grad-arrowhead)" />
               {/each}
-              <!-- Center -->
-              <circle cx="135" cy="60" r="3" fill="#f59e0b" />
+
+              <!-- A few thin contours over the field for context -->
+              <ellipse cx={gradVizCx} cy={gradVizCy} rx="10" ry="7"
+                       fill="none" stroke="#fff" stroke-opacity="0.55" stroke-width="1" />
+              <ellipse cx={gradVizCx} cy={gradVizCy} rx="28" ry="20"
+                       fill="none" stroke="#fff" stroke-opacity="0.32" stroke-width="1" />
+              <ellipse cx={gradVizCx} cy={gradVizCy} rx="55" ry="40"
+                       fill="none" stroke="#fff" stroke-opacity="0.18" stroke-width="1" />
+
+              <!-- The "current parameters" marker, same colour as the app's -->
+              <circle cx={gradVizCx} cy={gradVizCy} r="6" fill="none"
+                      stroke="#f59e0b" stroke-width="1.5" />
+              <circle cx={gradVizCx} cy={gradVizCy} r="3.5" fill="#f59e0b"
+                      stroke="#fff" stroke-width="1.5" />
             </svg>
             <div class="concept-text">
               <h4>Gradient — which way is steepest?</h4>
