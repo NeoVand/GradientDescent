@@ -284,10 +284,81 @@ const polynomialRegression: ProblemConfig = {
   }
 };
 
+/**
+ * Sine Wave Fit
+ * Fitting y = a * sin(b * x): amplitude a, angular frequency b.
+ * Frequency aliasing creates many local minima along the b axis — a great
+ * demonstration of why gradient descent can get stuck.
+ */
+const sineWave: ProblemConfig = {
+  type: 'sine-wave',
+  name: 'Sine Wave',
+  description: 'Fit a sine wave: amplitude and frequency',
+  trueParameters: { a: 1.5, b: 3 },
+
+  generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
+    const trueA = sineWave.trueParameters.a;
+    const trueB = sineWave.trueParameters.b;
+
+    const data: DataPoint[] = [];
+    const numTrain = Math.floor(numPoints * trainRatio);
+
+    for (let i = 0; i < numPoints; i++) {
+      const x = (i / (numPoints - 1)) * 4 - 2 + (Math.random() - 0.5) * 0.05;
+      const noise = (Math.random() - 0.5) * noiseLevel;
+      const y = trueA * Math.sin(trueB * x) + noise;
+
+      data.push({ x, y, isTraining: i < numTrain });
+    }
+
+    return data.sort(() => Math.random() - 0.5);
+  },
+
+  predict: (x: number, params: ModelParameters): number => {
+    return params.a * Math.sin(params.b * x);
+  },
+
+  computeLoss: (data: DataPoint[], params: ModelParameters): number => {
+    if (data.length === 0) return 0;
+
+    let totalError = 0;
+    for (const point of data) {
+      const prediction = params.a * Math.sin(params.b * point.x);
+      const error = prediction - point.y;
+      totalError += error * error;
+    }
+
+    return totalError / data.length;
+  },
+
+  computeGradient: (data: DataPoint[], params: ModelParameters): ModelParameters => {
+    if (data.length === 0) return { a: 0, b: 0 };
+
+    let gradA = 0;
+    let gradB = 0;
+
+    for (const point of data) {
+      const s = Math.sin(params.b * point.x);
+      const c = Math.cos(params.b * point.x);
+      const prediction = params.a * s;
+      const error = prediction - point.y;
+
+      gradA += 2 * error * s;
+      gradB += 2 * error * params.a * point.x * c;
+    }
+
+    return {
+      a: gradA / data.length,
+      b: gradB / data.length
+    };
+  }
+};
+
 // Export all problem configurations
 export const problemConfigs: Record<string, ProblemConfig> = {
   'linear-regression': linearRegression,
   'logistic-regression': logisticRegression,
-  'polynomial-regression': polynomialRegression
+  'polynomial-regression': polynomialRegression,
+  'sine-wave': sineWave
 };
 

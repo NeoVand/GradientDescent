@@ -23,7 +23,8 @@
   const modelFormulas: Record<string, string> = {
     'linear-regression': String.raw`Y = \alpha X + \beta`,
     'logistic-regression': String.raw`P(Y\!=\!1) = \frac{1}{1 + \exp(-(\alpha X + \beta Y))}`,
-    'polynomial-regression': String.raw`Y = \alpha X^2 + \beta X`
+    'polynomial-regression': String.raw`Y = \alpha X^2 + \beta X`,
+    'sine-wave': String.raw`Y = \alpha \sin(\beta X)`
   };
   
   const parametersFormula = String.raw`(\boldsymbol{\theta} = [\alpha, \beta]^\top)`;
@@ -31,13 +32,15 @@
   const lossFormulas: Record<string, string> = {
     'linear-regression': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`,
     'logistic-regression': String.raw`\mathcal{L} = -\frac{1}{n} \sum_{i=1}^{n} \left[ Y_i \log(\hat{Y}_i) + (1-Y_i) \log(1-\hat{Y}_i) \right]`,
-    'polynomial-regression': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`
+    'polynomial-regression': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`,
+    'sine-wave': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`
   };
-  
+
   const gradientFormulas: Record<string, string> = {
     'linear-regression': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} X_i & 1 \end{bmatrix}^\top`,
     'logistic-regression': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} X_i & Y_i \end{bmatrix}^\top`,
-    'polynomial-regression': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} X_i^2 & X_i \end{bmatrix}^\top`
+    'polynomial-regression': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} X_i^2 & X_i \end{bmatrix}^\top`,
+    'sine-wave': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} \sin(\beta X_i) & \alpha X_i \cos(\beta X_i) \end{bmatrix}^\top`
   };
   
   const updateFormula = String.raw`\boldsymbol{\theta}^{(t+1)} \leftarrow \boldsymbol{\theta}^{(t)} - \gamma \nabla_{\boldsymbol{\theta}} \mathcal{L}`;

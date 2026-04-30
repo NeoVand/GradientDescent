@@ -5,7 +5,7 @@
  */
 
 // Supported machine learning problems
-export type ProblemType = 'linear-regression' | 'logistic-regression' | 'polynomial-regression';
+export type ProblemType = 'linear-regression' | 'logistic-regression' | 'polynomial-regression' | 'sine-wave';
 
 // A single data point in our dataset
 export interface DataPoint {

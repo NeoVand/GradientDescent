@@ -50,7 +50,8 @@
   const problems: { type: ProblemType; name: string; icon: any; customIcon?: string }[] = [
     { type: 'linear-regression', name: 'Linear Regression', icon: TrendingUp },
     { type: 'logistic-regression', name: 'Logistic Regression', icon: Percent },
-    { type: 'polynomial-regression', name: 'Polynomial Regression', icon: null, customIcon: 'x²' }
+    { type: 'polynomial-regression', name: 'Polynomial Regression', icon: null, customIcon: 'x²' },
+    { type: 'sine-wave', name: 'Sine Wave', icon: Activity }
   ];
   
   // Subscribe to stores
