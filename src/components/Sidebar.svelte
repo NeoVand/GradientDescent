@@ -150,10 +150,10 @@
       const trainData = $datasetStore.data.filter(point => point.isTraining);
       const testData = $datasetStore.data.filter(point => !point.isTraining);
       const config = problemConfigs[$selectedProblem];
-      
+
       // Get current parameters
       const currentParams = $parametersStore;
-      
+
       // Perform gradient descent
       const newParams = gradientDescentStep(
         trainData,
@@ -161,7 +161,7 @@
         $trainingStore.learningRate,
         config
       );
-      
+
       // Update parameters
       parametersStore.set(newParams);
       
@@ -223,10 +223,33 @@
     }
   }
   
+  // 1-2-5 sequence: two intermediate stops between each decade so the
+  // stepper feels gradual instead of jumping by 10× per click.
+  const learningRateSteps = [
+    0.0001, 0.0002, 0.0005,
+    0.001,  0.002,  0.005,
+    0.01,   0.02,   0.05,
+    0.1,    0.2,    0.5,
+    1
+  ];
+  const lrEpsilon = 1e-9;
+
+  function nextLearningRate(current: number): number {
+    const next = learningRateSteps.find(v => v > current + lrEpsilon);
+    return next ?? learningRateSteps[learningRateSteps.length - 1];
+  }
+
+  function prevLearningRate(current: number): number {
+    for (let i = learningRateSteps.length - 1; i >= 0; i--) {
+      if (learningRateSteps[i] < current - lrEpsilon) return learningRateSteps[i];
+    }
+    return learningRateSteps[0];
+  }
+
   // Format learning rate for display
   function formatLearningRate(rate: number): string {
-    if (rate >= 0.01) return rate.toFixed(3);
-    return rate.toExponential(1);
+    if (rate >= 0.001) return rate.toFixed(3);
+    return rate.toFixed(4);
   }
   
   // Focus action for inputs
@@ -502,11 +525,11 @@
       </div>
     </div>
     <div class="number-stepper">
-      <button 
+      <button
         class="stepper-btn"
-        disabled={learningRate <= 0.0001}
+        disabled={learningRate <= 0.0001 + lrEpsilon}
         on:click={() => {
-          trainingStore.update(store => ({ ...store, learningRate: Math.max(0.0001, learningRate / 10) }));
+          trainingStore.update(store => ({ ...store, learningRate: prevLearningRate(learningRate) }));
         }}
       >
         −
@@ -545,11 +568,11 @@
           {formatLearningRate(learningRate)}
         </button>
       {/if}
-      <button 
+      <button
         class="stepper-btn"
-        disabled={learningRate >= 1}
+        disabled={learningRate >= 1 - lrEpsilon}
         on:click={() => {
-          trainingStore.update(store => ({ ...store, learningRate: Math.min(1, learningRate * 10) }));
+          trainingStore.update(store => ({ ...store, learningRate: nextLearningRate(learningRate) }));
         }}
       >
         +
