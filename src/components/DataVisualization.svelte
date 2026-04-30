@@ -33,6 +33,15 @@
   $: problemConfig = $currentProblemConfig;
   $: problemType = $selectedProblem;
   $: theme = $themeStore;
+
+  // 2D-point problems: parameters (α, β) live in the *same* coordinate system
+  // as the data points (a 2D position). The marker is drawn directly on the
+  // data plot, and the plot's range is forced to match parameterRange so the
+  // marker's screen position matches the loss landscape's marker exactly.
+  $: is2DPointProblem =
+    problemType === 'circle-classifier' ||
+    problemType === 'source-localization' ||
+    problemType === 'mean-shift';
   
   // Redraw when data or theme changes
   $: if (svgElement && data && parameters && problemConfig) {
@@ -95,20 +104,26 @@
       .attr('height', innerHeight);
     
     // Create scales
-    const xExtent = d3.extent(data, d => d.x) as [number, number];
-    const yExtent = d3.extent(data, d => d.y) as [number, number];
-    
-    // Add some padding to the scales
-    const xPadding = (xExtent[1] - xExtent[0]) * 0.1;
-    const yPadding = (yExtent[1] - yExtent[0]) * 0.1;
-    
-    const xScale = d3.scaleLinear()
-      .domain([xExtent[0] - xPadding, xExtent[1] + xPadding])
-      .range([0, innerWidth]);
-    
-    const yScale = d3.scaleLinear()
-      .domain([yExtent[0] - yPadding, yExtent[1] + yPadding])
-      .range([innerHeight, 0]);
+    let xScale: d3.ScaleLinear<number, number>;
+    let yScale: d3.ScaleLinear<number, number>;
+    if (is2DPointProblem) {
+      // Lock the plot range to the per-problem parameter range so the marker's
+      // (α, β) position lines up with the same point on the loss landscape.
+      const range = problemConfig.parameterRange ?? { min: -2, max: 2 };
+      xScale = d3.scaleLinear().domain([range.min, range.max]).range([0, innerWidth]);
+      yScale = d3.scaleLinear().domain([range.min, range.max]).range([innerHeight, 0]);
+    } else {
+      const xExtent = d3.extent(data, d => d.x) as [number, number];
+      const yExtent = d3.extent(data, d => d.y) as [number, number];
+      const xPadding = (xExtent[1] - xExtent[0]) * 0.1;
+      const yPadding = (yExtent[1] - yExtent[0]) * 0.1;
+      xScale = d3.scaleLinear()
+        .domain([xExtent[0] - xPadding, xExtent[1] + xPadding])
+        .range([0, innerWidth]);
+      yScale = d3.scaleLinear()
+        .domain([yExtent[0] - yPadding, yExtent[1] + yPadding])
+        .range([innerHeight, 0]);
+    }
     
     // Create axes
     const xAxis = d3.axisBottom(xScale).tickSizeOuter(0);
@@ -184,8 +199,8 @@
       .attr('transform', `translate(${margin.left},${margin.top})`);
     
     // Add grid lines to clipped group (isDark already declared above)
-    // Skip grid for logistic regression (heatmap is enough)
-    if (problemType !== 'logistic-regression') {
+    // Skip grid for logistic regression and 2D-point problems (heatmap fills it)
+    if (problemType !== 'logistic-regression' && !is2DPointProblem) {
       const gridColor = isDark ? '#64748b' : '#9ca3af';
       
       // Regular grid lines
@@ -234,9 +249,79 @@
     
     // Draw the model prediction line/curve (will be clipped)
     drawModelPrediction(plotGroup, xScale, yScale, innerWidth);
-    
+
     // Draw data points (will be clipped)
     drawDataPoints(plotGroup, xScale, yScale);
+
+    // For 2D-point problems, overlay the marker (α, β) directly on the plot
+    if (is2DPointProblem) {
+      drawParamsMarker(plotGroup, xScale, yScale);
+    }
+  }
+
+  /**
+   * Heatmap renderer for 2D-point problems. `valueAt(x, y)` returns the
+   * scalar field at (x, y) given current params; the result is mapped to a
+   * color via `colorFor(t)` where t ∈ [0, 1] (after normalisation).
+   */
+  function draw2DHeatmap(
+    g: d3.Selection<SVGGElement, unknown, null, undefined>,
+    xScale: d3.ScaleLinear<number, number>,
+    yScale: d3.ScaleLinear<number, number>,
+    innerWidth: number,
+    innerHeight: number,
+    valueAt: (x: number, y: number) => number,
+    colorFor: (normalized: number) => string,
+    opacity: number = 0.6
+  ) {
+    const res = 50;
+    const cellW = innerWidth / res;
+    const cellH = innerHeight / res;
+    // First pass: collect values for normalization
+    const vals: number[] = [];
+    for (let i = 0; i < res; i++) {
+      for (let j = 0; j < res; j++) {
+        const cx = xScale.invert((i + 0.5) * cellW);
+        const cy = yScale.invert((j + 0.5) * cellH);
+        vals.push(valueAt(cx, cy));
+      }
+    }
+    let lo = Infinity, hi = -Infinity;
+    for (const v of vals) { if (v < lo) lo = v; if (v > hi) hi = v; }
+    const span = hi - lo || 1;
+    // Second pass: render
+    let k = 0;
+    for (let i = 0; i < res; i++) {
+      for (let j = 0; j < res; j++) {
+        const px = Math.round(i * cellW);
+        const py = Math.round(j * cellH);
+        const pxN = Math.round((i + 1) * cellW);
+        const pyN = Math.round((j + 1) * cellH);
+        const t = (vals[k++] - lo) / span;
+        g.append('rect')
+          .attr('x', px).attr('y', py)
+          .attr('width', pxN - px).attr('height', pyN - py)
+          .attr('fill', colorFor(t))
+          .style('opacity', opacity);
+      }
+    }
+  }
+
+  /**
+   * Marker overlay drawn on the data plot for 2D-point problems. The marker
+   * sits at (params.a, params.b) and matches the orange marker on the loss
+   * landscape so the user can see the geometric meaning of the parameters.
+   */
+  function drawParamsMarker(
+    g: d3.Selection<SVGGElement, unknown, null, undefined>,
+    xScale: d3.ScaleLinear<number, number>,
+    yScale: d3.ScaleLinear<number, number>
+  ) {
+    const cx = xScale(parameters.a);
+    const cy = yScale(parameters.b);
+    const marker = g.append('g').attr('class', 'params-marker').attr('transform', `translate(${cx}, ${cy})`);
+    marker.append('circle').attr('r', 10).attr('fill', 'none').attr('stroke', '#f59e0b').attr('stroke-width', 2);
+    marker.append('circle').attr('r', 6).attr('fill', '#f59e0b').attr('stroke', '#fff').attr('stroke-width', 2);
   }
   
   function drawModelPrediction(
@@ -245,6 +330,69 @@
     yScale: d3.ScaleLinear<number, number>,
     innerWidth: number
   ) {
+    const innerHeight = height - margin.top - margin.bottom;
+    const isDarkTheme = document.documentElement.getAttribute('data-theme') === 'dark';
+    const middleColor = isDarkTheme ? '#1e293b' : '#ffffff';
+
+    if (problemType === 'circle-classifier') {
+      // Probability heatmap: blue (outside) → mid → green (inside) of model circle
+      const R = 1.0, tau = 0.4;
+      const probAt = (x: number, y: number) => {
+        const d2 = (x - parameters.a) ** 2 + (y - parameters.b) ** 2;
+        const z = (R * R - d2) / tau;
+        return 1 / (1 + Math.exp(-z));
+      };
+      draw2DHeatmap(g, xScale, yScale, innerWidth, innerHeight,
+        probAt,
+        (t) => t < 0.5
+          ? d3.interpolateRgb('#3b82f6', middleColor)(t * 2)
+          : d3.interpolateRgb(middleColor, '#10b981')((t - 0.5) * 2),
+        isDarkTheme ? 0.5 : 0.35);
+      // Model circle outline (decision boundary)
+      const circle = d3.path();
+      const N = 100;
+      for (let i = 0; i <= N; i++) {
+        const ang = (i / N) * Math.PI * 2;
+        const x = parameters.a + R * Math.cos(ang);
+        const y = parameters.b + R * Math.sin(ang);
+        if (i === 0) circle.moveTo(xScale(x), yScale(y));
+        else circle.lineTo(xScale(x), yScale(y));
+      }
+      g.append('path').attr('d', circle.toString())
+        .attr('fill', 'none').attr('stroke', '#3b82f6').attr('stroke-width', 2.5).style('opacity', 1);
+      return;
+    }
+
+    if (problemType === 'source-localization') {
+      // Heatmap of predicted signal field for the current source guess
+      const K = 1.0, eps = 0.5;
+      const sigAt = (x: number, y: number) => K / ((x - parameters.a) ** 2 + (y - parameters.b) ** 2 + eps);
+      draw2DHeatmap(g, xScale, yScale, innerWidth, innerHeight,
+        sigAt,
+        (t) => d3.interpolateViridis(t),
+        0.55);
+      return;
+    }
+
+    if (problemType === 'mean-shift') {
+      // Faint kernel-density heatmap centered on the marker
+      const sigma2 = 0.2;
+      const trainData = data.filter(d => d.isTraining);
+      const kde = (x: number, y: number) => {
+        let s = 0;
+        for (const p of trainData) {
+          const d2 = (x - p.x) ** 2 + (y - p.y) ** 2;
+          s += Math.exp(-d2 / (2 * sigma2));
+        }
+        return s / Math.max(1, trainData.length);
+      };
+      draw2DHeatmap(g, xScale, yScale, innerWidth, innerHeight,
+        kde,
+        (t) => d3.interpolateRgb(middleColor, '#10b981')(t),
+        0.35);
+      return;
+    }
+
     // For classification, draw probability heatmap with decision boundary
     if (problemType === 'logistic-regression') {
       const xDomain = xScale.domain();
@@ -419,13 +567,91 @@
     // Separate training and test data
     const trainData = data.filter(d => d.isTraining);
     const testData = data.filter(d => !d.isTraining);
-    
+
     const pointSize = 7;  // Slightly larger for better visibility
-    
+
     // Get theme for stroke colors
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     const strokeColor = isDark ? '#fff' : '#000';
-    
+
+    // -------- 2D-point problems --------
+
+    if (problemType === 'circle-classifier') {
+      const all = [...trainData, ...testData];
+      // Class 0 (outside, blue circles), Class 1 (inside, green squares)
+      for (const p of all) {
+        const isTrain = p.isTraining;
+        const isInside = p.label === 1;
+        const px = xScale(p.x), py = yScale(p.y);
+        if (isInside) {
+          g.append('rect')
+            .attr('x', px - pointSize).attr('y', py - pointSize)
+            .attr('width', pointSize * 2).attr('height', pointSize * 2)
+            .attr('fill', '#10b981').attr('stroke', strokeColor).attr('stroke-width', 1.5)
+            .attr('stroke-dasharray', isTrain ? null : '3,2')
+            .style('opacity', isTrain ? 0.85 : 0.7);
+        } else {
+          g.append('circle')
+            .attr('cx', px).attr('cy', py).attr('r', pointSize)
+            .attr('fill', '#3b82f6').attr('stroke', strokeColor).attr('stroke-width', 1.5)
+            .attr('stroke-dasharray', isTrain ? null : '3,2')
+            .style('opacity', isTrain ? 0.85 : 0.75);
+        }
+        // Misclassified marker (model says inside iff dist < R)
+        const R = 1.0;
+        const d2 = (p.x - parameters.a) ** 2 + (p.y - parameters.b) ** 2;
+        const predInside = d2 < R * R;
+        if (predInside !== isInside) {
+          const xs = 4;
+          g.append('line').attr('x1', px - xs).attr('y1', py - xs).attr('x2', px + xs).attr('y2', py + xs)
+            .attr('stroke', '#ef4444').attr('stroke-width', 2.5).attr('stroke-linecap', 'round');
+          g.append('line').attr('x1', px - xs).attr('y1', py + xs).attr('x2', px + xs).attr('y2', py - xs)
+            .attr('stroke', '#ef4444').attr('stroke-width', 2.5).attr('stroke-linecap', 'round');
+        }
+      }
+      return;
+    }
+
+    if (problemType === 'source-localization') {
+      // Size each sensor dot by its measured signal strength
+      const all = [...trainData, ...testData];
+      const sigs = all.map(d => d.label ?? 0);
+      const lo = Math.min(...sigs), hi = Math.max(...sigs);
+      const span = hi - lo || 1;
+      const sizeFor = (s: number) => 4 + ((s - lo) / span) * 10;
+      for (const p of all) {
+        g.append('circle')
+          .attr('cx', xScale(p.x)).attr('cy', yScale(p.y))
+          .attr('r', sizeFor(p.label ?? 0))
+          .attr('fill', '#fbbf24').attr('stroke', strokeColor).attr('stroke-width', 1.5)
+          .attr('stroke-dasharray', p.isTraining ? null : '3,2')
+          .style('opacity', p.isTraining ? 0.9 : 0.7);
+      }
+      // Mark the *true* source position with a green dashed star (target)
+      const tx = xScale(problemConfig.trueParameters.a);
+      const ty = yScale(problemConfig.trueParameters.b);
+      g.append('circle').attr('cx', tx).attr('cy', ty).attr('r', 4)
+        .attr('fill', '#10b981').attr('stroke', '#10b981')
+        .attr('stroke-width', 2).attr('stroke-dasharray', '4,2').style('opacity', 0.7);
+      return;
+    }
+
+    if (problemType === 'mean-shift') {
+      // Just plain 2D scatter
+      for (const p of trainData) {
+        g.append('circle').attr('cx', xScale(p.x)).attr('cy', yScale(p.y)).attr('r', pointSize - 1)
+          .attr('fill', '#3b82f6').attr('stroke', strokeColor).attr('stroke-width', 1.5)
+          .style('opacity', 0.85);
+      }
+      for (const p of testData) {
+        g.append('circle').attr('cx', xScale(p.x)).attr('cy', yScale(p.y)).attr('r', pointSize - 1)
+          .attr('fill', '#10b981').attr('stroke', strokeColor).attr('stroke-width', 1.5)
+          .attr('stroke-dasharray', '3,2')
+          .style('opacity', 0.7);
+      }
+      return;
+    }
+
     // Helper function to check if a classification point is correctly classified
     const isCorrectlyClassified = (point: DataPoint): boolean => {
       if (problemType !== 'logistic-regression' || point.label === undefined) return true;
@@ -433,7 +659,7 @@
       const predicted = z > 0 ? 1 : 0;
       return predicted === point.label;
     };
-    
+
     if (problemType === 'logistic-regression') {
       // For classification: circles for class 0 (blue), squares for class 1 (green)
       
@@ -574,14 +800,14 @@
       <span>Data</span>
     </h2>
     <div class="legend-controls">
-      {#if problemType === 'logistic-regression'}
+      {#if problemType === 'logistic-regression' || problemType === 'circle-classifier'}
         <div class="legend-item">
           <div class="legend-symbol">
             <svg width="18" height="18" viewBox="0 0 18 18">
               <circle cx="9" cy="9" r="6" fill="#3b82f6" stroke="currentColor" stroke-width="1.5" />
             </svg>
           </div>
-          <span>Class 0</span>
+          <span>{problemType === 'circle-classifier' ? 'Outside' : 'Class 0'}</span>
         </div>
         <div class="legend-item">
           <div class="legend-symbol">
@@ -589,7 +815,7 @@
               <rect x="3" y="3" width="12" height="12" fill="#10b981" stroke="currentColor" stroke-width="1.5" />
             </svg>
           </div>
-          <span>Class 1</span>
+          <span>{problemType === 'circle-classifier' ? 'Inside' : 'Class 1'}</span>
         </div>
         <div class="legend-item">
           <div class="legend-symbol">
@@ -599,6 +825,23 @@
             </svg>
           </div>
           <span>Error</span>
+        </div>
+      {:else if problemType === 'source-localization'}
+        <div class="legend-item">
+          <div class="legend-symbol">
+            <svg width="18" height="18" viewBox="0 0 18 18">
+              <circle cx="9" cy="9" r="6" fill="#fbbf24" stroke="currentColor" stroke-width="1.5" />
+            </svg>
+          </div>
+          <span>Sensor</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-symbol">
+            <svg width="18" height="18" viewBox="0 0 18 18">
+              <circle cx="9" cy="9" r="4" fill="#10b981" stroke="#10b981" stroke-width="2" stroke-dasharray="3,1.5" />
+            </svg>
+          </div>
+          <span>True source</span>
         </div>
       {:else}
         <div class="legend-item">

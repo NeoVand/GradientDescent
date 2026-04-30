@@ -31,7 +31,10 @@
     Info,
     Rocket,
     Waves,
-    Sigma
+    Sigma,
+    Target,
+    Radio,
+    ScatterChart
   } from 'lucide-svelte';
   
   // Component state
@@ -61,7 +64,10 @@
     { type: 'damped-oscillator', name: 'Damped Oscillator', icon: Waves },
     { type: 'logistic-growth', name: 'Logistic Growth', icon: null, customIcon: 'σ' },
     { type: 'power-law', name: 'Power Law', icon: null, customIcon: 'xⁿ' },
-    { type: 'gaussian-mixture', name: 'Gaussian Mixture', icon: null, customIcon: 'ΛΛ' }
+    { type: 'gaussian-mixture', name: 'Gaussian Mixture', icon: null, customIcon: 'ΛΛ' },
+    { type: 'circle-classifier', name: 'Circle Classifier', icon: Target },
+    { type: 'source-localization', name: 'Source Localization', icon: Radio },
+    { type: 'mean-shift', name: 'Mean-Shift Cluster', icon: ScatterChart }
   ];
   
   // Subscribe to stores

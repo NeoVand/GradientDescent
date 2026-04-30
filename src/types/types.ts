@@ -15,7 +15,10 @@ export type ProblemType =
   | 'damped-oscillator'
   | 'logistic-growth'
   | 'power-law'
-  | 'gaussian-mixture';
+  | 'gaussian-mixture'
+  | 'circle-classifier'
+  | 'source-localization'
+  | 'mean-shift';
 
 // A single data point in our dataset
 export interface DataPoint {

@@ -824,6 +824,240 @@ const gaussianMixture: ProblemConfig = {
   parameterRange: { min: -3, max: 3 }
 };
 
+/**
+ * Circle Classifier
+ * Each data point is a 2D position; label = 1 if inside a circle of fixed
+ * radius around the *true* center, 0 otherwise. The model learns the
+ * center (α, β). Soft boundary p = σ((R² − dist²)/τ) — smooth so gradients
+ * flow even when boundary is far from points.
+ */
+const CIRCLE_RADIUS = 1.0;
+const CIRCLE_TAU = 0.4; // boundary softness
+const circleClassifier: ProblemConfig = {
+  type: 'circle-classifier',
+  name: 'Circle Classifier',
+  description: 'Find a circle center to separate inside / outside points',
+  trueParameters: { a: 0, b: 0 },
+
+  generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
+    const trueCx = circleClassifier.trueParameters.a;
+    const trueCy = circleClassifier.trueParameters.b;
+    const data: DataPoint[] = [];
+    const numTrain = Math.floor(numPoints * trainRatio);
+
+    for (let i = 0; i < numPoints; i++) {
+      // Random 2D position in [-2, 2]²
+      const x = (Math.random() - 0.5) * 4;
+      const y = (Math.random() - 0.5) * 4;
+      const dist = Math.sqrt((x - trueCx) ** 2 + (y - trueCy) ** 2);
+      // Noisy classification near the boundary
+      const noisyR = CIRCLE_RADIUS + (Math.random() - 0.5) * noiseLevel * 0.4;
+      const label = dist < noisyR ? 1 : 0;
+      data.push({ x, y, isTraining: i < numTrain, label });
+    }
+
+    return data.sort(() => Math.random() - 0.5);
+  },
+
+  predict: (_x: number, _params: ModelParameters): number => 0,
+
+  computeLoss: (data: DataPoint[], params: ModelParameters): number => {
+    if (data.length === 0) return 0;
+    const eps = 1e-7;
+    let loss = 0;
+    for (const p of data) {
+      const dist2 = (p.x - params.a) ** 2 + (p.y - params.b) ** 2;
+      const z = (CIRCLE_RADIUS * CIRCLE_RADIUS - dist2) / CIRCLE_TAU;
+      const pred = 1 / (1 + Math.exp(-z));
+      const c = Math.max(eps, Math.min(1 - eps, pred));
+      const y = p.label ?? 0;
+      loss -= y * Math.log(c) + (1 - y) * Math.log(1 - c);
+    }
+    return loss / data.length;
+  },
+
+  computeGradient: (data: DataPoint[], params: ModelParameters): ModelParameters => {
+    if (data.length === 0) return { a: 0, b: 0 };
+    let gA = 0, gB = 0;
+    for (const p of data) {
+      const dx = p.x - params.a, dy = p.y - params.b;
+      const dist2 = dx * dx + dy * dy;
+      const z = (CIRCLE_RADIUS * CIRCLE_RADIUS - dist2) / CIRCLE_TAU;
+      const pred = 1 / (1 + Math.exp(-z));
+      const err = pred - (p.label ?? 0);
+      // ∂z/∂α = 2(x-α)/τ, ∂z/∂β = 2(y-β)/τ
+      gA += err * 2 * dx / CIRCLE_TAU;
+      gB += err * 2 * dy / CIRCLE_TAU;
+    }
+    return { a: gA / data.length, b: gB / data.length };
+  },
+
+  // Init away from the true center so descent is visible.
+  getInitialParameters: () => ({
+    a: -1.5 + Math.random() * 3,
+    b: -1.5 + Math.random() * 3
+  }),
+
+  defaultLearningRate: 0.5,
+  defaultMomentum: 0.5,
+  parameterRange: { min: -2, max: 2 }
+};
+
+/**
+ * Source Localization
+ * Sensors at known 2D positions report a signal strength S = K / (d² + ε)
+ * proportional to inverse-square distance to a hidden source. The model
+ * learns where the source is (α, β) given (sensor position, signal) pairs.
+ */
+const SOURCE_K = 1.0;
+// Larger ε softens the singularity at sensor positions so the loss surface
+// has a single broad basin instead of many sharp local minima.
+const SOURCE_EPS = 0.5;
+const sourceLocalization: ProblemConfig = {
+  type: 'source-localization',
+  name: 'Source Localization',
+  description: 'Find a hidden source from sensor signal strengths',
+  trueParameters: { a: 0.5, b: -0.5 },
+
+  generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
+    const sx = sourceLocalization.trueParameters.a;
+    const sy = sourceLocalization.trueParameters.b;
+    const data: DataPoint[] = [];
+    const numTrain = Math.floor(numPoints * trainRatio);
+
+    for (let i = 0; i < numPoints; i++) {
+      const x = (Math.random() - 0.5) * 4;
+      const y = (Math.random() - 0.5) * 4;
+      const dist2 = (x - sx) ** 2 + (y - sy) ** 2;
+      const trueSignal = SOURCE_K / (dist2 + SOURCE_EPS);
+      const signal = trueSignal + (Math.random() - 0.5) * noiseLevel * 0.5;
+      // Stash signal in DataPoint.label (just a numeric scalar field).
+      data.push({ x, y, isTraining: i < numTrain, label: signal });
+    }
+
+    return data.sort(() => Math.random() - 0.5);
+  },
+
+  predict: (_x: number, _params: ModelParameters): number => 0,
+
+  computeLoss: (data: DataPoint[], params: ModelParameters): number => {
+    if (data.length === 0) return 0;
+    let loss = 0;
+    for (const p of data) {
+      const dx = p.x - params.a, dy = p.y - params.b;
+      const denom = dx * dx + dy * dy + SOURCE_EPS;
+      const pred = SOURCE_K / denom;
+      const err = pred - (p.label ?? 0);
+      loss += err * err;
+    }
+    return loss / data.length;
+  },
+
+  computeGradient: (data: DataPoint[], params: ModelParameters): ModelParameters => {
+    if (data.length === 0) return { a: 0, b: 0 };
+    let gA = 0, gB = 0;
+    for (const p of data) {
+      const dx = p.x - params.a, dy = p.y - params.b;
+      const denom = dx * dx + dy * dy + SOURCE_EPS;
+      const pred = SOURCE_K / denom;
+      const err = pred - (p.label ?? 0);
+      // ∂pred/∂α = 2·(x-α)·pred / denom
+      gA += 2 * err * 2 * dx * pred / denom;
+      gB += 2 * err * 2 * dy * pred / denom;
+    }
+    return { a: gA / data.length, b: gB / data.length };
+  },
+
+  // Loss surface is broad; needs a fairly aggressive step to reach the basin
+  // within 200 iterations.
+  getInitialParameters: () => ({
+    a: -1.5 + Math.random() * 3,
+    b: -1.5 + Math.random() * 3
+  }),
+
+  defaultLearningRate: 0.02,
+  defaultMomentum: 0.9,
+  parameterRange: { min: -2, max: 2 }
+};
+
+/**
+ * Mean-Shift / Cluster-Center finder
+ * 2D point cloud with two clusters. Loss is the negative kernel-density
+ * estimate at the marker — equivalent to mean-shift mode-finding. Each
+ * cluster is its own local minimum, so depending on init the marker
+ * converges to whichever cluster mode is nearest.
+ *
+ * (We chose the kernel form over plain Σ‖p−c‖² because the latter is a
+ * single convex bowl with optimum at the *overall* mean — the marker
+ * just sits between clusters, which is pedagogically dull.)
+ */
+const MEAN_SHIFT_SIGMA2 = 0.2;
+const meanShift: ProblemConfig = {
+  type: 'mean-shift',
+  name: 'Mean-Shift Cluster',
+  description: 'Find a cluster mode in a 2D point cloud',
+  trueParameters: { a: -1, b: 1 },
+
+  generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
+    const data: DataPoint[] = [];
+    const numTrain = Math.floor(numPoints * trainRatio);
+    const c1 = { x: -1, y: 1 };
+    const c2 = { x: 1, y: -1 };
+    const spread = 0.25 + noiseLevel * 0.3;
+
+    for (let i = 0; i < numPoints; i++) {
+      const c = i < numPoints / 2 ? c1 : c2;
+      const x = c.x + (Math.random() - 0.5) * spread;
+      const y = c.y + (Math.random() - 0.5) * spread;
+      data.push({ x, y, isTraining: i < numTrain });
+    }
+
+    return data.sort(() => Math.random() - 0.5);
+  },
+
+  predict: (_x: number, _params: ModelParameters): number => 0,
+
+  computeLoss: (data: DataPoint[], params: ModelParameters): number => {
+    if (data.length === 0) return 0;
+    // L = (1/n) Σ (1 − k_i) — always ≥ 0 (so the log-color heatmap doesn't
+    // blow up). Same minima as -k since the constant 1 has zero gradient.
+    let loss = 0;
+    for (const p of data) {
+      const dx = p.x - params.a, dy = p.y - params.b;
+      const d2 = dx * dx + dy * dy;
+      loss += 1 - Math.exp(-d2 / (2 * MEAN_SHIFT_SIGMA2));
+    }
+    return loss / data.length;
+  },
+
+  computeGradient: (data: DataPoint[], params: ModelParameters): ModelParameters => {
+    if (data.length === 0) return { a: 0, b: 0 };
+    let gA = 0, gB = 0;
+    for (const p of data) {
+      const dx = p.x - params.a, dy = p.y - params.b;
+      const d2 = dx * dx + dy * dy;
+      const k = Math.exp(-d2 / (2 * MEAN_SHIFT_SIGMA2));
+      // ∂(-k)/∂α = -k · (x-α) / σ²   (chain rule on -exp(-d²/2σ²))
+      gA += -k * dx / MEAN_SHIFT_SIGMA2;
+      gB += -k * dy / MEAN_SHIFT_SIGMA2;
+    }
+    return { a: gA / data.length, b: gB / data.length };
+  },
+
+  // Init biased toward one of the two cluster regions (off-diagonal) so
+  // the run lands in a basin and the symmetric pair both surface.
+  getInitialParameters: () => {
+    const flip = Math.random() < 0.5;
+    return flip
+      ? { a: -1.7 - Math.random() * 0.2, b: 1.5 + Math.random() * 0.3 }
+      : { a: 1.5 + Math.random() * 0.3, b: -1.7 - Math.random() * 0.2 };
+  },
+
+  defaultLearningRate: 0.3,
+  defaultMomentum: 0.5,
+  parameterRange: { min: -2, max: 2 }
+};
+
 // Export all problem configurations
 export const problemConfigs: Record<string, ProblemConfig> = {
   'linear-regression': linearRegression,
@@ -835,6 +1069,9 @@ export const problemConfigs: Record<string, ProblemConfig> = {
   'damped-oscillator': dampedOscillator,
   'logistic-growth': logisticGrowth,
   'power-law': powerLaw,
-  'gaussian-mixture': gaussianMixture
+  'gaussian-mixture': gaussianMixture,
+  'circle-classifier': circleClassifier,
+  'source-localization': sourceLocalization,
+  'mean-shift': meanShift
 };
 

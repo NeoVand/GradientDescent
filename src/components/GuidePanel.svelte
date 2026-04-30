@@ -30,7 +30,10 @@
     'damped-oscillator': String.raw`Y = e^{-\alpha X} \cos(\beta X)`,
     'logistic-growth': String.raw`Y = \frac{1}{1 + \exp(-(\alpha X + \beta))}`,
     'power-law': String.raw`Y = \alpha \, X^{\beta}`,
-    'gaussian-mixture': String.raw`Y = e^{-(X - \alpha)^2} + e^{-(X - \beta)^2}`
+    'gaussian-mixture': String.raw`Y = e^{-(X - \alpha)^2} + e^{-(X - \beta)^2}`,
+    'circle-classifier': String.raw`P(\text{inside}) = \sigma\!\left(\frac{R^2 - (X-\alpha)^2 - (Y-\beta)^2}{\tau}\right)`,
+    'source-localization': String.raw`\hat{S} = \frac{K}{(X-\alpha)^2 + (Y-\beta)^2 + \varepsilon}`,
+    'mean-shift': String.raw`\hat{f}(\alpha,\beta) = -\sum_i \exp\!\left(-\frac{(X_i-\alpha)^2 + (Y_i-\beta)^2}{2\sigma^2}\right)`
   };
   
   const parametersFormula = String.raw`(\boldsymbol{\theta} = [\alpha, \beta]^\top)`;
@@ -45,7 +48,10 @@
     'damped-oscillator': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`,
     'logistic-growth': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`,
     'power-law': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`,
-    'gaussian-mixture': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`
+    'gaussian-mixture': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`,
+    'circle-classifier': String.raw`\mathcal{L} = -\frac{1}{n} \sum_{i=1}^{n} \left[ Y_i \log p_i + (1-Y_i) \log(1-p_i) \right]`,
+    'source-localization': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{S}_i - S_i)^2`,
+    'mean-shift': String.raw`\mathcal{L} = -\frac{1}{n} \sum_{i=1}^{n} \exp\!\left(-\frac{\|\mathbf{p}_i - \boldsymbol{c}\|^2}{2\sigma^2}\right)`
   };
 
   const gradientFormulas: Record<string, string> = {
@@ -58,7 +64,10 @@
     'damped-oscillator': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} -X_i \, \hat{Y}_i & -X_i \, e^{-\alpha X_i} \sin(\beta X_i) \end{bmatrix}^\top`,
     'logistic-growth': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \, \hat{Y}_i (1 - \hat{Y}_i) \begin{bmatrix} X_i & 1 \end{bmatrix}^\top`,
     'power-law': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} X_i^{\beta} & \hat{Y}_i \ln X_i \end{bmatrix}^\top`,
-    'gaussian-mixture': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{4}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} (X_i - \alpha)\, e^{-(X_i-\alpha)^2} & (X_i - \beta)\, e^{-(X_i-\beta)^2} \end{bmatrix}^\top`
+    'gaussian-mixture': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{4}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} (X_i - \alpha)\, e^{-(X_i-\alpha)^2} & (X_i - \beta)\, e^{-(X_i-\beta)^2} \end{bmatrix}^\top`,
+    'circle-classifier': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n\tau} \sum_{i=1}^{n} (p_i - Y_i) \begin{bmatrix} X_i - \alpha & Y_i' - \beta \end{bmatrix}^\top`,
+    'source-localization': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{4}{n} \sum_{i=1}^{n} (\hat{S}_i - S_i) \, \frac{\hat{S}_i}{d_i^2 + \varepsilon} \begin{bmatrix} X_i - \alpha & Y_i' - \beta \end{bmatrix}^\top`,
+    'mean-shift': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = -\frac{1}{n\sigma^2} \sum_{i=1}^{n} k_i \begin{bmatrix} X_i - \alpha & Y_i' - \beta \end{bmatrix}^\top`
   };
   
   const updateFormula = String.raw`\boldsymbol{\theta}^{(t+1)} \leftarrow \boldsymbol{\theta}^{(t)} - \gamma \nabla_{\boldsymbol{\theta}} \mathcal{L}`;
