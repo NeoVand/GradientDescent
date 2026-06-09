@@ -535,143 +535,309 @@
     </div>
   </div>
 
-  <!-- Per-optimizer hyperparameters (rendered from the optimizer's spec) -->
-  {#each currentOptimizer.hyperparams as spec (optimizerSel.id + '-' + spec.key)}
-    <div class="control-group">
+  <!-- Per-optimizer hyperparameters (rendered from the optimizer's spec);
+       Adam's two β sliders sit side by side, single sliders go full width -->
+  {#if currentOptimizer.hyperparams.length > 0}
+    <div class="control-row" class:single={currentOptimizer.hyperparams.length === 1}>
+      {#each currentOptimizer.hyperparams as spec (optimizerSel.id + '-' + spec.key)}
+        <div class="control-group" class:compact={currentOptimizer.hyperparams.length > 1}>
+          <div class="control-header">
+            <span class="icon"><Rocket size={currentOptimizer.hyperparams.length > 1 ? 15 : 18} strokeWidth={2} /></span>
+            <label for={'hyper-' + spec.key}>{spec.label} <span class="greek-label"> ({spec.symbol})</span></label>
+            <div class="tooltip-container">
+              <button
+                class="info-btn"
+                on:mouseenter={() => activeTooltip = 'hyper-' + spec.key}
+                on:mouseleave={() => activeTooltip = null}
+              >
+                <Info size={14} strokeWidth={2} />
+              </button>
+              {#if activeTooltip === 'hyper-' + spec.key}
+                <div class="tooltip">{spec.hint}</div>
+              {/if}
+            </div>
+          </div>
+          <div class="slider-container">
+            <div class="slider-value-display">
+              <span class="momentum-value">{(optimizerSel.hyper[spec.key] ?? spec.default).toFixed(spec.step < 0.01 ? 3 : 2)}</span>
+            </div>
+            <input
+              id={'hyper-' + spec.key}
+              class="hyper-slider"
+              type="range"
+              min={spec.min}
+              max={spec.max}
+              step={spec.step}
+              value={optimizerSel.hyper[spec.key] ?? spec.default}
+              style="--fill: {(((optimizerSel.hyper[spec.key] ?? spec.default) - spec.min) / (spec.max - spec.min)) * 100}%"
+              on:input={(e) => setHyper(spec.key, parseFloat(e.currentTarget.value))}
+            />
+            <div class="slider-labels">
+              <span>{spec.min}</span>
+              <span>{spec.max}</span>
+            </div>
+          </div>
+        </div>
+      {/each}
+    </div>
+  {/if}
+
+  <!-- Learning Rate | Batch Size -->
+  <div class="control-row">
+    <div class="control-group compact">
       <div class="control-header">
-        <span class="icon"><Rocket size={18} strokeWidth={2} /></span>
-        <label for={'hyper-' + spec.key}>{spec.label} <span class="greek-label"> ({spec.symbol})</span></label>
+        <span class="icon"><Zap size={15} strokeWidth={2} /></span>
+        <label for="learning-rate">Learn Rate <span class="greek-label"> (γ)</span></label>
         <div class="tooltip-container">
           <button
             class="info-btn"
-            on:mouseenter={() => activeTooltip = 'hyper-' + spec.key}
+            on:mouseenter={() => activeTooltip = 'learningRate'}
             on:mouseleave={() => activeTooltip = null}
           >
             <Info size={14} strokeWidth={2} />
           </button>
-          {#if activeTooltip === 'hyper-' + spec.key}
-            <div class="tooltip">{spec.hint}</div>
+          {#if activeTooltip === 'learningRate'}
+            <div class="tooltip">
+              Step size for gradient descent updates<br/>
+              <span style="opacity: 0.8; font-size: 0.7rem;">Higher = faster but less stable</span>
+            </div>
+          {/if}
+        </div>
+      </div>
+      <div class="number-stepper">
+        <button
+          class="stepper-btn"
+          disabled={learningRate <= 0.0001 + lrEpsilon}
+          on:click={() => {
+            trainingStore.update(store => ({ ...store, learningRate: prevLearningRate(learningRate) }));
+          }}
+        >
+          −
+        </button>
+        {#if editingLearningRate}
+          <input
+            class="stepper-input"
+            type="text"
+            value={draftLearningRate}
+            on:input={(e) => draftLearningRate = e.currentTarget.value.replace(/[^0-9.eE\-]/g, '')}
+            on:blur={() => {
+              const parsed = parseFloat(draftLearningRate);
+              if (!isNaN(parsed)) {
+                const clamped = Math.max(0.0001, Math.min(1, parsed));
+                trainingStore.update(store => ({ ...store, learningRate: clamped }));
+              }
+              editingLearningRate = false;
+            }}
+            on:keydown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur();
+              if (e.key === 'Escape') {
+                editingLearningRate = false;
+                draftLearningRate = formatLearningRate(learningRate);
+              }
+            }}
+            use:focusOnMount
+          />
+        {:else}
+          <button
+            class="stepper-value"
+            on:click={() => {
+              editingLearningRate = true;
+              draftLearningRate = formatLearningRate(learningRate);
+            }}
+          >
+            {formatLearningRate(learningRate)}
+          </button>
+        {/if}
+        <button
+          class="stepper-btn"
+          disabled={learningRate >= 1 - lrEpsilon}
+          on:click={() => {
+            trainingStore.update(store => ({ ...store, learningRate: nextLearningRate(learningRate) }));
+          }}
+        >
+          +
+        </button>
+      </div>
+    </div>
+
+    <div class="control-group compact">
+      <div class="control-header">
+        <span class="icon"><Layers size={15} strokeWidth={2} /></span>
+        <span class="control-label">Batch</span>
+        <div class="tooltip-container">
+          <button
+            class="info-btn"
+            on:mouseenter={() => activeTooltip = 'batch'}
+            on:mouseleave={() => activeTooltip = null}
+          >
+            <Info size={14} strokeWidth={2} />
+          </button>
+          {#if activeTooltip === 'batch'}
+            <div class="tooltip">
+              Points sampled per gradient step<br/>
+              <span style="opacity: 0.8; font-size: 0.7rem;">Small batches = noisy, stochastic descent (SGD)</span>
+            </div>
+          {/if}
+        </div>
+      </div>
+      <div class="number-stepper">
+        <button
+          class="stepper-btn"
+          disabled={batchIndex(batchSize) === 0}
+          on:click={prevBatchSize}
+        >
+          −
+        </button>
+        <span class="stepper-value stepper-static">{batchLabel}</span>
+        <button
+          class="stepper-btn"
+          disabled={batchSize === 'all'}
+          on:click={nextBatchSize}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Data Points | Noise -->
+  <div class="control-row">
+    <div class="control-group compact">
+      <div class="control-header">
+        <span class="icon"><MapPin size={15} strokeWidth={2} /></span>
+        <label for="num-points">Points</label>
+        <button
+          class="reroll-btn"
+          title="Generate a new random dataset"
+          on:click={() => datasetStore.reroll()}
+        >
+          <Dices size={15} strokeWidth={2} />
+        </button>
+        <div class="tooltip-container">
+          <button
+            class="info-btn"
+            on:mouseenter={() => activeTooltip = 'dataPoints'}
+            on:mouseleave={() => activeTooltip = null}
+          >
+            <Info size={14} strokeWidth={2} />
+          </button>
+          {#if activeTooltip === 'dataPoints'}
+            <div class="tooltip">
+              Number of synthetic data points to generate<br/>
+              <span style="opacity: 0.8; font-size: 0.7rem;">The dice rolls a fresh dataset</span>
+            </div>
+          {/if}
+        </div>
+      </div>
+      <div class="number-stepper">
+        <button
+          class="stepper-btn"
+          disabled={numPoints <= 10}
+          on:click={() => {
+            const newValue = Math.max(10, numPoints - 5);
+            datasetStore.setNumPoints(newValue);
+            datasetStore.regenerateData();
+          }}
+        >
+          −
+        </button>
+        {#if editingNumPoints}
+          <input
+            class="stepper-input"
+            type="text"
+            value={draftNumPoints}
+            on:input={(e) => draftNumPoints = e.currentTarget.value.replace(/[^0-9]/g, '')}
+            on:blur={() => {
+              const parsed = parseInt(draftNumPoints, 10);
+              if (!isNaN(parsed)) {
+                const clamped = Math.max(10, Math.min(100, parsed));
+                datasetStore.setNumPoints(clamped);
+                datasetStore.regenerateData();
+              }
+              editingNumPoints = false;
+            }}
+            on:keydown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur();
+              if (e.key === 'Escape') {
+                editingNumPoints = false;
+                draftNumPoints = String(numPoints);
+              }
+            }}
+            use:focusOnMount
+          />
+        {:else}
+          <button
+            class="stepper-value"
+            on:click={() => {
+              editingNumPoints = true;
+              draftNumPoints = String(numPoints);
+            }}
+          >
+            {numPoints}
+          </button>
+        {/if}
+        <button
+          class="stepper-btn"
+          disabled={numPoints >= 100}
+          on:click={() => {
+            const newValue = Math.min(100, numPoints + 5);
+            datasetStore.setNumPoints(newValue);
+            datasetStore.regenerateData();
+          }}
+        >
+          +
+        </button>
+      </div>
+    </div>
+
+    <div class="control-group compact">
+      <div class="control-header">
+        <span class="icon"><Droplets size={15} strokeWidth={2} /></span>
+        <label for="noise-level">Noise</label>
+        <div class="tooltip-container">
+          <button
+            class="info-btn"
+            on:mouseenter={() => activeTooltip = 'noise'}
+            on:mouseleave={() => activeTooltip = null}
+          >
+            <Info size={14} strokeWidth={2} />
+          </button>
+          {#if activeTooltip === 'noise'}
+            <div class="tooltip">
+              Amount of random noise added to synthetic data<br/>
+              <span style="opacity: 0.8; font-size: 0.7rem;">0 = clean, 2 = very noisy</span>
+            </div>
           {/if}
         </div>
       </div>
       <div class="slider-container">
         <div class="slider-value-display">
-          <span class="momentum-value">{(optimizerSel.hyper[spec.key] ?? spec.default).toFixed(spec.step < 0.01 ? 3 : 2)}</span>
+          <span class="noise-value">{noiseLevel.toFixed(2)}</span>
         </div>
         <input
-          id={'hyper-' + spec.key}
-          class="hyper-slider"
+          id="noise-level"
           type="range"
-          min={spec.min}
-          max={spec.max}
-          step={spec.step}
-          value={optimizerSel.hyper[spec.key] ?? spec.default}
-          style="--fill: {(((optimizerSel.hyper[spec.key] ?? spec.default) - spec.min) / (spec.max - spec.min)) * 100}%"
-          on:input={(e) => setHyper(spec.key, parseFloat(e.currentTarget.value))}
+          min="0"
+          max="2"
+          step="0.05"
+          value={noiseLevel}
+          on:input={handleNoiseLevelChange}
         />
         <div class="slider-labels">
-          <span>{spec.min}</span>
-          <span>{spec.max}</span>
+          <span>Low</span>
+          <span>High</span>
         </div>
       </div>
     </div>
-  {/each}
-
-  <!-- Data Points -->
-  <div class="control-group">
-    <div class="control-header">
-      <span class="icon"><MapPin size={18} strokeWidth={2} /></span>
-      <label for="num-points">Data Points</label>
-      <button
-        class="reroll-btn"
-        title="Generate a new random dataset"
-        on:click={() => datasetStore.reroll()}
-      >
-        <Dices size={15} strokeWidth={2} />
-      </button>
-      <div class="tooltip-container">
-        <button
-          class="info-btn"
-          on:mouseenter={() => activeTooltip = 'dataPoints'}
-          on:mouseleave={() => activeTooltip = null}
-        >
-          <Info size={14} strokeWidth={2} />
-        </button>
-        {#if activeTooltip === 'dataPoints'}
-          <div class="tooltip">
-            Number of synthetic data points to generate
-          </div>
-        {/if}
-      </div>
-    </div>
-    <div class="number-stepper">
-      <button 
-        class="stepper-btn"
-        disabled={numPoints <= 10}
-        on:click={() => {
-          const newValue = Math.max(10, numPoints - 5);
-          datasetStore.setNumPoints(newValue);
-          datasetStore.regenerateData();
-        }}
-      >
-        −
-      </button>
-      {#if editingNumPoints}
-        <input
-          class="stepper-input"
-          type="text"
-          value={draftNumPoints}
-          on:input={(e) => draftNumPoints = e.currentTarget.value.replace(/[^0-9]/g, '')}
-          on:blur={() => {
-            const parsed = parseInt(draftNumPoints, 10);
-            if (!isNaN(parsed)) {
-              const clamped = Math.max(10, Math.min(100, parsed));
-              datasetStore.setNumPoints(clamped);
-              datasetStore.regenerateData();
-            }
-            editingNumPoints = false;
-          }}
-          on:keydown={(e) => {
-            if (e.key === 'Enter') e.currentTarget.blur();
-            if (e.key === 'Escape') {
-              editingNumPoints = false;
-              draftNumPoints = String(numPoints);
-            }
-          }}
-          use:focusOnMount
-        />
-      {:else}
-        <button
-          class="stepper-value"
-          on:click={() => {
-            editingNumPoints = true;
-            draftNumPoints = String(numPoints);
-          }}
-        >
-          {numPoints}
-        </button>
-      {/if}
-      <button 
-        class="stepper-btn"
-        disabled={numPoints >= 100}
-        on:click={() => {
-          const newValue = Math.min(100, numPoints + 5);
-          datasetStore.setNumPoints(newValue);
-          datasetStore.regenerateData();
-        }}
-      >
-        +
-      </button>
-    </div>
   </div>
-  
+
   <!-- Train/Test Ratio -->
   <div class="control-group">
     <div class="control-header">
       <span class="icon"><PieChart size={18} strokeWidth={2} /></span>
       <label for="train-ratio">Train/Test Split</label>
       <div class="tooltip-container">
-        <button 
+        <button
           class="info-btn"
           on:mouseenter={() => activeTooltip = 'trainTest'}
           on:mouseleave={() => activeTooltip = null}
@@ -686,10 +852,21 @@
       </div>
     </div>
     <div class="slider-container">
-      <div class="slider-value-display">
+      <div class="slider-value-display split-display">
         <span class="split-value train">{Math.round(trainRatio * 100)}%</span>
         <span class="split-separator">/</span>
         <span class="split-value test">{Math.round((1 - trainRatio) * 100)}%</span>
+        <label class="checkbox-label inline-check">
+          <input
+            type="checkbox"
+            checked={randomSplit}
+            on:change={(e) => {
+              datasetStore.setRandomSplit(e.currentTarget.checked);
+              datasetStore.regenerateData();
+            }}
+          />
+          <span class="checkbox-text">Random</span>
+        </label>
       </div>
       <input
         id="train-ratio"
@@ -705,303 +882,130 @@
         <span>Test</span>
       </div>
     </div>
-    <div class="checkbox-container">
-      <label class="checkbox-label">
-        <input 
-          type="checkbox" 
-          checked={randomSplit}
-          on:change={(e) => {
-            datasetStore.setRandomSplit(e.currentTarget.checked);
-            datasetStore.regenerateData();
-          }}
-        />
-        <span class="checkbox-text">Randomized</span>
-      </label>
-    </div>
-  </div>
-  
-  <!-- Noise Level -->
-  <div class="control-group">
-    <div class="control-header">
-      <span class="icon"><Droplets size={18} strokeWidth={2} /></span>
-      <label for="noise-level">Noise Level</label>
-      <div class="tooltip-container">
-        <button 
-          class="info-btn"
-          on:mouseenter={() => activeTooltip = 'noise'}
-          on:mouseleave={() => activeTooltip = null}
-        >
-          <Info size={14} strokeWidth={2} />
-        </button>
-        {#if activeTooltip === 'noise'}
-          <div class="tooltip">
-            Amount of random noise added to synthetic data<br/>
-            <span style="opacity: 0.8; font-size: 0.7rem;">0 = clean, 2 = very noisy</span>
-          </div>
-        {/if}
-      </div>
-    </div>
-    <div class="slider-container">
-      <div class="slider-value-display">
-        <span class="noise-value">{noiseLevel.toFixed(2)}</span>
-      </div>
-      <input
-        id="noise-level"
-        type="range"
-        min="0"
-        max="2"
-        step="0.05"
-        value={noiseLevel}
-        on:input={handleNoiseLevelChange}
-      />
-      <div class="slider-labels">
-        <span>Low</span>
-        <span>High</span>
-      </div>
-    </div>
   </div>
 
-  <!-- Learning Rate -->
-  <div class="control-group">
-    <div class="control-header">
-      <span class="icon"><Zap size={18} strokeWidth={2} /></span>
-      <label for="learning-rate">Learning Rate <span class="greek-label"> (γ)</span></label>
-      <div class="tooltip-container">
-        <button 
-          class="info-btn"
-          on:mouseenter={() => activeTooltip = 'learningRate'}
-          on:mouseleave={() => activeTooltip = null}
-        >
-          <Info size={14} strokeWidth={2} />
-        </button>
-        {#if activeTooltip === 'learningRate'}
-          <div class="tooltip">
-            Step size for gradient descent updates<br/>
-            <span style="opacity: 0.8; font-size: 0.7rem;">Higher = faster but less stable</span>
-          </div>
-        {/if}
+  <!-- Training Steps | Speed -->
+  <div class="control-row">
+    <div class="control-group compact">
+      <div class="control-header">
+        <span class="icon"><RefreshCw size={15} strokeWidth={2} /></span>
+        <label for="training-steps">Steps</label>
+        <div class="tooltip-container">
+          <button
+            class="info-btn"
+            on:mouseenter={() => activeTooltip = 'steps'}
+            on:mouseleave={() => activeTooltip = null}
+          >
+            <Info size={14} strokeWidth={2} />
+          </button>
+          {#if activeTooltip === 'steps'}
+            <div class="tooltip">
+              Number of gradient descent iterations to perform when training
+            </div>
+          {/if}
+        </div>
       </div>
-    </div>
-    <div class="number-stepper">
-      <button
-        class="stepper-btn"
-        disabled={learningRate <= 0.0001 + lrEpsilon}
-        on:click={() => {
-          trainingStore.update(store => ({ ...store, learningRate: prevLearningRate(learningRate) }));
-        }}
-      >
-        −
-      </button>
-      {#if editingLearningRate}
-        <input
-          class="stepper-input"
-          type="text"
-          value={draftLearningRate}
-          on:input={(e) => draftLearningRate = e.currentTarget.value.replace(/[^0-9.eE\-]/g, '')}
-          on:blur={() => {
-            const parsed = parseFloat(draftLearningRate);
-            if (!isNaN(parsed)) {
-              const clamped = Math.max(0.0001, Math.min(1, parsed));
-              trainingStore.update(store => ({ ...store, learningRate: clamped }));
-            }
-            editingLearningRate = false;
-          }}
-          on:keydown={(e) => {
-            if (e.key === 'Enter') e.currentTarget.blur();
-            if (e.key === 'Escape') {
-              editingLearningRate = false;
-              draftLearningRate = formatLearningRate(learningRate);
-            }
-          }}
-          use:focusOnMount
-        />
-      {:else}
+      <div class="number-stepper">
         <button
-          class="stepper-value"
+          class="stepper-btn"
+          disabled={totalSteps <= 10}
           on:click={() => {
-            editingLearningRate = true;
-            draftLearningRate = formatLearningRate(learningRate);
+            trainingStore.update(store => ({ ...store, totalSteps: Math.max(10, totalSteps - 10) }));
           }}
         >
-          {formatLearningRate(learningRate)}
+          −
         </button>
-      {/if}
-      <button
-        class="stepper-btn"
-        disabled={learningRate >= 1 - lrEpsilon}
-        on:click={() => {
-          trainingStore.update(store => ({ ...store, learningRate: nextLearningRate(learningRate) }));
-        }}
-      >
-        +
-      </button>
-    </div>
-  </div>
-  
-  <!-- Batch Size -->
-  <div class="control-group">
-    <div class="control-header">
-      <span class="icon"><Layers size={18} strokeWidth={2} /></span>
-      <span class="control-label">Batch Size</span>
-      <div class="tooltip-container">
-        <button
-          class="info-btn"
-          on:mouseenter={() => activeTooltip = 'batch'}
-          on:mouseleave={() => activeTooltip = null}
-        >
-          <Info size={14} strokeWidth={2} />
-        </button>
-        {#if activeTooltip === 'batch'}
-          <div class="tooltip">
-            Points sampled per gradient step<br/>
-            <span style="opacity: 0.8; font-size: 0.7rem;">Small batches = noisy, stochastic descent (SGD)</span>
-          </div>
-        {/if}
-      </div>
-    </div>
-    <div class="number-stepper">
-      <button
-        class="stepper-btn"
-        disabled={batchIndex(batchSize) === 0}
-        on:click={prevBatchSize}
-      >
-        −
-      </button>
-      <span class="stepper-value stepper-static">{batchLabel}</span>
-      <button
-        class="stepper-btn"
-        disabled={batchSize === 'all'}
-        on:click={nextBatchSize}
-      >
-        +
-      </button>
-    </div>
-  </div>
-
-  <!-- Speed -->
-  <div class="control-group">
-    <div class="control-header">
-      <span class="icon"><Gauge size={18} strokeWidth={2} /></span>
-      <label for="speed">Speed</label>
-      <div class="tooltip-container">
-        <button
-          class="info-btn"
-          on:mouseenter={() => activeTooltip = 'speed'}
-          on:mouseleave={() => activeTooltip = null}
-        >
-          <Info size={14} strokeWidth={2} />
-        </button>
-        {#if activeTooltip === 'speed'}
-          <div class="tooltip">
-            Animation speed — gradient steps per second
-          </div>
-        {/if}
-      </div>
-    </div>
-    <div class="slider-container">
-      <div class="slider-value-display">
-        <span class="speed-value">{stepsPerSecond} steps/s</span>
-      </div>
-      <input
-        id="speed"
-        class="hyper-slider"
-        type="range"
-        min="2"
-        max="60"
-        step="1"
-        value={stepsPerSecond}
-        style="--fill: {((stepsPerSecond - 2) / 58) * 100}%"
-        on:input={(e) => {
-          const v = parseInt(e.currentTarget.value);
-          trainingStore.update(s => ({ ...s, stepsPerSecond: v }));
-        }}
-      />
-      <div class="slider-labels">
-        <span>Slow</span>
-        <span>Fast</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Training Steps -->
-  <div class="control-group">
-    <div class="control-header">
-      <span class="icon"><RefreshCw size={18} strokeWidth={2} /></span>
-      <label for="training-steps">Training Steps</label>
-      <div class="tooltip-container">
-        <button 
-          class="info-btn"
-          on:mouseenter={() => activeTooltip = 'steps'}
-          on:mouseleave={() => activeTooltip = null}
-        >
-          <Info size={14} strokeWidth={2} />
-        </button>
-        {#if activeTooltip === 'steps'}
-          <div class="tooltip">
-            Number of gradient descent iterations to perform when training
-          </div>
-        {/if}
-      </div>
-    </div>
-    <div class="number-stepper">
-      <button 
-        class="stepper-btn"
-        disabled={totalSteps <= 10}
-        on:click={() => {
-          trainingStore.update(store => ({ ...store, totalSteps: Math.max(10, totalSteps - 10) }));
-        }}
-      >
-        −
-      </button>
-      {#if editingTrainingSteps}
-        <input
-          class="stepper-input"
-          type="text"
-          value={draftTrainingSteps}
-          on:input={(e) => draftTrainingSteps = e.currentTarget.value.replace(/[^0-9]/g, '')}
-          on:blur={() => {
-            const parsed = parseInt(draftTrainingSteps, 10);
-            if (!isNaN(parsed)) {
-              const clamped = Math.max(10, Math.min(1000, parsed));
-              trainingStore.update(store => ({ ...store, totalSteps: clamped }));
-            }
-            editingTrainingSteps = false;
-          }}
-          on:keydown={(e) => {
-            if (e.key === 'Enter') e.currentTarget.blur();
-            if (e.key === 'Escape') {
+        {#if editingTrainingSteps}
+          <input
+            class="stepper-input"
+            type="text"
+            value={draftTrainingSteps}
+            on:input={(e) => draftTrainingSteps = e.currentTarget.value.replace(/[^0-9]/g, '')}
+            on:blur={() => {
+              const parsed = parseInt(draftTrainingSteps, 10);
+              if (!isNaN(parsed)) {
+                const clamped = Math.max(10, Math.min(1000, parsed));
+                trainingStore.update(store => ({ ...store, totalSteps: clamped }));
+              }
               editingTrainingSteps = false;
+            }}
+            on:keydown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur();
+              if (e.key === 'Escape') {
+                editingTrainingSteps = false;
+                draftTrainingSteps = String(totalSteps);
+              }
+            }}
+            use:focusOnMount
+          />
+        {:else}
+          <button
+            class="stepper-value"
+            on:click={() => {
+              editingTrainingSteps = true;
               draftTrainingSteps = String(totalSteps);
-            }
-          }}
-          use:focusOnMount
-        />
-      {:else}
+            }}
+          >
+            {totalSteps}
+          </button>
+        {/if}
         <button
-          class="stepper-value"
+          class="stepper-btn"
+          disabled={totalSteps >= 1000}
           on:click={() => {
-            editingTrainingSteps = true;
-            draftTrainingSteps = String(totalSteps);
+            trainingStore.update(store => ({ ...store, totalSteps: Math.min(1000, totalSteps + 10) }));
           }}
         >
-          {totalSteps}
+          +
         </button>
-      {/if}
-      <button
-        class="stepper-btn"
-        disabled={totalSteps >= 1000}
-        on:click={() => {
-          trainingStore.update(store => ({ ...store, totalSteps: Math.min(1000, totalSteps + 10) }));
-        }}
-      >
-        +
-      </button>
+      </div>
+    </div>
+
+    <div class="control-group compact">
+      <div class="control-header">
+        <span class="icon"><Gauge size={15} strokeWidth={2} /></span>
+        <label for="speed">Speed</label>
+        <div class="tooltip-container">
+          <button
+            class="info-btn"
+            on:mouseenter={() => activeTooltip = 'speed'}
+            on:mouseleave={() => activeTooltip = null}
+          >
+            <Info size={14} strokeWidth={2} />
+          </button>
+          {#if activeTooltip === 'speed'}
+            <div class="tooltip">
+              Animation speed — gradient steps per second
+            </div>
+          {/if}
+        </div>
+      </div>
+      <div class="slider-container">
+        <div class="slider-value-display">
+          <span class="speed-value">{stepsPerSecond}/s</span>
+        </div>
+        <input
+          id="speed"
+          class="hyper-slider"
+          type="range"
+          min="2"
+          max="60"
+          step="1"
+          value={stepsPerSecond}
+          style="--fill: {((stepsPerSecond - 2) / 58) * 100}%"
+          on:input={(e) => {
+            const v = parseInt(e.currentTarget.value);
+            trainingStore.update(s => ({ ...s, stepsPerSecond: v }));
+          }}
+        />
+        <div class="slider-labels">
+          <span>Slow</span>
+          <span>Fast</span>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- Spacer to push buttons to bottom -->
-  <div class="spacer"></div>
-  
   <!-- Action Buttons - pinned to bottom -->
   <div class="action-buttons">
     <button
@@ -1038,10 +1042,22 @@
   .sidebar-content {
     display: flex;
     flex-direction: column;
-    gap: 1.125rem;
+    gap: 0.875rem;
     height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
+  }
+
+  /* Two-column rows for compact paired controls */
+  .control-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.625rem;
+    align-items: start;
+  }
+
+  .control-row.single {
+    grid-template-columns: 1fr;
   }
   
   /* Custom scrollbar for sidebar */
@@ -1062,9 +1078,65 @@
     background: rgba(16, 185, 129, 0.4);
   }
   
-  .spacer {
-    flex: 1;
-    min-height: 1rem;
+  /* Compact variant for paired controls: smaller header, tighter stepper */
+  .control-group.compact .control-header {
+    gap: 0.375rem;
+  }
+
+  .control-group.compact .control-header label,
+  .control-group.compact .control-header .control-label {
+    font-size: 0.71rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  .control-group.compact .number-stepper {
+    grid-template-columns: 26px 1fr 26px;
+    padding: 0.25rem;
+    gap: 0.25rem;
+  }
+
+  .control-group.compact .stepper-btn {
+    width: 26px;
+    height: 26px;
+    font-size: 0.875rem;
+  }
+
+  .control-group.compact .stepper-value,
+  .control-group.compact .stepper-input {
+    min-width: 0;
+    width: 100%;
+    font-size: 0.8125rem;
+    padding: 0.25rem 0.125rem;
+  }
+
+  .control-group.compact .slider-labels {
+    font-size: 0.625rem;
+  }
+
+  .control-group.compact .reroll-btn {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* Inline "Random" checkbox inside the split value row */
+  .split-display {
+    position: relative;
+  }
+
+  .inline-check {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.72rem;
+  }
+
+  .inline-check input[type='checkbox'] {
+    width: 14px;
+    height: 14px;
   }
   
   h1 {
@@ -1508,10 +1580,6 @@
   }
   
   /* Checkbox */
-  .checkbox-container {
-    margin-top: 0.25rem;
-  }
-  
   .checkbox-label {
     display: flex;
     align-items: center;
@@ -1533,12 +1601,18 @@
     font-weight: 500;
   }
   
-  /* Action Buttons */
+  /* Action Buttons: pushed to the bottom and sticky, so Train is always
+     reachable even if a short viewport forces the controls to scroll */
   .action-buttons {
     display: flex;
     gap: 0.5rem;
-    margin-top: 0;
     align-items: stretch;
+    margin-top: auto;
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    background: var(--color-bg-secondary);
+    padding-top: 0.5rem;
   }
   
   .train-button {

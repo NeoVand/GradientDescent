@@ -15,6 +15,7 @@ An interactive visualization tool for understanding gradient descent through bea
 ## ✨ Features
 
 - **Interactive Loss Landscape**: Color-coded heatmap, smooth contour lines, and gradient vector field all in one view
+- **2D & 3D Loss Landscapes**: Flip between the classic heatmap+contours view and a fully rotatable 3D surface — same data, same colors, draggable marker in both
 - **Six Optimizers**: Gradient Descent, Momentum, Nesterov, AdaGrad, RMSProp, and Adam — each with its own hyperparameter sliders and live-updating LaTeX update rule
 - **Real-time Training**: Watch the optimizer descend with animated parameter trails, single-step through updates, and tune the animation speed
 - **Stochastic Gradients**: A batch-size control turns full-batch descent into noisy SGD — watch the path wobble

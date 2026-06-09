@@ -152,6 +152,50 @@ export function gridToImageURL(grid: LossGrid): string {
   return canvas.toDataURL();
 }
 
+/**
+ * Bilinear sample of the loss at parameter point (a, b), clamped to the
+ * grid. Used by the 3D surface to place the marker and descent path at the
+ * exact surface height.
+ */
+export function sampleLoss(grid: LossGrid, a: number, b: number): number {
+  const { res, extMin, extMax, values } = grid;
+  const span = extMax - extMin;
+  // Invert the cell-center convention: sample i sits at extMin + (i+0.5)/res·span
+  const fi = ((a - extMin) / span) * res - 0.5;
+  const fj = ((b - extMin) / span) * res - 0.5;
+  const i0 = Math.max(0, Math.min(res - 1, Math.floor(fi)));
+  const j0 = Math.max(0, Math.min(res - 1, Math.floor(fj)));
+  const i1 = Math.min(res - 1, i0 + 1);
+  const j1 = Math.min(res - 1, j0 + 1);
+  const tx = Math.max(0, Math.min(1, fi - i0));
+  const ty = Math.max(0, Math.min(1, fj - j0));
+
+  const v00 = values[j0 * res + i0];
+  const v10 = values[j0 * res + i1];
+  const v01 = values[j1 * res + i0];
+  const v11 = values[j1 * res + i1];
+  const top = v00 + (v10 - v00) * tx;
+  const bot = v01 + (v11 - v01) * tx;
+  return top + (bot - top) * ty;
+}
+
+/**
+ * Normalized log-height t ∈ [0, 1] for a loss value — the SAME mapping the
+ * heatmap colors use, so 3D height and 2D color always agree.
+ */
+export function normalizedLogLoss(grid: LossGrid, loss: number): number {
+  const span = grid.logMax - grid.logMin || 1;
+  const t = (Math.log(loss + LOG_EPS) - grid.logMin) / span;
+  return t < 0 ? 0 : t > 1 ? 1 : t;
+}
+
+/** Viridis color for normalized t ∈ [0, 1] as 0–1 RGB (bright = t high). */
+export function viridisRGB(t: number): [number, number, number] {
+  const lut = getViridisLUT();
+  const k = Math.max(0, Math.min(LUT_SIZE - 1, Math.round(t * (LUT_SIZE - 1))));
+  return [lut[k * 3] / 255, lut[k * 3 + 1] / 255, lut[k * 3 + 2] / 255];
+}
+
 // ---------- Gradient vector field ----------
 
 export interface FieldArrow {

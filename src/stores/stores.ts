@@ -267,6 +267,32 @@ export function recordInitialHistory() {
   ]);
 }
 
+// ========== Landscape View Store ==========
+// Which rendering of the loss landscape is active. Persisted so returning
+// visitors keep their preferred view.
+export type LandscapeView = '2d' | '3d';
+
+function createLandscapeViewStore() {
+  const initial = (): LandscapeView => {
+    if (typeof window === 'undefined') return '2d';
+    return localStorage.getItem('landscape-view') === '3d' ? '3d' : '2d';
+  };
+
+  const { subscribe, set } = writable<LandscapeView>(initial());
+
+  return {
+    subscribe,
+    set: (view: LandscapeView) => {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('landscape-view', view);
+      }
+      set(view);
+    }
+  };
+}
+
+export const landscapeViewStore = createLandscapeViewStore();
+
 // ========== Theme Store ==========
 // Manages the current theme (light or dark)
 export type Theme = 'light' | 'dark';

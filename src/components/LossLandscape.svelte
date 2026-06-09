@@ -23,15 +23,18 @@
     themeStore,
     resetOptimizerState,
     lossSceneStore,
-    divergenceStore
+    divergenceStore,
+    landscapeViewStore
   } from '../stores/stores';
   import type { ModelParameters } from '../types/types';
   import { Mountain } from 'lucide-svelte';
 
   // Component references
-  let svgElement: SVGSVGElement;
+  let svgElement: SVGSVGElement | null = null;
+  let containerEl: HTMLDivElement;
   let width = 400;
   let height = 400;
+  $: view = $landscapeViewStore;
   // Margins shrink on narrow viewports to claw back vertical space
   $: compact = width < 480;
   $: margin = compact
@@ -114,10 +117,7 @@
       }
     });
 
-    const container = svgElement.closest('.svg-container');
-    if (container) {
-      resizeObserver.observe(container);
-    }
+    resizeObserver.observe(containerEl);
 
     return () => {
       resizeObserver.disconnect();
@@ -136,7 +136,7 @@
   }
 
   function redraw() {
-    if (!scene) return;
+    if (!scene || !svgElement) return;
 
     // Clear previous content
     d3.select(svgElement).selectAll('*').remove();
@@ -631,6 +631,7 @@
   }
 
   function updateTrail() {
+    if (!svgElement) return;
     // Only update the trail without redrawing everything
     const svg = d3.select(svgElement);
     const plotGroup = svg.select<SVGGElement>('.plot-group');
@@ -661,17 +662,53 @@
       <Mountain size={20} strokeWidth={2} />
       <span>Loss & Gradient</span>
     </h2>
-    <div class="color-legend">
-      <span class="legend-label">Loss:</span>
-      <div class="legend-scale">
-        <span class="scale-value">{maxLossValue.toFixed(2)}</span>
-        <div class="color-bar"></div>
-        <span class="scale-value">{minLossValue.toFixed(2)}</span>
+    <div class="view-toggle" role="group" aria-label="Landscape view">
+      <button
+        class:active={view === '2d'}
+        on:click={() => landscapeViewStore.set('2d')}
+      >2D</button>
+      <button
+        class:active={view === '3d'}
+        on:click={() => landscapeViewStore.set('3d')}
+      >3D</button>
+    </div>
+    <div class="legend-group">
+      {#if view === '2d'}
+      <div class="vector-legend">
+        <span class="vec-item" title="Steepest-descent direction at the marker: −∇ℒ, straight downhill">
+          <svg width="20" height="10" viewBox="0 0 20 10" aria-hidden="true">
+            <line x1="1" y1="5" x2="12" y2="5" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" />
+            <path d="M12,1.5 L19,5 L12,8.5 Z" fill="#3b82f6" />
+          </svg>
+          <span>−∇ℒ</span>
+        </span>
+        <span class="vec-item" title="The optimizer's actual last step: Δθ (momentum and adaptive methods bend away from −∇ℒ)">
+          <svg width="20" height="10" viewBox="0 0 20 10" aria-hidden="true">
+            <line x1="1" y1="5" x2="12" y2="5" stroke="#ef4444" stroke-width="2" stroke-linecap="round" />
+            <path d="M12,1.5 L19,5 L12,8.5 Z" fill="#ef4444" />
+          </svg>
+          <span>Δθ</span>
+        </span>
+      </div>
+      {/if}
+      <div class="color-legend">
+        <span class="legend-label">Loss:</span>
+        <div class="legend-scale">
+          <span class="scale-value">{maxLossValue.toFixed(2)}</span>
+          <div class="color-bar"></div>
+          <span class="scale-value">{minLossValue.toFixed(2)}</span>
+        </div>
       </div>
     </div>
   </div>
-  <div class="svg-container">
-    <svg bind:this={svgElement} {width} {height}></svg>
+  <div class="svg-container" bind:this={containerEl}>
+    {#if view === '3d'}
+      {#await import('./LossLandscape3D.svelte') then mod}
+        <svelte:component this={mod.default} />
+      {/await}
+    {:else}
+      <svg bind:this={svgElement} {width} {height}></svg>
+    {/if}
     <div class="readout" style="left: {margin.left + 8}px; top: {margin.top + 8}px;">
       <span class="readout-item"><em>α</em> {fmtParam(parameters.a)}</span>
       <span class="readout-item"><em>β</em> {fmtParam(parameters.b)}</span>
@@ -718,6 +755,67 @@
     align-items: center;
     gap: 0.5rem;
     opacity: 0.9;
+  }
+
+  /* 2D / 3D segmented toggle */
+  .view-toggle {
+    display: flex;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    overflow: hidden;
+    flex-shrink: 0;
+    margin: 0 0.75rem;
+  }
+
+  .view-toggle button {
+    border: none;
+    background: transparent;
+    color: var(--color-text-tertiary);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    padding: 0.2rem 0.55rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    letter-spacing: 0.03em;
+  }
+
+  .view-toggle button:hover {
+    color: #10b981;
+  }
+
+  .view-toggle button.active {
+    background: rgba(16, 185, 129, 0.16);
+    color: #10b981;
+  }
+
+  .legend-group {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    min-width: 0;
+  }
+
+  /* Marker-arrow key: what the blue and red arrows on the marker mean */
+  .vector-legend {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+  }
+
+  .vec-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    font-family: 'SF Mono', Monaco, monospace;
+    color: var(--color-text-tertiary);
+    cursor: help;
+    white-space: nowrap;
+  }
+
+  .vec-item svg {
+    flex-shrink: 0;
   }
 
   .color-legend {
@@ -847,6 +945,14 @@
     opacity: 1;
   }
 
+  /* Narrow desktop: reclaim header space so title + toggle + legend fit */
+  @media (max-width: 1280px) {
+    h2 { margin-left: 8px; white-space: nowrap; }
+    .view-toggle { margin: 0 0.375rem; }
+    .legend-group { gap: 0.5rem; }
+    .color-bar { width: 56px; }
+  }
+
   @media (max-width: 768px) {
     h2 {
       margin-left: 0;
@@ -858,6 +964,9 @@
     .legend-label { font-size: 0.6875rem; }
     .scale-value { font-size: 0.5625rem; min-width: 2rem; }
     .readout { font-size: 0.625rem; gap: 0.5rem; }
+    .legend-group { gap: 0.5rem; }
+    .vec-item { font-size: 0.625rem; }
+    .vec-item svg { width: 14px; }
   }
 
   .svg-container {
