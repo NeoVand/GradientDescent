@@ -1,26 +1,33 @@
 <script lang="ts">
   /**
-   * Gradient Field Component
-   * 
-   * Visualizes the gradient vector field of the loss function.
-   * Shows the direction of steepest descent at each point in parameter space.
+   * Loss Landscape Component
+   *
+   * Visualizes the loss surface over parameter space: a heatmap (bright =
+   * low loss), contour lines, the gradient vector field, the descent trail,
+   * and a draggable marker for the current parameters.
+   *
+   * All expensive computation lives in lossSceneStore (one cached grid per
+   * data/problem pair). This component only *renders*: theme toggles and
+   * resizes redraw from the cache; training and drags move marker + trail
+   * layers without touching the rest.
    */
-  
+
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
   import { contours } from 'd3-contour';
-  import { interpolateViridis } from 'd3-scale-chromatic';
   import {
     datasetStore,
     parametersStore,
     historyStore,
     currentProblemConfig,
     themeStore,
-    velocityStore
+    resetOptimizerState,
+    lossSceneStore,
+    divergenceStore
   } from '../stores/stores';
   import type { ModelParameters } from '../types/types';
   import { Mountain } from 'lucide-svelte';
-  
+
   // Component references
   let svgElement: SVGSVGElement;
   let width = 400;
@@ -32,80 +39,116 @@
     : { top: 20, right: 20, bottom: 50, left: 50 };
   $: xLabelOffset = compact ? 26 : 38;
   $: yLabelOffset = compact ? 26 : 35;
-  
-  // Default parameter range for visualization. Problems can override via
-  // problemConfig.parameterRange to focus on the useful region.
+
   const defaultParameterRange = { min: -7, max: 7 };
-  const gridResolution = 24; // 24x24 grid for gradient arrows
-  // Reactive: pulls the per-problem range when one is provided.
-  $: parameterRange = problemConfig?.parameterRange ?? defaultParameterRange;
-  
+
   // Loss range for legend
   let minLossValue = 0;
   let maxLossValue = 1;
-  
+
   // Reactive data
   $: data = $datasetStore.data;
   $: parameters = $parametersStore;
   $: history = $historyStore;
   $: problemConfig = $currentProblemConfig;
   $: theme = $themeStore;
-  
-  // Redraw when data changes
-  $: if (svgElement && data.length > 0 && problemConfig) {
-    drawGradientField();
+  $: scene = $lossSceneStore;
+  $: parameterRange = scene?.range ?? problemConfig?.parameterRange ?? defaultParameterRange;
+
+  $: if (scene) {
+    minLossValue = scene.grid.visMin;
+    maxLossValue = scene.grid.visMax;
   }
-  
-  // Redraw when history changes (for trail updates)
+
+  // Live readout: current parameters and gradient at the marker
+  $: trainData = data.filter(d => d.isTraining);
+  $: currentGradient = computeGrad(trainData, parameters, problemConfig);
+  $: gradMag = currentGradient ? Math.hypot(currentGradient.a, currentGradient.b) : 0;
+
+  function computeGrad(
+    train: typeof trainData,
+    params: typeof parameters,
+    config: typeof problemConfig
+  ): ModelParameters | null {
+    if (!config || train.length === 0) return null;
+    return config.computeGradient(train, params);
+  }
+
+  function fmtParam(v: number): string {
+    if (!Number.isFinite(v)) return '—';
+    return v.toFixed(3);
+  }
+
+  function fmtMag(v: number): string {
+    if (!Number.isFinite(v)) return '—';
+    if (v === 0) return '0';
+    return v >= 0.01 ? v.toFixed(3) : v.toExponential(1);
+  }
+
+  // Full redraw whenever the cached scene or the theme changes (both cheap:
+  // the heavy work already happened in the store).
+  $: if (svgElement && scene && theme) {
+    redraw();
+  }
+
+  // Trail/marker layer updates during training (no full redraw)
   $: if (svgElement && history.length > 0 && !isDragging) {
     updateTrail();
   }
-  
+
   let isDragging = false;
-  
-  // Redraw when theme changes
-  $: if (svgElement && theme) {
-    drawGradientField();
-    }
-  
+
   let resizeTimer: number | null = null;
-  
+
   onMount(() => {
     const resizeObserver = new ResizeObserver(entries => {
       const entry = entries[0];
       if (entry) {
         width = entry.contentRect.width;
         height = entry.contentRect.height;
-        
+
         if (resizeTimer) clearTimeout(resizeTimer);
         resizeTimer = setTimeout(() => {
-          drawGradientField();
+          redraw();
         }, 100);
       }
     });
-    
+
     const container = svgElement.closest('.svg-container');
     if (container) {
-    resizeObserver.observe(container);
+      resizeObserver.observe(container);
     }
-    
+
     return () => {
       resizeObserver.disconnect();
       if (resizeTimer) clearTimeout(resizeTimer);
     };
   });
-  
-  function drawGradientField() {
+
+  function makeScales(innerWidth: number, innerHeight: number) {
+    const xScale = d3.scaleLinear()
+      .domain([parameterRange.min, parameterRange.max])
+      .range([0, innerWidth]);
+    const yScale = d3.scaleLinear()
+      .domain([parameterRange.min, parameterRange.max])
+      .range([innerHeight, 0]);
+    return { xScale, yScale };
+  }
+
+  function redraw() {
+    if (!scene) return;
+
     // Clear previous content
     d3.select(svgElement).selectAll('*').remove();
-    
+
     const svg = d3.select(svgElement);
     const g = svg.append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
-    
+
     const innerWidth = width - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
-    
+    if (innerWidth <= 0 || innerHeight <= 0) return;
+
     // Create clipping path
     svg.append('defs')
       .append('clipPath')
@@ -115,55 +158,48 @@
       .attr('y', margin.top)
       .attr('width', innerWidth)
       .attr('height', innerHeight);
-    
-    // Create scales
-    const xScale = d3.scaleLinear()
-      .domain([parameterRange.min, parameterRange.max])
-      .range([0, innerWidth]);
-    
-    const yScale = d3.scaleLinear()
-      .domain([parameterRange.min, parameterRange.max])
-      .range([innerHeight, 0]);
-    
+
+    const { xScale, yScale } = makeScales(innerWidth, innerHeight);
+
     // Add axes
     const xAxis = d3.axisBottom(xScale).tickSizeOuter(0);
     const yAxis = d3.axisLeft(yScale).tickSizeOuter(0);
-    
-    const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
-    const axisColor = isDarkMode ? '#527a75' : '#064e3b';
-    
+
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const axisColor = isDark ? '#527a75' : '#064e3b';
+
     // Bottom axis
     g.append('g')
       .attr('class', 'x-axis')
       .attr('transform', `translate(0,${innerHeight})`)
       .call(xAxis)
-      .call(g => g.selectAll('line').attr('stroke', axisColor))
-      .call(g => g.selectAll('path').attr('stroke', axisColor).attr('stroke-width', 1))
-      .call(g => g.selectAll('text').attr('fill', axisColor));
-    
+      .call(sel => sel.selectAll('line').attr('stroke', axisColor))
+      .call(sel => sel.selectAll('path').attr('stroke', axisColor).attr('stroke-width', 1))
+      .call(sel => sel.selectAll('text').attr('fill', axisColor));
+
     // Left axis
     g.append('g')
       .attr('class', 'y-axis')
       .call(yAxis)
-      .call(g => g.selectAll('line').attr('stroke', axisColor))
-      .call(g => g.selectAll('path').attr('stroke', axisColor).attr('stroke-width', 1))
-      .call(g => g.selectAll('text').attr('fill', axisColor));
-    
+      .call(sel => sel.selectAll('line').attr('stroke', axisColor))
+      .call(sel => sel.selectAll('path').attr('stroke', axisColor).attr('stroke-width', 1))
+      .call(sel => sel.selectAll('text').attr('fill', axisColor));
+
     // Top axis (frame - no ticks)
     g.append('g')
       .attr('class', 'x-axis-top')
       .call(d3.axisTop(xScale).tickSizeOuter(0).tickSize(0).tickFormat(() => ''))
-      .call(g => g.selectAll('line').remove())
-      .call(g => g.select('.domain').attr('stroke', axisColor).attr('stroke-width', 1));
-    
+      .call(sel => sel.selectAll('line').remove())
+      .call(sel => sel.select('.domain').attr('stroke', axisColor).attr('stroke-width', 1));
+
     // Right axis (frame - no ticks)
     g.append('g')
       .attr('class', 'y-axis-right')
       .attr('transform', `translate(${innerWidth},0)`)
       .call(d3.axisRight(yScale).tickSizeOuter(0).tickSize(0).tickFormat(() => ''))
-      .call(g => g.selectAll('line').remove())
-      .call(g => g.select('.domain').attr('stroke', axisColor).attr('stroke-width', 1));
-    
+      .call(sel => sel.selectAll('line').remove())
+      .call(sel => sel.select('.domain').attr('stroke', axisColor).attr('stroke-width', 1));
+
     // Add axis labels (Greek letters)
     g.append('text')
       .attr('x', innerWidth / 2)
@@ -186,9 +222,8 @@
       .attr('font-family', 'Georgia, serif')
       .style('text-anchor', 'middle')
       .text('β');
-    
+
     // Add background
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     g.insert('rect', ':first-child')
       .attr('x', 0)
       .attr('y', 0)
@@ -196,181 +231,75 @@
       .attr('height', innerHeight)
       .attr('fill', isDark ? '#060913' : '#ffffff')
       .attr('rx', 4);
-    
-    // Create clipped group for gradient field
+
+    // Create clipped group for landscape content
     const clippedGroup = g.append('g')
       .attr('clip-path', 'url(#gradient-clip-path)')
       .attr('transform', `translate(${-margin.left},${-margin.top})`);
-    
+
     const plotGroup = clippedGroup.append('g')
       .attr('class', 'plot-group')
       .attr('transform', `translate(${margin.left},${margin.top})`);
-    
-    // Draw loss heatmap first (behind everything)
-    const lossData = drawLossHeatmap(plotGroup, xScale, yScale, innerWidth, innerHeight);
-    
-    // Draw gradient field (above heatmap, below contours)
-    drawGradients(plotGroup, xScale, yScale, innerWidth, innerHeight);
-    
-    // Draw contour lines (above gradient field, below trail)
-    if (lossData) {
-      drawContours(plotGroup, lossData, xScale, yScale, innerWidth, innerHeight);
-    }
-    
-    // Draw training path with fade effect (in clipped group, above contours, below marker)
+
+    // Heatmap: single pre-rendered image, stretched over the extended range
+    drawHeatmapImage(plotGroup, xScale, yScale);
+
+    // Gradient field (above heatmap, below contours)
+    drawGradients(plotGroup, xScale, yScale, isDark);
+
+    // Contour lines (above gradient field, below trail)
+    drawContours(plotGroup, xScale, yScale);
+
+    // Training path with fade effect (above contours, below marker)
     drawTrainingPath(plotGroup, xScale, yScale);
-    
-    // Draw current position last (needs to be in main group, not clipped, on top)
+
+    // Current position last (in main group: never clipped, but clamped)
     drawCurrentPosition(g, xScale, yScale, innerWidth, innerHeight);
   }
-  
-  function drawLossHeatmap(
+
+  function drawHeatmapImage(
     g: d3.Selection<SVGGElement, unknown, null, undefined>,
     xScale: d3.ScaleLinear<number, number>,
-    yScale: d3.ScaleLinear<number, number>,
-    innerWidth: number,
-    innerHeight: number
-  ): { trainData: any[], minLoss: number, maxLoss: number } | null {
-    const trainData = data.filter(d => d.isTraining);
-    if (trainData.length === 0) return null;
-    
-    // Create loss heatmap for display (visible range only)
-    const heatmapResolution = 60;
-    const cellWidth = innerWidth / heatmapResolution;
-    const cellHeight = innerHeight / heatmapResolution;
-    
-    let minLoss = Infinity;
-    let maxLoss = -Infinity;
-    
-    // First pass: compute min/max loss in visible range
-    for (let i = 0; i < heatmapResolution; i++) {
-      for (let j = 0; j < heatmapResolution; j++) {
-        const pixelX = Math.round(i * cellWidth);
-        const pixelY = Math.round(j * cellHeight);
-        
-        const a = xScale.invert(pixelX + cellWidth / 2);
-        const b = yScale.invert(pixelY + cellHeight / 2);
-        
-        const loss = problemConfig.computeLoss(trainData, { a, b });
-        minLoss = Math.min(minLoss, loss);
-        maxLoss = Math.max(maxLoss, loss);
-      }
-    }
-    
-    // Store min/max for legend
-    minLossValue = minLoss;
-    maxLossValue = maxLoss;
-    
-    // Use log scale for better color distribution
-    const logMin = Math.log(minLoss + 0.001);
-    const logMax = Math.log(maxLoss + 0.001);
-    
-    // Second pass: draw cells with color based on loss
-    for (let i = 0; i < heatmapResolution; i++) {
-      for (let j = 0; j < heatmapResolution; j++) {
-        const pixelX = Math.round(i * cellWidth);
-        const pixelY = Math.round(j * cellHeight);
-        const nextPixelX = Math.round((i + 1) * cellWidth);
-        const nextPixelY = Math.round((j + 1) * cellHeight);
-        const exactWidth = nextPixelX - pixelX;
-        const exactHeight = nextPixelY - pixelY;
-        
-        // Recompute loss for this cell
-        const a = xScale.invert(pixelX + cellWidth / 2);
-        const b = yScale.invert(pixelY + cellHeight / 2);
-        const loss = problemConfig.computeLoss(trainData, { a, b });
-        
-        // Normalize loss using log scale (0 = low loss, 1 = high loss)
-        const logLoss = Math.log(loss + 0.001);
-        const normalized = (logLoss - logMin) / (logMax - logMin);
-        
-        // Color: blue (low loss) to red (high loss)
-        const color = d3.interpolateViridis(1 - normalized);
-        
-        g.append('rect')
-          .attr('x', pixelX)
-          .attr('y', pixelY)
-          .attr('width', exactWidth)
-          .attr('height', exactHeight)
-          .attr('fill', color)
-          .style('opacity', 0.85);
-      }
-    }
-    
-    // Return data for contour generation
-    return {
-      trainData,
-      minLoss,
-      maxLoss
-    };
+    yScale: d3.ScaleLinear<number, number>
+  ) {
+    if (!scene) return;
+    const { extMin, extMax } = scene.grid;
+    g.append('image')
+      .attr('href', scene.imageURL)
+      .attr('x', xScale(extMin))
+      .attr('y', yScale(extMax))
+      .attr('width', xScale(extMax) - xScale(extMin))
+      .attr('height', yScale(extMin) - yScale(extMax))
+      .attr('preserveAspectRatio', 'none');
   }
-  
+
   function drawContours(
     g: d3.Selection<SVGGElement, unknown, null, undefined>,
-    lossData: { trainData: any[], minLoss: number, maxLoss: number },
     xScale: d3.ScaleLinear<number, number>,
-    yScale: d3.ScaleLinear<number, number>,
-    innerWidth: number,
-    innerHeight: number
+    yScale: d3.ScaleLinear<number, number>
   ) {
-    const { trainData, minLoss, maxLoss } = lossData;
-    
-    // Compute loss on extended grid (20% larger) for smooth contours beyond frame
-    const contourResolution = 50;
-    const paramRange = parameterRange.max - parameterRange.min;
-    const extension = paramRange * 0.2; // 20% extension
-    const extendedMin = parameterRange.min - extension;
-    const extendedMax = parameterRange.max + extension;
-    
-    // Compute loss values on extended grid
-    const lossGrid: number[] = [];
-    for (let j = 0; j < contourResolution; j++) {
-      for (let i = 0; i < contourResolution; i++) {
-        const a = extendedMin + (i / (contourResolution - 1)) * (extendedMax - extendedMin);
-        const b = extendedMin + (j / (contourResolution - 1)) * (extendedMax - extendedMin);
-        const loss = problemConfig.computeLoss(trainData, { a, b });
-        lossGrid.push(loss);
-      }
-    }
-    
-    // Generate contour levels using log scale
-    const logMin = Math.log(minLoss + 0.001);
-    const logMax = Math.log(maxLoss + 0.001);
-    const numContours = 12;
-    const thresholds: number[] = [];
-    
-    for (let i = 1; i < numContours; i++) {
-      const logValue = logMin + (i / numContours) * (logMax - logMin);
-      thresholds.push(Math.exp(logValue) - 0.001);
-    }
-    
-    // Generate contours on extended grid
+    if (!scene) return;
+    const { res, extMin, extMax, values, thresholds } = scene.grid;
+    const extSpan = extMax - extMin;
+
     const contourGenerator = contours()
-      .size([contourResolution, contourResolution])
+      .size([res, res])
       .smooth(true)
       .thresholds(thresholds);
-    
-    const contourData = contourGenerator(lossGrid);
-    
+
+    const contourData = contourGenerator(values as unknown as number[]);
+
     const pathGenerator = d3.geoPath()
       .projection(d3.geoTransform({
-        point: function(x, y) {
-          // d3.contours treats x, y as continuous coordinates in grid space
-          // Map grid coordinates directly to parameter space, accounting for the extended range
-          const paramA = extendedMin + (x / contourResolution) * (extendedMax - extendedMin);
-          const paramB = extendedMin + (y / contourResolution) * (extendedMax - extendedMin);
-          
-          // Map to pixels using the SAME scales as heatmap (xScale, yScale)
-          const pixelX = xScale(paramA);
-          const pixelY = yScale(paramB);
-          
-          this.stream.point(pixelX, pixelY);
+        point: function (x, y) {
+          // Contour coordinates live in grid space [0, res]; samples sit at
+          // cell centers, so x / res maps back to parameter space exactly.
+          const paramA = extMin + (x / res) * extSpan;
+          const paramB = extMin + (y / res) * extSpan;
+          this.stream.point(xScale(paramA), yScale(paramB));
         }
       }));
-    
-    // Draw contours - always white for best visibility
-    const contourColor = '#ffffff';
-    
+
     g.selectAll('.contour')
       .data(contourData)
       .enter()
@@ -378,37 +307,36 @@
       .attr('class', 'contour')
       .attr('d', pathGenerator)
       .attr('fill', 'none')
-      .attr('stroke', contourColor)
+      .attr('stroke', '#ffffff')
       .attr('stroke-width', 1.5)
       .style('opacity', 0.5);
   }
-  
+
   function drawTrainingPath(
     g: d3.Selection<SVGGElement, unknown, null, undefined>,
     xScale: d3.ScaleLinear<number, number>,
     yScale: d3.ScaleLinear<number, number>
   ) {
     if (history.length < 2) return;
-    
+
     // Get last 100 points
     const windowSize = 100;
     const recentHistory = history.slice(Math.max(0, history.length - windowSize));
-    
+
     // Draw path with gradient fade effect (always fades from old to new)
     for (let i = 0; i < recentHistory.length - 1; i++) {
       const current = recentHistory[i];
       const next = recentHistory[i + 1];
-      
+
       // Calculate progress (0 = oldest, 1 = newest)
       const progress = i / (recentHistory.length - 1);
-      
+
       // Opacity fades from nearly invisible to visible
       const opacity = 0.05 + progress * 0.75; // 0.05 to 0.8
-      
+
       // Thickness increases from thin to thick (almost as thick as handle)
       const thickness = 2 + progress * 10; // 2 to 12 (handle is ~20px diameter)
-      
-      // Draw line segment
+
       g.append('line')
         .attr('class', 'path-segment')
         .attr('x1', xScale(current.parameters.a))
@@ -422,77 +350,57 @@
         .style('opacity', opacity);
     }
   }
-  
+
   function drawGradients(
     g: d3.Selection<SVGGElement, unknown, null, undefined>,
     xScale: d3.ScaleLinear<number, number>,
     yScale: d3.ScaleLinear<number, number>,
-    innerWidth: number,
-    innerHeight: number
+    isDark: boolean
   ) {
-    const trainData = data.filter(d => d.isTraining);
-    if (trainData.length === 0) return;
-    
-    // Keep arrows black (light mode style) for better contour visibility
-    const arrowColor = '#000000';
-    
-    // Compute gradients at grid points
-    const gradients = [];
-    let maxMagnitude = 0;
-    
-    for (let i = 0; i < gridResolution; i++) {
-      for (let j = 0; j < gridResolution; j++) {
-        const a = parameterRange.min + (i / (gridResolution - 1)) * (parameterRange.max - parameterRange.min);
-        const b = parameterRange.min + (j / (gridResolution - 1)) * (parameterRange.max - parameterRange.min);
-        
-        const gradient = problemConfig.computeGradient(trainData, { a, b });
-      const magnitude = Math.sqrt(gradient.a * gradient.a + gradient.b * gradient.b);
-        
-        if (magnitude > 0.001) {
-          gradients.push({ a, b, gradient, magnitude });
-          maxMagnitude = Math.max(maxMagnitude, magnitude);
-        }
-      }
-    }
-    
+    if (!scene || scene.field.arrows.length === 0) return;
+    const { arrows, maxMag } = scene.field;
+
+    // Light slate in dark mode (black vanishes on the dark purples);
+    // black in light mode as before.
+    const arrowColor = isDark ? '#e2e8f0' : '#000000';
+
     // Define arrowhead marker
     const defs = g.append('defs');
-      defs.append('marker')
-        .attr('id', 'arrowhead')
-        .attr('viewBox', '0 -5 10 10')
-        .attr('refX', 8)
-        .attr('refY', 0)
-        .attr('markerWidth', 5)
-        .attr('markerHeight', 5)
-        .attr('orient', 'auto')
-        .append('path')
-        .attr('d', 'M0,-5L10,0L0,5')
+    defs.append('marker')
+      .attr('id', 'arrowhead')
+      .attr('viewBox', '0 -5 10 10')
+      .attr('refX', 8)
+      .attr('refY', 0)
+      .attr('markerWidth', 5)
+      .attr('markerHeight', 5)
+      .attr('orient', 'auto')
+      .append('path')
+      .attr('d', 'M0,-5L10,0L0,5')
       .attr('fill', arrowColor);
-    
+
     // Draw arrows - balanced size for density
     const baseArrowLength = 12;
     const maxArrowLength = 20;
-    
-    for (const item of gradients) {
-      const { a, b, gradient, magnitude } = item;
-      const normalizedMagnitude = magnitude / maxMagnitude;
-      
+
+    for (const item of arrows) {
+      const { a, b, ga, gb, mag } = item;
+      const normalizedMagnitude = maxMag > 0 ? mag / maxMag : 0;
+
       // Position
       const x = xScale(a);
       const y = yScale(b);
-      
-      // Normalize gradient direction
-      const normGradA = -gradient.a / magnitude;
-      const normGradB = -gradient.b / magnitude;
-      
+
+      // Normalized steepest-descent direction (negative gradient)
+      const normGradA = -ga / mag;
+      const normGradB = -gb / mag;
+
       // Arrow length based on magnitude
       const arrowLength = baseArrowLength + (maxArrowLength - baseArrowLength) * normalizedMagnitude;
-      
+
       // End position
       const x2 = x + normGradA * arrowLength;
       const y2 = y - normGradB * arrowLength; // Negative because SVG y is inverted
-      
-      // Draw arrow with reduced thickness scale
+
       g.append('line')
         .attr('class', 'gradient-arrow')
         .attr('x1', x)
@@ -505,7 +413,89 @@
         .style('opacity', 0.35 + normalizedMagnitude * 0.25);
     }
   }
-  
+
+  /**
+   * Place the marker, clamping to the plot frame. When the true position is
+   * outside the visible range (e.g. mid-divergence), the marker pins to the
+   * edge and switches to a dashed "off-map" look instead of floating over
+   * axes and headers.
+   */
+  function positionMarker(
+    marker: d3.Selection<SVGGElement, unknown, null, undefined>,
+    xScale: d3.ScaleLinear<number, number>,
+    yScale: d3.ScaleLinear<number, number>,
+    innerWidth: number,
+    innerHeight: number
+  ) {
+    const rawX = xScale(parameters.a);
+    const rawY = yScale(parameters.b);
+    const x = Math.max(0, Math.min(innerWidth, Number.isFinite(rawX) ? rawX : 0));
+    const y = Math.max(0, Math.min(innerHeight, Number.isFinite(rawY) ? rawY : 0));
+    const offMap = x !== rawX || y !== rawY;
+
+    marker.attr('transform', `translate(${x}, ${y})`);
+    marker.select('.marker-ring')
+      .attr('stroke-dasharray', offMap ? '4,3' : null)
+      .style('opacity', offMap ? 0.7 : 1);
+    marker.select('.marker-dot').style('opacity', offMap ? 0.7 : 1);
+
+    updateMarkerVectors(marker, xScale, yScale);
+  }
+
+  /**
+   * Two direction arrows anchored at the marker:
+   *  - blue: steepest descent (−∇ℒ) at the current position
+   *  - red:  the actual last update (Δθ, from history)
+   * For plain GD they coincide; for momentum and adaptive optimizers they
+   * visibly part ways — that gap IS the optimizer. Directions are computed
+   * in screen space so anisotropic plots keep faithful angles.
+   */
+  function updateMarkerVectors(
+    marker: d3.Selection<SVGGElement, unknown, null, undefined>,
+    xScale: d3.ScaleLinear<number, number>,
+    yScale: d3.ScaleLinear<number, number>
+  ) {
+    const kx = xScale(1) - xScale(0);
+    const ky = yScale(0) - yScale(1);
+
+    const setVec = (
+      sel: d3.Selection<d3.BaseType, unknown, null, undefined>,
+      sx: number,
+      sy: number,
+      len: number
+    ) => {
+      const m = Math.hypot(sx, sy);
+      if (!Number.isFinite(m) || m < 1e-12) {
+        sel.style('display', 'none');
+        return;
+      }
+      sel.style('display', null)
+        .attr('x1', 0)
+        .attr('y1', 0)
+        .attr('x2', (sx / m) * len)
+        .attr('y2', (sy / m) * len);
+    };
+
+    // Steepest descent: param direction (−ga, −gb) → screen (−ga·kx, +gb·ky)
+    const g = currentGradient;
+    setVec(
+      marker.select('.vec-grad'),
+      g ? -g.a * kx : 0,
+      g ? g.b * ky : 0,
+      32
+    );
+
+    // Last actual update Δθ
+    const n = history.length;
+    if (n >= 2) {
+      const da = history[n - 1].parameters.a - history[n - 2].parameters.a;
+      const db = history[n - 1].parameters.b - history[n - 2].parameters.b;
+      setVec(marker.select('.vec-upd'), da * kx, -db * ky, 24);
+    } else {
+      marker.select('.vec-upd').style('display', 'none');
+    }
+  }
+
   function drawCurrentPosition(
     g: d3.Selection<SVGGElement, unknown, null, undefined>,
     xScale: d3.ScaleLinear<number, number>,
@@ -513,12 +503,24 @@
     innerWidth: number,
     innerHeight: number
   ) {
-    const x = xScale(parameters.a);
-    const y = yScale(parameters.b);
-    
+    // Arrowheads for the marker's direction vectors
+    const defs = g.append('defs');
+    for (const [id, color] of [['vec-grad-head', '#3b82f6'], ['vec-upd-head', '#ef4444']] as const) {
+      defs.append('marker')
+        .attr('id', id)
+        .attr('viewBox', '0 -5 10 10')
+        .attr('refX', 8)
+        .attr('refY', 0)
+        .attr('markerWidth', 4.5)
+        .attr('markerHeight', 4.5)
+        .attr('orient', 'auto')
+        .append('path')
+        .attr('d', 'M0,-5L10,0L0,5')
+        .attr('fill', color);
+    }
+
     const marker = g.append('g')
       .attr('class', 'current-position')
-      .attr('transform', `translate(${x}, ${y})`)
       .style('touch-action', 'none');
 
     // Invisible hit area: makes the marker tappable on touch screens (≈44px)
@@ -529,8 +531,29 @@
       .style('cursor', 'grab')
       .style('touch-action', 'none');
 
+    // Direction vectors (under the ring, above the hit area). Blue =
+    // steepest descent −∇ℒ; red = the optimizer's actual last step Δθ.
+    marker.append('line')
+      .attr('class', 'vec-grad')
+      .attr('stroke', '#3b82f6')
+      .attr('stroke-width', 2.5)
+      .attr('stroke-linecap', 'round')
+      .attr('marker-end', 'url(#vec-grad-head)')
+      .style('opacity', 0.95)
+      .style('pointer-events', 'none');
+
+    marker.append('line')
+      .attr('class', 'vec-upd')
+      .attr('stroke', '#ef4444')
+      .attr('stroke-width', 2.5)
+      .attr('stroke-linecap', 'round')
+      .attr('marker-end', 'url(#vec-upd-head)')
+      .style('opacity', 0.95)
+      .style('pointer-events', 'none');
+
     // Outer ring
     marker.append('circle')
+      .attr('class', 'marker-ring')
       .attr('r', 10)
       .attr('fill', 'none')
       .attr('stroke', '#f59e0b')
@@ -539,98 +562,95 @@
 
     // Inner circle
     marker.append('circle')
+      .attr('class', 'marker-dot')
       .attr('r', 6)
       .attr('fill', '#f59e0b')
       .attr('stroke', '#fff')
       .attr('stroke-width', 2)
       .style('pointer-events', 'none');
-    
+
+    positionMarker(marker, xScale, yScale, innerWidth, innerHeight);
+
     // Make draggable (force touch support so it works on mobile regardless
     // of the viewport's touch detection at render time)
     marker.call(d3.drag<SVGGElement, unknown>()
       .touchable(() => true)
-      .on('start', function() {
+      .on('start', function () {
         isDragging = true;
         // Drag means the user is restarting from a new position, so any
-        // accumulated momentum from prior steps shouldn't carry over.
-        velocityStore.set({ a: 0, b: 0 });
+        // accumulated optimizer state (velocity, moment estimates) from
+        // prior steps shouldn't carry over — and any divergence warning
+        // is now stale.
+        resetOptimizerState();
+        divergenceStore.set(null);
         d3.select(this).style('cursor', 'grabbing');
       })
-      .on('drag', function(event) {
+      .on('drag', function (event) {
         // Convert pixel coordinates to parameter values
         const newA = xScale.invert(event.x);
         const newB = yScale.invert(event.y);
-        
+
         // Clamp to valid range
         const clampedA = Math.max(parameterRange.min, Math.min(parameterRange.max, newA));
         const clampedB = Math.max(parameterRange.min, Math.min(parameterRange.max, newB));
-        
+
         // Update position immediately (visual feedback)
-        const clampedX = xScale(clampedA);
-        const clampedY = yScale(clampedB);
         d3.select(this)
-          .attr('transform', `translate(${clampedX}, ${clampedY})`);
-        
+          .attr('transform', `translate(${xScale(clampedA)}, ${yScale(clampedB)})`);
+
         // Update parameters store (will trigger other diagrams to update)
         parametersStore.set({ a: clampedA, b: clampedB });
-        
+
         // Add to history
-        const trainData = data.filter(d => d.isTraining);
-        const testData = data.filter(d => !d.isTraining);
+        const train = data.filter(d => d.isTraining);
+        const test = data.filter(d => !d.isTraining);
         const nextStep = history.length > 0 ? history[history.length - 1].step + 1 : 0;
-        
+
         historyStore.addPoint({
           step: nextStep,
-          trainLoss: problemConfig.computeLoss(trainData, { a: clampedA, b: clampedB }),
-          testLoss: problemConfig.computeLoss(testData, { a: clampedA, b: clampedB }),
+          trainLoss: problemConfig.computeLoss(train, { a: clampedA, b: clampedB }),
+          testLoss: problemConfig.computeLoss(test, { a: clampedA, b: clampedB }),
           parameters: { a: clampedA, b: clampedB }
         });
-        
+
         // Manually update the trail during dragging
         const svg = d3.select(svgElement);
-        const plotGroup = svg.select('.plot-group');
+        const plotGroup = svg.select<SVGGElement>('.plot-group');
         if (!plotGroup.empty()) {
           plotGroup.selectAll('.path-segment').remove();
           drawTrainingPath(plotGroup, xScale, yScale);
         }
+
+        // Keep the marker's direction vectors live while dragging
+        updateMarkerVectors(d3.select(this), xScale, yScale);
       })
-      .on('end', function() {
+      .on('end', function () {
         isDragging = false;
         d3.select(this).style('cursor', 'grab');
       }));
   }
-  
+
   function updateTrail() {
     // Only update the trail without redrawing everything
     const svg = d3.select(svgElement);
-    const plotGroup = svg.select('.plot-group');
-    
+    const plotGroup = svg.select<SVGGElement>('.plot-group');
+
     if (plotGroup.empty()) return;
-    
+
     // Remove old trail
     plotGroup.selectAll('.path-segment').remove();
-    
-    // Get scales
-      const innerWidth = width - margin.left - margin.right;
-      const innerHeight = height - margin.top - margin.bottom;
-      
-    const xScale = d3.scaleLinear()
-      .domain([parameterRange.min, parameterRange.max])
-      .range([0, innerWidth]);
-    
-    const yScale = d3.scaleLinear()
-      .domain([parameterRange.min, parameterRange.max])
-      .range([innerHeight, 0]);
-    
+
+    const innerWidth = width - margin.left - margin.right;
+    const innerHeight = height - margin.top - margin.bottom;
+    const { xScale, yScale } = makeScales(innerWidth, innerHeight);
+
     // Redraw trail
     drawTrainingPath(plotGroup, xScale, yScale);
-    
-    // Update marker position
-    const marker = svg.select('.current-position');
+
+    // Update marker position (clamped to the frame)
+    const marker = svg.select<SVGGElement>('.current-position');
     if (!marker.empty()) {
-      const x = xScale(parameters.a);
-      const y = yScale(parameters.b);
-      marker.attr('transform', `translate(${x}, ${y})`);
+      positionMarker(marker, xScale, yScale, innerWidth, innerHeight);
     }
   }
 </script>
@@ -652,6 +672,21 @@
   </div>
   <div class="svg-container">
     <svg bind:this={svgElement} {width} {height}></svg>
+    <div class="readout" style="left: {margin.left + 8}px; top: {margin.top + 8}px;">
+      <span class="readout-item"><em>α</em> {fmtParam(parameters.a)}</span>
+      <span class="readout-item"><em>β</em> {fmtParam(parameters.b)}</span>
+      <span class="readout-item"><em>‖∇ℒ‖</em> {fmtMag(gradMag)}</span>
+    </div>
+    {#if $divergenceStore}
+      <div class="divergence-banner" role="alert">
+        <span>
+          <strong>Diverged at step {$divergenceStore.step}!</strong>
+          The learning rate γ is too large — each step overshoots the minimum
+          and the overshoot compounds. Lower γ (or μ) and train again.
+        </span>
+        <button class="banner-dismiss" on:click={() => divergenceStore.set(null)} aria-label="Dismiss">×</button>
+      </div>
+    {/if}
   </div>
 </div>
 
@@ -664,7 +699,7 @@
     min-height: 0;
     overflow: hidden;
   }
-  
+
   .header {
     display: flex;
     justify-content: space-between;
@@ -673,7 +708,7 @@
     margin-right: 20px;
     flex-shrink: 0;
   }
-  
+
   h2 {
     margin: 0 0 0 50px;
     font-size: 1.125rem;
@@ -684,34 +719,34 @@
     gap: 0.5rem;
     opacity: 0.9;
   }
-  
+
   .color-legend {
     display: flex;
     align-items: center;
     gap: 0.5rem;
   }
-  
+
   .legend-label {
     font-size: 0.75rem;
     font-weight: 600;
     color: var(--color-text-tertiary);
   }
-  
+
   .legend-scale {
     display: flex;
     align-items: center;
     gap: 0.375rem;
   }
-  
+
   .color-bar {
     width: 80px;
     height: 12px;
     border-radius: 6px;
-    background: linear-gradient(to right, 
+    background: linear-gradient(to right,
       #440154, #31688e, #35b779, #fde724);
     border: 1px solid var(--color-border);
   }
-  
+
   .scale-value {
     font-size: 0.625rem;
     font-weight: 600;
@@ -719,6 +754,97 @@
     color: var(--color-text-tertiary);
     min-width: 2.5rem;
     text-align: center;
+  }
+
+  /* Live α / β / gradient readout, pinned inside the plot frame */
+  .readout {
+    position: absolute;
+    display: flex;
+    gap: 0.625rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  :global([data-theme='light']) .readout {
+    background: rgba(255, 255, 255, 0.75);
+    color: #334155;
+  }
+
+  :global([data-theme='dark']) .readout {
+    background: rgba(6, 9, 19, 0.65);
+    color: #cbd5e1;
+  }
+
+  .readout-item em {
+    font-family: Georgia, serif;
+    font-style: italic;
+    font-weight: 400;
+    opacity: 0.7;
+    margin-right: 0.2rem;
+  }
+
+  /* Divergence explainer */
+  .divergence-banner {
+    position: absolute;
+    top: 12%;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: min(92%, 420px);
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.625rem 0.75rem;
+    border-radius: 10px;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    animation: bannerIn 0.25s ease;
+    z-index: 5;
+  }
+
+  @keyframes bannerIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+
+  :global([data-theme='light']) .divergence-banner {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #7f1d1d;
+  }
+
+  :global([data-theme='dark']) .divergence-banner {
+    background: #2a1215;
+    border: 1px solid #7f1d1d;
+    color: #fecaca;
+  }
+
+  .divergence-banner strong {
+    font-weight: 700;
+  }
+
+  .banner-dismiss {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    opacity: 0.7;
+  }
+
+  .banner-dismiss:hover {
+    opacity: 1;
   }
 
   @media (max-width: 768px) {
@@ -731,8 +857,9 @@
     .color-bar { width: 50px; height: 10px; }
     .legend-label { font-size: 0.6875rem; }
     .scale-value { font-size: 0.5625rem; min-width: 2rem; }
+    .readout { font-size: 0.625rem; gap: 0.5rem; }
   }
-  
+
   .svg-container {
     flex: 1;
     min-height: 0;
@@ -740,7 +867,7 @@
     position: relative;
     overflow: hidden;
   }
-  
+
   svg {
     display: block;
     background: transparent;
@@ -748,5 +875,4 @@
     max-width: 100%;
     max-height: 100%;
   }
-  
 </style>

@@ -52,6 +52,10 @@
     if (e.target === e.currentTarget) onClose();
   }
 
+  function handleKeydown(e: KeyboardEvent) {
+    if (isOpen && e.key === 'Escape') onClose();
+  }
+
   // ----- Gradient concept SVG: a real vector field that fills the whole card -----
   // Same loss as the Loss Landscape panel: L(α, β) = (α − cα)² + (β − cβ)².
   // Negative gradient at every grid cell points toward (cα, cβ).
@@ -96,7 +100,8 @@
   })();
 
   // The 13 problems, grouped — formulas kept tiny so they fit in card layout.
-  const problems = {
+  type ProblemCard = { name: string; icon: any; customIcon?: string; formula: string; tag: string };
+  const problems: Record<string, ProblemCard[]> = {
     'Curve fitting': [
       { name: 'Linear', icon: TrendingUp, formula: 'αX + β', tag: 'one bowl, one minimum' },
       { name: 'Polynomial', icon: null, customIcon: 'x²', formula: 'αX² + βX', tag: 'curvature; convex bowl' },
@@ -112,14 +117,20 @@
       { name: 'Logistic Reg.', icon: Percent, formula: 'σ(αX + βY)', tag: 'find the linear boundary' },
       { name: 'Circle Classifier', icon: Target, formula: 'σ((R²−d²)/τ)', tag: 'find a circle center' },
       { name: 'Source Localization', icon: Radio, formula: 'K / (d² + ε)', tag: 'inverse-square triangulation' },
-      { name: 'Mean-Shift Cluster', icon: ScatterChart, formula: '1 − Σ k_i', tag: 'two cluster modes' }
+      { name: 'Mean-Shift Cluster', icon: ScatterChart, formula: 'Σ(1 − kᵢ)/n', tag: 'two cluster modes' }
     ]
   };
 </script>
 
+<svelte:window on:keydown={handleKeydown} />
+
 {#if isOpen}
-  <div class="modal-backdrop" on:click={handleBackdropClick}>
-    <div class="modal-content">
+  <div
+    class="modal-backdrop"
+    role="presentation"
+    on:click={handleBackdropClick}
+  >
+    <div class="modal-content" role="dialog" aria-modal="true" aria-label="Help and guide">
       <div class="modal-header">
         <div class="modal-title">
           <span class="modal-icon">∂</span>
@@ -311,10 +322,23 @@
           </div>
 
           <div class="knob">
+            <div class="knob-head"><Compass size={16} strokeWidth={2} /> Optimizer</div>
+            <p>
+              How the step is computed from the gradient. Plain <strong>GD</strong> steps
+              straight downhill; <strong>Momentum</strong> and <strong>Nesterov</strong> accumulate
+              velocity; <strong>AdaGrad</strong>, <strong>RMSProp</strong>, and <strong>Adam</strong> adapt
+              each parameter's step size from gradient history. Watch the two arrows on the
+              marker: blue is the raw downhill direction, red is the step the optimizer
+              actually takes — the gap between them is the optimizer's personality.
+            </p>
+          </div>
+
+          <div class="knob">
             <div class="knob-head"><Rocket size={16} strokeWidth={2} /> Momentum <em class="g">μ</em></div>
             <p>
-              The marker keeps a velocity. Each step blends a fraction of the
-              previous direction with the current gradient:
+              On the Momentum and Nesterov optimizers, the marker keeps a velocity.
+              Each step blends a fraction of the previous direction with the current
+              gradient:
             </p>
             <div class="formula-display" bind:this={momentumEl}></div>
             <ul class="knob-bullets">
@@ -438,8 +462,11 @@
             </li>
             <li>
               <strong>Loss & Gradient</strong> — the loss surface as a function of (α, β).
-              Bright = low loss. White contour lines connect points of equal loss. Black arrows
-              show the steepest-descent direction at each grid cell. Drag the marker to teleport.
+              Bright = low loss. White contour lines connect points of equal loss. Field arrows
+              show the steepest-descent direction at each grid cell. On the marker itself,
+              the <span style="color:#3b82f6; font-weight:600">blue arrow</span> is the local
+              steepest descent (−∇ℒ) and the <span style="color:#ef4444; font-weight:600">red
+              arrow</span> is the step the optimizer actually took. Drag the marker to teleport.
             </li>
             <li>
               <strong>Loss History</strong> — train and test loss vs. step number. A clean
@@ -686,7 +713,6 @@
     height: 120px;
     color: var(--color-text-tertiary);
   }
-  .concept-svg-left { order: -1; }
   .concept :global(.caption) {
     fill: var(--color-text-tertiary);
     font-size: 11px;
@@ -953,7 +979,6 @@
       grid-template-columns: 1fr;
     }
     .concept-svg { height: 100px; }
-    .concept-svg-left { order: 0; }
 
     /* On mobile, drop the overlay layout: stack SVG on top, text below. */
     .concept-bg-overlay {

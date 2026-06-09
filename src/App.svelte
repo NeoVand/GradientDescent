@@ -4,14 +4,13 @@
   // through visual experiments with machine learning algorithms.
   
   import { onMount } from 'svelte';
-  import { get } from 'svelte/store';
   import Sidebar from './components/Sidebar.svelte';
   import DataVisualization from './components/DataVisualization.svelte';
   import LossLandscape from './components/LossLandscape.svelte';
   import LossHistory from './components/LossHistory.svelte';
   import GuidePanel from './components/GuidePanel.svelte';
   import HelpModal from './components/HelpModal.svelte';
-  import { datasetStore, parametersStore, historyStore, currentProblemConfig, themeStore } from './stores/stores';
+  import { datasetStore, recordInitialHistory, themeStore } from './stores/stores';
   import { Sun, Moon, HelpCircle, Menu, X } from 'lucide-svelte';
 
   // The main app orchestrates all our components and manages the overall layout.
@@ -34,25 +33,9 @@
   onMount(() => {
     // Set initial theme on mount
     document.documentElement.setAttribute('data-theme', theme);
-    
-    datasetStore.initialize();
-    
-    // Add initial point to history
-    const { data } = get(datasetStore);
-    const parameters = get(parametersStore);
-    const problemConfig = get(currentProblemConfig);
-    
-    if (data.length > 0) {
-      const trainData = data.filter(d => d.isTraining);
-      const testData = data.filter(d => !d.isTraining);
-      
-      historyStore.addPoint({
-        step: 0,
-        trainLoss: problemConfig.computeLoss(trainData, parameters),
-        testLoss: problemConfig.computeLoss(testData, parameters),
-        parameters
-      });
-    }
+
+    datasetStore.regenerateData();
+    recordInitialHistory();
   });
   
   function toggleTheme() {

@@ -9,10 +9,10 @@
    * - Action buttons (Train and Reset)
    */
   
-  import { selectedProblem, datasetStore, trainingStore, parametersStore, historyStore, velocityStore } from '../stores/stores';
-  import type { ProblemType } from '../types/types';
+  import { selectedProblem, datasetStore, trainingStore, parametersStore, historyStore, optimizerStore, optimizerStateStore, resetOptimizerState, divergenceStore, recordInitialHistory } from '../stores/stores';
+  import type { ProblemType, DataPoint } from '../types/types';
   import { problemConfigs } from '../utils/problems';
-  import { gradientDescentStep } from '../utils/gradientDescent';
+  import { optimizers, optimizerOrder, defaultHyper, type OptimizerId } from '../utils/optimizers';
   import {
     TrendingUp,
     TrendingDown,
@@ -34,7 +34,12 @@
     Sigma,
     Target,
     Radio,
-    ScatterChart
+    ScatterChart,
+    Dices,
+    Route,
+    StepForward,
+    Gauge,
+    Layers
   } from 'lucide-svelte';
   
   // Component state
@@ -43,6 +48,7 @@
   
   // Problem selection state
   let showProblemDropdown = false;
+  let showOptimizerDropdown = false;
   
   // Edit state for number steppers
   let editingNumPoints = false;
@@ -79,6 +85,10 @@
   $: learningRate = $trainingStore.learningRate;
   $: totalSteps = $trainingStore.totalSteps;
   $: currentStep = $trainingStore.currentStep;
+  $: batchSize = $trainingStore.batchSize;
+  $: stepsPerSecond = $trainingStore.stepsPerSecond;
+  $: optimizerSel = $optimizerStore;
+  $: currentOptimizer = optimizers[optimizerSel.id];
   
   // Calculate training progress
   $: trainingProgress = isTraining && $historyStore.length > 0 
@@ -96,32 +106,76 @@
     document.documentElement.style.setProperty('--train-percentage', `${normalizedPosition}%`);
   }
 
-  // Same idea for the momentum slider (range 0..0.99)
-  $: if (typeof document !== 'undefined') {
-    const muPct = ($trainingStore.momentum / 0.99) * 100;
-    document.documentElement.style.setProperty('--mu-percentage', `${muPct}%`);
+  /**
+   * Resolve the learning rate to apply when problem or optimizer changes:
+   * adaptive optimizers carry their own γ (they're scale-robust), everyone
+   * else uses the problem's curated default. Always applying it on switch
+   * means a rate tuned for one surface can never silently carry over to
+   * another where it diverges.
+   */
+  function resolveLearningRate(optimizerId: OptimizerId, problemType: ProblemType): number {
+    return optimizers[optimizerId].fixedLearningRate
+      ?? problemConfigs[problemType]?.defaultLearningRate
+      ?? 0.01;
   }
-  
+
+  /** Hyper defaults for an optimizer, honoring the problem's curated μ. */
+  function hyperForProblem(optimizerId: OptimizerId, problemType: ProblemType): Record<string, number> {
+    const hyper = defaultHyper(optimizerId);
+    const mu = problemConfigs[problemType]?.defaultMomentum;
+    if ((optimizerId === 'momentum' || optimizerId === 'nesterov') && mu) {
+      hyper.mu = mu;
+    }
+    return hyper;
+  }
+
   // Handle problem selection
   function selectProblem(type: ProblemType) {
     selectedProblem.set(type);
     showProblemDropdown = false;
-    // Apply per-problem defaults. Momentum always resets (to the problem's
-    // default or 0) so a high-μ value from a previous problem doesn't bleed
-    // into one that prefers plain GD. Learning rate only resets if the
-    // problem explicitly specifies one — otherwise the user keeps theirs.
+    // Problems curated around momentum auto-select the Momentum optimizer
+    // (matching the old behavior where the μ slider was set per problem) —
+    // but only when the user is on a momentum-family/plain method; a
+    // deliberate Adam/RMSProp/AdaGrad choice is respected.
     const cfg = problemConfigs[type];
-    const defaultLr = cfg?.defaultLearningRate;
-    const targetMu = cfg?.defaultMomentum ?? 0;
+    let optimizerId = $optimizerStore.id;
+    if (optimizerId === 'gd' || optimizerId === 'momentum') {
+      optimizerId = (cfg?.defaultMomentum ?? 0) > 0 ? 'momentum' : 'gd';
+    }
+    optimizerStore.set({ id: optimizerId, hyper: hyperForProblem(optimizerId, type) });
     trainingStore.update(store => ({
       ...store,
-      momentum: targetMu,
-      ...(defaultLr !== undefined ? { learningRate: defaultLr } : {})
+      learningRate: resolveLearningRate(optimizerId, type),
+      // Per-problem γ/μ are curated for full-batch gradients; a sticky
+      // batch of 1 can blast a momentum run out of a narrow basin.
+      batchSize: 'all'
     }));
-    velocityStore.set({ a: 0, b: 0 });
-    resetTraining();
-    // Regenerate data for the new problem
+    // Regenerate data for the new problem, then reset on top of it so the
+    // initial history point reflects the new dataset.
     datasetStore.regenerateData();
+    resetTraining();
+  }
+
+  // Handle optimizer selection: keep the marker where it is (comparing
+  // optimizers from the same start is the whole point), reset only the
+  // optimizer's internal state and apply its learning rate.
+  function selectOptimizer(id: OptimizerId) {
+    showOptimizerDropdown = false;
+    if (id === $optimizerStore.id) return;
+    optimizerStore.set({ id, hyper: hyperForProblem(id, $selectedProblem) });
+    resetOptimizerState();
+    divergenceStore.set(null);
+    trainingStore.update(store => ({
+      ...store,
+      learningRate: resolveLearningRate(id, $selectedProblem)
+    }));
+  }
+
+  // Hyperparameter slider change: store the value and restart accumulation
+  // so the new setting takes effect cleanly.
+  function setHyper(key: string, value: number) {
+    optimizerStore.update(sel => ({ ...sel, hyper: { ...sel.hyper, [key]: value } }));
+    resetOptimizerState();
   }
   
   // Handle dataset size change
@@ -157,110 +211,153 @@
     trainingStore.update(store => ({ ...store, totalSteps: value }));
   }
   
-  // Training logic
-  async function startTraining() {
-    if (isTraining) return;
-    
-    isTraining = true;
-    trainingStore.update(store => ({ ...store, isTraining: true }));
-    
-    // Always train for the specified number of steps
-    const stepsToTrain = $trainingStore.totalSteps;
-    let stepsCompleted = 0;
-    
-    // Get the starting step from history to continue from
-    const currentHistory = $historyStore;
-    const startingStep = currentHistory.length > 0 ? currentHistory[currentHistory.length - 1].step : 0;
-    startingStepForProgress = startingStep;
-    
-    // Training loop with animation
+  // Parameters this far outside any visible range mean the run has blown
+  // up: stop, explain, and never feed non-finite values to the charts.
+  const DIVERGENCE_LIMIT = 1e4;
+
+  function hasDiverged(params: { a: number; b: number }, loss: number): boolean {
+    return (
+      !Number.isFinite(params.a) ||
+      !Number.isFinite(params.b) ||
+      !Number.isFinite(loss) ||
+      Math.abs(params.a) > DIVERGENCE_LIMIT ||
+      Math.abs(params.b) > DIVERGENCE_LIMIT
+    );
+  }
+
+  /**
+   * Sample a minibatch for this step. Full batch ('all' or batch ≥ n)
+   * returns the data as-is; otherwise a uniform sample without replacement.
+   * Deliberately unseeded — per-step SGD noise is the phenomenon on display.
+   */
+  function sampleBatch(trainData: DataPoint[]): DataPoint[] {
+    const bs = $trainingStore.batchSize;
+    if (bs === 'all' || bs >= trainData.length) return trainData;
+    const idx = trainData.map((_, i) => i);
+    for (let i = idx.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [idx[i], idx[j]] = [idx[j], idx[i]];
+    }
+    return idx.slice(0, bs).map(i => trainData[i]);
+  }
+
+  /**
+   * One optimizer update: gradient on the (mini)batch, step via the
+   * selected optimizer, record full-batch losses. Shared by the animated
+   * loop and the single-Step button. Returns false when the step diverged
+   * (nothing is committed and the run should stop).
+   */
+  function doOneStep(): boolean {
+    const trainData = $datasetStore.data.filter(point => point.isTraining);
+    if (trainData.length === 0) return false;
+    const testData = $datasetStore.data.filter(point => !point.isTraining);
+    const config = problemConfigs[$selectedProblem];
+    const opt = optimizers[$optimizerStore.id];
+
+    const gradient = config.computeGradient(sampleBatch(trainData), $parametersStore);
+    const result = opt.step(
+      $parametersStore,
+      gradient,
+      $optimizerStateStore,
+      $trainingStore.learningRate,
+      $optimizerStore.hyper
+    );
+
+    // The chart always shows the loss over the full training set, so curve
+    // wobble under small batches reflects parameter noise, not measurement.
+    const trainLoss = config.computeLoss(trainData, result.params);
+    const history = $historyStore;
+    const nextStepNumber = (history.length > 0 ? history[history.length - 1].step : 0) + 1;
+
+    // Divergence check BEFORE committing anything: the marker stays at
+    // its last sane position and the loss chart never sees NaN.
+    if (hasDiverged(result.params, trainLoss)) {
+      divergenceStore.set({ step: nextStepNumber });
+      return false;
+    }
+
+    parametersStore.set(result.params);
+    optimizerStateStore.set(result.state);
+    trainingStore.update(store => ({ ...store, currentStep: nextStepNumber }));
+    historyStore.addPoint({
+      step: nextStepNumber,
+      trainLoss,
+      testLoss: config.computeLoss(testData, result.params),
+      parameters: result.params
+    });
+    return true;
+  }
+
+  // Loop bookkeeping lives at component scope so the speed slider can
+  // rebuild the interval mid-run without losing progress.
+  let stepsToTrain = 0;
+  let stepsCompleted = 0;
+  let runningIntervalSps = 0;
+
+  function startLoop() {
+    if (trainingInterval !== null) clearInterval(trainingInterval);
+    runningIntervalSps = $trainingStore.stepsPerSecond;
+    const intervalMs = Math.max(8, Math.round(1000 / runningIntervalSps));
     trainingInterval = window.setInterval(() => {
-      // Stop when we've completed the requested number of steps
-      if (stepsCompleted >= stepsToTrain) {
+      if (stepsCompleted >= stepsToTrain || !doOneStep()) {
         stopTraining();
         return;
       }
-      
-      // Perform one gradient descent step
-      const trainData = $datasetStore.data.filter(point => point.isTraining);
-      const testData = $datasetStore.data.filter(point => !point.isTraining);
-      const config = problemConfigs[$selectedProblem];
-
-      // Get current parameters
-      const currentParams = $parametersStore;
-
-      // Perform gradient descent (μ = 0 falls back to plain GD)
-      const stepResult = gradientDescentStep(
-        trainData,
-        currentParams,
-        $velocityStore,
-        $trainingStore.learningRate,
-        $trainingStore.momentum,
-        config
-      );
-
-      // Update parameters and velocity
-      parametersStore.set(stepResult.params);
-      velocityStore.set(stepResult.velocity);
-      const newParams = stepResult.params;
-      
-      // Calculate next step number (continue from where we left off)
-      const nextStepNumber = startingStep + stepsCompleted + 1;
-      
-      // Update current step in store for display
-      trainingStore.update(store => ({
-        ...store,
-        currentStep: nextStepNumber
-      }));
-      
-      // Record history with the continuing step count
-      historyStore.addPoint({
-        step: nextStepNumber,
-        trainLoss: config.computeLoss(trainData, newParams),
-        testLoss: config.computeLoss(testData, newParams),
-        parameters: newParams
-      });
-      
       stepsCompleted++;
-    }, 50); // 50ms per step for smooth animation
+    }, intervalMs);
   }
-  
+
+  // Live speed change: rebuild the ticker at the new rate mid-run.
+  $: if (isTraining && stepsPerSecond !== runningIntervalSps) {
+    startLoop();
+  }
+
+  // Training logic
+  function startTraining() {
+    if (isTraining) return;
+
+    isTraining = true;
+    divergenceStore.set(null);
+    trainingStore.update(store => ({ ...store, isTraining: true }));
+
+    stepsToTrain = $trainingStore.totalSteps;
+    stepsCompleted = 0;
+
+    const history = $historyStore;
+    startingStepForProgress = history.length > 0 ? history[history.length - 1].step : 0;
+
+    startLoop();
+  }
+
+  // Single step: same code path as the loop, one click at a time.
+  function stepOnce() {
+    if (isTraining) return;
+    divergenceStore.set(null);
+    doOneStep();
+  }
+
   function stopTraining() {
     if (trainingInterval !== null) {
       clearInterval(trainingInterval);
       trainingInterval = null;
     }
     isTraining = false;
+    runningIntervalSps = 0;
     trainingStore.update(store => ({ ...store, isTraining: false }));
   }
-  
+
   function resetTraining() {
     stopTraining();
     parametersStore.reset();
-    historyStore.reset();
-    velocityStore.set({ a: 0, b: 0 });
+    resetOptimizerState();
+    divergenceStore.set(null);
     trainingStore.update(store => ({
       ...store,
       currentStep: 0,
       isTraining: false
     }));
-    
-    // Re-add initial point to history
-    const { data } = $datasetStore;
-    const parameters = $parametersStore;
-    const problemConfig = problemConfigs[$selectedProblem];
-    
-    if (data.length > 0) {
-      const trainData = data.filter(d => d.isTraining);
-      const testData = data.filter(d => !d.isTraining);
-      
-      historyStore.addPoint({
-        step: 0,
-        trainLoss: problemConfig.computeLoss(trainData, parameters),
-        testLoss: problemConfig.computeLoss(testData, parameters),
-        parameters
-      });
-    }
+    // Restart history at the new initial position (step 0)
+    recordInitialHistory();
   }
   
   // 1-2-5 sequence: two intermediate stops between each decade so the
@@ -291,6 +388,26 @@
     if (rate >= 0.001) return rate.toFixed(3);
     return rate.toFixed(4);
   }
+
+  // Batch size cycles through powers of two, then full batch.
+  const batchSizeSteps: (number | 'all')[] = [1, 2, 4, 8, 16, 32, 'all'];
+
+  function batchIndex(bs: number | 'all'): number {
+    const i = batchSizeSteps.findIndex(v => v === bs);
+    return i === -1 ? batchSizeSteps.length - 1 : i;
+  }
+
+  function nextBatchSize() {
+    const i = Math.min(batchSizeSteps.length - 1, batchIndex(batchSize) + 1);
+    trainingStore.update(store => ({ ...store, batchSize: batchSizeSteps[i] }));
+  }
+
+  function prevBatchSize() {
+    const i = Math.max(0, batchIndex(batchSize) - 1);
+    trainingStore.update(store => ({ ...store, batchSize: batchSizeSteps[i] }));
+  }
+
+  $: batchLabel = batchSize === 'all' ? 'All' : String(batchSize);
   
   // Focus action for inputs
   function focusOnMount(node: HTMLElement) {
@@ -365,14 +482,115 @@
       {/if}
     </div>
   </div>
-  
+
+  <!-- Optimizer -->
+  <div class="control-group">
+    <div class="control-header">
+      <span class="icon"><Route size={18} strokeWidth={2} /></span>
+      <span class="control-label">Optimizer</span>
+      <div class="tooltip-container">
+        <button
+          class="info-btn"
+          on:mouseenter={() => activeTooltip = 'optimizer'}
+          on:mouseleave={() => activeTooltip = null}
+        >
+          <Info size={14} strokeWidth={2} />
+        </button>
+        {#if activeTooltip === 'optimizer'}
+          <div class="tooltip">
+            How each step is computed from the gradient<br/>
+            <span style="opacity: 0.8; font-size: 0.7rem;">Adaptive methods (AdaGrad, RMSProp, Adam) rescale per parameter</span>
+          </div>
+        {/if}
+      </div>
+    </div>
+    <div class="problem-selector" class:open={showOptimizerDropdown}>
+      <button
+        class="problem-button"
+        on:click={() => showOptimizerDropdown = !showOptimizerDropdown}
+      >
+        <span class="problem-preview">
+          <span class="custom-icon optimizer-glyph">∇</span>
+        </span>
+        <span class="problem-name">{currentOptimizer.name}</span>
+        <span class="dropdown-arrow">▼</span>
+      </button>
+
+      {#if showOptimizerDropdown}
+        <div class="problem-dropdown">
+          {#each optimizerOrder as id}
+            <button
+              class="problem-option optimizer-option"
+              class:selected={id === optimizerSel.id}
+              on:click={() => selectOptimizer(id)}
+            >
+              <span class="optimizer-text">
+                <span class="optimizer-name">{optimizers[id].name}</span>
+                <span class="optimizer-desc">{optimizers[id].description}</span>
+              </span>
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </div>
+  </div>
+
+  <!-- Per-optimizer hyperparameters (rendered from the optimizer's spec) -->
+  {#each currentOptimizer.hyperparams as spec (optimizerSel.id + '-' + spec.key)}
+    <div class="control-group">
+      <div class="control-header">
+        <span class="icon"><Rocket size={18} strokeWidth={2} /></span>
+        <label for={'hyper-' + spec.key}>{spec.label} <span class="greek-label"> ({spec.symbol})</span></label>
+        <div class="tooltip-container">
+          <button
+            class="info-btn"
+            on:mouseenter={() => activeTooltip = 'hyper-' + spec.key}
+            on:mouseleave={() => activeTooltip = null}
+          >
+            <Info size={14} strokeWidth={2} />
+          </button>
+          {#if activeTooltip === 'hyper-' + spec.key}
+            <div class="tooltip">{spec.hint}</div>
+          {/if}
+        </div>
+      </div>
+      <div class="slider-container">
+        <div class="slider-value-display">
+          <span class="momentum-value">{(optimizerSel.hyper[spec.key] ?? spec.default).toFixed(spec.step < 0.01 ? 3 : 2)}</span>
+        </div>
+        <input
+          id={'hyper-' + spec.key}
+          class="hyper-slider"
+          type="range"
+          min={spec.min}
+          max={spec.max}
+          step={spec.step}
+          value={optimizerSel.hyper[spec.key] ?? spec.default}
+          style="--fill: {(((optimizerSel.hyper[spec.key] ?? spec.default) - spec.min) / (spec.max - spec.min)) * 100}%"
+          on:input={(e) => setHyper(spec.key, parseFloat(e.currentTarget.value))}
+        />
+        <div class="slider-labels">
+          <span>{spec.min}</span>
+          <span>{spec.max}</span>
+        </div>
+      </div>
+    </div>
+  {/each}
+
   <!-- Data Points -->
   <div class="control-group">
     <div class="control-header">
       <span class="icon"><MapPin size={18} strokeWidth={2} /></span>
       <label for="num-points">Data Points</label>
+      <button
+        class="reroll-btn"
+        title="Generate a new random dataset"
+        on:click={() => datasetStore.reroll()}
+      >
+        <Dices size={15} strokeWidth={2} />
+      </button>
       <div class="tooltip-container">
-        <button 
+        <button
           class="info-btn"
           on:mouseenter={() => activeTooltip = 'dataPoints'}
           on:mouseleave={() => activeTooltip = null}
@@ -403,7 +621,7 @@
           class="stepper-input"
           type="text"
           value={draftNumPoints}
-          on:input={(e) => draftNumPoints = e.target.value.replace(/[^0-9]/g, '')}
+          on:input={(e) => draftNumPoints = e.currentTarget.value.replace(/[^0-9]/g, '')}
           on:blur={() => {
             const parsed = parseInt(draftNumPoints, 10);
             if (!isNaN(parsed)) {
@@ -414,7 +632,7 @@
             editingNumPoints = false;
           }}
           on:keydown={(e) => {
-            if (e.key === 'Enter') e.target.blur();
+            if (e.key === 'Enter') e.currentTarget.blur();
             if (e.key === 'Escape') {
               editingNumPoints = false;
               draftNumPoints = String(numPoints);
@@ -493,7 +711,7 @@
           type="checkbox" 
           checked={randomSplit}
           on:change={(e) => {
-            datasetStore.setRandomSplit(e.target.checked);
+            datasetStore.setRandomSplit(e.currentTarget.checked);
             datasetStore.regenerateData();
           }}
         />
@@ -579,7 +797,7 @@
           class="stepper-input"
           type="text"
           value={draftLearningRate}
-          on:input={(e) => draftLearningRate = e.target.value.replace(/[^0-9.eE\-]/g, '')}
+          on:input={(e) => draftLearningRate = e.currentTarget.value.replace(/[^0-9.eE\-]/g, '')}
           on:blur={() => {
             const parsed = parseFloat(draftLearningRate);
             if (!isNaN(parsed)) {
@@ -589,7 +807,7 @@
             editingLearningRate = false;
           }}
           on:keydown={(e) => {
-            if (e.key === 'Enter') e.target.blur();
+            if (e.key === 'Enter') e.currentTarget.blur();
             if (e.key === 'Escape') {
               editingLearningRate = false;
               draftLearningRate = formatLearningRate(learningRate);
@@ -620,48 +838,87 @@
     </div>
   </div>
   
-  <!-- Momentum -->
+  <!-- Batch Size -->
   <div class="control-group">
     <div class="control-header">
-      <span class="icon"><Rocket size={18} strokeWidth={2} /></span>
-      <label for="momentum">Momentum <span class="greek-label"> (μ)</span></label>
+      <span class="icon"><Layers size={18} strokeWidth={2} /></span>
+      <span class="control-label">Batch Size</span>
       <div class="tooltip-container">
         <button
           class="info-btn"
-          on:mouseenter={() => activeTooltip = 'momentum'}
+          on:mouseenter={() => activeTooltip = 'batch'}
           on:mouseleave={() => activeTooltip = null}
         >
           <Info size={14} strokeWidth={2} />
         </button>
-        {#if activeTooltip === 'momentum'}
+        {#if activeTooltip === 'batch'}
           <div class="tooltip">
-            Heavy-ball momentum carries the marker through flat regions<br/>
-            <span style="opacity: 0.8; font-size: 0.7rem;">v ← μ·v + ∇L,&nbsp; θ ← θ − γ·v &nbsp;(μ = 0 → plain GD)</span>
+            Points sampled per gradient step<br/>
+            <span style="opacity: 0.8; font-size: 0.7rem;">Small batches = noisy, stochastic descent (SGD)</span>
+          </div>
+        {/if}
+      </div>
+    </div>
+    <div class="number-stepper">
+      <button
+        class="stepper-btn"
+        disabled={batchIndex(batchSize) === 0}
+        on:click={prevBatchSize}
+      >
+        −
+      </button>
+      <span class="stepper-value stepper-static">{batchLabel}</span>
+      <button
+        class="stepper-btn"
+        disabled={batchSize === 'all'}
+        on:click={nextBatchSize}
+      >
+        +
+      </button>
+    </div>
+  </div>
+
+  <!-- Speed -->
+  <div class="control-group">
+    <div class="control-header">
+      <span class="icon"><Gauge size={18} strokeWidth={2} /></span>
+      <label for="speed">Speed</label>
+      <div class="tooltip-container">
+        <button
+          class="info-btn"
+          on:mouseenter={() => activeTooltip = 'speed'}
+          on:mouseleave={() => activeTooltip = null}
+        >
+          <Info size={14} strokeWidth={2} />
+        </button>
+        {#if activeTooltip === 'speed'}
+          <div class="tooltip">
+            Animation speed — gradient steps per second
           </div>
         {/if}
       </div>
     </div>
     <div class="slider-container">
       <div class="slider-value-display">
-        <span class="momentum-value">{$trainingStore.momentum.toFixed(2)}</span>
+        <span class="speed-value">{stepsPerSecond} steps/s</span>
       </div>
       <input
-        id="momentum"
+        id="speed"
+        class="hyper-slider"
         type="range"
-        min="0"
-        max="0.99"
-        step="0.01"
-        value={$trainingStore.momentum}
+        min="2"
+        max="60"
+        step="1"
+        value={stepsPerSecond}
+        style="--fill: {((stepsPerSecond - 2) / 58) * 100}%"
         on:input={(e) => {
-          const v = parseFloat((e.target as HTMLInputElement).value);
-          trainingStore.update(s => ({ ...s, momentum: v }));
-          // Reset accumulated velocity so the new μ takes effect cleanly
-          velocityStore.set({ a: 0, b: 0 });
+          const v = parseInt(e.currentTarget.value);
+          trainingStore.update(s => ({ ...s, stepsPerSecond: v }));
         }}
       />
       <div class="slider-labels">
-        <span>Off</span>
-        <span>0.99</span>
+        <span>Slow</span>
+        <span>Fast</span>
       </div>
     </div>
   </div>
@@ -701,7 +958,7 @@
           class="stepper-input"
           type="text"
           value={draftTrainingSteps}
-          on:input={(e) => draftTrainingSteps = e.target.value.replace(/[^0-9]/g, '')}
+          on:input={(e) => draftTrainingSteps = e.currentTarget.value.replace(/[^0-9]/g, '')}
           on:blur={() => {
             const parsed = parseInt(draftTrainingSteps, 10);
             if (!isNaN(parsed)) {
@@ -711,7 +968,7 @@
             editingTrainingSteps = false;
           }}
           on:keydown={(e) => {
-            if (e.key === 'Enter') e.target.blur();
+            if (e.key === 'Enter') e.currentTarget.blur();
             if (e.key === 'Escape') {
               editingTrainingSteps = false;
               draftTrainingSteps = String(totalSteps);
@@ -747,8 +1004,16 @@
   
   <!-- Action Buttons - pinned to bottom -->
   <div class="action-buttons">
-    <button 
-      class="train-button" 
+    <button
+      class="step-button"
+      on:click={stepOnce}
+      disabled={isTraining}
+      title="Single gradient step"
+    >
+      <StepForward size={18} strokeWidth={2} />
+    </button>
+    <button
+      class="train-button"
       class:training={isTraining}
       on:click={isTraining ? stopTraining : startTraining}
       style="--progress: {trainingProgress}%;"
@@ -869,6 +1134,30 @@
     flex-shrink: 0;
     opacity: 0.35;
     margin-left: auto;
+  }
+
+  .reroll-btn {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    color: var(--color-text-tertiary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    opacity: 0.55;
+  }
+
+  .reroll-btn:hover {
+    opacity: 1;
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.1);
+    transform: rotate(-12deg) scale(1.1);
   }
   
   .info-btn:hover {
@@ -1371,31 +1660,100 @@
     font-weight: 600;
   }
 
-  .momentum-value {
+  .momentum-value,
+  .speed-value {
     font-family: 'SF Mono', Monaco, monospace;
     color: #10b981;
     font-weight: 600;
   }
 
-  /* Momentum slider — left (active) side fills with a soft-to-vibrant green
-     gradient as μ grows, suggesting accumulating momentum. The unfilled side
-     is muted so the eye reads the slider value at a glance. */
-  #momentum {
+  /* Hyperparameter sliders — left (active) side fills with a soft-to-vibrant
+     green gradient as the value grows; the unfilled side is muted so the eye
+     reads the slider position at a glance. --fill is set inline per slider. */
+  .hyper-slider {
     background:
       linear-gradient(to right,
         rgba(16, 185, 129, 0.25) 0%,
-        rgba(16, 185, 129, 1.0) var(--mu-percentage, 0%),
-        rgba(127, 127, 127, 0.25) var(--mu-percentage, 0%),
+        rgba(16, 185, 129, 1.0) var(--fill, 0%),
+        rgba(127, 127, 127, 0.25) var(--fill, 0%),
         rgba(127, 127, 127, 0.25) 100%);
   }
 
-  /* Momentum thumb gets a green glow that intensifies with μ — visual cue
+  /* Thumb gets a green glow that intensifies with the value — visual cue
      that the slider is doing something energetic. */
-  #momentum::-webkit-slider-thumb {
+  .hyper-slider::-webkit-slider-thumb {
     border-color: #10b981;
     box-shadow:
       0 2px 4px rgba(0, 0, 0, 0.2),
-      0 0 calc(var(--mu-percentage, 0%) * 0.12) rgba(16, 185, 129, 0.7);
+      0 0 calc(var(--fill, 0%) * 0.12) rgba(16, 185, 129, 0.7);
+  }
+
+  /* Optimizer dropdown rows: name + one-line description */
+  .optimizer-option {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .optimizer-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+  }
+
+  .optimizer-name {
+    font-weight: 600;
+    font-size: 0.8438rem;
+  }
+
+  .optimizer-desc {
+    font-size: 0.7188rem;
+    color: var(--color-text-tertiary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .optimizer-glyph {
+    font-family: 'Times New Roman', Georgia, serif;
+    font-size: 1.25rem;
+    font-weight: 400;
+  }
+
+  .stepper-static {
+    cursor: default;
+  }
+
+  .stepper-static:hover {
+    background: transparent;
+  }
+
+  /* Step button: same footprint as reset, sits left of Train */
+  .step-button {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 2px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-bg-secondary);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .step-button:hover:not(:disabled) {
+    background: var(--color-bg-tertiary);
+    border-color: #10b981;
+    color: #10b981;
+    transform: translateY(-1px);
+  }
+
+  .step-button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
   }
   
   .custom-icon {

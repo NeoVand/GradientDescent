@@ -6,11 +6,12 @@
    */
   
   import { onMount, afterUpdate } from 'svelte';
-  import { selectedProblem } from '../stores/stores';
+  import { selectedProblem, optimizerStore } from '../stores/stores';
+  import { optimizers } from '../utils/optimizers';
   import { BookOpen } from 'lucide-svelte';
   import katex from 'katex';
   import 'katex/dist/katex.min.css';
-  
+
   $: problemType = $selectedProblem;
   
   let modelFormulaElement: HTMLSpanElement;
@@ -22,7 +23,7 @@
   // LaTeX formulas for each problem
   const modelFormulas: Record<string, string> = {
     'linear-regression': String.raw`Y = \alpha X + \beta`,
-    'logistic-regression': String.raw`P(Y\!=\!1) = \frac{1}{1 + \exp(-(\alpha X + \beta Y))}`,
+    'logistic-regression': String.raw`P(C\!=\!1) = \frac{1}{1 + \exp(-(\alpha X + \beta Y))}`,
     'polynomial-regression': String.raw`Y = \alpha X^2 + \beta X`,
     'sine-wave': String.raw`Y = \alpha \sin(\beta X)`,
     'gaussian-peak': String.raw`Y = \exp\!\left(-\frac{(X - \alpha)^2}{2\beta^2}\right)`,
@@ -33,14 +34,14 @@
     'gaussian-mixture': String.raw`Y = e^{-(X - \alpha)^2} + e^{-(X - \beta)^2}`,
     'circle-classifier': String.raw`P(\text{inside}) = \sigma\!\left(\frac{R^2 - (X-\alpha)^2 - (Y-\beta)^2}{\tau}\right)`,
     'source-localization': String.raw`\hat{S} = \frac{K}{(X-\alpha)^2 + (Y-\beta)^2 + \varepsilon}`,
-    'mean-shift': String.raw`\hat{f}(\alpha,\beta) = -\sum_i \exp\!\left(-\frac{(X_i-\alpha)^2 + (Y_i-\beta)^2}{2\sigma^2}\right)`
+    'mean-shift': String.raw`\hat{f}(\alpha,\beta) = \frac{1}{n}\sum_i \exp\!\left(-\frac{(X_i-\alpha)^2 + (Y_i-\beta)^2}{2\sigma^2}\right)`
   };
   
   const parametersFormula = String.raw`(\boldsymbol{\theta} = [\alpha, \beta]^\top)`;
   
   const lossFormulas: Record<string, string> = {
     'linear-regression': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`,
-    'logistic-regression': String.raw`\mathcal{L} = -\frac{1}{n} \sum_{i=1}^{n} \left[ Y_i \log(\hat{Y}_i) + (1-Y_i) \log(1-\hat{Y}_i) \right]`,
+    'logistic-regression': String.raw`\mathcal{L} = -\frac{1}{n} \sum_{i=1}^{n} \left[ C_i \log(\hat{p}_i) + (1-C_i) \log(1-\hat{p}_i) \right]`,
     'polynomial-regression': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`,
     'sine-wave': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`,
     'gaussian-peak': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`,
@@ -49,14 +50,14 @@
     'logistic-growth': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`,
     'power-law': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`,
     'gaussian-mixture': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`,
-    'circle-classifier': String.raw`\mathcal{L} = -\frac{1}{n} \sum_{i=1}^{n} \left[ Y_i \log p_i + (1-Y_i) \log(1-p_i) \right]`,
+    'circle-classifier': String.raw`\mathcal{L} = -\frac{1}{n} \sum_{i=1}^{n} \left[ C_i \log p_i + (1-C_i) \log(1-p_i) \right]`,
     'source-localization': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{S}_i - S_i)^2`,
-    'mean-shift': String.raw`\mathcal{L} = -\frac{1}{n} \sum_{i=1}^{n} \exp\!\left(-\frac{\|\mathbf{p}_i - \boldsymbol{c}\|^2}{2\sigma^2}\right)`
+    'mean-shift': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} \left( 1 - \exp\!\left(-\frac{\|\mathbf{p}_i - \boldsymbol{c}\|^2}{2\sigma^2}\right) \right)`
   };
 
   const gradientFormulas: Record<string, string> = {
     'linear-regression': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} X_i & 1 \end{bmatrix}^\top`,
-    'logistic-regression': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} X_i & Y_i \end{bmatrix}^\top`,
+    'logistic-regression': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{p}_i - C_i) \begin{bmatrix} X_i & Y_i \end{bmatrix}^\top`,
     'polynomial-regression': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} X_i^2 & X_i \end{bmatrix}^\top`,
     'sine-wave': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} \sin(\beta X_i) & \alpha X_i \cos(\beta X_i) \end{bmatrix}^\top`,
     'gaussian-peak': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \hat{Y}_i \begin{bmatrix} \dfrac{X_i - \alpha}{\beta^2} & \dfrac{(X_i - \alpha)^2}{\beta^3} \end{bmatrix}^\top`,
@@ -65,16 +66,16 @@
     'logistic-growth': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \, \hat{Y}_i (1 - \hat{Y}_i) \begin{bmatrix} X_i & 1 \end{bmatrix}^\top`,
     'power-law': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} X_i^{\beta} & \hat{Y}_i \ln X_i \end{bmatrix}^\top`,
     'gaussian-mixture': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{4}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} (X_i - \alpha)\, e^{-(X_i-\alpha)^2} & (X_i - \beta)\, e^{-(X_i-\beta)^2} \end{bmatrix}^\top`,
-    'circle-classifier': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n\tau} \sum_{i=1}^{n} (p_i - Y_i) \begin{bmatrix} X_i - \alpha & Y_i' - \beta \end{bmatrix}^\top`,
+    'circle-classifier': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n\tau} \sum_{i=1}^{n} (p_i - C_i) \begin{bmatrix} X_i - \alpha & Y_i - \beta \end{bmatrix}^\top`,
     'source-localization': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{4}{n} \sum_{i=1}^{n} (\hat{S}_i - S_i) \, \frac{\hat{S}_i}{d_i^2 + \varepsilon} \begin{bmatrix} X_i - \alpha & Y_i' - \beta \end{bmatrix}^\top`,
     'mean-shift': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = -\frac{1}{n\sigma^2} \sum_{i=1}^{n} k_i \begin{bmatrix} X_i - \alpha & Y_i' - \beta \end{bmatrix}^\top`
   };
   
-  const updateFormula = String.raw`\boldsymbol{\theta}^{(t+1)} \leftarrow \boldsymbol{\theta}^{(t)} - \gamma \nabla_{\boldsymbol{\theta}} \mathcal{L}`;
-  
   $: currentModelLatex = modelFormulas[problemType];
   $: currentLossLatex = lossFormulas[problemType];
   $: currentGradientLatex = gradientFormulas[problemType];
+  // The update rule tracks the selected optimizer
+  $: updateFormula = optimizers[$optimizerStore.id].updateRuleLatex;
   
   // Render LaTeX when component mounts or problem changes
   function renderLatex() {

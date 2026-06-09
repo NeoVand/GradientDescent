@@ -69,7 +69,12 @@ export interface TrainingConfig {
   totalSteps: number;
   currentStep: number;
   isTraining: boolean;
-  momentum: number;  // Heavy-ball momentum coefficient (μ). 0 = plain GD.
+  // Gradient is computed on a random sample of this many training points
+  // per step ('all' = full batch). Small batches make the descent path
+  // visibly stochastic — the "S" in SGD.
+  batchSize: number | 'all';
+  // Animation speed of the training loop.
+  stepsPerSecond: number;
 }
 
 // A single point in our training history

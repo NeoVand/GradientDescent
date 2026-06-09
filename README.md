@@ -15,8 +15,13 @@ An interactive visualization tool for understanding gradient descent through bea
 ## ✨ Features
 
 - **Interactive Loss Landscape**: Color-coded heatmap, smooth contour lines, and gradient vector field all in one view
-- **Real-time Training**: Watch gradient descent optimize with animated parameter trails that fade over time
-- **Multiple Problem Types**: Explore linear regression, logistic classification, and polynomial regression
+- **Six Optimizers**: Gradient Descent, Momentum, Nesterov, AdaGrad, RMSProp, and Adam — each with its own hyperparameter sliders and live-updating LaTeX update rule
+- **Real-time Training**: Watch the optimizer descend with animated parameter trails, single-step through updates, and tune the animation speed
+- **Stochastic Gradients**: A batch-size control turns full-batch descent into noisy SGD — watch the path wobble
+- **13 Problem Types**: From linear regression to Gaussian mixtures, source localization, and mean-shift clustering, each with hand-derived analytic gradients
+- **Optimizer X-ray**: Two arrows on the marker show the steepest-descent direction (−∇ℒ) vs. the step the optimizer actually took
+- **Divergence Coaching**: Blow past a stable learning rate and the app stops, explains why, and keeps every chart alive
+- **Reproducible Data**: Seeded generation means sliders deform the same dataset smoothly; a dice button rolls a fresh one
 - **Beautiful LaTeX Formulas**: Professional mathematical notation rendered with KaTeX
 - **Dark/Light Themes**: Elegant emerald-themed interface with seamless theme switching
 - **Educational**: Comprehensive help modal with theory and suggested experiments
@@ -26,8 +31,9 @@ An interactive visualization tool for understanding gradient descent through bea
 Gradient Descent Explorer helps you understand optimization algorithms through visual experimentation:
 
 - **Drag** the orange marker to manually explore parameter space
-- **Train** the model to watch gradient descent find optimal solutions automatically
-- **Experiment** with learning rates, noise levels, and data splits
+- **Train** the model — or **Step** through one update at a time — and watch the optimizer find solutions
+- **Compare** optimizers: switch between GD, Momentum, Nesterov, AdaGrad, RMSProp, and Adam from the same starting point
+- **Experiment** with learning rates, momentum, batch sizes, noise levels, and data splits
 - **Observe** how loss landscapes change with different configurations
 
 > **💡 Tip**: Drag the orange marker on the Loss & Gradient diagram to explore the connection between parameters, the model, and loss in real-time.

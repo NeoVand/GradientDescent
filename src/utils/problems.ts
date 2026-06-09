@@ -10,6 +10,7 @@
  */
 
 import type { ProblemConfig, DataPoint, ModelParameters } from '../types/types';
+import { rand, shuffle } from './rng';
 
 /**
  * Linear Regression
@@ -33,9 +34,9 @@ const linearRegression: ProblemConfig = {
     
     for (let i = 0; i < numPoints; i++) {
       // Generate x values evenly spaced with some jitter
-      const x = (i / (numPoints - 1)) * 4 - 2 + (Math.random() - 0.5) * 0.2;
+      const x = (i / (numPoints - 1)) * 4 - 2 + (rand() - 0.5) * 0.2;
       // Generate y with noise
-      const noise = (Math.random() - 0.5) * noiseLevel * 2;  // Scale noise
+      const noise = (rand() - 0.5) * noiseLevel * 2;  // Scale noise
       const y = trueA * x + trueB + noise;
       
       data.push({
@@ -46,7 +47,7 @@ const linearRegression: ProblemConfig = {
     }
     
     // Shuffle the data to mix training and test points
-    return data.sort(() => Math.random() - 0.5);
+    return shuffle(data);
   },
   
   // Linear model prediction
@@ -89,7 +90,9 @@ const linearRegression: ProblemConfig = {
       a: gradA / data.length,
       b: gradB / data.length
     };
-  }
+  },
+
+  defaultLearningRate: 0.01
 };
 
 /**
@@ -125,8 +128,8 @@ const logisticRegression: ProblemConfig = {
       const centerX = -0.8;
       const centerY = -0.5;
       
-      const x = centerX + (Math.random() - 0.5) * spread;
-      const y = centerY + (Math.random() - 0.5) * spread;
+      const x = centerX + (rand() - 0.5) * spread;
+      const y = centerY + (rand() - 0.5) * spread;
       
       data.push({
         x,
@@ -141,8 +144,8 @@ const logisticRegression: ProblemConfig = {
       const centerX = 0.8;
       const centerY = 0.5;
       
-      const x = centerX + (Math.random() - 0.5) * spread;
-      const y = centerY + (Math.random() - 0.5) * spread;
+      const x = centerX + (rand() - 0.5) * spread;
+      const y = centerY + (rand() - 0.5) * spread;
       
       data.push({
         x,
@@ -152,7 +155,7 @@ const logisticRegression: ProblemConfig = {
       });
     }
     
-    return data.sort(() => Math.random() - 0.5);
+    return shuffle(data);
   },
   
   // Logistic model prediction (probability of class 1)
@@ -209,7 +212,21 @@ const logisticRegression: ProblemConfig = {
       a: gradA / data.length,
       b: gradB / data.length
     };
-  }
+  },
+
+  // With separable clusters BCE has no finite minimum — ‖θ‖ grows forever
+  // toward the max-margin direction (the marker eventually pins to the
+  // frame edge, which is itself a teachable moment). Init at a moderate
+  // radius + γ=0.1 so the default 200-step run reaches a clean boundary
+  // and still ends inside the visible range; the historical corner init
+  // with γ=0.01 crawled and never got there.
+  getInitialParameters: () => {
+    const angle = Math.random() * Math.PI * 2;
+    const radius = 3.5 + Math.random() * 1.5;
+    return { a: radius * Math.cos(angle), b: radius * Math.sin(angle) };
+  },
+
+  defaultLearningRate: 0.1
 };
 
 /**
@@ -233,7 +250,7 @@ const polynomialRegression: ProblemConfig = {
     
     for (let i = 0; i < numPoints; i++) {
       const x = (i / (numPoints - 1)) * 4 - 2;
-      const noise = (Math.random() - 0.5) * noiseLevel * 2;  // Scale noise
+      const noise = (rand() - 0.5) * noiseLevel * 2;  // Scale noise
       const y = trueA * x * x + trueB * x + noise;
       
       data.push({
@@ -243,7 +260,7 @@ const polynomialRegression: ProblemConfig = {
       });
     }
     
-    return data.sort(() => Math.random() - 0.5);
+    return shuffle(data);
   },
   
   predict: (x: number, params: ModelParameters): number => {
@@ -281,7 +298,9 @@ const polynomialRegression: ProblemConfig = {
       a: gradA / data.length,
       b: gradB / data.length
     };
-  }
+  },
+
+  defaultLearningRate: 0.01
 };
 
 /**
@@ -304,14 +323,14 @@ const sineWave: ProblemConfig = {
     const numTrain = Math.floor(numPoints * trainRatio);
 
     for (let i = 0; i < numPoints; i++) {
-      const x = (i / (numPoints - 1)) * 4 - 2 + (Math.random() - 0.5) * 0.05;
-      const noise = (Math.random() - 0.5) * noiseLevel;
+      const x = (i / (numPoints - 1)) * 4 - 2 + (rand() - 0.5) * 0.05;
+      const noise = (rand() - 0.5) * noiseLevel;
       const y = trueA * Math.sin(trueB * x) + noise;
 
       data.push({ x, y, isTraining: i < numTrain });
     }
 
-    return data.sort(() => Math.random() - 0.5);
+    return shuffle(data);
   },
 
   predict: (x: number, params: ModelParameters): number => {
@@ -351,7 +370,9 @@ const sineWave: ProblemConfig = {
       a: gradA / data.length,
       b: gradB / data.length
     };
-  }
+  },
+
+  defaultLearningRate: 0.01
 };
 
 /**
@@ -374,13 +395,13 @@ const gaussianPeak: ProblemConfig = {
     const numTrain = Math.floor(numPoints * trainRatio);
 
     for (let i = 0; i < numPoints; i++) {
-      const x = (i / (numPoints - 1)) * 4 - 2 + (Math.random() - 0.5) * 0.05;
+      const x = (i / (numPoints - 1)) * 4 - 2 + (rand() - 0.5) * 0.05;
       const peak = Math.exp(-((x - trueA) ** 2) / (2 * trueB * trueB));
-      const noise = (Math.random() - 0.5) * noiseLevel * 0.5;
+      const noise = (rand() - 0.5) * noiseLevel * 0.5;
       data.push({ x, y: peak + noise, isTraining: i < numTrain });
     }
 
-    return data.sort(() => Math.random() - 0.5);
+    return shuffle(data);
   },
 
   predict: (x: number, params: ModelParameters): number => {
@@ -465,13 +486,13 @@ const exponentialDecay: ProblemConfig = {
     const numTrain = Math.floor(numPoints * trainRatio);
 
     for (let i = 0; i < numPoints; i++) {
-      const x = (i / (numPoints - 1)) * 4 - 2 + (Math.random() - 0.5) * 0.05;
-      const noise = (Math.random() - 0.5) * noiseLevel * 0.5;
+      const x = (i / (numPoints - 1)) * 4 - 2 + (rand() - 0.5) * 0.05;
+      const noise = (rand() - 0.5) * noiseLevel * 0.5;
       const y = trueA * Math.exp(-trueB * x) + noise;
       data.push({ x, y, isTraining: i < numTrain });
     }
 
-    return data.sort(() => Math.random() - 0.5);
+    return shuffle(data);
   },
 
   predict: (x: number, params: ModelParameters): number => {
@@ -544,13 +565,13 @@ const dampedOscillator: ProblemConfig = {
 
     for (let i = 0; i < numPoints; i++) {
       // t in [0, 4]: standard damped-oscillator time-axis appearance
-      const x = (i / (numPoints - 1)) * 4 + (Math.random() - 0.5) * 0.05;
-      const noise = (Math.random() - 0.5) * noiseLevel * 0.5;
+      const x = (i / (numPoints - 1)) * 4 + (rand() - 0.5) * 0.05;
+      const noise = (rand() - 0.5) * noiseLevel * 0.5;
       const y = Math.exp(-trueA * x) * Math.cos(trueB * x) + noise;
       data.push({ x, y, isTraining: i < numTrain });
     }
 
-    return data.sort(() => Math.random() - 0.5);
+    return shuffle(data);
   },
 
   predict: (x: number, params: ModelParameters): number => {
@@ -618,14 +639,14 @@ const logisticGrowth: ProblemConfig = {
     const numTrain = Math.floor(numPoints * trainRatio);
 
     for (let i = 0; i < numPoints; i++) {
-      const x = (i / (numPoints - 1)) * 4 - 2 + (Math.random() - 0.5) * 0.05;
-      const noise = (Math.random() - 0.5) * noiseLevel * 0.3;
+      const x = (i / (numPoints - 1)) * 4 - 2 + (rand() - 0.5) * 0.05;
+      const noise = (rand() - 0.5) * noiseLevel * 0.3;
       const z = trueA * x + trueB;
       const y = 1 / (1 + Math.exp(-z)) + noise;
       data.push({ x, y, isTraining: i < numTrain });
     }
 
-    return data.sort(() => Math.random() - 0.5);
+    return shuffle(data);
   },
 
   predict: (x: number, params: ModelParameters): number => {
@@ -693,13 +714,13 @@ const powerLaw: ProblemConfig = {
 
     for (let i = 0; i < numPoints; i++) {
       // x in [0.3, 3.5] — strictly positive
-      const x = 0.3 + (i / (numPoints - 1)) * 3.2 + (Math.random() - 0.5) * 0.05;
-      const noise = (Math.random() - 0.5) * noiseLevel * 0.6;
+      const x = 0.3 + (i / (numPoints - 1)) * 3.2 + (rand() - 0.5) * 0.05;
+      const noise = (rand() - 0.5) * noiseLevel * 0.6;
       const y = trueA * Math.pow(x, trueB) + noise;
       data.push({ x, y, isTraining: i < numTrain });
     }
 
-    return data.sort(() => Math.random() - 0.5);
+    return shuffle(data);
   },
 
   predict: (x: number, params: ModelParameters): number => {
@@ -768,13 +789,13 @@ const gaussianMixture: ProblemConfig = {
     const numTrain = Math.floor(numPoints * trainRatio);
 
     for (let i = 0; i < numPoints; i++) {
-      const x = (i / (numPoints - 1)) * 4 - 2 + (Math.random() - 0.5) * 0.05;
-      const noise = (Math.random() - 0.5) * noiseLevel * 0.4;
+      const x = (i / (numPoints - 1)) * 4 - 2 + (rand() - 0.5) * 0.05;
+      const noise = (rand() - 0.5) * noiseLevel * 0.4;
       const y = Math.exp(-Math.pow(x - trueA, 2)) + Math.exp(-Math.pow(x - trueB, 2)) + noise;
       data.push({ x, y, isTraining: i < numTrain });
     }
 
-    return data.sort(() => Math.random() - 0.5);
+    return shuffle(data);
   },
 
   predict: (x: number, params: ModelParameters): number => {
@@ -847,16 +868,16 @@ const circleClassifier: ProblemConfig = {
 
     for (let i = 0; i < numPoints; i++) {
       // Random 2D position in [-2, 2]²
-      const x = (Math.random() - 0.5) * 4;
-      const y = (Math.random() - 0.5) * 4;
+      const x = (rand() - 0.5) * 4;
+      const y = (rand() - 0.5) * 4;
       const dist = Math.sqrt((x - trueCx) ** 2 + (y - trueCy) ** 2);
       // Noisy classification near the boundary
-      const noisyR = CIRCLE_RADIUS + (Math.random() - 0.5) * noiseLevel * 0.4;
+      const noisyR = CIRCLE_RADIUS + (rand() - 0.5) * noiseLevel * 0.4;
       const label = dist < noisyR ? 1 : 0;
       data.push({ x, y, isTraining: i < numTrain, label });
     }
 
-    return data.sort(() => Math.random() - 0.5);
+    return shuffle(data);
   },
 
   predict: (_x: number, _params: ModelParameters): number => 0,
@@ -926,16 +947,16 @@ const sourceLocalization: ProblemConfig = {
     const numTrain = Math.floor(numPoints * trainRatio);
 
     for (let i = 0; i < numPoints; i++) {
-      const x = (Math.random() - 0.5) * 4;
-      const y = (Math.random() - 0.5) * 4;
+      const x = (rand() - 0.5) * 4;
+      const y = (rand() - 0.5) * 4;
       const dist2 = (x - sx) ** 2 + (y - sy) ** 2;
       const trueSignal = SOURCE_K / (dist2 + SOURCE_EPS);
-      const signal = trueSignal + (Math.random() - 0.5) * noiseLevel * 0.5;
+      const signal = trueSignal + (rand() - 0.5) * noiseLevel * 0.5;
       // Stash signal in DataPoint.label (just a numeric scalar field).
       data.push({ x, y, isTraining: i < numTrain, label: signal });
     }
 
-    return data.sort(() => Math.random() - 0.5);
+    return shuffle(data);
   },
 
   predict: (_x: number, _params: ModelParameters): number => 0,
@@ -1007,12 +1028,12 @@ const meanShift: ProblemConfig = {
 
     for (let i = 0; i < numPoints; i++) {
       const c = i < numPoints / 2 ? c1 : c2;
-      const x = c.x + (Math.random() - 0.5) * spread;
-      const y = c.y + (Math.random() - 0.5) * spread;
+      const x = c.x + (rand() - 0.5) * spread;
+      const y = c.y + (rand() - 0.5) * spread;
       data.push({ x, y, isTraining: i < numTrain });
     }
 
-    return data.sort(() => Math.random() - 0.5);
+    return shuffle(data);
   },
 
   predict: (_x: number, _params: ModelParameters): number => 0,
