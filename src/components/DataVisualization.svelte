@@ -461,49 +461,65 @@
     const middleColor = isDarkTheme ? '#1e293b' : '#ffffff';
 
     if (problemType === 'ar2' || problemType === 'ar2-rollout') {
-      // Time series: the dots are the truth, the blue line is the model —
-      // exactly like every curve fit. For AR(2) the model's output is its
-      // one-step prediction x̂_t = α·x_{t−1} + β·x_{t−2}; for the rollout
-      // problem it is the k-step forecast fed on its own output (which
-      // runs off the chart when the fitted dynamics are unstable).
+      // Time series, same interface as every curve fit: green dashed =
+      // the true model's output, blue solid = the current model's. For
+      // AR(2) the output is the one-step prediction x̂_t = α·x_{t−1} +
+      // β·x_{t−2}; for the rollout problem it is the k-step forecast fed
+      // on its own output (which runs off the chart when the fitted
+      // dynamics are unstable).
       const ordered = [...data].sort((p, q) => p.x - q.x);
       if (ordered.length < 3) return;
       const byT = new Map(ordered.map(d => [d.x, d.y]));
-      const pred: { x: number; y: number }[] = [];
+      const yLim = 4 * Math.max(...ordered.map(d => Math.abs(d.y)), 1);
 
-      if (problemType === 'ar2') {
-        for (const d of ordered) {
-          const y1 = byT.get(d.x - 1);
-          const y2 = byT.get(d.x - 2);
-          if (y1 === undefined || y2 === undefined) continue;
-          pred.push({ x: d.x, y: parameters.a * y1 + parameters.b * y2 });
+      const series = (p: ModelParameters): { x: number; y: number }[] => {
+        const pred: { x: number; y: number }[] = [];
+        if (problemType === 'ar2') {
+          for (const d of ordered) {
+            const y1 = byT.get(d.x - 1);
+            const y2 = byT.get(d.x - 2);
+            if (y1 === undefined || y2 === undefined) continue;
+            pred.push({ x: d.x, y: p.a * y1 + p.b * y2 });
+          }
+        } else {
+          // Free-run from the first two observations; stop once the
+          // forecast leaves the data's neighborhood so coords stay sane.
+          let y2 = ordered[0].y;
+          let y1 = ordered[1].y;
+          const lastT = ordered[ordered.length - 1].x;
+          for (let t = ordered[1].x + 1; t <= lastT; t++) {
+            const y = p.a * y1 + p.b * y2;
+            if (!Number.isFinite(y) || Math.abs(y) > yLim) break;
+            pred.push({ x: t, y });
+            y2 = y1;
+            y1 = y;
+          }
         }
-      } else {
-        // Free-run from the first two observations; stop once the forecast
-        // leaves the neighborhood of the data so SVG coords stay sane.
-        const yLim = 4 * Math.max(...ordered.map(d => Math.abs(d.y)), 1);
-        let y2 = ordered[0].y;
-        let y1 = ordered[1].y;
-        const lastT = ordered[ordered.length - 1].x;
-        for (let t = ordered[1].x + 1; t <= lastT; t++) {
-          const y = parameters.a * y1 + parameters.b * y2;
-          if (!Number.isFinite(y) || Math.abs(y) > yLim) break;
-          pred.push({ x: t, y });
-          y2 = y1;
-          y1 = y;
-        }
-      }
+        return pred;
+      };
 
       const predLine = d3.line<{ x: number; y: number }>()
         .x(d => xScale(d.x))
         .y(d => yScale(d.y));
+
+      // The true model (dashed) — same style as every regression fit
       g.append('path')
-        .datum(pred)
+        .datum(series(problemConfig.trueParameters))
+        .attr('fill', 'none')
+        .attr('stroke', '#10b981')
+        .attr('stroke-width', 2)
+        .attr('stroke-dasharray', '8,4')
+        .attr('d', predLine)
+        .style('opacity', 0.6);
+
+      // The current model
+      g.append('path')
+        .datum(series(parameters))
         .attr('fill', 'none')
         .attr('stroke', '#3b82f6')
-        .attr('stroke-width', 2.5)
+        .attr('stroke-width', 3)
         .attr('d', predLine)
-        .style('opacity', 0.95);
+        .style('opacity', 1);
       return;
     }
 
