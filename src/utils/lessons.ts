@@ -122,12 +122,12 @@ export const lessons: Lesson[] = [
     id: 'trap',
     title: 'The trap',
     intro:
-      'A double well: two valleys, the left one deeper (toggle Basins ▦ to see the two territories). The marker starts on the right rim.',
+      'A double well: two valleys, the left one deeper — the map button in the landscape header colors their two territories. The marker starts on the right rim.',
     question: 'Two valleys; the left one is deeper. Starting on the RIGHT rim, gradient descent ends up…',
     options: ['In the deep left valley — it finds the best', 'In the shallow right valley', 'Bouncing between both'],
     correctIndex: 1,
     explain:
-      'GD only ever rolls downhill, so it commits to whichever valley it starts above — it cannot climb the barrier to check the other one. Where you start decides where you finish. (Toggle Basins to see the two territories.)',
+      'GD only ever rolls downhill, so it commits to whichever valley it starts above — it cannot climb the barrier to check the other one. Where you start decides where you finish. (The map button in the landscape header shows the two territories.)',
     setup: () =>
       scenario({
         problem: 'double-well-1d',
@@ -202,7 +202,7 @@ export const lessons: Lesson[] = [
     id: 'narrow-valley',
     title: 'The banana valley',
     intro:
-      "Rosenbrock's banana valley: the classic torture test. The walls are ~2500× steeper than the floor (the Curvature lens ◎ shows κ).",
+      "Rosenbrock's banana valley: the classic torture test. The walls are ~2500× steeper than the floor — the curvature-lens button in the landscape header reads out κ.",
     question:
       'Rosenbrock: reaching the curved valley is easy, but its floor is ~2500× shallower than its walls. Plain GD with a safe γ will…',
     options: ['March straight down the floor to the minimum', 'Drop in fast, then crawl along the floor', 'Refuse to enter the valley'],

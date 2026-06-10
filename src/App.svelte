@@ -80,6 +80,18 @@ import CoursePanel from './components/CoursePanel.svelte';
   // Desktop tool corner: collapsed to one button by default
   let toolsOpen = false;
 
+  // Problem switches redraw every panel at once — a brief veil washing
+  // out over the new scene turns the hard cut into a gentle transition.
+  let problemVeil = false;
+  let lastProblemSeen = '';
+  $: {
+    const t = $currentProblemConfig?.type ?? '';
+    if (t !== lastProblemSeen) {
+      if (lastProblemSeen) problemVeil = true;
+      lastProblemSeen = t;
+    }
+  }
+
   // ---------- Share popover ----------
   let showSharePopover = false;
   let challengeTarget = 100;
@@ -235,6 +247,9 @@ import CoursePanel from './components/CoursePanel.svelte';
 
     <!-- Main content area with our visualizations -->
     <div class="main-content">
+      {#if problemVeil}
+        <div class="problem-veil" aria-hidden="true" on:animationend={() => (problemVeil = false)}></div>
+      {/if}
       <!-- Top row: Data visualization and Loss landscape; analytic surfaces
            have no data, so the landscape takes the whole row -->
       <div class="top-row" class:single={isAnalytic}>
@@ -516,6 +531,23 @@ import CoursePanel from './components/CoursePanel.svelte';
     flex-direction: column;
     gap: var(--gap);
     min-height: 0;
+    position: relative;
+  }
+
+  /* Gentle wash over the plots while a new problem paints underneath */
+  .problem-veil {
+    position: absolute;
+    inset: 0;
+    background: var(--color-bg-primary);
+    z-index: 40;
+    pointer-events: none;
+    border-radius: 8px;
+    animation: veilFade 0.45s ease forwards;
+  }
+
+  @keyframes veilFade {
+    from { opacity: 0.92; }
+    to   { opacity: 0; }
   }
   
   /* Top row with data viz and loss landscape */

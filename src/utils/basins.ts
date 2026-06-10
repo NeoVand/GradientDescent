@@ -65,7 +65,8 @@ export function basinKey(
   data: DataPoint[],
   range: { min: number; max: number },
   learningRate: number,
-  oneParam: boolean
+  oneParam: boolean,
+  res: number
 ): string {
   return [
     problemType,
@@ -73,7 +74,8 @@ export function basinKey(
     learningRate.toPrecision(3),
     range.min,
     range.max,
-    oneParam ? '1d' : '2d'
+    oneParam ? '1d' : '2d',
+    res
   ].join('|');
 }
 
@@ -161,7 +163,7 @@ export function ensureBasins(
   oneParam: boolean,
   res: number = 96
 ): void {
-  const key = basinKey(problemType, trainData, range, learningRate, oneParam);
+  const key = basinKey(problemType, trainData, range, learningRate, oneParam, res);
 
   const cached = cache.get(key);
   if (cached) {

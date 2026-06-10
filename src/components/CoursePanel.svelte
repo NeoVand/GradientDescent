@@ -22,6 +22,7 @@
     restartCourse
   } from '../utils/lessons';
   import { GraduationCap, X, ArrowRight, RotateCcw, ChevronLeft, ChevronRight, Play, Eye } from 'lucide-svelte';
+  import { fly } from 'svelte/transition';
 
   $: cs = $courseStore;
   $: lesson = lessons[Math.min(cs.idx, lessons.length - 1)];
@@ -131,6 +132,8 @@
         {/each}
       </div>
 
+      {#key cs.idx}
+      <div class="lesson-body" in:fly={{ y: 10, duration: 260 }}>
       {#if cs.phase === 'setup'}
         <p class="body-text">{lesson.intro}</p>
         <div class="cta-row">
@@ -183,6 +186,8 @@
           </p>
         {/if}
       {/if}
+      </div>
+      {/key}
 
       <div class="card-footer">
         <button
@@ -233,7 +238,7 @@
     position: fixed;
     top: 50%;
     left: 50%;
-    width: min(94vw, 480px);
+    width: min(92vw, 400px);
     border-radius: 12px;
     border: 1px solid var(--color-border);
     padding: 0.7rem 0.85rem 0.6rem;

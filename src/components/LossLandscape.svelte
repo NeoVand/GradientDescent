@@ -162,6 +162,9 @@
 
   // Keep the basin map in sync with the visible scenario while the toggle
   // is on (debounced + cached inside ensureBasins).
+  // Resolution by cost: analytic surfaces evaluate in nanoseconds, so
+  // they get a fine grid (smoother basin boundaries); data problems pay
+  // n× per gradient and stay a step coarser.
   $: if (basinsOn && scene && problemConfig) {
     ensureBasins(
       problemConfig.type,
@@ -169,7 +172,7 @@
       parameterRange,
       learningRate,
       oneParam,
-      oneParam ? 192 : 96
+      oneParam ? 280 : problemConfig.noData ? 180 : 128
     );
   }
 
