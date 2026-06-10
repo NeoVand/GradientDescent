@@ -1,0 +1,6 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Maskable PWA icon: full-bleed background, glyph inside the safe zone -->
+  <rect width="512" height="512" fill="#0a1218" />
+  <rect x="22" y="22" width="468" height="468" rx="104" fill="#10b981" opacity="0.12" />
+  <text x="256" y="368" font-family="'Times New Roman', Georgia, serif" font-size="340" font-style="italic" fill="#10b981" text-anchor="middle">∂</text>
+</svg>

@@ -26,7 +26,6 @@ import {
   recordInitialHistory,
   lossSceneStore,
   raceStore,
-  landscapeViewStore,
   showCoach,
   clearCoach,
   courseStore,
@@ -396,8 +395,6 @@ export function startRace() {
   stopRace();
   runEndStore.set(null);
   divergenceStore.set(null);
-  // Trails render in the 2D view
-  landscapeViewStore.set('2d');
 
   const start = get(parametersStore);
   const racers: Racer[] = RACE_LINEUP.map(({ id, color }) => ({

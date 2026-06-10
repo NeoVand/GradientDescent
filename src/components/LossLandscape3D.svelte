@@ -28,7 +28,9 @@
     resetOptimizerState,
     divergenceStore,
     clearCoach,
-    type LossScene
+    raceStore,
+    type LossScene,
+    type RaceState
   } from '../stores/stores';
   import { sampleLoss, normalizedLogLoss, viridisRGB } from '../utils/lossGrid';
   import type { TrainingHistoryPoint } from '../types/types';
@@ -244,6 +246,72 @@
     pathTube = new THREE.Mesh(geo, mat);
     pathTube.renderOrder = 10;
     scene3.add(pathTube);
+  }
+
+  /**
+   * Race trails: one colored line per racer riding the surface, with a
+   * small head sphere — the 3D mirror of the 2D race layer. Lines (not
+   * tubes) keep the per-tick rebuild cheap.
+   */
+  let raceGroup: THREE.Group | null = null;
+
+  function disposeRaceGroup() {
+    if (!raceGroup) return;
+    scene3.remove(raceGroup);
+    raceGroup.traverse(obj => {
+      const mesh = obj as THREE.Mesh;
+      if (mesh.geometry) mesh.geometry.dispose();
+      const mat = mesh.material as THREE.Material | THREE.Material[] | undefined;
+      if (Array.isArray(mat)) mat.forEach(m => m.dispose());
+      else mat?.dispose();
+    });
+    raceGroup = null;
+  }
+
+  function buildRaceTrails(rs: RaceState | null) {
+    disposeRaceGroup();
+    if (!currentScene || !rs) return;
+    raceGroup = new THREE.Group();
+    const { min, max } = currentScene.range;
+
+    for (const racer of rs.racers) {
+      const pts: THREE.Vector3[] = [];
+      for (const p of racer.trail) {
+        const a = Math.max(min, Math.min(max, p.a));
+        const b = Math.max(min, Math.min(max, p.b));
+        if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+        pts.push(new THREE.Vector3(toX(a), heightAt(a, b) + 0.015, toZ(b)));
+      }
+      if (pts.length >= 2) {
+        const geo = new THREE.BufferGeometry().setFromPoints(pts);
+        const mat = new THREE.LineBasicMaterial({
+          color: new THREE.Color(racer.color),
+          transparent: true,
+          opacity: racer.diverged ? 0.3 : 0.9,
+          depthTest: false,
+          depthWrite: false
+        });
+        const line = new THREE.Line(geo, mat);
+        line.renderOrder = 9;
+        raceGroup.add(line);
+      }
+      if (pts.length > 0) {
+        const head = new THREE.Mesh(
+          new THREE.SphereGeometry(racer.finished ? 0.024 : 0.019, 12, 8),
+          new THREE.MeshBasicMaterial({
+            color: new THREE.Color(racer.color),
+            transparent: true,
+            opacity: racer.diverged ? 0.35 : 1,
+            depthTest: false,
+            depthWrite: false
+          })
+        );
+        head.renderOrder = 11;
+        head.position.copy(pts[pts.length - 1]);
+        raceGroup.add(head);
+      }
+    }
+    scene3.add(raceGroup);
   }
 
   function updateMarker() {
@@ -502,6 +570,9 @@
       historyStore.subscribe(h => {
         if (currentScene) buildPath(h);
       }),
+      raceStore.subscribe(rs => {
+        if (currentScene) buildRaceTrails(rs);
+      }),
       themeStore.subscribe(t => {
         applyTheme(t);
         buildLabels(t);
@@ -579,6 +650,7 @@
     cancelAnimationFrame(raf);
     for (const u of unsubs) u();
     disposeGizmo();
+    disposeRaceGroup();
     if (scene3) {
       scene3.traverse(obj => {
         const mesh = obj as THREE.Mesh;
