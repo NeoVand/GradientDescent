@@ -6,6 +6,9 @@
 
 // Supported machine learning problems
 export type ProblemType =
+  | 'slope-1d'
+  | 'double-well-1d'
+  | 'bumpy-1d'
   | 'linear-regression'
   | 'logistic-regression'
   | 'polynomial-regression'
@@ -19,6 +22,7 @@ export type ProblemType =
   | 'circle-classifier'
   | 'source-localization'
   | 'mean-shift'
+  | 'tiny-net'
   | 'rosenbrock'
   | 'saddle-point'
   | 'himmelblau';
@@ -49,6 +53,10 @@ export interface ProblemConfig {
   // Pure analytic surfaces: the loss is f(α, β) directly with no dataset.
   // The Data panel and dataset controls hide; loss/gradient ignore `data`.
   noData?: boolean;
+  // One-parameter problems: the loss depends on α only (∂ℒ/∂β ≡ 0). The
+  // landscape renders as a loss-vs-α curve — the first rung of the ladder
+  // before 2D surfaces — and β is frozen at 0.
+  oneParam?: boolean;
   trueParameters: ModelParameters; // The true underlying model parameters
   generateData: (numPoints: number, trainRatio: number, noiseLevel?: number) => DataPoint[];
   predict: (x: number, params: ModelParameters) => number;

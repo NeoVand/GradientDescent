@@ -13,6 +13,136 @@ import type { ProblemConfig, DataPoint, ModelParameters } from '../types/types';
 import { rand, shuffle } from './rng';
 
 /**
+ * ---------- One-parameter problems (oneParam) ----------
+ * The first rung of the ladder: loss depends on α only, so the whole
+ * landscape is a single curve and "gradient" is just the slope. β is
+ * frozen at 0 (∂ℒ/∂β ≡ 0 everywhere).
+ */
+
+/**
+ * Fit a Slope — y = αx through the origin. One parameter, one parabola:
+ * the cleanest possible picture of step = −γ · slope.
+ */
+const slopeFit: ProblemConfig = {
+  type: 'slope-1d',
+  name: 'Fit a Slope',
+  description: 'One parameter: the slope of a line through the origin',
+  tagline: 'One parameter, one parabola — each step is literally −γ × slope.',
+  oneParam: true,
+  trueParameters: { a: 1.8, b: 0 },
+
+  generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
+    const trueA = slopeFit.trueParameters.a;
+    const data: DataPoint[] = [];
+    const numTrain = Math.floor(numPoints * trainRatio);
+
+    for (let i = 0; i < numPoints; i++) {
+      const x = (i / (numPoints - 1)) * 4 - 2 + (rand() - 0.5) * 0.2;
+      const noise = (rand() - 0.5) * noiseLevel * 2;
+      data.push({ x, y: trueA * x + noise, isTraining: i < numTrain });
+    }
+
+    return shuffle(data);
+  },
+
+  predict: (x: number, params: ModelParameters): number => params.a * x,
+
+  computeLoss: (data: DataPoint[], params: ModelParameters): number => {
+    if (data.length === 0) return 0;
+    let total = 0;
+    for (const p of data) {
+      const err = params.a * p.x - p.y;
+      total += err * err;
+    }
+    return total / data.length;
+  },
+
+  computeGradient: (data: DataPoint[], params: ModelParameters): ModelParameters => {
+    if (data.length === 0) return { a: 0, b: 0 };
+    let gA = 0;
+    for (const p of data) {
+      gA += 2 * (params.a * p.x - p.y) * p.x;
+    }
+    return { a: gA / data.length, b: 0 };
+  },
+
+  // Start near either edge of the curve so a full descent is visible.
+  getInitialParameters: () => ({
+    a: Math.random() < 0.5 ? -3.4 + Math.random() * 0.9 : 5.5 + Math.random() * 0.9,
+    b: 0
+  }),
+
+  defaultLearningRate: 0.05,
+  parameterRange: { min: -4, max: 7 }
+};
+
+/**
+ * Double Well — f(α) = (α²−4)²/8 + 0.6α + 1.3. Two valleys, tilted so one
+ * is deeper: the simplest possible local-minimum trap.
+ * Stationary points: global min α ≈ −2.14, barrier α ≈ 0.31, local min α ≈ 1.84.
+ */
+const doubleWell1D: ProblemConfig = {
+  type: 'double-well-1d',
+  name: 'Double Well',
+  description: 'Two valleys, one deeper — the simplest local-minimum trap',
+  tagline: 'Two valleys, one deeper. Gradient descent only ever rolls downhill.',
+  oneParam: true,
+  noData: true,
+  trueParameters: { a: -2.14, b: 0 },
+  generateData: (_n: number, _r: number, _noise?: number): DataPoint[] => [],
+  predict: () => 0,
+
+  computeLoss: (_data: DataPoint[], p: ModelParameters): number => {
+    const u = p.a * p.a - 4;
+    return (u * u) / 8 + 0.6 * p.a + 1.3;
+  },
+
+  computeGradient: (_data: DataPoint[], p: ModelParameters): ModelParameters => {
+    return { a: (p.a * (p.a * p.a - 4)) / 2 + 0.6, b: 0 };
+  },
+
+  // Either rim: from the right the marker falls into the shallow trap,
+  // from the left it finds the true bottom.
+  getInitialParameters: () => ({
+    a: (Math.random() < 0.5 ? -1 : 1) * (2.6 + Math.random() * 0.7),
+    b: 0
+  }),
+
+  defaultLearningRate: 0.1,
+  parameterRange: { min: -3.5, max: 3.5 }
+};
+
+/**
+ * Bumpy Valley — f(α) = 0.15α² + sin(2α) + 1.4. A parabola with ripples:
+ * four local minima in view (global at α ≈ −0.8), so most starts get stuck
+ * partway down. Momentum can roll through the small bumps.
+ */
+const bumpyValley1D: ProblemConfig = {
+  type: 'bumpy-1d',
+  name: 'Bumpy Valley',
+  description: 'A rippled bowl with several local minima',
+  tagline: 'Four dips, one true bottom — most starting points find the wrong one.',
+  oneParam: true,
+  noData: true,
+  trueParameters: { a: -0.8, b: 0 },
+  generateData: (_n: number, _r: number, _noise?: number): DataPoint[] => [],
+  predict: () => 0,
+
+  computeLoss: (_data: DataPoint[], p: ModelParameters): number => {
+    return 0.15 * p.a * p.a + Math.sin(2 * p.a) + 1.4;
+  },
+
+  computeGradient: (_data: DataPoint[], p: ModelParameters): ModelParameters => {
+    return { a: 0.3 * p.a + 2 * Math.cos(2 * p.a), b: 0 };
+  },
+
+  getInitialParameters: () => ({ a: -5.5 + Math.random() * 11, b: 0 }),
+
+  defaultLearningRate: 0.05,
+  parameterRange: { min: -6, max: 6 }
+};
+
+/**
  * Linear Regression
  * The simplest problem: fitting a line y = ax + b to data points
  * Loss function: Mean Squared Error (MSE)
@@ -1093,6 +1223,77 @@ const meanShift: ProblemConfig = {
 };
 
 /**
+ * Tiny Neural Net
+ * ŷ = β · tanh(α · X): a REAL neural network with one hidden tanh unit —
+ * α is the input weight, β the output weight. Tiny, but it already shows
+ * the genuine pathologies of deep learning in miniature:
+ *  - (α, β) ↔ (−α, −β) symmetry → two mirror-image global minima
+ *  - the origin is an exact saddle: zero-init produces zero gradient
+ *    (the classic "why we randomly initialize" lesson)
+ *  - large |α| saturates the tanh and its gradient vanishes
+ */
+const tinyNet: ProblemConfig = {
+  type: 'tiny-net',
+  name: 'Tiny Neural Net',
+  description: 'A real neural network with one hidden tanh unit',
+  tagline: 'A real neural net in miniature — mirror minima, and a dead saddle at zero-init.',
+  trueParameters: { a: 1.2, b: 1.5 },
+
+  generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
+    const trueA = tinyNet.trueParameters.a;
+    const trueB = tinyNet.trueParameters.b;
+    const data: DataPoint[] = [];
+    const numTrain = Math.floor(numPoints * trainRatio);
+
+    for (let i = 0; i < numPoints; i++) {
+      const x = (i / (numPoints - 1)) * 4 - 2 + (rand() - 0.5) * 0.05;
+      const noise = (rand() - 0.5) * noiseLevel * 0.5;
+      data.push({ x, y: trueB * Math.tanh(trueA * x) + noise, isTraining: i < numTrain });
+    }
+
+    return shuffle(data);
+  },
+
+  predict: (x: number, params: ModelParameters): number => {
+    return params.b * Math.tanh(params.a * x);
+  },
+
+  computeLoss: (data: DataPoint[], params: ModelParameters): number => {
+    if (data.length === 0) return 0;
+    let total = 0;
+    for (const p of data) {
+      const err = params.b * Math.tanh(params.a * p.x) - p.y;
+      total += err * err;
+    }
+    return total / data.length;
+  },
+
+  computeGradient: (data: DataPoint[], params: ModelParameters): ModelParameters => {
+    if (data.length === 0) return { a: 0, b: 0 };
+    let gA = 0, gB = 0;
+    for (const p of data) {
+      const t = Math.tanh(params.a * p.x);
+      const err = params.b * t - p.y;
+      // d(pred)/d(α) = β·(1−tanh²(αx))·x;  d(pred)/d(β) = tanh(αx)
+      gA += 2 * err * params.b * (1 - t * t) * p.x;
+      gB += 2 * err * t;
+    }
+    return { a: gA / data.length, b: gB / data.length };
+  },
+
+  // Random angle at a healthy radius: away from the dead saddle at the
+  // origin and from the saturated rim, landing in either mirror basin.
+  getInitialParameters: () => {
+    const angle = Math.random() * Math.PI * 2;
+    const radius = 2.0 + Math.random() * 0.7;
+    return { a: radius * Math.cos(angle), b: radius * Math.sin(angle) };
+  },
+
+  defaultLearningRate: 0.1,
+  parameterRange: { min: -3, max: 3 }
+};
+
+/**
  * ---------- Pure analytic surfaces (noData) ----------
  * The classic optimizer test functions: no dataset, the loss IS f(α, β).
  * They slot into the same ProblemConfig shape — generateData returns
@@ -1225,6 +1426,9 @@ const himmelblau: ProblemConfig = {
 
 // Export all problem configurations
 export const problemConfigs: Record<string, ProblemConfig> = {
+  'slope-1d': slopeFit,
+  'double-well-1d': doubleWell1D,
+  'bumpy-1d': bumpyValley1D,
   'linear-regression': linearRegression,
   'logistic-regression': logisticRegression,
   'polynomial-regression': polynomialRegression,
@@ -1238,6 +1442,7 @@ export const problemConfigs: Record<string, ProblemConfig> = {
   'circle-classifier': circleClassifier,
   'source-localization': sourceLocalization,
   'mean-shift': meanShift,
+  'tiny-net': tinyNet,
   'rosenbrock': rosenbrock,
   'saddle-point': saddlePoint,
   'himmelblau': himmelblau

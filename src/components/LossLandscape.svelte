@@ -32,6 +32,7 @@
   import { optimizers } from '../utils/optimizers';
   import type { ModelParameters } from '../types/types';
   import { Mountain } from 'lucide-svelte';
+  import LossCurve1D from './LossCurve1D.svelte';
 
   // Component references
   let svgElement: SVGSVGElement | null = null;
@@ -61,6 +62,9 @@
   $: theme = $themeStore;
   $: scene = $lossSceneStore;
   $: parameterRange = scene?.range ?? problemConfig?.parameterRange ?? defaultParameterRange;
+  // One-parameter problems render as a loss-vs-α curve; the 2D/3D toggle
+  // doesn't apply (there is no β axis).
+  $: oneParam = problemConfig?.oneParam ?? false;
 
   $: if (scene) {
     minLossValue = scene.grid.visMin;
@@ -77,7 +81,8 @@
     params: typeof parameters,
     config: typeof problemConfig
   ): ModelParameters | null {
-    if (!config || train.length === 0) return null;
+    // Analytic surfaces have no data but a perfectly good gradient.
+    if (!config || (train.length === 0 && !config.noData)) return null;
     return config.computeGradient(train, params);
   }
 
@@ -90,6 +95,14 @@
     if (!Number.isFinite(v)) return '—';
     if (v === 0) return '0';
     return v >= 0.01 ? v.toFixed(3) : v.toExponential(1);
+  }
+
+  /** Signed variant for the 1D slope readout. */
+  function fmtSlope(v: number): string {
+    if (!Number.isFinite(v)) return '—';
+    if (v === 0) return '0';
+    const s = Math.abs(v) >= 0.01 ? Math.abs(v).toFixed(3) : Math.abs(v).toExponential(1);
+    return (v < 0 ? '−' : '') + s;
   }
 
   // Full redraw whenever the cached scene or the theme changes (both cheap:
@@ -719,20 +732,24 @@
         <Mountain size={20} strokeWidth={2} />
         <span>Loss & Gradient</span>
       </h2>
-      <div class="view-toggle" role="group" aria-label="Landscape view">
-        <button
-          class:active={view === '2d'}
-          on:click={() => landscapeViewStore.set('2d')}
-        >2D</button>
-        <button
-          class:active={view === '3d'}
-          on:click={() => landscapeViewStore.set('3d')}
-        >3D</button>
-      </div>
+      {#if !oneParam}
+        <div class="view-toggle" role="group" aria-label="Landscape view">
+          <button
+            class:active={view === '2d'}
+            on:click={() => landscapeViewStore.set('2d')}
+          >2D</button>
+          <button
+            class:active={view === '3d'}
+            on:click={() => landscapeViewStore.set('3d')}
+          >3D</button>
+        </div>
+      {/if}
     </div>
   </div>
   <div class="svg-container" bind:this={containerEl}>
-    {#if view === '3d'}
+    {#if oneParam}
+      <LossCurve1D {width} {height} {margin} />
+    {:else if view === '3d'}
       <!-- Inset to the same margins as the 2D plot frame, so the 3D window
            aligns exactly with the Data panel and the 2D view. -->
       <div
@@ -748,8 +765,12 @@
     {/if}
     <div class="readout" style="left: {margin.left + 8}px; top: {margin.top + 8}px;">
       <span class="readout-item"><em>α</em> {fmtParam(parameters.a)}</span>
-      <span class="readout-item"><em>β</em> {fmtParam(parameters.b)}</span>
-      <span class="readout-item"><em>‖∇ℒ‖</em> {fmtMag(gradMag)}</span>
+      {#if oneParam}
+        <span class="readout-item"><em>dℒ/dα</em> {fmtSlope(currentGradient?.a ?? 0)}</span>
+      {:else}
+        <span class="readout-item"><em>β</em> {fmtParam(parameters.b)}</span>
+        <span class="readout-item"><em>‖∇ℒ‖</em> {fmtMag(gradMag)}</span>
+      {/if}
     </div>
     <!-- Loss color key: vertical, tucked into the bottom-right corner -->
     <div class="loss-key" style="right: {margin.right + 8}px; bottom: {margin.bottom + 8}px;">
@@ -758,7 +779,7 @@
       <div class="vbar"></div>
       <span class="key-val">{minLossValue.toFixed(2)}</span>
     </div>
-    {#if view === '2d'}
+    {#if view === '2d' || oneParam}
       <!-- Marker-arrow key, bottom-left corner -->
       <div class="vec-key" style="left: {margin.left + 8}px; bottom: {margin.bottom + 8}px;">
         <span class="vec-item" title="Steepest-descent direction at the marker: −∇ℒ, straight downhill">
@@ -775,6 +796,14 @@
           </svg>
           <span>Δθ</span>
         </span>
+        {#if oneParam}
+          <span class="vec-item" title="Where one plain gradient-descent step would land: α − γ·dℒ/dα">
+            <svg width="20" height="10" viewBox="0 0 20 10" aria-hidden="true">
+              <circle cx="10" cy="5" r="4" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="2.5,2" />
+            </svg>
+            <span>next GD step</span>
+          </span>
+        {/if}
       </div>
     {/if}
     {#if race}

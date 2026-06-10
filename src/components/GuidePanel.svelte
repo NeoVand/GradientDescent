@@ -8,6 +8,7 @@
   import { onMount, afterUpdate } from 'svelte';
   import { selectedProblem, optimizerStore } from '../stores/stores';
   import { optimizers } from '../utils/optimizers';
+  import { problemConfigs } from '../utils/problems';
   import { BookOpen } from 'lucide-svelte';
   import katex from 'katex';
   import 'katex/dist/katex.min.css';
@@ -22,6 +23,10 @@
   
   // LaTeX formulas for each problem
   const modelFormulas: Record<string, string> = {
+    'slope-1d': String.raw`Y = \alpha X`,
+    'double-well-1d': String.raw`\text{pure surface}`,
+    'bumpy-1d': String.raw`\text{pure surface}`,
+    'tiny-net': String.raw`\hat{Y} = \beta \, \tanh(\alpha X)`,
     'linear-regression': String.raw`Y = \alpha X + \beta`,
     'logistic-regression': String.raw`P(C\!=\!1) = \frac{1}{1 + \exp(-(\alpha X + \beta Y))}`,
     'polynomial-regression': String.raw`Y = \alpha X^2 + \beta X`,
@@ -40,9 +45,17 @@
     'himmelblau': String.raw`\text{pure surface}`
   };
   
-  const parametersFormula = String.raw`(\boldsymbol{\theta} = [\alpha, \beta]^\top)`;
-  
+  // One-parameter problems carry a single scalar θ = α; everything else
+  // optimizes the two-vector θ = [α, β]ᵀ.
+  $: parametersFormula = problemConfigs[problemType]?.oneParam
+    ? String.raw`(\theta = \alpha)`
+    : String.raw`(\boldsymbol{\theta} = [\alpha, \beta]^\top)`;
+
   const lossFormulas: Record<string, string> = {
+    'slope-1d': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\alpha X_i - Y_i)^2`,
+    'double-well-1d': String.raw`\mathcal{L} = \tfrac{(\alpha^2 - 4)^2}{8} + 0.6\,\alpha + 1.3`,
+    'bumpy-1d': String.raw`\mathcal{L} = 0.15\,\alpha^2 + \sin(2\alpha) + 1.4`,
+    'tiny-net': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`,
     'linear-regression': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`,
     'logistic-regression': String.raw`\mathcal{L} = -\frac{1}{n} \sum_{i=1}^{n} \left[ C_i \log(\hat{p}_i) + (1-C_i) \log(1-\hat{p}_i) \right]`,
     'polynomial-regression': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`,
@@ -62,6 +75,10 @@
   };
 
   const gradientFormulas: Record<string, string> = {
+    'slope-1d': String.raw`\frac{d\mathcal{L}}{d\alpha} = \frac{2}{n} \sum_{i=1}^{n} (\alpha X_i - Y_i)\, X_i`,
+    'double-well-1d': String.raw`\frac{d\mathcal{L}}{d\alpha} = \tfrac{\alpha(\alpha^2 - 4)}{2} + 0.6`,
+    'bumpy-1d': String.raw`\frac{d\mathcal{L}}{d\alpha} = 0.3\,\alpha + 2\cos(2\alpha)`,
+    'tiny-net': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} \beta\,(1{-}\tanh^2(\alpha X_i))\, X_i & \tanh(\alpha X_i) \end{bmatrix}^\top`,
     'linear-regression': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} X_i & 1 \end{bmatrix}^\top`,
     'logistic-regression': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{p}_i - C_i) \begin{bmatrix} X_i & Y_i \end{bmatrix}^\top`,
     'polynomial-regression': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i) \begin{bmatrix} X_i^2 & X_i \end{bmatrix}^\top`,

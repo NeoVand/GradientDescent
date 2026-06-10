@@ -11,7 +11,7 @@
   import {
     X,
     Activity, Mountain, TrendingUp, TrendingDown, Percent, Waves,
-    Target, Radio, ScatterChart,
+    Target, Radio, ScatterChart, Brain,
     Sparkles, Compass, Rocket, Zap, RefreshCw,
     BookOpen, FlaskConical, Layers, Map, Play
   } from 'lucide-svelte';
@@ -105,9 +105,14 @@
     return arrows;
   })();
 
-  // The 13 problems, grouped — formulas kept tiny so they fit in card layout.
+  // All problems, grouped — formulas kept tiny so they fit in card layout.
   type ProblemCard = { name: string; icon: any; customIcon?: string; formula: string; tag: string };
   const problems: Record<string, ProblemCard[]> = {
+    'Start in 1D': [
+      { name: 'Fit a Slope', icon: null, customIcon: '╱', formula: 'αX', tag: 'one parameter, one parabola' },
+      { name: 'Double Well', icon: null, customIcon: 'W', formula: '(α²−4)²/8 + 0.6α', tag: 'the simplest local-minimum trap' },
+      { name: 'Bumpy Valley', icon: null, customIcon: '∿', formula: '0.15α² + sin 2α', tag: 'four dips, one true bottom' }
+    ],
     'Curve fitting': [
       { name: 'Linear', icon: TrendingUp, formula: 'αX + β', tag: 'one bowl, one minimum' },
       { name: 'Polynomial', icon: null, customIcon: 'x²', formula: 'αX² + βX', tag: 'curvature; convex bowl' },
@@ -124,6 +129,9 @@
       { name: 'Circle Classifier', icon: Target, formula: 'σ((R²−d²)/τ)', tag: 'find a circle center' },
       { name: 'Source Localization', icon: Radio, formula: 'K / (d² + ε)', tag: 'inverse-square triangulation' },
       { name: 'Mean-Shift Cluster', icon: ScatterChart, formula: 'Σ(1 − kᵢ)/n', tag: 'two cluster modes' }
+    ],
+    'Neural network': [
+      { name: 'Tiny Neural Net', icon: Brain, formula: 'β tanh(αX)', tag: 'mirror minima; zero-init is a dead saddle' }
     ],
     'Pure surfaces (no data)': [
       { name: 'Rosenbrock Valley', icon: null, customIcon: '∪', formula: '(1−α)² + 100(β−α²)²', tag: 'the classic banana benchmark' },

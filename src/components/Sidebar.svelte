@@ -49,7 +49,8 @@
     StepForward,
     Gauge,
     Layers,
-    Flag
+    Flag,
+    Brain
   } from 'lucide-svelte';
 
   // Dropdown state
@@ -58,24 +59,64 @@
 
   // Tooltip state
   let activeTooltip: string | null = null;
-  const problems: { type: ProblemType; name: string; icon: any; customIcon?: string }[] = [
-    { type: 'linear-regression', name: 'Linear Regression', icon: TrendingUp },
-    { type: 'logistic-regression', name: 'Logistic Regression', icon: Percent },
-    { type: 'polynomial-regression', name: 'Polynomial Regression', icon: null, customIcon: 'x²' },
-    { type: 'sine-wave', name: 'Sine Wave', icon: Activity },
-    { type: 'gaussian-peak', name: 'Gaussian Peak', icon: Mountain },
-    { type: 'exponential-decay', name: 'Exponential Decay', icon: TrendingDown },
-    { type: 'damped-oscillator', name: 'Damped Oscillator', icon: Waves },
-    { type: 'logistic-growth', name: 'Logistic Growth', icon: null, customIcon: 'σ' },
-    { type: 'power-law', name: 'Power Law', icon: null, customIcon: 'xⁿ' },
-    { type: 'gaussian-mixture', name: 'Gaussian Mixture', icon: null, customIcon: 'ΛΛ' },
-    { type: 'circle-classifier', name: 'Circle Classifier', icon: Target },
-    { type: 'source-localization', name: 'Source Localization', icon: Radio },
-    { type: 'mean-shift', name: 'Mean-Shift Cluster', icon: ScatterChart },
-    { type: 'rosenbrock', name: 'Rosenbrock Valley', icon: null, customIcon: '∪' },
-    { type: 'saddle-point', name: 'Saddle Point', icon: null, customIcon: '±' },
-    { type: 'himmelblau', name: 'Himmelblau', icon: null, customIcon: '∷' }
+
+  interface ProblemEntry {
+    type: ProblemType;
+    name: string;
+    icon: any;
+    customIcon?: string;
+  }
+
+  // Picker groups follow the learning arc: one parameter first, then 2D
+  // fits, classification/localization, the neural-net bridge, and the
+  // classic optimizer benchmarks.
+  const problemGroups: { label: string; items: ProblemEntry[] }[] = [
+    {
+      label: 'Start in 1D',
+      items: [
+        { type: 'slope-1d', name: 'Fit a Slope', icon: null, customIcon: '╱' },
+        { type: 'double-well-1d', name: 'Double Well', icon: null, customIcon: 'W' },
+        { type: 'bumpy-1d', name: 'Bumpy Valley', icon: null, customIcon: '∿' }
+      ]
+    },
+    {
+      label: 'Fit curves',
+      items: [
+        { type: 'linear-regression', name: 'Linear Regression', icon: TrendingUp },
+        { type: 'polynomial-regression', name: 'Polynomial Regression', icon: null, customIcon: 'x²' },
+        { type: 'sine-wave', name: 'Sine Wave', icon: Activity },
+        { type: 'gaussian-peak', name: 'Gaussian Peak', icon: Mountain },
+        { type: 'exponential-decay', name: 'Exponential Decay', icon: TrendingDown },
+        { type: 'damped-oscillator', name: 'Damped Oscillator', icon: Waves },
+        { type: 'logistic-growth', name: 'Logistic Growth', icon: null, customIcon: 'σ' },
+        { type: 'power-law', name: 'Power Law', icon: null, customIcon: 'xⁿ' },
+        { type: 'gaussian-mixture', name: 'Gaussian Mixture', icon: null, customIcon: 'ΛΛ' }
+      ]
+    },
+    {
+      label: 'Classify & locate',
+      items: [
+        { type: 'logistic-regression', name: 'Logistic Regression', icon: Percent },
+        { type: 'circle-classifier', name: 'Circle Classifier', icon: Target },
+        { type: 'source-localization', name: 'Source Localization', icon: Radio },
+        { type: 'mean-shift', name: 'Mean-Shift Cluster', icon: ScatterChart }
+      ]
+    },
+    {
+      label: 'Neural network',
+      items: [{ type: 'tiny-net', name: 'Tiny Neural Net', icon: Brain }]
+    },
+    {
+      label: 'Classic surfaces',
+      items: [
+        { type: 'rosenbrock', name: 'Rosenbrock Valley', icon: null, customIcon: '∪' },
+        { type: 'saddle-point', name: 'Saddle Point', icon: null, customIcon: '±' },
+        { type: 'himmelblau', name: 'Himmelblau', icon: null, customIcon: '∷' }
+      ]
+    }
   ];
+
+  const problems: ProblemEntry[] = problemGroups.flatMap(g => g.items);
 
   // Subscribe to stores
   $: currentProblem = $selectedProblem;
@@ -208,21 +249,24 @@
 
       {#if showProblemDropdown}
         <div class="problem-dropdown">
-          {#each problems as problem}
-            <button
-              class="problem-option"
-              class:selected={problem.type === currentProblem}
-              on:click={() => selectProblem(problem.type)}
-            >
-              <span class="problem-icon">
-                {#if problem.customIcon}
-                  <span class="custom-icon">{problem.customIcon}</span>
-                {:else}
-                  <svelte:component this={problem.icon} size={18} strokeWidth={2} />
-                {/if}
-              </span>
-              <span>{problem.name}</span>
-            </button>
+          {#each problemGroups as group}
+            <div class="dropdown-group-label">{group.label}</div>
+            {#each group.items as problem}
+              <button
+                class="problem-option"
+                class:selected={problem.type === currentProblem}
+                on:click={() => selectProblem(problem.type)}
+              >
+                <span class="problem-icon">
+                  {#if problem.customIcon}
+                    <span class="custom-icon">{problem.customIcon}</span>
+                  {:else}
+                    <svelte:component this={problem.icon} size={18} strokeWidth={2} />
+                  {/if}
+                </span>
+                <span>{problem.name}</span>
+              </button>
+            {/each}
           {/each}
         </div>
       {/if}
@@ -900,9 +944,27 @@
     background: var(--color-bg-secondary);
     border: 2px solid var(--color-border);
     border-radius: 9px;
-    overflow: hidden;
+    overflow-y: auto;
+    max-height: min(64vh, 560px);
     box-shadow: 0 8px 24px var(--color-shadow);
     z-index: 30;
+  }
+
+  .dropdown-group-label {
+    padding: 0.45rem 0.7rem 0.2rem;
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--color-text-tertiary);
+    opacity: 0.85;
+    pointer-events: none;
+  }
+
+  .dropdown-group-label:not(:first-child) {
+    margin-top: 0.25rem;
+    border-top: 1px solid var(--color-border);
+    padding-top: 0.5rem;
   }
 
   .problem-option {
