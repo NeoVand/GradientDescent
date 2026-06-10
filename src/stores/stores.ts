@@ -360,6 +360,26 @@ function createLandscapeViewStore() {
 
 export const landscapeViewStore = createLandscapeViewStore();
 
+// ========== Course Store ==========
+// Predict-then-run lessons: each lesson configures a scenario, asks for a
+// prediction, runs it, and explains. The panel lives on the landscape;
+// lesson content and flow helpers live in utils/lessons.ts.
+export type CoursePhase = 'predict' | 'running' | 'reveal' | 'done';
+
+export interface CourseState {
+  active: boolean;
+  idx: number;
+  phase: CoursePhase;
+  answer: number | null;
+}
+
+export const courseStore = writable<CourseState>({
+  active: false,
+  idx: 0,
+  phase: 'predict',
+  answer: null
+});
+
 // ========== Presenter Mode Store ==========
 // Lecture-hall mode: bigger fonts, fatter markers and trails, so the room
 // can read the projector. Persisted per visitor; toggled with P.

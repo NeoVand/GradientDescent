@@ -29,6 +29,7 @@ import {
   landscapeViewStore,
   showCoach,
   clearCoach,
+  courseStore,
   type Racer
 } from '../stores/stores';
 import { problemConfigs } from './problems';
@@ -47,6 +48,15 @@ const BASIN_LOG_THRESHOLD = 0.05;
 
 /** History step the current run started from — drives the progress fill. */
 export const runStartStep = writable(0);
+
+/**
+ * Signal posted when a run finishes naturally — what happened and in how
+ * many steps. The course panel uses it to flip from "running" to "reveal".
+ */
+export type RunVerdict = 'converged' | 'stalled' | 'descending';
+export const runEndStore = writable<{ steps: number; verdict: RunVerdict } | null>(null);
+
+const courseActive = () => get(courseStore).active;
 
 // Parameters this far outside any visible range mean the run has blown up.
 const DIVERGENCE_LIMIT = 1e4;
@@ -160,6 +170,7 @@ export function startTraining() {
 
   stopRace();
   clearCoach();
+  runEndStore.set(null);
   divergenceStore.set(null);
   trainingStore.update(store => ({ ...store, isTraining: true }));
 
@@ -258,7 +269,8 @@ export function applyProblem(type: ProblemType) {
   // initial history point reflects the new dataset.
   datasetStore.regenerateData();
   resetRun();
-  if (cfg?.tagline) {
+  // During the course, the lesson card does the introducing.
+  if (cfg?.tagline && !courseActive()) {
     showCoach('info', `${cfg.name} — ${cfg.tagline}`);
   }
 }
@@ -292,20 +304,28 @@ function evaluateRun(steps: number) {
   const scene = get(lossSceneStore);
   const fmtMag = mag >= 0.01 ? mag.toFixed(3) : mag.toExponential(1);
 
-  if (scene) {
-    const nearBasin = normalizedLogLoss(scene.grid, loss) <= BASIN_LOG_THRESHOLD;
-    if (nearBasin) {
-      showCoach('success', `Converged — reached the basin in ${steps} steps (‖∇ℒ‖ = ${fmtMag}).`);
-      return;
-    }
-    const fieldMax = scene.field.maxMag || 1;
-    if (mag < 0.004 * fieldMax) {
-      showCoach(
-        'warn',
-        `Stalled after ${steps} steps: ‖∇ℒ‖ ≈ ${fmtMag} but the loss is still high — a local minimum or flat plateau. Momentum, a larger γ, or a new start can help.`
-      );
-      return;
-    }
+  // Classify first, then report: the course panel consumes the verdict
+  // silently (its reveal step does the talking); the coach narrates
+  // otherwise.
+  let verdict: RunVerdict = 'descending';
+  if (scene && normalizedLogLoss(scene.grid, loss) <= BASIN_LOG_THRESHOLD) {
+    verdict = 'converged';
+  } else if (scene && mag < 0.004 * (scene.field.maxMag || 1)) {
+    verdict = 'stalled';
+  }
+  runEndStore.set({ steps, verdict });
+  if (courseActive()) return;
+
+  if (verdict === 'converged') {
+    showCoach('success', `Converged — reached the basin in ${steps} steps (‖∇ℒ‖ = ${fmtMag}).`);
+    return;
+  }
+  if (verdict === 'stalled') {
+    showCoach(
+      'warn',
+      `Stalled after ${steps} steps: ‖∇ℒ‖ ≈ ${fmtMag} but the loss is still high — a local minimum or flat plateau. Momentum, a larger γ, or a new start can help.`
+    );
+    return;
   }
 
   const h = get(historyStore);
@@ -331,6 +351,7 @@ let raceInterval: number | null = null;
 export function startRace() {
   stopTraining();
   stopRace();
+  runEndStore.set(null);
   divergenceStore.set(null);
   // Trails render in the 2D view
   landscapeViewStore.set('2d');
@@ -347,7 +368,9 @@ export function startRace() {
     diverged: false
   }));
   raceStore.set({ racers, running: true });
-  showCoach('info', 'Racing GD, Momentum, RMSProp, and Adam from the same start — each with its own γ. First to the basin wins.', 0);
+  if (!courseActive()) {
+    showCoach('info', 'Racing GD, Momentum, RMSProp, and Adam from the same start — each with its own γ. First to the basin wins.', 0);
+  }
 
   const cap = Math.max(get(trainingStore).totalSteps, 100);
   const intervalMs = Math.max(8, Math.round(1000 / get(trainingStore).stepsPerSecond));
@@ -416,12 +439,14 @@ function stepRace(cap: number) {
       return `${name}: >${cap}`;
     });
     const nobodyFinished = rs.racers.every(r => !r.finished);
-    showCoach(
-      'success',
-      `🏁 Finish line — ${parts.join('  ·  ')}` +
-        (nobodyFinished ? '. Nobody reached the basin within the step budget — some surfaces are just that hard.' : ''),
-      0
-    );
+    if (!courseActive()) {
+      showCoach(
+        'success',
+        `🏁 Finish line — ${parts.join('  ·  ')}` +
+          (nobodyFinished ? '. Nobody reached the basin within the step budget — some surfaces are just that hard.' : ''),
+        0
+      );
+    }
   }
 }
 

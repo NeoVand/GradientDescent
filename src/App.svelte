@@ -21,11 +21,13 @@
     trainingStore,
     landscapeViewStore,
     historyStore,
-    resetOptimizerState
+    resetOptimizerState,
+    courseStore
   } from './stores/stores';
   import { startTraining, stopTraining, stepOnce, resetRun } from './utils/trainer';
+  import { startCourse, closeCourse } from './utils/lessons';
   import { applyUrlState, encodeStateUrl } from './utils/urlState';
-  import { Sun, Moon, HelpCircle, Menu, X, Share2, Presentation } from 'lucide-svelte';
+  import { Sun, Moon, HelpCircle, Menu, X, Share2, Presentation, GraduationCap } from 'lucide-svelte';
 
   // The main app orchestrates all our components and manages the overall layout.
   // We use CSS Grid for a responsive, flexible layout that adapts to different screen sizes.
@@ -233,6 +235,14 @@
 
 <!-- Desktop floating buttons (hidden on mobile, replaced by topbar) -->
 <div class="floating-buttons">
+  <button
+    class="help-btn"
+    class:presenter-active={$courseStore.active}
+    on:click={() => ($courseStore.active ? closeCourse() : startCourse())}
+    title="Course — ten predict-then-run lessons, from slopes to a tiny neural net"
+  >
+    <GraduationCap size={19} strokeWidth={2.5} />
+  </button>
   <button
     class="help-btn"
     class:presenter-active={$presenterStore}
