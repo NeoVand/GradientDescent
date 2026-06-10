@@ -4,9 +4,9 @@
    *
    * The whole loss "landscape" is a single curve ℒ(α), so everything the 2D
    * view encodes spatially becomes directly readable:
-   *   - the curve itself, over the problem's α range
-   *   - a viridis strip along the bottom: the SAME color mapping as the 2D
-   *     heatmap (a 2D map is just many of these strips stacked)
+   *   - the curve itself, over the problem's α range, its under-fill
+   *     colored BY the loss — the same log→viridis mapping as the 2D
+   *     heatmap, so this view is literally one slice of the 2D map
    *   - the draggable marker ball ON the curve, with the tangent line at it
    *   - blue −∇ℒ / red Δθ arrows (same semantics as the 2D marker)
    *   - a dashed ghost ball previewing one plain-GD step: α − γ·dℒ/dα
@@ -42,8 +42,7 @@
   let svgElement: SVGSVGElement | null = null;
 
   const CURVE_SAMPLES = 240;
-  const STRIP_HEIGHT = 10;
-  // Same ε as the 2D heatmap's log color mapping, so strip colors agree.
+  // Same ε as the 2D heatmap's log color mapping, so fill colors agree.
   const LOG_EPS = 0.001;
 
   const defaultParameterRange = { min: -7, max: 7 };
@@ -204,26 +203,26 @@
       .attr('class', 'plot-group')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // Strip along the bottom. Default: the 1D heatmap — same log mapping
-    // and alpha as the 2D image so the two views speak the same color
-    // language. In basin mode: each α colored by which minimum GD reaches.
+    // The fill under the curve IS the loss colorization: each α column is
+    // colored by its loss — the same log→viridis mapping as the 2D heatmap
+    // (so this view is literally one slice of the 2D map, with the height
+    // and the color encoding the same number). In basin mode the columns
+    // are colored by destination instead. Implementation: a 1-px-tall
+    // colormap image stretched over the whole plot, clipped to the
+    // area under the curve.
+    let fillURL: string;
+    let fillPixelated = false;
     if (basinActive && basin.scene) {
-      plotGroup.append('image')
-        .attr('href', basin.scene.imageURL)
-        .attr('x', 0)
-        .attr('y', innerHeight - STRIP_HEIGHT)
-        .attr('width', innerWidth)
-        .attr('height', STRIP_HEIGHT)
-        .attr('preserveAspectRatio', 'none')
-        .style('image-rendering', 'pixelated');
+      fillURL = basin.scene.imageURL;
+      fillPixelated = true; // crisp basin boundaries, no false blends
     } else {
       const logMin = Math.log(yMin + LOG_EPS);
       const logMax = Math.log(yMax + LOG_EPS);
       const logSpan = logMax - logMin || 1;
-      const stripCanvas = document.createElement('canvas');
-      stripCanvas.width = CURVE_SAMPLES;
-      stripCanvas.height = 1;
-      const ctx = stripCanvas.getContext('2d')!;
+      const fillCanvas = document.createElement('canvas');
+      fillCanvas.width = CURVE_SAMPLES;
+      fillCanvas.height = 1;
+      const ctx = fillCanvas.getContext('2d')!;
       const img = ctx.createImageData(CURVE_SAMPLES, 1);
       for (let i = 0; i < CURVE_SAMPLES; i++) {
         let t = (Math.log(curve[i].loss + LOG_EPS) - logMin) / logSpan;
@@ -232,17 +231,49 @@
         img.data[i * 4] = Math.round(r * 255);
         img.data[i * 4 + 1] = Math.round(gg * 255);
         img.data[i * 4 + 2] = Math.round(b * 255);
-        img.data[i * 4 + 3] = 217;
+        img.data[i * 4 + 3] = 217; // same translucency as the 2D heatmap
       }
       ctx.putImageData(img, 0, 0);
-      plotGroup.append('image')
-        .attr('href', stripCanvas.toDataURL())
-        .attr('x', 0)
-        .attr('y', innerHeight - STRIP_HEIGHT)
-        .attr('width', innerWidth)
-        .attr('height', STRIP_HEIGHT)
-        .attr('preserveAspectRatio', 'none');
+      fillURL = fillCanvas.toDataURL();
     }
+
+    const area = d3.area<{ a: number; loss: number }>()
+      .x(d => xScale!(d.a))
+      .y0(innerHeight)
+      .y1(d => yScale!(d.loss))
+      .curve(d3.curveMonotoneX);
+
+    svg.select('defs')
+      .append('clipPath')
+      .attr('id', 'curve-area-clip')
+      .append('path')
+      .attr('d', area(curve));
+
+    plotGroup.append('image')
+      .attr('href', fillURL)
+      .attr('x', 0)
+      .attr('y', 0)
+      .attr('width', innerWidth)
+      .attr('height', innerHeight)
+      .attr('preserveAspectRatio', 'none')
+      .attr('clip-path', 'url(#curve-area-clip)')
+      .style('image-rendering', fillPixelated ? 'pixelated' : 'auto');
+
+    // The curve itself rides on top — neutral stroke (like the 2D contour
+    // lines) so it never fights the colormap underneath.
+    const line = d3.line<{ a: number; loss: number }>()
+      .x(d => xScale!(d.a))
+      .y(d => yScale!(d.loss))
+      .curve(d3.curveMonotoneX);
+
+    plotGroup.append('path')
+      .datum(curve)
+      .attr('d', line)
+      .attr('fill', 'none')
+      .attr('stroke', isDark ? '#e2e8f0' : '#334155')
+      .attr('stroke-width', 2.25 * pm)
+      .attr('stroke-linejoin', 'round')
+      .style('opacity', 0.95);
 
     // Basin destinations: a ringed dot on the curve at each minimum
     if (basinActive && basin.scene) {
@@ -256,31 +287,6 @@
           .attr('stroke-width', 1.6);
       });
     }
-
-    // Soft area under the curve, then the curve itself
-    const area = d3.area<{ a: number; loss: number }>()
-      .x(d => xScale!(d.a))
-      .y0(innerHeight)
-      .y1(d => yScale!(d.loss))
-      .curve(d3.curveMonotoneX);
-
-    plotGroup.append('path')
-      .datum(curve)
-      .attr('d', area)
-      .attr('fill', isDark ? 'rgba(16, 185, 129, 0.07)' : 'rgba(5, 150, 105, 0.06)');
-
-    const line = d3.line<{ a: number; loss: number }>()
-      .x(d => xScale!(d.a))
-      .y(d => yScale!(d.loss))
-      .curve(d3.curveMonotoneX);
-
-    plotGroup.append('path')
-      .datum(curve)
-      .attr('d', line)
-      .attr('fill', 'none')
-      .attr('stroke', isDark ? '#10b981' : '#059669')
-      .attr('stroke-width', 2.5 * pm)
-      .attr('stroke-linejoin', 'round');
 
     // Dynamic layers (cleared and refilled by updateDynamics)
     plotGroup.append('g').attr('class', 'tangent-layer');

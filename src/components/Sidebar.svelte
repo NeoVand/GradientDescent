@@ -67,6 +67,24 @@
   let showProblemDropdown = false;
   let showOptimizerDropdown = false;
 
+  // The problem list is taller than the dropdown: instead of a scrollbar,
+  // soft fades at the edges signal "there's more" in that direction.
+  let problemScrollEl: HTMLDivElement | null = null;
+  let dropdownFadeTop = false;
+  let dropdownFadeBottom = false;
+
+  function updateDropdownFades() {
+    const el = problemScrollEl;
+    if (!el) return;
+    dropdownFadeTop = el.scrollTop > 2;
+    dropdownFadeBottom = el.scrollTop + el.clientHeight < el.scrollHeight - 2;
+  }
+
+  $: if (showProblemDropdown) {
+    // Measure once the dropdown has rendered
+    requestAnimationFrame(updateDropdownFades);
+  }
+
   // Tooltip state
   let activeTooltip: string | null = null;
 
@@ -260,25 +278,29 @@
 
       {#if showProblemDropdown}
         <div class="problem-dropdown">
-          {#each problemGroups as group}
-            <div class="dropdown-group-label">{group.label}</div>
-            {#each group.items as problem}
-              <button
-                class="problem-option"
-                class:selected={problem.type === currentProblem}
-                on:click={() => selectProblem(problem.type)}
-              >
-                <span class="problem-icon">
-                  {#if problem.customIcon}
-                    <span class="custom-icon">{problem.customIcon}</span>
-                  {:else}
-                    <svelte:component this={problem.icon} size={18} strokeWidth={2} />
-                  {/if}
-                </span>
-                <span>{problem.name}</span>
-              </button>
+          <div class="dropdown-scroll" bind:this={problemScrollEl} on:scroll={updateDropdownFades}>
+            {#each problemGroups as group}
+              <div class="dropdown-group-label">{group.label}</div>
+              {#each group.items as problem}
+                <button
+                  class="problem-option"
+                  class:selected={problem.type === currentProblem}
+                  on:click={() => selectProblem(problem.type)}
+                >
+                  <span class="problem-icon">
+                    {#if problem.customIcon}
+                      <span class="custom-icon">{problem.customIcon}</span>
+                    {:else}
+                      <svelte:component this={problem.icon} size={18} strokeWidth={2} />
+                    {/if}
+                  </span>
+                  <span>{problem.name}</span>
+                </button>
+              {/each}
             {/each}
-          {/each}
+          </div>
+          <div class="scroll-fade fade-top" class:visible={dropdownFadeTop} aria-hidden="true"></div>
+          <div class="scroll-fade fade-bottom" class:visible={dropdownFadeBottom} aria-hidden="true"></div>
         </div>
       {/if}
     </div>
@@ -988,10 +1010,47 @@
     background: var(--color-bg-secondary);
     border: 2px solid var(--color-border);
     border-radius: 9px;
-    overflow-y: auto;
-    max-height: min(64vh, 560px);
+    overflow: hidden;
     box-shadow: 0 8px 24px var(--color-shadow);
     z-index: 30;
+  }
+
+  /* Scroll container: no scrollbar — the edge fades are the affordance */
+  .dropdown-scroll {
+    max-height: min(64vh, 560px);
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .dropdown-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Edge fades: content melts into the dropdown background where there's
+     more to scroll — darkens in dark mode, whitens in light, for free. */
+  .scroll-fade {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 34px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.18s ease;
+  }
+
+  .fade-top {
+    top: 0;
+    background: linear-gradient(to bottom, var(--color-bg-secondary) 18%, transparent);
+  }
+
+  .fade-bottom {
+    bottom: 0;
+    background: linear-gradient(to top, var(--color-bg-secondary) 18%, transparent);
+  }
+
+  .scroll-fade.visible {
+    opacity: 1;
   }
 
   .dropdown-group-label {
