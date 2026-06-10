@@ -33,11 +33,13 @@ import type { OptimizerId } from './optimizers';
 export interface Lesson {
   id: string;
   title: string;
+  /** The setup step: what was staged and where to look before predicting. */
+  intro: string;
   question: string;
   options: string[];
   correctIndex: number;
   explain: string;
-  /** What answering launches: a training run (default) or a race. */
+  /** What the Run step launches: a training run (default) or a race. */
   kind?: 'train' | 'race';
   setup: () => void;
 }
@@ -78,6 +80,8 @@ export const lessons: Lesson[] = [
   {
     id: 'downhill',
     title: 'Which way is down?',
+    intro:
+      "I've dropped the marker high on the right wall of a 1D parabola — the simplest loss landscape there is. The dashed tangent line shows the slope under it.",
     question:
       'The marker sits on the right wall of the parabola, where the slope dℒ/dα is positive. One gradient-descent step moves α…',
     options: ['Left — toward smaller α', 'Right — toward larger α', 'Nowhere — it needs the minimum first'],
@@ -97,6 +101,8 @@ export const lessons: Lesson[] = [
   {
     id: 'step-size',
     title: 'Step size',
+    intro:
+      "Same parabola, same start — but γ is cranked from 0.05 to 0.9. Look at the amber 'next step' ghost: the predicted jump is now enormous.",
     question: 'Same parabola, but γ cranked from 0.05 to 0.9. The run will…',
     options: ['Converge much faster', 'Overshoot harder each step and blow up', 'End in the same place, same speed'],
     correctIndex: 1,
@@ -115,6 +121,8 @@ export const lessons: Lesson[] = [
   {
     id: 'trap',
     title: 'The trap',
+    intro:
+      'A double well: two valleys, the left one deeper (toggle Basins ▦ to see the two territories). The marker starts on the right rim.',
     question: 'Two valleys; the left one is deeper. Starting on the RIGHT rim, gradient descent ends up…',
     options: ['In the deep left valley — it finds the best', 'In the shallow right valley', 'Bouncing between both'],
     correctIndex: 1,
@@ -132,6 +140,8 @@ export const lessons: Lesson[] = [
   {
     id: 'dead-gradient',
     title: 'The dead plateau',
+    intro:
+      "The marker sits far out on the Gaussian peak's flat shoulder. Check the readout: ‖∇ℒ‖ is essentially zero out here.",
     question: 'Far from the Gaussian peak the surface is almost flat: ‖∇ℒ‖ ≈ 0. Training from out here will…',
     options: ['Reach the peak anyway — slowly but surely', 'Barely move at all', 'Diverge'],
     correctIndex: 1,
@@ -150,6 +160,8 @@ export const lessons: Lesson[] = [
   {
     id: 'momentum-race',
     title: 'Momentum',
+    intro:
+      'A steep, curved valley — and a four-way race staged from one start: GD, Momentum, RMSProp, and Adam, each with its tuned γ.',
     question: 'A steep, curved valley. Four optimizers race from the same start, each with its tuned γ. Plain GD finishes…',
     options: ['First — simplest is fastest', 'Last (or not at all) — it zig-zags and crawls', 'Exactly tied with Momentum'],
     correctIndex: 1,
@@ -168,6 +180,8 @@ export const lessons: Lesson[] = [
   {
     id: 'sgd-noise',
     title: 'The S in SGD',
+    intro:
+      'Batch size is set to 2 of 20 points. See the faint blue fan at the marker — every ray is the gradient according to a different random pair.',
     question: 'Batch size 2 instead of all 20 points: each step sees a random sliver of the data. The descent path becomes…',
     options: ['Identical — same data overall', 'Wobbly, but downhill on average', 'A random walk going nowhere'],
     correctIndex: 1,
@@ -187,6 +201,8 @@ export const lessons: Lesson[] = [
   {
     id: 'narrow-valley',
     title: 'The banana valley',
+    intro:
+      "Rosenbrock's banana valley: the classic torture test. The walls are ~2500× steeper than the floor (the Curvature lens ◎ shows κ).",
     question:
       'Rosenbrock: reaching the curved valley is easy, but its floor is ~2500× shallower than its walls. Plain GD with a safe γ will…',
     options: ['March straight down the floor to the minimum', 'Drop in fast, then crawl along the floor', 'Refuse to enter the valley'],
@@ -206,6 +222,8 @@ export const lessons: Lesson[] = [
   {
     id: 'adam',
     title: 'Adaptive steps',
+    intro:
+      'The same dead plateau as lesson 4 — same start, same surface — but the optimizer is now Adam. Watch the amber ghost: it already disagrees with plain GD.',
     question: 'Back on the dead plateau from lesson 4 — but now with Adam instead of plain GD. This time the marker…',
     options: ['Still barely moves — flat is flat', 'Walks out briskly', 'Teleports straight to the peak'],
     correctIndex: 1,
@@ -223,6 +241,8 @@ export const lessons: Lesson[] = [
   {
     id: 'saddle',
     title: 'The saddle',
+    intro:
+      'Dead center of this surface is a saddle point. The marker starts just beside it, where the gradient is almost — but not exactly — zero.',
     question: 'At the dead center of this surface the gradient is exactly zero. Is that point a minimum?',
     options: ['Yes — zero gradient means done', 'No — it curves DOWN in one direction', 'Impossible to tell from gradients'],
     correctIndex: 1,
@@ -241,6 +261,8 @@ export const lessons: Lesson[] = [
   {
     id: 'tiny-net',
     title: 'You\'ve been doing deep learning',
+    intro:
+      'This is a real neural network with two weights, and the surface shows its twin mirror basins. The marker starts in the lower-left.',
     question:
       'This is a real neural network: ŷ = β·tanh(αX), twin minima at ±(1.2, 1.5). Starting from the lower-left, training finds…',
     options: ['The + copy at (1.2, 1.5)', 'The mirror copy at (−1.2, −1.5)', 'The dead saddle at the origin'],
@@ -277,19 +299,45 @@ export function startCourse() {
   stopRace();
   clearCoach();
   const idx = loadProgress();
-  courseStore.set({ active: true, idx, phase: 'predict', answer: null });
+  courseStore.set({ active: true, idx, phase: 'setup', answer: null });
   lessons[idx].setup();
 }
 
-export function closeCourse() {
-  courseStore.set({ active: false, idx: get(courseStore).idx, phase: 'predict', answer: null });
+/** Stage lesson idx from its setup step. The one entry point for all
+ *  navigation: next, previous, and jumping via the progress dots. */
+export function enterLesson(idx: number) {
+  const clamped = Math.max(0, Math.min(lessons.length - 1, idx));
+  stopTraining();
+  stopRace();
+  clearCoach();
+  saveProgress(clamped);
+  courseStore.set({ active: true, idx: clamped, phase: 'setup', answer: null });
+  lessons[clamped].setup();
 }
 
-/** Lock in a prediction and launch the run. */
+export function closeCourse() {
+  courseStore.set({ active: false, idx: get(courseStore).idx, phase: 'setup', answer: null });
+}
+
+/** Setup step acknowledged — show the question. */
+export function beginPredict() {
+  const s = get(courseStore);
+  if (!s.active || s.phase !== 'setup') return;
+  courseStore.set({ ...s, phase: 'predict' });
+}
+
+/** Select an answer (no side effects — Run is its own explicit step). */
 export function answerLesson(answer: number) {
   const s = get(courseStore);
   if (!s.active || s.phase !== 'predict') return;
-  courseStore.set({ ...s, answer, phase: 'running' });
+  courseStore.set({ ...s, answer });
+}
+
+/** Launch the run for the committed answer. */
+export function launchLesson() {
+  const s = get(courseStore);
+  if (!s.active || s.phase !== 'predict' || s.answer === null) return;
+  courseStore.set({ ...s, phase: 'running' });
   const lesson = lessons[s.idx];
   if (lesson.kind === 'race') startRace();
   else startTraining();
@@ -299,20 +347,21 @@ export function answerLesson(answer: number) {
 export function nextLesson() {
   const s = get(courseStore);
   if (!s.active) return;
-  const idx = s.idx + 1;
-  if (idx >= lessons.length) {
+  if (s.idx + 1 >= lessons.length) {
     saveProgress(0); // a finished course restarts from the top next time
     courseStore.set({ ...s, phase: 'done' });
     return;
   }
-  saveProgress(idx);
-  courseStore.set({ active: true, idx, phase: 'predict', answer: null });
-  lessons[idx].setup();
+  enterLesson(s.idx + 1);
+}
+
+export function prevLesson() {
+  const s = get(courseStore);
+  if (!s.active) return;
+  enterLesson(s.idx - 1);
 }
 
 /** From the completion card: run it again from lesson one. */
 export function restartCourse() {
-  saveProgress(0);
-  courseStore.set({ active: true, idx: 0, phase: 'predict', answer: null });
-  lessons[0].setup();
+  enterLesson(0);
 }

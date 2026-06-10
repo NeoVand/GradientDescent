@@ -15,7 +15,7 @@ An interactive visualization tool for understanding gradient descent through bea
 ## ✨ Features
 
 ### The landscape, three ways
-- **1D Loss Curves**: one-parameter problems render the whole landscape as a single curve — marker on the curve, live tangent line, a ghost preview of the next GD step, and a viridis strip that bridges directly to the 2D heatmap
+- **1D Loss Curves**: one-parameter problems render the whole landscape as a single curve, its fill colored by the loss itself — marker on the curve, live tangent line, and an amber ghost previewing the optimizer's next step
 - **Interactive 2D Landscape**: color-coded heatmap, smooth contour lines, and gradient vector field in one view
 - **Rotatable 3D Surface**: same cached grid, same colors, draggable marker, tapered fading descent trail, and a corner axes gizmo
 
@@ -29,10 +29,9 @@ An interactive visualization tool for understanding gradient descent through bea
 - **Basins of Attraction**: one toggle colors every point by which minimum GD reaches from there (computed in a Web Worker) — Himmelblau becomes a four-color map, convexity becomes one color
 
 ### Built for teaching
-- **A 10-Lesson Course**: predict-then-run lessons from "which way is down?" to a real tiny neural network — answer first, watch the run, get the explanation
+- **A 10-Lesson Course**: guided lessons from "which way is down?" to a real tiny neural network — four explicit steps each (setup → predict → run → learn), freely navigable, draggable out of the way
 - **Challenge Links**: share a URL with a goal ("reach the basin in ≤ 80 steps") — zero-backend homework with a 🏆 verdict
 - **20 Problem Types**: 1D slopes and traps, curve fits, classifiers, localization, a tiny neural net (β·tanh(αX) — mirror minima, dead saddle at zero-init), and the classic benchmarks (Rosenbrock, saddle, Himmelblau); every analytic gradient verified against finite differences
-- **Presenter Mode**: one key (P) scales fonts, markers, and trails for the projector
 - **Keyboard Shortcuts**: Space train/pause · S step · R reset · arrows nudge the marker · D 2D/3D
 - **Video Export**: render the last run to a WebM clip for slides
 - **Works Offline**: installable PWA — lecture-hall wifi is not a dependency

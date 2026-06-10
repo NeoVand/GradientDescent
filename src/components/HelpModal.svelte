@@ -465,7 +465,6 @@
             <span class="kbd-item"><kbd>R</kbd> Reset</span>
             <span class="kbd-item"><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> Nudge marker <span class="kbd-note">(⇧ = bigger)</span></span>
             <span class="kbd-item"><kbd>D</kbd> 2D / 3D</span>
-            <span class="kbd-item"><kbd>P</kbd> Presenter mode</span>
           </div>
         </section>
       </div>

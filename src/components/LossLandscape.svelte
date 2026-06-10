@@ -29,7 +29,6 @@
     landscapeViewStore,
     raceStore,
     trainingStore,
-    presenterStore,
     challengeStore,
     optimizerStore,
     optimizerStateStore
@@ -84,9 +83,6 @@
   // One-parameter problems render as a loss-vs-α curve; the 2D/3D toggle
   // doesn't apply (there is no β axis).
   $: oneParam = problemConfig?.oneParam ?? false;
-
-  // Presenter mode scales marker/trail geometry for the projector.
-  $: pm = $presenterStore ? 1.45 : 1;
 
   $: if (scene) {
     minLossValue = scene.grid.visMin;
@@ -283,10 +279,9 @@
     return (v < 0 ? '−' : '') + s;
   }
 
-  // Full redraw whenever the cached scene, the theme, the basin overlay,
-  // or presenter scaling changes (all cheap: the heavy work already
-  // happened off-thread).
-  $: if (svgElement && scene && theme && basinActive !== undefined && pm) {
+  // Full redraw whenever the cached scene, the theme, or the basin overlay
+  // changes (all cheap: the heavy work already happened off-thread).
+  $: if (svgElement && scene && theme && basinActive !== undefined) {
     redraw();
   }
 
@@ -491,7 +486,7 @@
           .attr('d', lineGen(r.trail))
           .attr('fill', 'none')
           .attr('stroke', r.color)
-          .attr('stroke-width', 2.2 * pm)
+          .attr('stroke-width', 2.2)
           .attr('stroke-linecap', 'round')
           .attr('stroke-linejoin', 'round')
           .style('opacity', 0.9);
@@ -500,7 +495,7 @@
       layer.append('circle')
         .attr('cx', xScale(head.a))
         .attr('cy', yScale(head.b))
-        .attr('r', (r.finished ? 5.5 : 4.5) * pm)
+        .attr('r', r.finished ? 5.5 : 4.5)
         .attr('fill', r.color)
         .attr('stroke', '#fff')
         .attr('stroke-width', 1.2)
@@ -621,7 +616,7 @@
       const opacity = 0.05 + progress * 0.75; // 0.05 to 0.8
 
       // Thickness increases from thin to thick (almost as thick as handle)
-      const thickness = (2 + progress * 10) * pm; // 2 to 12 (handle is ~20px diameter)
+      const thickness = 2 + progress * 10; // 2 to 12 (handle is ~20px diameter)
 
       g.append('line')
         .attr('class', 'path-segment')
@@ -771,7 +766,7 @@
       marker.select('.vec-grad'),
       g ? -g.a * kx : 0,
       g ? g.b * ky : 0,
-      32 * pm
+      32
     );
 
     // Last actual update Δθ
@@ -779,7 +774,7 @@
     if (n >= 2) {
       const da = history[n - 1].parameters.a - history[n - 2].parameters.a;
       const db = history[n - 1].parameters.b - history[n - 2].parameters.b;
-      setVec(marker.select('.vec-upd'), da * kx, -db * ky, 24 * pm);
+      setVec(marker.select('.vec-upd'), da * kx, -db * ky, 24);
     } else {
       marker.select('.vec-upd').style('display', 'none');
     }
@@ -816,7 +811,7 @@
       .style('opacity', 0.8);
     layer.append('circle')
       .attr('cx', dx).attr('cy', dy)
-      .attr('r', 7 * pm)
+      .attr('r', 7)
       .attr('fill', 'rgba(251, 191, 36, 0.15)')
       .attr('stroke', '#fbbf24')
       .attr('stroke-width', 2)
@@ -824,7 +819,7 @@
       .style('opacity', 1);
     layer.append('circle')
       .attr('cx', dx).attr('cy', dy)
-      .attr('r', 1.8 * pm)
+      .attr('r', 1.8)
       .attr('fill', '#fbbf24');
   }
 
@@ -847,8 +842,8 @@
       layer.append('line')
         .attr('x1', 0)
         .attr('y1', 0)
-        .attr('x2', (sx / m) * 30 * pm)
-        .attr('y2', (sy / m) * 30 * pm)
+        .attr('x2', (sx / m) * 30)
+        .attr('y2', (sy / m) * 30)
         .attr('stroke', '#3b82f6')
         .attr('stroke-width', 1.4)
         .attr('stroke-linecap', 'round')
@@ -876,8 +871,8 @@
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
     // Radii from |λ|: the shallow axis gets the long radius.
-    const R_MAX = 42 * pm;
-    const R_MIN = 7 * pm;
+    const R_MAX = 42;
+    const R_MIN = 7;
     const abs1 = Math.abs(eig.lambda1); // largest |λ| → short axis
     const abs2 = Math.abs(eig.lambda2);
     if (abs1 < 1e-12) return; // locally flat: nothing meaningful to draw
@@ -940,7 +935,7 @@
       if (Number.isFinite(m) && m > 1e-9) {
         layer.append('line')
           .attr('x1', 0).attr('y1', 0)
-          .attr('x2', (sx / m) * 28 * pm).attr('y2', (sy / m) * 28 * pm)
+          .attr('x2', (sx / m) * 28).attr('y2', (sy / m) * 28)
           .attr('stroke', '#8b5cf6')
           .attr('stroke-width', 2.5)
           .attr('stroke-dasharray', '5,3')
@@ -1028,7 +1023,7 @@
     // Outer ring
     marker.append('circle')
       .attr('class', 'marker-ring')
-      .attr('r', 10 * pm)
+      .attr('r', 10)
       .attr('fill', 'none')
       .attr('stroke', '#f59e0b')
       .attr('stroke-width', 2)
@@ -1037,7 +1032,7 @@
     // Inner circle
     marker.append('circle')
       .attr('class', 'marker-dot')
-      .attr('r', 6 * pm)
+      .attr('r', 6)
       .attr('fill', '#f59e0b')
       .attr('stroke', '#fff')
       .attr('stroke-width', 2)

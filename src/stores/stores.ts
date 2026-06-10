@@ -371,10 +371,11 @@ export interface ChallengeState {
 export const challengeStore = writable<ChallengeState | null>(null);
 
 // ========== Course Store ==========
-// Predict-then-run lessons: each lesson configures a scenario, asks for a
-// prediction, runs it, and explains. The panel lives on the landscape;
-// lesson content and flow helpers live in utils/lessons.ts.
-export type CoursePhase = 'predict' | 'running' | 'reveal' | 'done';
+// Guided lessons in four explicit steps — setup (look here) → predict
+// (commit to an answer) → run (watch it happen) → learn (the explanation).
+// The panel lives on the landscape; lesson content and flow helpers live
+// in utils/lessons.ts.
+export type CoursePhase = 'setup' | 'predict' | 'running' | 'reveal' | 'done';
 
 export interface CourseState {
   active: boolean;
@@ -389,34 +390,6 @@ export const courseStore = writable<CourseState>({
   phase: 'predict',
   answer: null
 });
-
-// ========== Presenter Mode Store ==========
-// Lecture-hall mode: bigger fonts, fatter markers and trails, so the room
-// can read the projector. Persisted per visitor; toggled with P.
-function createPresenterStore() {
-  const initial = typeof window !== 'undefined' && localStorage.getItem('gd-presenter') === '1';
-  const { subscribe, set, update } = writable<boolean>(initial);
-
-  const persist = (on: boolean) => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('gd-presenter', on ? '1' : '0');
-      document.documentElement.classList.toggle('presenter', on);
-    }
-    return on;
-  };
-
-  if (typeof window !== 'undefined') {
-    document.documentElement.classList.toggle('presenter', initial);
-  }
-
-  return {
-    subscribe,
-    set: (on: boolean) => set(persist(on)),
-    toggle: () => update(on => persist(!on))
-  };
-}
-
-export const presenterStore = createPresenterStore();
 
 // ========== Theme Store ==========
 // Manages the current theme (light or dark)

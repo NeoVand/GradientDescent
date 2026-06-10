@@ -95,11 +95,7 @@
 
     const pos = plotPos(event);
     layer.selectAll('*').remove();
-    if (!pos) {
-      svgElement.style.cursor = '';
-      return;
-    }
-    svgElement.style.cursor = 'none';
+    if (!pos) return;
     const { px, py } = pos;
 
     if (editTool === 'erase') {
@@ -159,7 +155,6 @@
 
   function clearPlotHover() {
     if (!svgElement) return;
-    svgElement.style.cursor = '';
     d3.select(svgElement).select('.edit-preview').selectAll('*').remove();
   }
 
@@ -989,7 +984,7 @@
           </svg>
         </button>
         <button
-          class="tool-btn"
+          class="tool-btn erase-btn"
           class:active={editTool === 'erase'}
           title="Erase points — click a point to remove it (a dataset keeps at least 3)"
           aria-label="Erase points"
@@ -1006,8 +1001,9 @@
       bind:this={svgElement}
       width={width}
       height={height}
-      class:editable={isEditable && editTool !== 'erase'}
-      class:erasing={isEditable && editTool === 'erase'}
+      class:tool-train={isEditable && editTool === 'train'}
+      class:tool-test={isEditable && editTool === 'test'}
+      class:tool-erase={isEditable && editTool === 'erase'}
     ></svg>
     <!-- Point legend, tucked into the plot like the landscape's keys -->
     <div class="data-key" style="right: {margin.right + 8}px; bottom: {margin.bottom + 8}px;">
@@ -1143,6 +1139,30 @@
   .tool-btn.active {
     background: rgba(16, 185, 129, 0.16);
     color: #10b981;
+  }
+
+  /* The eraser is a destructive tool — it speaks red, not emerald */
+  .tool-btn.erase-btn:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+  }
+
+  .tool-btn.erase-btn.active {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+  }
+
+  /* Tool-shaped cursors: the pointer itself says what a click will do */
+  svg.tool-train {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='5.5' fill='%233b82f6' stroke='white' stroke-width='1.5'/%3E%3Cpath d='M18.5 2.5v6M15.5 5.5h6' stroke='%233b82f6' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 12 12, crosshair;
+  }
+
+  svg.tool-test {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='5.5' fill='rgba(16,185,129,0.3)' stroke='%2310b981' stroke-width='2' stroke-dasharray='3 2'/%3E%3Cpath d='M18.5 2.5v6M15.5 5.5h6' stroke='%2310b981' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 12 12, crosshair;
+  }
+
+  svg.tool-erase {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='7' fill='rgba(239,68,68,0.12)' stroke='%23ef4444' stroke-width='2'/%3E%3Cpath d='M8 16 16 8' stroke='%23ef4444' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 12 12, pointer;
   }
 
   /* ---------- In-plot point legend (mirrors the landscape's corner keys) ---------- */

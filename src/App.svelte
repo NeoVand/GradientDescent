@@ -17,7 +17,6 @@
     currentProblemConfig,
     themeStore,
     showCoach,
-    presenterStore,
     trainingStore,
     landscapeViewStore,
     historyStore,
@@ -28,7 +27,7 @@
   import { startTraining, stopTraining, stepOnce, resetRun, runEndStore } from './utils/trainer';
   import { startCourse, closeCourse } from './utils/lessons';
   import { applyUrlState, encodeStateUrl } from './utils/urlState';
-  import { Sun, Moon, HelpCircle, Menu, X, Share2, Presentation, GraduationCap } from 'lucide-svelte';
+  import { Sun, Moon, HelpCircle, Menu, X, Share2, GraduationCap, Wrench } from 'lucide-svelte';
 
   // The main app orchestrates all our components and manages the overall layout.
   // We use CSS Grid for a responsive, flexible layout that adapts to different screen sizes.
@@ -77,6 +76,9 @@
     }
   });
 
+  // Desktop tool corner: collapsed to one button by default
+  let toolsOpen = false;
+
   // ---------- Share popover ----------
   let showSharePopover = false;
   let challengeTarget = 100;
@@ -120,7 +122,7 @@
 
   // ---------- Keyboard shortcuts ----------
   // Space train/pause · S step · R reset · arrows nudge the marker
-  // (Shift = bigger nudge) · D 2D/3D · P presenter mode.
+  // (Shift = bigger nudge) · D 2D/3D.
   function nudgeMarker(da: number, db: number, fine: boolean) {
     const cfg = $currentProblemConfig;
     if (!cfg) return;
@@ -175,10 +177,6 @@
         if (!$currentProblemConfig?.oneParam) {
           landscapeViewStore.set($landscapeViewStore === '2d' ? '3d' : '2d');
         }
-        break;
-      case 'p':
-      case 'P':
-        presenterStore.toggle();
         break;
       case 'ArrowLeft':
         e.preventDefault();
@@ -262,35 +260,46 @@
   </div>
 </main>
 
-<!-- Desktop floating buttons (hidden on mobile, replaced by topbar) -->
-<div class="floating-buttons">
+<!-- Desktop tool corner (hidden on mobile, replaced by topbar): a single
+     collapsed button that expands into the tool row, so it never crowds
+     the Formulas panel. -->
+<div class="floating-buttons" class:expanded={toolsOpen}>
+  {#if toolsOpen}
+    <div class="tool-tray">
+      <button
+        class="help-btn"
+        class:tool-on={$courseStore.active}
+        on:click={() => ($courseStore.active ? closeCourse() : startCourse())}
+        title="Course — ten predict-then-run lessons, from slopes to a tiny neural net"
+      >
+        <GraduationCap size={19} strokeWidth={2.5} />
+      </button>
+      <button class="help-btn" class:tool-on={showSharePopover} on:click={toggleSharePopover} title="Share this exact scenario — or turn it into a challenge">
+        <Share2 size={18} strokeWidth={2.5} />
+      </button>
+      <button class="help-btn" on:click={() => showHelpModal = true} title="Help & Guide">
+        <HelpCircle size={20} strokeWidth={2.5} />
+      </button>
+      <button class="help-btn" on:click={() => themeStore.toggle()} title="Toggle theme">
+        {#if theme === 'light'}
+          <Moon size={20} strokeWidth={2.5} />
+        {:else}
+          <Sun size={20} strokeWidth={2.5} />
+        {/if}
+      </button>
+    </div>
+  {/if}
   <button
-    class="help-btn"
-    class:presenter-active={$courseStore.active}
-    on:click={() => ($courseStore.active ? closeCourse() : startCourse())}
-    title="Course — ten predict-then-run lessons, from slopes to a tiny neural net"
+    class="help-btn tools-fab"
+    class:tool-on={toolsOpen}
+    on:click={() => (toolsOpen = !toolsOpen)}
+    title={toolsOpen ? 'Collapse tools' : 'Tools — course, share, help, theme'}
+    aria-expanded={toolsOpen}
   >
-    <GraduationCap size={19} strokeWidth={2.5} />
-  </button>
-  <button
-    class="help-btn"
-    class:presenter-active={$presenterStore}
-    on:click={() => presenterStore.toggle()}
-    title="Presenter mode (P) — bigger text and markers for the projector"
-  >
-    <Presentation size={18} strokeWidth={2.5} />
-  </button>
-  <button class="help-btn" class:presenter-active={showSharePopover} on:click={toggleSharePopover} title="Share this exact scenario — or turn it into a challenge">
-    <Share2 size={18} strokeWidth={2.5} />
-  </button>
-  <button class="help-btn" on:click={() => showHelpModal = true} title="Help & Guide">
-    <HelpCircle size={20} strokeWidth={2.5} />
-  </button>
-  <button class="theme-toggle" on:click={() => themeStore.toggle()} title="Toggle theme">
-    {#if theme === 'light'}
-      <Moon size={20} strokeWidth={2.5} />
+    {#if toolsOpen}
+      <X size={18} strokeWidth={2.5} />
     {:else}
-      <Sun size={20} strokeWidth={2.5} />
+      <Wrench size={17} strokeWidth={2.5} />
     {/if}
   </button>
 </div>
@@ -410,8 +419,7 @@
     z-index: 99;
   }
   
-  .help-btn,
-  .theme-toggle {
+  .help-btn {
     width: 36px;
     height: 36px;
     border-radius: 50%;
@@ -426,165 +434,49 @@
   }
   
   /* Light mode buttons */
-  :global([data-theme='light']) .help-btn,
-  :global([data-theme='light']) .theme-toggle {
+  :global([data-theme='light']) .help-btn {
     background: rgba(255, 255, 255, 0.7);
     color: rgba(0, 0, 0, 0.5);
   }
   
   /* Dark mode buttons */
-  :global([data-theme='dark']) .help-btn,
-  :global([data-theme='dark']) .theme-toggle {
+  :global([data-theme='dark']) .help-btn {
     background: rgba(30, 41, 59, 0.6);
     color: rgba(255, 255, 255, 0.5);
   }
   
-  .help-btn:hover,
-  .theme-toggle:hover {
+  .help-btn:hover {
     border-color: #10b981;
     transform: scale(1.05);
     color: #10b981;
   }
   
-  :global([data-theme='light']) .help-btn:hover,
-  :global([data-theme='light']) .theme-toggle:hover {
+  :global([data-theme='light']) .help-btn:hover {
     background: rgba(255, 255, 255, 0.9);
   }
 
-  :global([data-theme='dark']) .help-btn:hover,
-  :global([data-theme='dark']) .theme-toggle:hover {
+  :global([data-theme='dark']) .help-btn:hover {
     background: rgba(30, 41, 59, 0.8);
   }
 
-  .help-btn.presenter-active {
+  .help-btn.tool-on {
     border-color: rgba(16, 185, 129, 0.6);
     color: #10b981 !important;
     background: rgba(16, 185, 129, 0.14) !important;
   }
 
-  /* ---------- Share popover ---------- */
-  .popover-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 98;
-    background: transparent;
-    border: none;
-  }
-
-  .share-popover {
-    position: fixed;
-    bottom: 4.25rem;
-    right: 1.5rem;
-    z-index: 99;
-    width: 250px;
-    border-radius: 12px;
-    border: 1px solid var(--color-border);
-    background: var(--color-bg-secondary);
-    box-shadow: 0 12px 32px var(--color-shadow);
-    padding: 0.4rem;
-    animation: popIn 0.16s ease;
-  }
-
-  @keyframes popIn {
-    from { opacity: 0; transform: translateY(6px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  .share-row {
+  /* Expanded tool tray slides out of the collapsed button */
+  .tool-tray {
     display: flex;
-    align-items: center;
     gap: 0.5rem;
-    width: 100%;
-    border: none;
-    border-radius: 8px;
-    background: transparent;
-    color: var(--color-text-primary);
-    font-size: 0.8125rem;
-    font-weight: 600;
-    text-align: left;
-    padding: 0.5rem 0.55rem;
-    cursor: pointer;
-    transition: background 0.15s ease;
+    animation: trayIn 0.18s ease;
   }
 
-  .share-row:hover {
-    background: rgba(16, 185, 129, 0.1);
-    color: #10b981;
+  @keyframes trayIn {
+    from { opacity: 0; transform: translateX(10px); }
+    to   { opacity: 1; transform: translateX(0); }
   }
 
-  .share-divider {
-    height: 1px;
-    background: var(--color-border);
-    margin: 0.25rem 0.35rem;
-  }
-
-  .target-emoji { font-size: 0.8125rem; }
-
-  .target-label {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0 0.55rem 0.45rem 2rem;
-    font-size: 0.7188rem;
-    color: var(--color-text-tertiary);
-  }
-
-  .target-label input {
-    width: 58px;
-    padding: 0.15rem 0.3rem;
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    background: var(--color-bg-primary);
-    color: var(--color-text-primary);
-    font-family: 'SF Mono', Monaco, monospace;
-    font-size: 0.7188rem;
-    font-weight: 600;
-  }
-
-  .target-label input:focus {
-    outline: none;
-    border-color: #10b981;
-  }
-
-  /* ---------- Presenter mode ----------
-     Text-level bumps live here as global rules; marker/trail geometry
-     scales via presenterStore inside the d3 components. */
-  :global(.presenter .readout) {
-    font-size: 0.8438rem !important;
-  }
-
-  :global(.presenter .vec-item) {
-    font-size: 0.8125rem !important;
-  }
-
-  :global(.presenter .loss-key) {
-    font-size: 0.75rem;
-  }
-
-  :global(.presenter .key-title) {
-    font-size: 0.75rem !important;
-  }
-
-  :global(.presenter svg .tick text) {
-    font-size: 12.5px;
-  }
-
-  :global(.presenter .latex-inline .katex) {
-    font-size: 1.35rem !important;
-  }
-
-  :global(.presenter .equation-label) {
-    font-size: 0.95rem !important;
-  }
-
-  :global(.presenter .race-legend) {
-    font-size: 0.8125rem !important;
-  }
-
-  :global(.presenter .divergence-banner) {
-    font-size: 0.95rem !important;
-  }
-  
   /* Main app container using CSS Grid for layout */
   .app-container {
     display: grid;
