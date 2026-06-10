@@ -14,7 +14,7 @@
   import * as d3 from 'd3';
   import { datasetStore, parametersStore, currentProblemConfig, selectedProblem, themeStore } from '../stores/stores';
   import type { DataPoint, ModelParameters } from '../types/types';
-  import { ScatterChart } from 'lucide-svelte';
+  import { ScatterChart, Eraser } from 'lucide-svelte';
   
   let svgElement: SVGSVGElement;
   let width = 400;
@@ -43,10 +43,13 @@
     problemType === 'source-localization' ||
     problemType === 'mean-shift';
 
-  // 1D curve-fitting plots are hand-editable: click empty space to add a
-  // training point, click a point to remove it. The loss landscape morphs
-  // live — the landscape IS the data.
+  // 1D curve-fitting plots are hand-editable via the toolbar: add train
+  // points, add test points, or erase. The loss landscape morphs live —
+  // the landscape IS the data.
   $: isEditable = !is2DPointProblem && problemType !== 'logistic-regression';
+
+  // Active editor tool (the toolbar's pressed button)
+  let editTool: 'train' | 'test' | 'erase' = 'train';
 
   // Last-drawn scales, kept for click → data-space inversion
   let lastXScale: d3.ScaleLinear<number, number> | null = null;
@@ -61,29 +64,28 @@
     const innerHeight = height - margin.top - margin.bottom;
     if (px < 0 || px > innerWidth || py < 0 || py > innerHeight) return;
 
-    // Click near an existing point removes it…
-    const all = $datasetStore.data;
-    let best = -1;
-    let bestD = 10 * 10;
-    all.forEach((p, i) => {
-      const dx = lastXScale!(p.x) - px;
-      const dy = lastYScale!(p.y) - py;
-      const d = dx * dx + dy * dy;
-      if (d < bestD) {
-        bestD = d;
-        best = i;
-      }
-    });
-    if (best >= 0) {
-      datasetStore.removePoint(best);
+    if (editTool === 'erase') {
+      // Remove the nearest point within reach
+      const all = $datasetStore.data;
+      let best = -1;
+      let bestD = 14 * 14;
+      all.forEach((p, i) => {
+        const dx = lastXScale!(p.x) - px;
+        const dy = lastYScale!(p.y) - py;
+        const d = dx * dx + dy * dy;
+        if (d < bestD) {
+          bestD = d;
+          best = i;
+        }
+      });
+      if (best >= 0) datasetStore.removePoint(best);
       return;
     }
 
-    // …anywhere else adds a training point
     datasetStore.addPoint({
       x: lastXScale.invert(px),
       y: lastYScale.invert(py),
-      isTraining: true
+      isTraining: editTool === 'train'
     });
   }
   
@@ -852,73 +854,105 @@
       <ScatterChart size={20} strokeWidth={2} />
       <span>Data</span>
     </h2>
-    <div class="legend-controls">
-      {#if problemType === 'logistic-regression' || problemType === 'circle-classifier'}
-        <div class="legend-item">
-          <div class="legend-symbol">
-            <svg width="18" height="18" viewBox="0 0 18 18">
-              <circle cx="9" cy="9" r="6" fill="#3b82f6" stroke="currentColor" stroke-width="1.5" />
-            </svg>
-          </div>
-          <span>{problemType === 'circle-classifier' ? 'Outside' : 'Class 0'}</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-symbol">
-            <svg width="18" height="18" viewBox="0 0 18 18">
-              <rect x="3" y="3" width="12" height="12" fill="#10b981" stroke="currentColor" stroke-width="1.5" />
-            </svg>
-          </div>
-          <span>{problemType === 'circle-classifier' ? 'Inside' : 'Class 1'}</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-symbol">
-            <svg width="18" height="18" viewBox="0 0 18 18">
-              <line x1="5" y1="5" x2="13" y2="13" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" />
-              <line x1="5" y1="13" x2="13" y2="5" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" />
-            </svg>
-          </div>
-          <span>Error</span>
-        </div>
-      {:else if problemType === 'source-localization'}
-        <div class="legend-item">
-          <div class="legend-symbol">
-            <svg width="18" height="18" viewBox="0 0 18 18">
-              <circle cx="9" cy="9" r="6" fill="#fbbf24" stroke="currentColor" stroke-width="1.5" />
-            </svg>
-          </div>
-          <span>Sensor</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-symbol">
-            <svg width="18" height="18" viewBox="0 0 18 18">
-              <circle cx="9" cy="9" r="4" fill="#10b981" stroke="#10b981" stroke-width="2" stroke-dasharray="3,1.5" />
-            </svg>
-          </div>
-          <span>True source</span>
-        </div>
-      {:else}
-        <span class="edit-hint" title="Click empty space to add a training point; click a point to remove it. The loss landscape reshapes live.">✎ editable</span>
-        <div class="legend-item">
-          <div class="legend-symbol">
-            <svg width="18" height="18" viewBox="0 0 18 18">
-              <circle cx="9" cy="9" r="6" fill="#3b82f6" stroke="#fff" stroke-width="1.5" />
-            </svg>
-          </div>
-          <span>Train</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-symbol">
-            <svg width="18" height="18" viewBox="0 0 18 18">
-              <circle cx="9" cy="9" r="6" fill="#10b981" stroke="#fff" stroke-width="1.5" stroke-dasharray="3,2" />
-            </svg>
-          </div>
-          <span>Test</span>
-        </div>
-      {/if}
-    </div>
+    {#if isEditable}
+      <div class="header-tools" role="toolbar" aria-label="Data editor">
+        <button
+          class="tool-btn"
+          class:active={editTool === 'train'}
+          title="Add training points — click anywhere on the plot. The loss landscape reshapes live."
+          aria-label="Add training points"
+          aria-pressed={editTool === 'train'}
+          on:click={() => (editTool = 'train')}
+        >
+          <svg width="15" height="15" viewBox="0 0 15 15" aria-hidden="true">
+            <circle cx="6" cy="9" r="4" fill="#3b82f6" />
+            <path d="M10.5 4.5 H14.5 M12.5 2.5 V6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          </svg>
+        </button>
+        <button
+          class="tool-btn"
+          class:active={editTool === 'test'}
+          title="Add test points — held out of training, they only score the fit"
+          aria-label="Add test points"
+          aria-pressed={editTool === 'test'}
+          on:click={() => (editTool = 'test')}
+        >
+          <svg width="15" height="15" viewBox="0 0 15 15" aria-hidden="true">
+            <circle cx="6" cy="9" r="4" fill="none" stroke="#10b981" stroke-width="1.8" stroke-dasharray="2.5,1.8" />
+            <path d="M10.5 4.5 H14.5 M12.5 2.5 V6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          </svg>
+        </button>
+        <button
+          class="tool-btn"
+          class:active={editTool === 'erase'}
+          title="Erase points — click a point to remove it (a dataset keeps at least 3)"
+          aria-label="Erase points"
+          aria-pressed={editTool === 'erase'}
+          on:click={() => (editTool = 'erase')}
+        >
+          <Eraser size={15} strokeWidth={2.2} />
+        </button>
+      </div>
+    {/if}
   </div>
   <div class="svg-container">
-    <svg bind:this={svgElement} width={width} height={height} class:editable={isEditable}></svg>
+    <svg
+      bind:this={svgElement}
+      width={width}
+      height={height}
+      class:editable={isEditable && editTool !== 'erase'}
+      class:erasing={isEditable && editTool === 'erase'}
+    ></svg>
+    <!-- Point legend, tucked into the plot like the landscape's keys -->
+    <div class="data-key" style="right: {margin.right + 8}px; bottom: {margin.bottom + 8}px;">
+      {#if problemType === 'logistic-regression' || problemType === 'circle-classifier'}
+        <span class="key-item">
+          <svg width="12" height="12" viewBox="0 0 18 18" aria-hidden="true">
+            <circle cx="9" cy="9" r="6" fill="#3b82f6" stroke="currentColor" stroke-width="1.5" />
+          </svg>
+          <span>{problemType === 'circle-classifier' ? 'Outside' : 'Class 0'}</span>
+        </span>
+        <span class="key-item">
+          <svg width="12" height="12" viewBox="0 0 18 18" aria-hidden="true">
+            <rect x="3" y="3" width="12" height="12" fill="#10b981" stroke="currentColor" stroke-width="1.5" />
+          </svg>
+          <span>{problemType === 'circle-classifier' ? 'Inside' : 'Class 1'}</span>
+        </span>
+        <span class="key-item">
+          <svg width="12" height="12" viewBox="0 0 18 18" aria-hidden="true">
+            <line x1="5" y1="5" x2="13" y2="13" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" />
+            <line x1="5" y1="13" x2="13" y2="5" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" />
+          </svg>
+          <span>Error</span>
+        </span>
+      {:else if problemType === 'source-localization'}
+        <span class="key-item">
+          <svg width="12" height="12" viewBox="0 0 18 18" aria-hidden="true">
+            <circle cx="9" cy="9" r="6" fill="#fbbf24" stroke="currentColor" stroke-width="1.5" />
+          </svg>
+          <span>Sensor</span>
+        </span>
+        <span class="key-item">
+          <svg width="12" height="12" viewBox="0 0 18 18" aria-hidden="true">
+            <circle cx="9" cy="9" r="4" fill="#10b981" stroke="#10b981" stroke-width="2" stroke-dasharray="3,1.5" />
+          </svg>
+          <span>True source</span>
+        </span>
+      {:else}
+        <span class="key-item">
+          <svg width="12" height="12" viewBox="0 0 18 18" aria-hidden="true">
+            <circle cx="9" cy="9" r="6" fill="#3b82f6" stroke="#fff" stroke-width="1.5" />
+          </svg>
+          <span>Train</span>
+        </span>
+        <span class="key-item">
+          <svg width="12" height="12" viewBox="0 0 18 18" aria-hidden="true">
+            <circle cx="9" cy="9" r="6" fill="#10b981" stroke="#fff" stroke-width="1.5" stroke-dasharray="3,2" />
+          </svg>
+          <span>Test</span>
+        </span>
+      {/if}
+    </div>
   </div>
 </div>
 
@@ -966,45 +1000,89 @@
       gap: 0.375rem;
     }
     .header { margin-right: 0; margin-bottom: 0.125rem; }
-    .legend-item { font-size: 0.75rem; }
-  }
-  
-  .legend-controls {
-    display: flex;
-    gap: 0.75rem;
-    align-items: center;
+    .data-key { font-size: 0.625rem; }
   }
 
-  .edit-hint {
-    font-size: 0.6875rem;
-    font-weight: 600;
+  /* ---------- Data editor toolbar (same family as the landscape's) ---------- */
+  .header-tools {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-shrink: 0;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 1px;
+  }
+
+  .tool-btn {
+    width: 26px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
     color: var(--color-text-tertiary);
-    opacity: 0.75;
-    cursor: help;
-    white-space: nowrap;
+    padding: 0;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .tool-btn:hover {
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.1);
+  }
+
+  .tool-btn.active {
+    background: rgba(16, 185, 129, 0.16);
+    color: #10b981;
   }
 
   svg.editable {
     cursor: crosshair;
   }
-  
-  .legend-item {
+
+  svg.erasing {
+    cursor: pointer;
+  }
+
+  /* ---------- In-plot point legend (mirrors the landscape's corner keys) ---------- */
+  .data-key {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 0.35rem 0.5rem;
+    border-radius: 8px;
+    pointer-events: none;
+    z-index: 3;
+  }
+
+  :global([data-theme='light']) .data-key {
+    background: rgba(255, 255, 255, 0.78);
+    color: #475569;
+  }
+
+  :global([data-theme='dark']) .data-key {
+    background: rgba(6, 9, 19, 0.68);
+    color: #94a3b8;
+  }
+
+  .key-item {
     display: flex;
     align-items: center;
-    gap: 0.375rem;
-    font-size: 0.8125rem;
-    color: var(--color-text-tertiary);
-    font-weight: 500;
+    gap: 0.3rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    white-space: nowrap;
   }
-  
-  .legend-symbol {
-    width: 18px;
-    height: 18px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+
+  .key-item svg {
+    flex-shrink: 0;
   }
-  
+
   .svg-container {
     flex: 1;
     min-height: 0;

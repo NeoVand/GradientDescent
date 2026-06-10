@@ -30,10 +30,14 @@
     raceStore,
     trainingStore,
     presenterStore,
-    challengeStore
+    challengeStore,
+    optimizerStore,
+    optimizerStateStore
   } from '../stores/stores';
   import { basinStore, ensureBasins, BASIN_COLORS } from '../utils/basins';
   import { optimizers } from '../utils/optimizers';
+  import { schedules } from '../utils/schedules';
+  import { runStartStep } from '../utils/trainer';
   import {
     computeHessian,
     eigenSym2,
@@ -195,6 +199,35 @@
     } finally {
       exporting = false;
     }
+  }
+
+  // ---------- Next-step ghost ----------
+  // A dry run of the SELECTED optimizer's next update from the current
+  // position — velocity and adaptive state included, schedule applied.
+  // Step functions are pure (they return new state), so nothing leaks.
+  $: nextPreview = computeNextPreview(
+    parameters,
+    currentGradient,
+    $optimizerStore,
+    $optimizerStateStore,
+    $trainingStore,
+    $runStartStep
+  );
+
+  function computeNextPreview(
+    params: ModelParameters,
+    grad: ModelParameters | null,
+    sel: typeof $optimizerStore,
+    state: typeof $optimizerStateStore,
+    t: typeof $trainingStore,
+    startStep: number
+  ): ModelParameters | null {
+    if (!grad) return null;
+    const tInRun = Math.max(0, t.currentStep - startStep);
+    const effLr = t.learningRate * schedules[t.schedule].factor(tInRun, t.totalSteps);
+    const out = optimizers[sel.id].step(params, grad, state, effLr, sel.hyper);
+    if (!Number.isFinite(out.params.a) || !Number.isFinite(out.params.b)) return null;
+    return out.params;
   }
 
   // ---------- SGD gradient fan ----------
@@ -763,6 +796,42 @@
 
     drawLens(marker, kx, ky);
     drawFan(marker, kx, ky);
+    drawGhost(marker, kx, ky);
+  }
+
+  /** Dashed circle at the optimizer's predicted next position. */
+  function drawGhost(
+    marker: d3.Selection<SVGGElement, unknown, null, undefined>,
+    kx: number,
+    ky: number
+  ) {
+    const layer = marker.select<SVGGElement>('.ghost-layer');
+    if (layer.empty()) return;
+    layer.selectAll('*').remove();
+    if (!nextPreview || markerOffMap || race) return;
+
+    const dx = (nextPreview.a - parameters.a) * kx;
+    const dy = -(nextPreview.b - parameters.b) * ky;
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) return;
+    // Converged (or a microscopic step): no ghost — it would just sit
+    // under the marker.
+    if (Math.hypot(dx, dy) < 4) return;
+
+    layer.append('line')
+      .attr('x1', 0).attr('y1', 0)
+      .attr('x2', dx).attr('y2', dy)
+      .attr('stroke', '#f59e0b')
+      .attr('stroke-width', 1)
+      .attr('stroke-dasharray', '2,3')
+      .style('opacity', 0.55);
+    layer.append('circle')
+      .attr('cx', dx).attr('cy', dy)
+      .attr('r', 6 * pm)
+      .attr('fill', 'none')
+      .attr('stroke', '#f59e0b')
+      .attr('stroke-width', 1.5)
+      .attr('stroke-dasharray', '3,3')
+      .style('opacity', 0.8);
   }
 
   /** The minibatch noise cloud: faint −∇ℒ_batch rays around the marker. */
@@ -937,6 +1006,11 @@
       .attr('class', 'fan-layer')
       .style('pointer-events', 'none');
 
+    // Next-step ghost (dashed preview of the optimizer's landing point)
+    marker.append('g')
+      .attr('class', 'ghost-layer')
+      .style('pointer-events', 'none');
+
     // Direction vectors (under the ring, above the hit area). Blue =
     // steepest descent −∇ℒ; red = the optimizer's actual last step Δθ.
     marker.append('line')
@@ -1084,48 +1158,50 @@
       {/if}
     </div>
     {#if view === '2d' || oneParam}
-      <div class="header-tools">
+      <div class="header-tools" role="toolbar" aria-label="Landscape tools">
         {#if !oneParam}
           <button
-            class="tool-toggle"
+            class="tool-btn"
             class:active={lensOn}
             title="Curvature lens — the local Hessian's ellipse at the marker, condition number κ, and the Newton step a second-order method would take"
+            aria-label="Curvature lens"
             aria-pressed={lensOn}
             on:click={toggleLens}
           >
-            <Orbit size={14} strokeWidth={2.2} />
-            <span>Curvature</span>
+            <Orbit size={15} strokeWidth={2.2} />
           </button>
         {/if}
         <button
-          class="tool-toggle"
+          class="tool-btn"
           class:active={basinsOn}
           title="Basins of attraction — every point colored by WHICH minimum plain gradient descent (at the current γ) reaches from there. Same color = same destination."
+          aria-label="Basins of attraction"
           aria-pressed={basinsOn}
           on:click={toggleBasins}
         >
           {#if basinComputing}
             <span class="tool-spinner" aria-hidden="true"></span>
           {:else}
-            <MapIcon size={14} strokeWidth={2.2} />
+            <MapIcon size={15} strokeWidth={2.2} />
           {/if}
-          <span>Basins</span>
         </button>
         {#if videoSupported && !oneParam}
           <button
-            class="tool-toggle"
+            class="tool-btn"
             disabled={!canExport}
-            title={canExport
-              ? 'Export the last run as a WebM video for slides'
-              : 'Run a training first — then export it as a video'}
+            title={exporting
+              ? 'Recording…'
+              : canExport
+                ? 'Export the last run as a WebM video for slides'
+                : 'Run a training first — then export it as a video'}
+            aria-label="Export run as video"
             on:click={exportRun}
           >
             {#if exporting}
               <span class="tool-spinner" aria-hidden="true"></span>
             {:else}
-              <Video size={14} strokeWidth={2.2} />
+              <Video size={15} strokeWidth={2.2} />
             {/if}
-            <span>{exporting ? 'Recording' : 'Export'}</span>
           </button>
         {/if}
       </div>
@@ -1191,14 +1267,12 @@
           </svg>
           <span>Δθ</span>
         </span>
-        {#if oneParam}
-          <span class="vec-item" title="Where one plain gradient-descent step would land: α − γ·dℒ/dα">
-            <svg width="20" height="10" viewBox="0 0 20 10" aria-hidden="true">
-              <circle cx="10" cy="5" r="4" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="2.5,2" />
-            </svg>
-            <span>next GD step</span>
-          </span>
-        {/if}
+        <span class="vec-item" title="Where the selected optimizer's next update would land from here — momentum velocity, adaptive scaling, and the γ schedule all included. A dry run of the real step.">
+          <svg width="20" height="10" viewBox="0 0 20 10" aria-hidden="true">
+            <circle cx="10" cy="5" r="4" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="2.5,2" />
+          </svg>
+          <span>next step</span>
+        </span>
         {#if fanActive}
           <span class="vec-item" title="Each faint ray is −∇ℒ on a different random minibatch — the gradient is a noisy estimate, and this is its spread. The solid blue arrow is the full-batch direction.">
             <svg width="20" height="10" viewBox="0 0 20 10" aria-hidden="true">
@@ -1344,46 +1418,46 @@
     min-width: 0;
   }
 
-  /* Right-side header tools: small icon+label toggles (curvature, basins) */
+  /* Right-side header toolbar: compact icon-only buttons; the title
+     attribute carries the explanation on hover. */
   .header-tools {
     display: flex;
     align-items: center;
-    gap: 0.375rem;
+    gap: 0.25rem;
     flex-shrink: 0;
-  }
-
-  .tool-toggle {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
     border: 1px solid var(--color-border);
     border-radius: 8px;
+    padding: 1px;
+  }
+
+  .tool-btn {
+    width: 26px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 6px;
     background: transparent;
     color: var(--color-text-tertiary);
-    font-size: 0.6875rem;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-    padding: 0.2rem 0.55rem;
+    padding: 0;
     cursor: pointer;
     transition: all 0.15s ease;
   }
 
-  .tool-toggle:hover {
+  .tool-btn:hover:not(:disabled) {
     color: #10b981;
-    border-color: #10b981;
+    background: rgba(16, 185, 129, 0.1);
   }
 
-  .tool-toggle.active {
+  .tool-btn.active {
     background: rgba(16, 185, 129, 0.16);
-    border-color: rgba(16, 185, 129, 0.5);
     color: #10b981;
   }
 
-  .tool-toggle:disabled {
-    opacity: 0.45;
+  .tool-btn:disabled {
+    opacity: 0.4;
     cursor: default;
-    color: var(--color-text-tertiary);
-    border-color: var(--color-border);
   }
 
   .tool-spinner {

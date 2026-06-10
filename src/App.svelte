@@ -593,7 +593,7 @@
     background-color: var(--color-bg-secondary);
     border-radius: 16px;
     box-shadow: none;
-    padding: 1.25rem;
+    padding: 0.875rem 1.125rem;
     overflow: hidden;
     min-height: 0;
   }

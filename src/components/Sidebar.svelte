@@ -750,7 +750,7 @@
   .sidebar-content {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.375rem;
     height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
@@ -801,10 +801,10 @@
   .section {
     background: var(--color-bg-primary);
     border-radius: 12px;
-    padding: 0.625rem 0.75rem 0.75rem;
+    padding: 0.45rem 0.7rem 0.55rem;
     display: flex;
     flex-direction: column;
-    gap: 0.625rem;
+    gap: 0.3rem;
     flex-shrink: 0;
   }
 
@@ -823,7 +823,7 @@
     text-transform: uppercase;
     letter-spacing: 0.12em;
     color: #10b981;
-    min-height: 18px;
+    min-height: 15px;
   }
 
   /* ---------- Row grammar: [icon] Label (i) ······· value ---------- */
@@ -831,7 +831,7 @@
     display: flex;
     align-items: center;
     gap: 0.45rem;
-    min-height: 22px;
+    min-height: 20px;
   }
 
   .row .icon {
@@ -864,7 +864,7 @@
   .ctl {
     display: flex;
     flex-direction: column;
-    gap: 0.3rem;
+    gap: 0.1rem;
   }
 
   .greek-label {
@@ -952,7 +952,7 @@
 
   .problem-button {
     width: 100%;
-    height: 40px;
+    height: 34px;
     padding: 0 0.7rem;
     border: 2px solid var(--color-border);
     border-radius: 9px;
@@ -1015,16 +1015,31 @@
     z-index: 30;
   }
 
-  /* Scroll container: no scrollbar — the edge fades are the affordance */
+  /* Scroll container: deliberately shorter than the list (the cut lands
+     mid-item), with a hairline scrollbar + strong edge fades so "there's
+     more" is unmistakable. */
   .dropdown-scroll {
-    max-height: min(64vh, 560px);
+    max-height: min(46vh, 400px);
     overflow-y: auto;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(16, 185, 129, 0.35) transparent;
   }
 
   .dropdown-scroll::-webkit-scrollbar {
-    display: none;
+    width: 4px;
+  }
+
+  .dropdown-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .dropdown-scroll::-webkit-scrollbar-thumb {
+    background: rgba(16, 185, 129, 0.35);
+    border-radius: 2px;
+  }
+
+  .dropdown-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(16, 185, 129, 0.6);
   }
 
   /* Edge fades: content melts into the dropdown background where there's
@@ -1033,7 +1048,7 @@
     position: absolute;
     left: 0;
     right: 0;
-    height: 34px;
+    height: 64px;
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.18s ease;
@@ -1041,12 +1056,22 @@
 
   .fade-top {
     top: 0;
-    background: linear-gradient(to bottom, var(--color-bg-secondary) 18%, transparent);
+    background: linear-gradient(
+      to bottom,
+      var(--color-bg-secondary) 22%,
+      color-mix(in srgb, var(--color-bg-secondary) 72%, transparent) 55%,
+      transparent
+    );
   }
 
   .fade-bottom {
     bottom: 0;
-    background: linear-gradient(to top, var(--color-bg-secondary) 18%, transparent);
+    background: linear-gradient(
+      to top,
+      var(--color-bg-secondary) 22%,
+      color-mix(in srgb, var(--color-bg-secondary) 72%, transparent) 55%,
+      transparent
+    );
   }
 
   .scroll-fade.visible {
@@ -1127,7 +1152,7 @@
     font-size: 0.6563rem;
     font-weight: 700;
     letter-spacing: 0.02em;
-    padding: 0.3rem 0;
+    padding: 0.22rem 0;
     cursor: pointer;
     transition: all 0.15s ease;
   }
@@ -1191,7 +1216,7 @@
     -webkit-appearance: none;
     appearance: none;
     cursor: pointer;
-    margin: 2px 0;
+    margin: 0;
   }
 
   #train-ratio {
@@ -1327,8 +1352,8 @@
   }
 
   .step-button {
-    width: 38px;
-    height: 38px;
+    width: 34px;
+    height: 34px;
     padding: 0;
     border: 2px solid var(--color-border);
     border-radius: 8px;
@@ -1363,7 +1388,7 @@
     font-size: 0.875rem;
     cursor: pointer;
     transition: all 0.2s;
-    min-height: 38px;
+    min-height: 34px;
     position: relative;
     overflow: hidden;
   }
@@ -1397,7 +1422,7 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    padding: 0.625rem 0.75rem;
+    padding: 0.45rem 0.75rem;
   }
 
   :global([data-theme='light']) .button-content {
@@ -1440,8 +1465,8 @@
   }
 
   .reset-button {
-    width: 38px;
-    height: 38px;
+    width: 34px;
+    height: 34px;
     padding: 0;
     border: 2px solid var(--color-border);
     border-radius: 8px;
@@ -1469,7 +1494,7 @@
     justify-content: center;
     gap: 0.45rem;
     width: 100%;
-    padding: 0.45rem;
+    padding: 0.35rem;
     border: 1px dashed rgba(16, 185, 129, 0.5);
     border-radius: 8px;
     background: rgba(16, 185, 129, 0.06);

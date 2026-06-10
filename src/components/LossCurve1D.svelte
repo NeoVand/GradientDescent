@@ -9,7 +9,8 @@
    *     heatmap, so this view is literally one slice of the 2D map
    *   - the draggable marker ball ON the curve, with the tangent line at it
    *   - blue −∇ℒ / red Δθ arrows (same semantics as the 2D marker)
-   *   - a dashed ghost ball previewing one plain-GD step: α − γ·dℒ/dα
+   *   - a dashed ghost ball previewing the SELECTED optimizer's next step
+   *     (a dry run of its pure step fn — velocity/adaptive state included)
    *   - a fading red trail of past positions, pinned to the current curve
    *
    * Shares the parent's width/height/margins so the plot frame aligns
@@ -32,6 +33,10 @@
   } from '../stores/stores';
   import { viridisRGB } from '../utils/lossGrid';
   import { basinStore, BASIN_COLORS } from '../utils/basins';
+  import { optimizers } from '../utils/optimizers';
+  import { schedules } from '../utils/schedules';
+  import { runStartStep } from '../utils/trainer';
+  import { optimizerStore, optimizerStateStore } from '../stores/stores';
 
   export let width = 400;
   export let height = 400;
@@ -54,6 +59,8 @@
   $: problemConfig = $currentProblemConfig;
   $: theme = $themeStore;
   $: learningRate = $trainingStore.learningRate;
+  $: optimizerSel = $optimizerStore;
+  $: optimizerState = $optimizerStateStore;
   $: race = $raceStore;
   $: parameterRange = problemConfig?.parameterRange ?? defaultParameterRange;
 
@@ -85,8 +92,9 @@
     redraw();
   }
 
-  // Light updates while training / dragging elsewhere
-  $: if (svgElement && (parameters || history) && learningRate && !isDragging) {
+  // Light updates while training / dragging elsewhere (the next-step ghost
+  // also depends on the optimizer and its internal state)
+  $: if (svgElement && (parameters || history) && learningRate && optimizerSel && optimizerState && !isDragging) {
     updateDynamics();
   }
 
@@ -463,11 +471,25 @@
         .style('opacity', 0.85);
     }
 
-    // Ghost: one plain-GD step from here, α − γ·dℒ/dα
+    // Ghost: where the SELECTED optimizer's next update would land —
+    // momentum velocity and adaptive state included, schedule applied.
     const ghostLayer = plotGroup.select<SVGGElement>('.ghost-layer');
     ghostLayer.selectAll('*').remove();
     if (Number.isFinite(slope) && !pos.offMap && !race) {
-      const aNext = Math.max(parameterRange.min, Math.min(parameterRange.max, a0 - learningRate * slope));
+      const t = $trainingStore;
+      const tInRun = Math.max(0, t.currentStep - $runStartStep);
+      const effLr = t.learningRate * schedules[t.schedule].factor(tInRun, t.totalSteps);
+      const grad = problemConfig.computeGradient(trainData, { a: a0, b: parameters.b });
+      // Optimizer steps are pure (state returned, never mutated), so this
+      // is a true dry run of the next update.
+      const preview = optimizers[optimizerSel.id].step(
+        { a: a0, b: parameters.b },
+        grad,
+        optimizerState,
+        effLr,
+        optimizerSel.hyper
+      );
+      const aNext = Math.max(parameterRange.min, Math.min(parameterRange.max, preview.params.a));
       if (Math.abs(aNext - a0) > span * 0.005) {
         const gx = xScale(aNext);
         const gy = Math.max(0, Math.min(innerHeight, yScale(lossAt(aNext))));
