@@ -360,6 +360,34 @@ function createLandscapeViewStore() {
 
 export const landscapeViewStore = createLandscapeViewStore();
 
+// ========== Presenter Mode Store ==========
+// Lecture-hall mode: bigger fonts, fatter markers and trails, so the room
+// can read the projector. Persisted per visitor; toggled with P.
+function createPresenterStore() {
+  const initial = typeof window !== 'undefined' && localStorage.getItem('gd-presenter') === '1';
+  const { subscribe, set, update } = writable<boolean>(initial);
+
+  const persist = (on: boolean) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('gd-presenter', on ? '1' : '0');
+      document.documentElement.classList.toggle('presenter', on);
+    }
+    return on;
+  };
+
+  if (typeof window !== 'undefined') {
+    document.documentElement.classList.toggle('presenter', initial);
+  }
+
+  return {
+    subscribe,
+    set: (on: boolean) => set(persist(on)),
+    toggle: () => update(on => persist(!on))
+  };
+}
+
+export const presenterStore = createPresenterStore();
+
 // ========== Theme Store ==========
 // Manages the current theme (light or dark)
 export type Theme = 'light' | 'dark';

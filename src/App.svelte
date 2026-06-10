@@ -10,9 +10,22 @@
   import LossHistory from './components/LossHistory.svelte';
   import GuidePanel from './components/GuidePanel.svelte';
   import HelpModal from './components/HelpModal.svelte';
-  import { datasetStore, parametersStore, recordInitialHistory, currentProblemConfig, themeStore, showCoach } from './stores/stores';
+  import {
+    datasetStore,
+    parametersStore,
+    recordInitialHistory,
+    currentProblemConfig,
+    themeStore,
+    showCoach,
+    presenterStore,
+    trainingStore,
+    landscapeViewStore,
+    historyStore,
+    resetOptimizerState
+  } from './stores/stores';
+  import { startTraining, stopTraining, stepOnce, resetRun } from './utils/trainer';
   import { applyUrlState, encodeStateUrl } from './utils/urlState';
-  import { Sun, Moon, HelpCircle, Menu, X, Share2 } from 'lucide-svelte';
+  import { Sun, Moon, HelpCircle, Menu, X, Share2, Presentation } from 'lucide-svelte';
 
   // The main app orchestrates all our components and manages the overall layout.
   // We use CSS Grid for a responsive, flexible layout that adapts to different screen sizes.
@@ -73,7 +86,90 @@
   function toggleTheme() {
     themeStore.toggle();
   }
+
+  // ---------- Keyboard shortcuts ----------
+  // Space train/pause · S step · R reset · arrows nudge the marker
+  // (Shift = bigger nudge) · D 2D/3D · P presenter mode.
+  function nudgeMarker(da: number, db: number, fine: boolean) {
+    const cfg = $currentProblemConfig;
+    if (!cfg) return;
+    const range = cfg.parameterRange ?? { min: -7, max: 7 };
+    const step = (range.max - range.min) * (fine ? 0.05 : 0.01);
+    if (cfg.oneParam) db = 0;
+    const p = $parametersStore;
+    const next = {
+      a: Math.max(range.min, Math.min(range.max, p.a + da * step)),
+      b: Math.max(range.min, Math.min(range.max, p.b + db * step))
+    };
+    if (next.a === p.a && next.b === p.b) return;
+    resetOptimizerState();
+    parametersStore.set(next);
+    // Keep the trail and loss chart honest, like a marker drag does
+    const data = $datasetStore.data;
+    const train = data.filter(d => d.isTraining);
+    const test = data.filter(d => !d.isTraining);
+    const h = $historyStore;
+    historyStore.addPoint({
+      step: h.length > 0 ? h[h.length - 1].step + 1 : 0,
+      trainLoss: cfg.computeLoss(train, next),
+      testLoss: cfg.computeLoss(test, next),
+      parameters: next
+    });
+  }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (showHelpModal || drawerOpen) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const t = e.target as HTMLElement | null;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    // A focused button already handles Space natively — don't double-fire.
+    if (e.key === ' ' && t && t.tagName === 'BUTTON') return;
+
+    switch (e.key) {
+      case ' ':
+        e.preventDefault();
+        if ($trainingStore.isTraining) stopTraining();
+        else startTraining();
+        break;
+      case 's':
+      case 'S':
+        stepOnce();
+        break;
+      case 'r':
+      case 'R':
+        resetRun();
+        break;
+      case 'd':
+      case 'D':
+        if (!$currentProblemConfig?.oneParam) {
+          landscapeViewStore.set($landscapeViewStore === '2d' ? '3d' : '2d');
+        }
+        break;
+      case 'p':
+      case 'P':
+        presenterStore.toggle();
+        break;
+      case 'ArrowLeft':
+        e.preventDefault();
+        nudgeMarker(-1, 0, e.shiftKey);
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        nudgeMarker(1, 0, e.shiftKey);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        nudgeMarker(0, 1, e.shiftKey);
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        nudgeMarker(0, -1, e.shiftKey);
+        break;
+    }
+  }
 </script>
+
+<svelte:window on:keydown={handleKeydown} />
 
 <!-- Mobile top bar: only visible on small screens -->
 <header class="mobile-topbar">
@@ -137,6 +233,14 @@
 
 <!-- Desktop floating buttons (hidden on mobile, replaced by topbar) -->
 <div class="floating-buttons">
+  <button
+    class="help-btn"
+    class:presenter-active={$presenterStore}
+    on:click={() => presenterStore.toggle()}
+    title="Presenter mode (P) — bigger text and markers for the projector"
+  >
+    <Presentation size={18} strokeWidth={2.5} />
+  </button>
   <button class="help-btn" on:click={shareScenario} title="Copy a link to this exact scenario">
     <Share2 size={18} strokeWidth={2.5} />
   </button>
@@ -277,10 +381,55 @@
   :global([data-theme='light']) .theme-toggle:hover {
     background: rgba(255, 255, 255, 0.9);
   }
-  
+
   :global([data-theme='dark']) .help-btn:hover,
   :global([data-theme='dark']) .theme-toggle:hover {
     background: rgba(30, 41, 59, 0.8);
+  }
+
+  .help-btn.presenter-active {
+    border-color: rgba(16, 185, 129, 0.6);
+    color: #10b981 !important;
+    background: rgba(16, 185, 129, 0.14) !important;
+  }
+
+  /* ---------- Presenter mode ----------
+     Text-level bumps live here as global rules; marker/trail geometry
+     scales via presenterStore inside the d3 components. */
+  :global(.presenter .readout) {
+    font-size: 0.8438rem !important;
+  }
+
+  :global(.presenter .vec-item) {
+    font-size: 0.8125rem !important;
+  }
+
+  :global(.presenter .loss-key) {
+    font-size: 0.75rem;
+  }
+
+  :global(.presenter .key-title) {
+    font-size: 0.75rem !important;
+  }
+
+  :global(.presenter svg .tick text) {
+    font-size: 12.5px;
+  }
+
+  :global(.presenter .latex-inline .katex) {
+    font-size: 1.35rem !important;
+  }
+
+  :global(.presenter .equation-label) {
+    font-size: 0.95rem !important;
+  }
+
+  :global(.presenter .race-legend) {
+    font-size: 0.8125rem !important;
+  }
+
+  :global(.presenter .divergence-banner) {
+    font-size: 0.95rem !important;
   }
   
   /* Main app container using CSS Grid for layout */

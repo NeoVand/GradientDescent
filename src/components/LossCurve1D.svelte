@@ -27,7 +27,8 @@
     resetOptimizerState,
     divergenceStore,
     clearCoach,
-    raceStore
+    raceStore,
+    presenterStore
   } from '../stores/stores';
   import { viridisRGB } from '../utils/lossGrid';
   import { basinStore, BASIN_COLORS } from '../utils/basins';
@@ -77,8 +78,11 @@
   $: basin = $basinStore;
   $: basinActive = basinsOn && basin.status === 'ready' && basin.scene?.oneParam === true;
 
+  // Presenter mode scales marker/trail geometry for the projector.
+  $: pm = $presenterStore ? 1.45 : 1;
+
   // Full rebuild when the curve shape itself can change.
-  $: if (svgElement && problemConfig && data && theme && width && height && basinActive !== undefined) {
+  $: if (svgElement && problemConfig && data && theme && width && height && basinActive !== undefined && pm) {
     redraw();
   }
 
@@ -275,7 +279,7 @@
       .attr('d', line)
       .attr('fill', 'none')
       .attr('stroke', isDark ? '#10b981' : '#059669')
-      .attr('stroke-width', 2.5)
+      .attr('stroke-width', 2.5 * pm)
       .attr('stroke-linejoin', 'round');
 
     // Dynamic layers (cleared and refilled by updateDynamics)
@@ -352,7 +356,7 @@
 
     marker.append('circle')
       .attr('class', 'marker-ring')
-      .attr('r', 10)
+      .attr('r', 10 * pm)
       .attr('fill', 'none')
       .attr('stroke', '#f59e0b')
       .attr('stroke-width', 2)
@@ -360,7 +364,7 @@
 
     marker.append('circle')
       .attr('class', 'marker-dot')
-      .attr('r', 6)
+      .attr('r', 6 * pm)
       .attr('fill', '#f59e0b')
       .attr('stroke', '#fff')
       .attr('stroke-width', 2)
@@ -431,11 +435,11 @@
         .attr('x2', Math.sign(dir) * len).attr('y2', dy);
     };
 
-    setVec(marker.select('.vec-grad'), Math.abs(slope) < 1e-12 ? 0 : -Math.sign(slope), 32, -9);
+    setVec(marker.select('.vec-grad'), Math.abs(slope) < 1e-12 ? 0 : -Math.sign(slope), 32 * pm, -9 * pm);
 
     const n = history.length;
     const da = n >= 2 ? history[n - 1].parameters.a - history[n - 2].parameters.a : 0;
-    setVec(marker.select('.vec-upd'), Math.abs(da) < 1e-9 * span ? 0 : Math.sign(da), 24, 9);
+    setVec(marker.select('.vec-upd'), Math.abs(da) < 1e-9 * span ? 0 : Math.sign(da), 24 * pm, 9 * pm);
 
     // Tangent line through (α₀, ℒ(α₀)) with slope dℒ/dα
     const tangentLayer = plotGroup.select<SVGGElement>('.tangent-layer');
@@ -477,7 +481,7 @@
           .style('opacity', 0.55);
         ghostLayer.append('circle')
           .attr('cx', gx).attr('cy', gy)
-          .attr('r', 6)
+          .attr('r', 6 * pm)
           .attr('fill', 'none')
           .attr('stroke', '#f59e0b')
           .attr('stroke-width', 1.5)
@@ -500,7 +504,7 @@
         trailLayer.append('circle')
           .attr('cx', xScale(a))
           .attr('cy', Math.max(0, Math.min(innerHeight, yScale(lossAt(a)))))
-          .attr('r', 1.5 + progress * 3.5)
+          .attr('r', (1.5 + progress * 3.5) * pm)
           .attr('fill', '#ef4444')
           .style('opacity', 0.05 + progress * 0.7);
       }
@@ -522,7 +526,7 @@
       layer.append('circle')
         .attr('cx', xScale(a))
         .attr('cy', Math.max(0, Math.min(innerHeight, yScale(lossAt(a)))))
-        .attr('r', r.finished ? 5.5 : 4.5)
+        .attr('r', (r.finished ? 5.5 : 4.5) * pm)
         .attr('fill', r.color)
         .attr('stroke', '#fff')
         .attr('stroke-width', 1.2)

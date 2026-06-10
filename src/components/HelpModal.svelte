@@ -455,6 +455,19 @@
             </li>
           </ul>
         </section>
+
+        <!-- ============================== KEYBOARD ============================== -->
+        <section>
+          <h3><Zap size={18} strokeWidth={2} /> Keyboard</h3>
+          <div class="kbd-row">
+            <span class="kbd-item"><kbd>Space</kbd> Train / Pause</span>
+            <span class="kbd-item"><kbd>S</kbd> Step</span>
+            <span class="kbd-item"><kbd>R</kbd> Reset</span>
+            <span class="kbd-item"><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> Nudge marker <span class="kbd-note">(⇧ = bigger)</span></span>
+            <span class="kbd-item"><kbd>D</kbd> 2D / 3D</span>
+            <span class="kbd-item"><kbd>P</kbd> Presenter mode</span>
+          </div>
+        </section>
       </div>
 
       <footer class="modal-footer">
@@ -926,6 +939,43 @@
   /* ---------- Viz list ---------- */
   .viz-list { padding-left: 1.25rem; }
   .viz-list li { margin-bottom: 0.5rem; }
+
+  /* ---------- Keyboard ---------- */
+  .kbd-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.625rem 1.25rem;
+    align-items: center;
+  }
+
+  .kbd-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+  }
+
+  .kbd-item kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.5rem;
+    padding: 0.1rem 0.4rem;
+    border: 1px solid var(--color-border);
+    border-bottom-width: 2px;
+    border-radius: 6px;
+    background: var(--color-bg-primary);
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: var(--color-text-primary);
+  }
+
+  .kbd-note {
+    font-size: 0.6875rem;
+    opacity: 0.7;
+  }
 
   /* ---------- Footer ---------- */
   .modal-footer {
