@@ -30,8 +30,17 @@
     raceStore
   } from '../stores/stores';
   import { optimizers } from '../utils/optimizers';
+  import {
+    computeHessian,
+    eigenSym2,
+    conditionNumber,
+    newtonStep,
+    isPositiveDefinite,
+    type Hessian2,
+    type Eigen2
+  } from '../utils/hessian';
   import type { ModelParameters } from '../types/types';
-  import { Mountain } from 'lucide-svelte';
+  import { Mountain, Orbit } from 'lucide-svelte';
   import LossCurve1D from './LossCurve1D.svelte';
 
   // Component references
@@ -75,6 +84,60 @@
   $: trainData = data.filter(d => d.isTraining);
   $: currentGradient = computeGrad(trainData, parameters, problemConfig);
   $: gradMag = currentGradient ? Math.hypot(currentGradient.a, currentGradient.b) : 0;
+
+  // ---------- Curvature lens ----------
+  // Local Hessian at the marker: principal-axis ellipse, condition number,
+  // and the Newton ghost step. Off by default; persisted per visitor.
+  let lensOn = typeof window !== 'undefined' && localStorage.getItem('gd-lens') === '1';
+
+  function toggleLens() {
+    lensOn = !lensOn;
+    if (typeof window !== 'undefined') localStorage.setItem('gd-lens', lensOn ? '1' : '0');
+    updateTrail(); // repaint the marker layer with/without the lens
+  }
+
+  interface LensInfo {
+    hess: Hessian2;
+    eig: Eigen2;
+    kappa: number;
+    newton: ModelParameters | null;
+    posDef: boolean;
+  }
+
+  $: lensInfo = computeLensInfo(lensOn, oneParam, parameters, trainData, problemConfig, currentGradient);
+
+  function computeLensInfo(
+    on: boolean,
+    is1D: boolean,
+    params: ModelParameters,
+    train: typeof trainData,
+    config: typeof problemConfig,
+    grad: ModelParameters | null
+  ): LensInfo | null {
+    if (!on || is1D || !config || !grad) return null;
+    if (train.length === 0 && !config.noData) return null;
+    const hess = computeHessian(config, train, params);
+    if (![hess.h11, hess.h12, hess.h22].every(Number.isFinite)) return null;
+    const eig = eigenSym2(hess);
+    return {
+      hess,
+      eig,
+      kappa: conditionNumber(eig),
+      newton: newtonStep(hess, grad),
+      posDef: isPositiveDefinite(hess)
+    };
+  }
+
+  // Repaint the marker layer when the lens recomputes outside drags/training
+  $: if (svgElement && lensInfo !== undefined && !isDragging) {
+    updateTrail();
+  }
+
+  function fmtKappa(k: number): string {
+    if (!Number.isFinite(k)) return '∞';
+    if (k >= 100) return k.toExponential(1).replace('e+', 'e');
+    return k.toFixed(1);
+  }
 
   function computeGrad(
     train: typeof trainData,
@@ -123,6 +186,7 @@
   }
 
   let isDragging = false;
+  let markerOffMap = false;
 
   let resizeTimer: number | null = null;
 
@@ -506,6 +570,9 @@
       .attr('stroke-dasharray', offMap ? '4,3' : null)
       .style('opacity', offMap ? 0.7 : 1);
     marker.select('.marker-dot').style('opacity', offMap ? 0.7 : 1);
+    // A pinned-to-the-edge marker isn't at its true position — local
+    // curvature there would be misleading (drawLens checks this flag).
+    markerOffMap = offMap;
 
     updateMarkerVectors(marker, xScale, yScale);
   }
@@ -562,6 +629,103 @@
     } else {
       marker.select('.vec-upd').style('display', 'none');
     }
+
+    drawLens(marker, kx, ky);
+  }
+
+  /**
+   * The curvature lens at the marker: the local quadratic's principal-axis
+   * ellipse (radius ∝ 1/√|λ| — long axis = shallow direction), or crossed
+   * axes when the point is a saddle (red dashed = the escape direction),
+   * plus a violet Newton-step ghost arrow when the local bowl is convex.
+   */
+  function drawLens(
+    marker: d3.Selection<SVGGElement, unknown, null, undefined>,
+    kx: number,
+    ky: number
+  ) {
+    const layer = marker.select<SVGGElement>('.lens-layer');
+    if (layer.empty()) return;
+    layer.selectAll('*').remove();
+    if (!lensInfo || markerOffMap) return;
+
+    const { eig, newton, posDef } = lensInfo;
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    // Radii from |λ|: the shallow axis gets the long radius.
+    const R_MAX = 42;
+    const R_MIN = 7;
+    const abs1 = Math.abs(eig.lambda1); // largest |λ| → short axis
+    const abs2 = Math.abs(eig.lambda2);
+    if (abs1 < 1e-12) return; // locally flat: nothing meaningful to draw
+    const rShort = Math.max(R_MIN, R_MAX * Math.sqrt(abs2 / abs1));
+    const rLong = R_MAX;
+
+    // Screen angle of the *shallow* eigenvector (v2 — the long axis)
+    const angLong = (Math.atan2(-eig.v2[1] * ky, eig.v2[0] * kx) * 180) / Math.PI;
+
+    if (eig.lambda1 > 0 && eig.lambda2 > 0) {
+      // Convex bowl: level-set ellipse + faint principal axes
+      const strokeC = isDark ? '#f8fafc' : '#334155';
+      layer.append('ellipse')
+        .attr('rx', rLong)
+        .attr('ry', rShort)
+        .attr('transform', `rotate(${angLong})`)
+        .attr('fill', 'none')
+        .attr('stroke', strokeC)
+        .attr('stroke-width', 1.3)
+        .style('opacity', 0.6);
+      layer.append('line')
+        .attr('x1', -rLong).attr('x2', rLong).attr('y1', 0).attr('y2', 0)
+        .attr('transform', `rotate(${angLong})`)
+        .attr('stroke', strokeC)
+        .attr('stroke-width', 0.8)
+        .style('opacity', 0.28);
+      layer.append('line')
+        .attr('x1', 0).attr('x2', 0).attr('y1', -rShort).attr('y2', rShort)
+        .attr('transform', `rotate(${angLong})`)
+        .attr('stroke', strokeC)
+        .attr('stroke-width', 0.8)
+        .style('opacity', 0.28);
+    } else {
+      // Saddle (or concave): solid emerald = uphill-curving axis,
+      // red dashed = the downhill escape direction.
+      const negV = eig.lambda1 < 0 ? eig.v1 : eig.v2;
+      const posV = eig.lambda1 < 0 ? eig.v2 : eig.v1;
+      const angNeg = (Math.atan2(-negV[1] * ky, negV[0] * kx) * 180) / Math.PI;
+      const angPos = (Math.atan2(-posV[1] * ky, posV[0] * kx) * 180) / Math.PI;
+      layer.append('line')
+        .attr('x1', -rLong).attr('x2', rLong).attr('y1', 0).attr('y2', 0)
+        .attr('transform', `rotate(${angNeg})`)
+        .attr('stroke', '#f87171')
+        .attr('stroke-width', 1.6)
+        .attr('stroke-dasharray', '6,4')
+        .style('opacity', 0.85);
+      layer.append('line')
+        .attr('x1', -rShort * 0.8).attr('x2', rShort * 0.8).attr('y1', 0).attr('y2', 0)
+        .attr('transform', `rotate(${angPos})`)
+        .attr('stroke', '#34d399')
+        .attr('stroke-width', 1.6)
+        .style('opacity', 0.75);
+    }
+
+    // Newton ghost: where a second-order method would head (convex only)
+    if (newton && posDef) {
+      const sx = newton.a * kx;
+      const sy = -newton.b * ky;
+      const m = Math.hypot(sx, sy);
+      if (Number.isFinite(m) && m > 1e-9) {
+        layer.append('line')
+          .attr('x1', 0).attr('y1', 0)
+          .attr('x2', (sx / m) * 28).attr('y2', (sy / m) * 28)
+          .attr('stroke', '#8b5cf6')
+          .attr('stroke-width', 2.5)
+          .attr('stroke-dasharray', '5,3')
+          .attr('stroke-linecap', 'round')
+          .attr('marker-end', 'url(#vec-newton-head)')
+          .style('opacity', 0.95);
+      }
+    }
   }
 
   function drawCurrentPosition(
@@ -573,7 +737,11 @@
   ) {
     // Arrowheads for the marker's direction vectors
     const defs = g.append('defs');
-    for (const [id, color] of [['vec-grad-head', '#3b82f6'], ['vec-upd-head', '#ef4444']] as const) {
+    for (const [id, color] of [
+      ['vec-grad-head', '#3b82f6'],
+      ['vec-upd-head', '#ef4444'],
+      ['vec-newton-head', '#8b5cf6']
+    ] as const) {
       defs.append('marker')
         .attr('id', id)
         .attr('viewBox', '0 -5 10 10')
@@ -598,6 +766,11 @@
       .attr('fill', 'transparent')
       .style('cursor', 'grab')
       .style('touch-action', 'none');
+
+    // Curvature lens (under the rings and arrows; filled by updateMarkerVectors)
+    marker.append('g')
+      .attr('class', 'lens-layer')
+      .style('pointer-events', 'none');
 
     // Direction vectors (under the ring, above the hit area). Blue =
     // steepest descent −∇ℒ; red = the optimizer's actual last step Δθ.
@@ -745,6 +918,20 @@
         </div>
       {/if}
     </div>
+    {#if view === '2d' && !oneParam}
+      <div class="header-tools">
+        <button
+          class="tool-toggle"
+          class:active={lensOn}
+          title="Curvature lens — the local Hessian's ellipse at the marker, condition number κ, and the Newton step a second-order method would take"
+          aria-pressed={lensOn}
+          on:click={toggleLens}
+        >
+          <Orbit size={14} strokeWidth={2.2} />
+          <span>Curvature</span>
+        </button>
+      </div>
+    {/if}
   </div>
   <div class="svg-container" bind:this={containerEl}>
     {#if oneParam}
@@ -770,6 +957,9 @@
       {:else}
         <span class="readout-item"><em>β</em> {fmtParam(parameters.b)}</span>
         <span class="readout-item"><em>‖∇ℒ‖</em> {fmtMag(gradMag)}</span>
+        {#if lensInfo}
+          <span class="readout-item" title="Condition number |λ₁|/|λ₂| of the local Hessian — how stretched the bowl is here. Big κ = ill-conditioned = plain GD zig-zags."><em>κ</em> {fmtKappa(lensInfo.kappa)}</span>
+        {/if}
       {/if}
     </div>
     <!-- Loss color key: vertical, tucked into the bottom-right corner -->
@@ -802,6 +992,21 @@
               <circle cx="10" cy="5" r="4" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="2.5,2" />
             </svg>
             <span>next GD step</span>
+          </span>
+        {/if}
+        {#if lensInfo}
+          <span class="vec-item" title="The Newton step −H⁻¹∇ℒ: where a second-order method would head. It points straight at the local quadratic's minimum, regardless of how stretched the bowl is.">
+            <svg width="20" height="10" viewBox="0 0 20 10" aria-hidden="true">
+              <line x1="1" y1="5" x2="12" y2="5" stroke="#8b5cf6" stroke-width="2" stroke-dasharray="3,2" stroke-linecap="round" />
+              <path d="M12,1.5 L19,5 L12,8.5 Z" fill="#8b5cf6" />
+            </svg>
+            <span>Newton</span>
+          </span>
+          <span class="vec-item" title="Level set of the local quadratic approximation: long axis = shallow direction, short axis = steep. On a saddle it becomes crossed lines; red dashed = the escape direction.">
+            <svg width="20" height="10" viewBox="0 0 20 10" aria-hidden="true">
+              <ellipse cx="10" cy="5" rx="8" ry="3.5" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.7" />
+            </svg>
+            <span>curvature</span>
           </span>
         {/if}
       </div>
@@ -909,6 +1114,41 @@
     display: flex;
     align-items: center;
     min-width: 0;
+  }
+
+  /* Right-side header tools: small icon+label toggles (curvature, basins) */
+  .header-tools {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    flex-shrink: 0;
+  }
+
+  .tool-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--color-text-tertiary);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    padding: 0.2rem 0.55rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .tool-toggle:hover {
+    color: #10b981;
+    border-color: #10b981;
+  }
+
+  .tool-toggle.active {
+    background: rgba(16, 185, 129, 0.16);
+    border-color: rgba(16, 185, 129, 0.5);
+    color: #10b981;
   }
 
   /* ---------- In-plot corner keys ---------- */
