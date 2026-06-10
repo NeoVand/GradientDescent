@@ -347,6 +347,9 @@ import CoursePanel from './components/CoursePanel.svelte';
      there's room and only compresses when there isn't. */
   :global(:root) {
     --air: clamp(0px, calc((100vh - 800px) / 30), 14px);
+    /* THE spacing token: every frame, gutter, and card padding uses this
+       one thin value, so the whole chrome shares a single rhythm. */
+    --gap: calc(10px + 0.25 * var(--air));
     /* One height for the whole bottom line of the app: the run deck on
        the left and the loss-chart/formulas row share it, so they align. */
     --bottom-h: clamp(200px, 25vh, 300px);
@@ -489,8 +492,8 @@ import CoursePanel from './components/CoursePanel.svelte';
     display: grid;
     grid-template-columns: clamp(300px, 19vw, 360px) 1fr;
     height: 100vh;
-    gap: 1.25rem;
-    padding: 1.25rem;
+    gap: var(--gap);
+    padding: var(--gap);
     background-color: var(--color-bg-primary);
     box-sizing: border-box;
   }
@@ -502,7 +505,8 @@ import CoursePanel from './components/CoursePanel.svelte';
     border-radius: 0;
     box-shadow: none;
     padding: 0;
-    overflow: hidden;
+    /* Dropdowns must float past the card edge */
+    overflow: visible;
     min-height: 0;
   }
   
@@ -510,7 +514,7 @@ import CoursePanel from './components/CoursePanel.svelte';
   .main-content {
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: var(--gap);
     min-height: 0;
   }
   
@@ -518,7 +522,7 @@ import CoursePanel from './components/CoursePanel.svelte';
   .top-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1.25rem;
+    gap: var(--gap);
     flex: 1;
     min-height: 0;
   }
@@ -533,7 +537,7 @@ import CoursePanel from './components/CoursePanel.svelte';
   .bottom-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1.25rem;
+    gap: var(--gap);
     height: var(--bottom-h);
     flex-shrink: 0;
     position: relative;

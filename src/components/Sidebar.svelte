@@ -793,13 +793,14 @@
   /* Two sibling cards fill the left column: the controls panel grows,
      the run deck is its own piece pinned at the bottom, sized to match
      the app's bottom row so the whole bottom line of the app aligns. */
-  /* The gutter between the two cards is the app's standard 1.25rem —
-     always. The top card fills the remaining height (its sections stay
-     compact at the top; the card surface carries the slack). */
+  /* Two cards on the rail: the top one sizes to its content, the run
+     deck pins to the bottom (aligned with the app's bottom row). The
+     leftover space is honest page background between them. */
   .sidebar-stack {
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    justify-content: space-between;
+    gap: var(--gap);
     height: 100%;
     min-height: 0;
   }
@@ -807,14 +808,17 @@
   .panel {
     background-color: var(--color-bg-secondary);
     border-radius: 16px;
-    padding: calc(10px + 0.7 * var(--air));
+    padding: var(--gap);
   }
 
   .top-panel {
-    flex: 1;
+    flex: 0 1 auto;
     min-height: 0;
     display: flex;
     flex-direction: column;
+    /* Open dropdowns paint above the run card below */
+    position: relative;
+    z-index: 2;
   }
 
   .run-panel {
@@ -835,12 +839,19 @@
   .sidebar-content {
     display: flex;
     flex-direction: column;
-    gap: calc(6px + 0.6 * var(--air));
+    gap: var(--gap);
     flex: 0 1 auto;
     min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
-    margin-top: calc(2px + 0.8 * var(--air));
+    /* Dropdowns float freely; only short screens trade that for scroll */
+    overflow: visible;
+    margin-top: calc(2px + 0.6 * var(--air));
+  }
+
+  @media (max-height: 860px) {
+    .sidebar-content {
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
   }
 
   /* Custom scrollbar for sidebar */
