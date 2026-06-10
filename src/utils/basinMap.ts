@@ -43,6 +43,11 @@ export function computeBasinMap(
   const centroids: { a: number; b: number; n: number }[] = [];
   const eps = 0.03 * span;
   const epsSq = eps * eps;
+  // Cells still drifting when the step budget runs out (slow shallow
+  // valleys): remember where they got to and assign them to the nearest
+  // discovered minimum afterwards, so a convex bowl reads as ONE basin
+  // instead of a fast-core surrounded by "unsettled" gray.
+  const laggards: { idx: number; a: number; b: number }[] = [];
 
   for (let j = 0; j < rows; j++) {
     const b0 = oneParam ? 0 : range.min + ((j + 0.5) / res) * span;
@@ -50,6 +55,7 @@ export function computeBasinMap(
       let a = range.min + ((i + 0.5) / res) * span;
       let b = b0;
       let settled = false;
+      let alive = true;
 
       for (let s = 0; s < MAX_STEPS; s++) {
         const g = config.computeGradient(data, { a, b });
@@ -58,6 +64,7 @@ export function computeBasinMap(
         a += da;
         b += db;
         if (!Number.isFinite(a) || !Number.isFinite(b) || Math.abs(a) > blowUp || Math.abs(b) > blowUp) {
+          alive = false;
           break; // diverged
         }
         if (Math.hypot(da, db) < stepTol) {
@@ -66,7 +73,10 @@ export function computeBasinMap(
         }
       }
 
-      if (!settled) continue; // stays −1
+      if (!settled) {
+        if (alive) laggards.push({ idx: j * res + i, a, b });
+        continue; // stays −1 for now
+      }
 
       // Assign to the nearest existing destination, or open a new one.
       let best = -1;
@@ -122,6 +132,24 @@ export function computeBasinMap(
   }
   for (let k = 0; k < cells.length; k++) {
     if (cells[k] >= 0) cells[k] = remap[cells[k]];
+  }
+
+  // Late assignment for the slow drifters: close enough to a discovered
+  // minimum counts as being in its basin. Genuinely lost cells stay −1.
+  const lateEps = 0.1 * span;
+  for (const lag of laggards) {
+    let best = -1;
+    let bestD = lateEps * lateEps;
+    for (let m = 0; m < merged.length; m++) {
+      const dx = merged[m].a - lag.a;
+      const dy = merged[m].b - lag.b;
+      const d = dx * dx + dy * dy;
+      if (d < bestD) {
+        bestD = d;
+        best = m;
+      }
+    }
+    if (best >= 0) cells[lag.idx] = best;
   }
 
   return {

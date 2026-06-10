@@ -170,6 +170,40 @@
   $: basinActive = basinsOn && basin.status === 'ready' && basin.scene !== null && basin.scene.oneParam === oneParam;
   $: basinComputing = basinsOn && basin.status === 'computing';
 
+  // ---------- SGD gradient fan ----------
+  // With a minibatch selected, the gradient is a random variable: each
+  // batch points somewhere slightly different. The fan draws a dozen
+  // batch-gradient directions as a faint cloud around the solid −∇ℒ arrow.
+  $: batchSize = $trainingStore.batchSize;
+  $: fanActive =
+    !oneParam && batchSize !== 'all' && trainData.length > 0 && (batchSize as number) < trainData.length;
+
+  // Repaint the marker layer when the batch setting changes
+  $: if (svgElement && fanActive !== undefined && !isDragging) {
+    updateTrail();
+  }
+
+  const FAN_SAMPLES = 12;
+
+  /** Steepest-descent directions of FAN_SAMPLES random minibatches. */
+  function batchGradientDirections(): { a: number; b: number }[] {
+    if (!fanActive || !problemConfig) return [];
+    const bs = batchSize as number;
+    const out: { a: number; b: number }[] = [];
+    const idx = trainData.map((_, i) => i);
+    for (let k = 0; k < FAN_SAMPLES; k++) {
+      // Partial Fisher-Yates: only the first bs slots need shuffling
+      for (let i = 0; i < bs; i++) {
+        const j = i + Math.floor(Math.random() * (idx.length - i));
+        [idx[i], idx[j]] = [idx[j], idx[i]];
+      }
+      const batch = idx.slice(0, bs).map(i => trainData[i]);
+      const g = problemConfig.computeGradient(batch, parameters);
+      if (Number.isFinite(g.a) && Number.isFinite(g.b)) out.push(g);
+    }
+    return out;
+  }
+
   function computeGrad(
     train: typeof trainData,
     params: typeof parameters,
@@ -700,6 +734,35 @@
     }
 
     drawLens(marker, kx, ky);
+    drawFan(marker, kx, ky);
+  }
+
+  /** The minibatch noise cloud: faint −∇ℒ_batch rays around the marker. */
+  function drawFan(
+    marker: d3.Selection<SVGGElement, unknown, null, undefined>,
+    kx: number,
+    ky: number
+  ) {
+    const layer = marker.select<SVGGElement>('.fan-layer');
+    if (layer.empty()) return;
+    layer.selectAll('*').remove();
+    if (!fanActive || markerOffMap) return;
+
+    for (const g of batchGradientDirections()) {
+      const sx = -g.a * kx;
+      const sy = g.b * ky;
+      const m = Math.hypot(sx, sy);
+      if (m < 1e-12) continue;
+      layer.append('line')
+        .attr('x1', 0)
+        .attr('y1', 0)
+        .attr('x2', (sx / m) * 30)
+        .attr('y2', (sy / m) * 30)
+        .attr('stroke', '#3b82f6')
+        .attr('stroke-width', 1.4)
+        .attr('stroke-linecap', 'round')
+        .style('opacity', 0.18);
+    }
   }
 
   /**
@@ -839,6 +902,11 @@
     // Curvature lens (under the rings and arrows; filled by updateMarkerVectors)
     marker.append('g')
       .attr('class', 'lens-layer')
+      .style('pointer-events', 'none');
+
+    // SGD gradient fan (under the solid arrows)
+    marker.append('g')
+      .attr('class', 'fan-layer')
       .style('pointer-events', 'none');
 
     // Direction vectors (under the ring, above the hit area). Blue =
@@ -1084,6 +1152,16 @@
               <circle cx="10" cy="5" r="4" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="2.5,2" />
             </svg>
             <span>next GD step</span>
+          </span>
+        {/if}
+        {#if fanActive}
+          <span class="vec-item" title="Each faint ray is −∇ℒ on a different random minibatch — the gradient is a noisy estimate, and this is its spread. The solid blue arrow is the full-batch direction.">
+            <svg width="20" height="10" viewBox="0 0 20 10" aria-hidden="true">
+              <line x1="2" y1="8" x2="17" y2="5" stroke="#3b82f6" stroke-width="1.3" opacity="0.35" stroke-linecap="round" />
+              <line x1="2" y1="5" x2="18" y2="2" stroke="#3b82f6" stroke-width="1.3" opacity="0.35" stroke-linecap="round" />
+              <line x1="2" y1="2" x2="16" y2="8" stroke="#3b82f6" stroke-width="1.3" opacity="0.35" stroke-linecap="round" />
+            </svg>
+            <span>batch ∇ spread</span>
           </span>
         {/if}
         {#if lensInfo}
