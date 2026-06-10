@@ -10,8 +10,9 @@
   import LossHistory from './components/LossHistory.svelte';
   import GuidePanel from './components/GuidePanel.svelte';
   import HelpModal from './components/HelpModal.svelte';
-  import { datasetStore, recordInitialHistory, themeStore } from './stores/stores';
-  import { Sun, Moon, HelpCircle, Menu, X } from 'lucide-svelte';
+  import { datasetStore, parametersStore, recordInitialHistory, currentProblemConfig, themeStore, showCoach } from './stores/stores';
+  import { applyUrlState, encodeStateUrl } from './utils/urlState';
+  import { Sun, Moon, HelpCircle, Menu, X, Share2 } from 'lucide-svelte';
 
   // The main app orchestrates all our components and manages the overall layout.
   // We use CSS Grid for a responsive, flexible layout that adapts to different screen sizes.
@@ -29,14 +30,45 @@
     document.body.style.overflow = drawerOpen ? 'hidden' : '';
   }
   
+  // Pure analytic surfaces have no dataset: the Data panel hides and the
+  // landscape takes the full row.
+  $: isAnalytic = $currentProblemConfig?.noData ?? false;
+
   // Initialize data when app starts
   onMount(() => {
     // Set initial theme on mount
     document.documentElement.setAttribute('data-theme', theme);
 
+    // A shared link restores the full scenario (settings + seed + marker)
+    const shared = applyUrlState();
     datasetStore.regenerateData();
+    if (shared) {
+      parametersStore.set(shared.params);
+    }
     recordInitialHistory();
+
+    if (shared) {
+      // Sticky: someone opening a shared link looks around before acting;
+      // any training action clears it.
+      showCoach('info', 'Loaded a shared scenario — same data, same start. Hit Train to run it.', 0);
+    } else if (!localStorage.getItem('gd-visited')) {
+      // First visit: open the guide (it has the one-click experiments)
+      localStorage.setItem('gd-visited', '1');
+      showHelpModal = true;
+    }
   });
+
+  async function shareScenario() {
+    const url = encodeStateUrl();
+    try {
+      await navigator.clipboard.writeText(url);
+      showCoach('success', 'Link copied — it reproduces this exact data, settings, and marker position.');
+    } catch {
+      // Clipboard can be unavailable (permissions); fall back to the URL bar
+      location.hash = url.split('#')[1] ?? '';
+      showCoach('info', 'Link is in the address bar — copy it from there.');
+    }
+  }
   
   function toggleTheme() {
     themeStore.toggle();
@@ -77,11 +109,14 @@
 
     <!-- Main content area with our visualizations -->
     <div class="main-content">
-      <!-- Top row: Data visualization and Loss landscape -->
-      <div class="top-row">
-        <div class="data-viz-container">
-          <DataVisualization />
-        </div>
+      <!-- Top row: Data visualization and Loss landscape; analytic surfaces
+           have no data, so the landscape takes the whole row -->
+      <div class="top-row" class:single={isAnalytic}>
+        {#if !isAnalytic}
+          <div class="data-viz-container">
+            <DataVisualization />
+          </div>
+        {/if}
         <div class="loss-landscape-container">
           <LossLandscape />
         </div>
@@ -102,6 +137,9 @@
 
 <!-- Desktop floating buttons (hidden on mobile, replaced by topbar) -->
 <div class="floating-buttons">
+  <button class="help-btn" on:click={shareScenario} title="Copy a link to this exact scenario">
+    <Share2 size={18} strokeWidth={2.5} />
+  </button>
   <button class="help-btn" on:click={() => showHelpModal = true} title="Help & Guide">
     <HelpCircle size={20} strokeWidth={2.5} />
   </button>
@@ -281,6 +319,11 @@
     gap: 1.25rem;
     flex: 1;
     min-height: 0;
+  }
+
+  /* Analytic surfaces: the landscape is the whole story */
+  .top-row.single {
+    grid-template-columns: 1fr;
   }
   
   /* Bottom row with loss history and guide panel */

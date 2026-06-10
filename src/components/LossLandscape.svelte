@@ -26,8 +26,10 @@
     divergenceStore,
     coachStore,
     clearCoach,
-    landscapeViewStore
+    landscapeViewStore,
+    raceStore
   } from '../stores/stores';
+  import { optimizers } from '../utils/optimizers';
   import type { ModelParameters } from '../types/types';
   import { Mountain } from 'lucide-svelte';
 
@@ -99,6 +101,12 @@
   // Trail/marker layer updates during training (no full redraw)
   $: if (svgElement && history.length > 0 && !isDragging) {
     updateTrail();
+  }
+
+  // Race trails layer follows the race store
+  $: race = $raceStore;
+  $: if (svgElement && race !== undefined) {
+    updateRaceTrails();
   }
 
   let isDragging = false;
@@ -257,6 +265,51 @@
 
     // Current position last (in main group: never clipped, but clamped)
     drawCurrentPosition(g, xScale, yScale, innerWidth, innerHeight);
+
+    // Restore race trails after a full rebuild (theme/resize mid-race)
+    updateRaceTrails();
+  }
+
+  /** Colored per-optimizer trails + head dots while a race is running. */
+  function updateRaceTrails() {
+    if (!svgElement) return;
+    const svg = d3.select(svgElement);
+    const plotGroup = svg.select<SVGGElement>('.plot-group');
+    if (plotGroup.empty()) return;
+
+    plotGroup.selectAll('.race-layer').remove();
+    if (!race) return;
+
+    const innerWidth = width - margin.left - margin.right;
+    const innerHeight = height - margin.top - margin.bottom;
+    const { xScale, yScale } = makeScales(innerWidth, innerHeight);
+    const layer = plotGroup.append('g').attr('class', 'race-layer');
+
+    const lineGen = d3.line<ModelParameters>()
+      .x(p => xScale(p.a))
+      .y(p => yScale(p.b));
+
+    for (const r of race.racers) {
+      if (r.trail.length >= 2) {
+        layer.append('path')
+          .attr('d', lineGen(r.trail))
+          .attr('fill', 'none')
+          .attr('stroke', r.color)
+          .attr('stroke-width', 2.2)
+          .attr('stroke-linecap', 'round')
+          .attr('stroke-linejoin', 'round')
+          .style('opacity', 0.9);
+      }
+      const head = r.trail[r.trail.length - 1];
+      layer.append('circle')
+        .attr('cx', xScale(head.a))
+        .attr('cy', yScale(head.b))
+        .attr('r', r.finished ? 5.5 : 4.5)
+        .attr('fill', r.color)
+        .attr('stroke', '#fff')
+        .attr('stroke-width', 1.2)
+        .style('opacity', r.diverged ? 0.35 : 1);
+    }
   }
 
   function drawHeatmapImage(
@@ -724,6 +777,18 @@
       <span class="readout-item"><em>β</em> {fmtParam(parameters.b)}</span>
       <span class="readout-item"><em>‖∇ℒ‖</em> {fmtMag(gradMag)}</span>
     </div>
+    {#if race}
+      <div class="race-legend">
+        {#each race.racers as r (r.id)}
+          <span class="race-item" class:dim={r.diverged}>
+            <span class="race-dot" style="background: {r.color}"></span>
+            <span>{optimizers[r.id].name}</span>
+            {#if r.finished}<span class="race-flag">✓</span>{/if}
+            {#if r.diverged}<span class="race-flag">✗</span>{/if}
+          </span>
+        {/each}
+      </div>
+    {/if}
     {#if $divergenceStore}
       <div class="divergence-banner" role="alert">
         <span>
@@ -907,6 +972,54 @@
     font-weight: 400;
     opacity: 0.7;
     margin-right: 0.2rem;
+  }
+
+  /* Race legend: who's which color, bottom center of the plot */
+  .race-legend {
+    position: absolute;
+    bottom: 14%;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 8px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 4;
+  }
+
+  :global([data-theme='light']) .race-legend {
+    background: rgba(255, 255, 255, 0.82);
+    color: #334155;
+  }
+
+  :global([data-theme='dark']) .race-legend {
+    background: rgba(6, 9, 19, 0.72);
+    color: #cbd5e1;
+  }
+
+  .race-item {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  .race-item.dim {
+    opacity: 0.45;
+  }
+
+  .race-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .race-flag {
+    font-size: 0.625rem;
   }
 
   /* Divergence explainer */

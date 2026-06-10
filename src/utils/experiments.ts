@@ -11,11 +11,12 @@
 import {
   datasetStore,
   parametersStore,
+  trainingStore,
   recordInitialHistory,
   resetOptimizerState,
   showCoach
 } from '../stores/stores';
-import { applyProblem, applyOptimizer, startTraining } from './trainer';
+import { applyProblem, applyOptimizer, startTraining, startRace } from './trainer';
 
 export interface Experiment {
   id: string;
@@ -123,6 +124,18 @@ export const experiments: Experiment[] = [
         'Adam normalizes each parameter’s step by its gradient history. Compare: Optimizer → Gradient Descent on this surface needs a microscopic γ.',
         14000
       );
+    }
+  },
+  {
+    id: 'banana-race',
+    title: 'The banana-valley showdown',
+    blurb:
+      'Rosenbrock’s curved valley is the optimizer torture test. Race GD, Momentum, RMSProp, and Adam from the same start.',
+    apply() {
+      applyProblem('rosenbrock');
+      // The valley crawl is slow by design — give the racers room to finish
+      trainingStore.update(s => ({ ...s, totalSteps: 1000, stepsPerSecond: 60 }));
+      startRace();
     }
   },
   {

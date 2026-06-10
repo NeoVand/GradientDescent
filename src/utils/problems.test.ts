@@ -58,6 +58,7 @@ const XS_TIME = [0.2, 0.9, 1.7, 2.5, 3.2, 3.9];        // damped oscillator: t â
 
 function fixtureFor(type: string): DataPoint[] {
   const config = problemConfigs[type];
+  if (config.noData) return []; // analytic surfaces ignore data entirely
   switch (type) {
     case 'power-law':
       return curveData(config, XS_POSITIVE);
@@ -135,9 +136,11 @@ describe('analytic gradients match finite differences', () => {
         });
       }
 
-      it('returns zero gradient for empty data', () => {
-        expect(config.computeGradient([], config.trueParameters)).toEqual({ a: 0, b: 0 });
-      });
+      if (!config.noData) {
+        it('returns zero gradient for empty data', () => {
+          expect(config.computeGradient([], config.trueParameters)).toEqual({ a: 0, b: 0 });
+        });
+      }
 
       it('loss is finite and non-negative at test points', () => {
         for (const { da, db } of PARAM_OFFSETS) {

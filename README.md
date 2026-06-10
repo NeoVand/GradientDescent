@@ -17,9 +17,13 @@ An interactive visualization tool for understanding gradient descent through bea
 - **Interactive Loss Landscape**: Color-coded heatmap, smooth contour lines, and gradient vector field all in one view
 - **2D & 3D Loss Landscapes**: Flip between the classic heatmap+contours view and a fully rotatable 3D surface — same data, same colors, draggable marker in both
 - **Six Optimizers**: Gradient Descent, Momentum, Nesterov, AdaGrad, RMSProp, and Adam — each with its own hyperparameter sliders and live-updating LaTeX update rule
+- **Race Mode**: launch GD, Momentum, RMSProp, and Adam from the same start and watch colored trails compete to the basin, with a steps-to-finish scoreboard
+- **Classic Test Surfaces**: Rosenbrock's banana valley, a true saddle point, and Himmelblau's four minima — pure f(α, β) surfaces with no dataset, full-width landscape
+- **Editable Data**: click the data plot to add points, click a point to remove it, and watch the loss landscape reshape in real time
+- **Shareable Links**: one click copies a URL that reproduces your exact dataset (seeded), optimizer, hyperparameters, and marker position
 - **Real-time Training**: Watch the optimizer descend with animated parameter trails, single-step through updates, and tune the animation speed
 - **Stochastic Gradients**: A batch-size control turns full-batch descent into noisy SGD — watch the path wobble
-- **13 Problem Types**: From linear regression to Gaussian mixtures, source localization, and mean-shift clustering, each with hand-derived analytic gradients
+- **16 Problem Types**: From linear regression to Gaussian mixtures, source localization, mean-shift clustering, and the classic optimizer benchmarks, each with hand-derived analytic gradients verified against finite differences
 - **Optimizer X-ray**: Two arrows on the marker show the steepest-descent direction (−∇ℒ) vs. the step the optimizer actually took
 - **A Coach That Watches**: every run ends with a verdict — converged, stalled on a plateau, or out of steps — and each problem introduces itself with what makes its loss surface interesting
 - **One-Click Experiments**: seven ready-made scenarios in the help modal (local-minimum traps, vanishing gradients, Adam vs. GD, …) that configure everything, train, and narrate what to watch

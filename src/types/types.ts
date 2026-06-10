@@ -18,7 +18,10 @@ export type ProblemType =
   | 'gaussian-mixture'
   | 'circle-classifier'
   | 'source-localization'
-  | 'mean-shift';
+  | 'mean-shift'
+  | 'rosenbrock'
+  | 'saddle-point'
+  | 'himmelblau';
 
 // A single data point in our dataset
 export interface DataPoint {
@@ -43,6 +46,9 @@ export interface ProblemConfig {
   // One-line hook shown by the coach when the problem is selected — what
   // makes this loss surface interesting.
   tagline?: string;
+  // Pure analytic surfaces: the loss is f(α, β) directly with no dataset.
+  // The Data panel and dataset controls hide; loss/gradient ignore `data`.
+  noData?: boolean;
   trueParameters: ModelParameters; // The true underlying model parameters
   generateData: (numPoints: number, trainRatio: number, noiseLevel?: number) => DataPoint[];
   predict: (x: number, params: ModelParameters) => number;

@@ -10,8 +10,9 @@
    * intents.
    */
 
-  import { selectedProblem, datasetStore, trainingStore, historyStore, optimizerStore, resetOptimizerState } from '../stores/stores';
+  import { selectedProblem, datasetStore, trainingStore, historyStore, optimizerStore, resetOptimizerState, raceStore } from '../stores/stores';
   import type { ProblemType } from '../types/types';
+  import { problemConfigs } from '../utils/problems';
   import { optimizers, optimizerOrder, type OptimizerId } from '../utils/optimizers';
   import {
     startTraining,
@@ -20,6 +21,8 @@
     resetRun,
     applyProblem,
     applyOptimizer,
+    startRace,
+    stopRace,
     runStartStep
   } from '../utils/trainer';
   import {
@@ -45,7 +48,8 @@
     Dices,
     StepForward,
     Gauge,
-    Layers
+    Layers,
+    Flag
   } from 'lucide-svelte';
 
   // Dropdown state
@@ -67,7 +71,10 @@
     { type: 'gaussian-mixture', name: 'Gaussian Mixture', icon: null, customIcon: 'ΛΛ' },
     { type: 'circle-classifier', name: 'Circle Classifier', icon: Target },
     { type: 'source-localization', name: 'Source Localization', icon: Radio },
-    { type: 'mean-shift', name: 'Mean-Shift Cluster', icon: ScatterChart }
+    { type: 'mean-shift', name: 'Mean-Shift Cluster', icon: ScatterChart },
+    { type: 'rosenbrock', name: 'Rosenbrock Valley', icon: null, customIcon: '∪' },
+    { type: 'saddle-point', name: 'Saddle Point', icon: null, customIcon: '±' },
+    { type: 'himmelblau', name: 'Himmelblau', icon: null, customIcon: '∷' }
   ];
 
   // Subscribe to stores
@@ -84,6 +91,8 @@
   $: isTraining = $trainingStore.isTraining;
   $: optimizerSel = $optimizerStore;
   $: currentOptimizer = optimizers[optimizerSel.id];
+  $: isAnalytic = problemConfigs[currentProblem]?.noData ?? false;
+  $: raceRunning = $raceStore?.running ?? false;
 
   // Training progress for the Train button fill
   $: trainingProgress = isTraining && totalSteps > 0
@@ -220,7 +229,8 @@
     </div>
   </div>
 
-  <!-- ===================== DATA ===================== -->
+  <!-- ===================== DATA (hidden for pure analytic surfaces) ===================== -->
+  {#if !isAnalytic}
   <div class="section">
     <div class="section-label">
       <span>Data</span>
@@ -353,6 +363,7 @@
       </div>
     </div>
   </div>
+  {/if}
 
   <!-- ===================== OPTIMIZER ===================== -->
   <div class="section">
@@ -610,6 +621,18 @@
         <RotateCcw size={18} strokeWidth={2} />
       </button>
     </div>
+
+    <!-- Race: all four optimizer families from the marker's current spot -->
+    <button
+      class="race-button"
+      class:racing={raceRunning}
+      on:click={() => (raceRunning ? stopRace() : startRace())}
+      disabled={isTraining}
+      title="Race GD, Momentum, RMSProp, and Adam from the current marker position"
+    >
+      <Flag size={14} strokeWidth={2.25} />
+      <span>{raceRunning ? 'Stop race' : 'Race optimizers'}</span>
+    </button>
   </div>
 </div>
 
@@ -1238,5 +1261,39 @@
     border-color: var(--color-danger);
     color: var(--color-danger);
     transform: translateY(-1px);
+  }
+
+  /* Race button: full-width secondary action under the transport row */
+  .race-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    width: 100%;
+    padding: 0.45rem;
+    border: 1px dashed rgba(16, 185, 129, 0.5);
+    border-radius: 8px;
+    background: rgba(16, 185, 129, 0.06);
+    color: #10b981;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .race-button:hover:not(:disabled) {
+    background: rgba(16, 185, 129, 0.15);
+    border-style: solid;
+  }
+
+  .race-button.racing {
+    border-color: rgba(244, 63, 94, 0.6);
+    background: rgba(244, 63, 94, 0.08);
+    color: #f43f5e;
+  }
+
+  .race-button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
   }
 </style>

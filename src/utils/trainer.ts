@@ -25,12 +25,24 @@ import {
   divergenceStore,
   recordInitialHistory,
   lossSceneStore,
+  raceStore,
+  landscapeViewStore,
   showCoach,
-  clearCoach
+  clearCoach,
+  type Racer
 } from '../stores/stores';
 import { problemConfigs } from './problems';
 import { optimizers, defaultHyper, type OptimizerId } from './optimizers';
+import { normalizedLogLoss } from './lossGrid';
 import type { DataPoint, ProblemType } from '../types/types';
+
+/**
+ * "In the basin" means the bright region of the heatmap: the bottom slice
+ * of the normalized log-loss range. Log space makes this scale-free —
+ * 3%-of-linear-span would count half of Rosenbrock as converged because
+ * its corners tower five orders of magnitude over the valley.
+ */
+const BASIN_LOG_THRESHOLD = 0.05;
 
 /** History step the current run started from — drives the progress fill. */
 export const runStartStep = writable(0);
@@ -75,10 +87,10 @@ function sampleBatch(trainData: DataPoint[]): DataPoint[] {
  * (nothing is committed and the run should stop).
  */
 function doOneStep(): boolean {
-  const trainData = get(datasetStore).data.filter(point => point.isTraining);
-  if (trainData.length === 0) return false;
-  const testData = get(datasetStore).data.filter(point => !point.isTraining);
   const config = problemConfigs[get(selectedProblem)];
+  const trainData = get(datasetStore).data.filter(point => point.isTraining);
+  if (trainData.length === 0 && !config.noData) return false;
+  const testData = get(datasetStore).data.filter(point => !point.isTraining);
   const sel = get(optimizerStore);
   const opt = optimizers[sel.id];
 
@@ -139,6 +151,7 @@ export function startTraining() {
   const t = get(trainingStore);
   if (t.isTraining) return;
 
+  stopRace();
   clearCoach();
   divergenceStore.set(null);
   trainingStore.update(store => ({ ...store, isTraining: true }));
@@ -178,6 +191,7 @@ export function stepOnce() {
 
 export function resetRun() {
   stopTraining();
+  stopRace();
   parametersStore.reset();
   resetOptimizerState();
   divergenceStore.set(null);
@@ -257,11 +271,10 @@ export function applyOptimizer(id: OptimizerId) {
 /** Post-run verdict: what should the learner take away from this run? */
 function evaluateRun(steps: number) {
   if (get(divergenceStore)) return;
+  const config = problemConfigs[get(selectedProblem)];
   const data = get(datasetStore).data;
   const trainData = data.filter(d => d.isTraining);
-  if (trainData.length === 0) return;
-
-  const config = problemConfigs[get(selectedProblem)];
+  if (trainData.length === 0 && !config.noData) return;
   const params = get(parametersStore);
   const g = config.computeGradient(trainData, params);
   const mag = Math.hypot(g.a, g.b);
@@ -270,8 +283,7 @@ function evaluateRun(steps: number) {
   const fmtMag = mag >= 0.01 ? mag.toFixed(3) : mag.toExponential(1);
 
   if (scene) {
-    const span = Math.max(scene.grid.visMax - scene.grid.visMin, 1e-12);
-    const nearBasin = loss <= scene.grid.visMin + 0.03 * span;
+    const nearBasin = normalizedLogLoss(scene.grid, loss) <= BASIN_LOG_THRESHOLD;
     if (nearBasin) {
       showCoach('success', `Converged — reached the basin in ${steps} steps (‖∇ℒ‖ = ${fmtMag}).`);
       return;
@@ -290,4 +302,124 @@ function evaluateRun(steps: number) {
   if (h.length >= 2 && h[h.length - 1].trainLoss < h[h.length - 2].trainLoss - 1e-12) {
     showCoach('info', 'Out of steps while still descending — Train again to continue, or raise γ.');
   }
+}
+
+// ====================== Race mode ======================
+// Four contrasting optimizers descend from the marker's current position,
+// each with its own curated γ/μ for the active problem. First to the basin
+// wins; the coach posts the finishing order.
+
+const RACE_LINEUP: Array<{ id: OptimizerId; color: string }> = [
+  { id: 'gd', color: '#94a3b8' },       // slate
+  { id: 'momentum', color: '#a855f7' }, // purple
+  { id: 'rmsprop', color: '#22d3ee' },  // cyan
+  { id: 'adam', color: '#f43f5e' }      // rose
+];
+
+let raceInterval: number | null = null;
+
+export function startRace() {
+  stopTraining();
+  stopRace();
+  divergenceStore.set(null);
+  // Trails render in the 2D view
+  landscapeViewStore.set('2d');
+
+  const start = get(parametersStore);
+  const racers: Racer[] = RACE_LINEUP.map(({ id, color }) => ({
+    id,
+    color,
+    params: { ...start },
+    state: optimizers[id].init(),
+    trail: [{ ...start }],
+    steps: 0,
+    finished: false,
+    diverged: false
+  }));
+  raceStore.set({ racers, running: true });
+  showCoach('info', 'Racing GD, Momentum, RMSProp, and Adam from the same start — each with its own γ. First to the basin wins.', 0);
+
+  const cap = Math.max(get(trainingStore).totalSteps, 100);
+  const intervalMs = Math.max(8, Math.round(1000 / get(trainingStore).stepsPerSecond));
+  raceInterval = window.setInterval(() => stepRace(cap), intervalMs);
+}
+
+function stepRace(cap: number) {
+  const rs = get(raceStore);
+  if (!rs) {
+    stopRace();
+    return;
+  }
+
+  const problem = get(selectedProblem);
+  const config = problemConfigs[problem];
+  const trainData = get(datasetStore).data.filter(p => p.isTraining);
+  if (trainData.length === 0 && !config.noData) {
+    stopRace();
+    return;
+  }
+  const scene = get(lossSceneStore);
+
+  let anyActive = false;
+  for (const r of rs.racers) {
+    if (r.finished || r.diverged || r.steps >= cap) continue;
+
+    const gradient = config.computeGradient(trainData, r.params);
+    const out = optimizers[r.id].step(
+      r.params,
+      gradient,
+      r.state,
+      resolveLearningRate(r.id, problem),
+      hyperForProblem(r.id, problem)
+    );
+    const loss = config.computeLoss(trainData, out.params);
+
+    if (hasDiverged(out.params, loss)) {
+      r.diverged = true;
+      continue;
+    }
+
+    r.params = out.params;
+    r.state = out.state;
+    r.steps++;
+    r.trail.push({ ...out.params });
+
+    if (scene && normalizedLogLoss(scene.grid, loss) <= BASIN_LOG_THRESHOLD) {
+      r.finished = true;
+    }
+
+    if (!r.finished && r.steps < cap) anyActive = true;
+  }
+
+  raceStore.set({ ...rs }); // racers mutated in place; new wrapper triggers redraws
+
+  if (!anyActive) {
+    if (raceInterval !== null) {
+      clearInterval(raceInterval);
+      raceInterval = null;
+    }
+    raceStore.update(s => (s ? { ...s, running: false } : null));
+    const parts = rs.racers.map(r => {
+      const name = optimizers[r.id].name;
+      if (r.diverged) return `${name}: diverged`;
+      if (r.finished) return `${name}: ${r.steps} steps`;
+      return `${name}: >${cap}`;
+    });
+    const nobodyFinished = rs.racers.every(r => !r.finished);
+    showCoach(
+      'success',
+      `🏁 Finish line — ${parts.join('  ·  ')}` +
+        (nobodyFinished ? '. Nobody reached the basin within the step budget — some surfaces are just that hard.' : ''),
+      0
+    );
+  }
+}
+
+/** Stop and clear the race (trails disappear). */
+export function stopRace() {
+  if (raceInterval !== null) {
+    clearInterval(raceInterval);
+    raceInterval = null;
+  }
+  if (get(raceStore)) raceStore.set(null);
 }

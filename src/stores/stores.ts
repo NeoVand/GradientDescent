@@ -85,7 +85,20 @@ function createDatasetStore() {
       update(state => {
         const next = { ...state, seed: newSeed() };
         return { ...next, data: buildData(next) };
-      })
+      }),
+    /** Hand-edit: append a point (click-to-add on the data plot). */
+    addPoint: (point: DataPoint) =>
+      update(state => ({ ...state, data: [...state.data, point] })),
+    /** Hand-edit: remove the point at an index (click-to-remove). */
+    removePoint: (index: number) =>
+      update(state =>
+        state.data.length > 3
+          ? { ...state, data: state.data.filter((_, i) => i !== index) }
+          : state
+      ),
+    /** Restore settings from a shared URL (data rebuilt separately). */
+    hydrate: (partial: Partial<Omit<DatasetState, 'data'>>) =>
+      update(state => ({ ...state, ...partial }))
   };
 }
 
@@ -230,16 +243,17 @@ export const testData = derived(
   $dataset => $dataset.data.filter(point => !point.isTraining)
 );
 
-// Current losses
+// Current losses (analytic surfaces ignore data, so empty arrays are fine)
 export const currentLosses = derived(
   [datasetStore, parametersStore, currentProblemConfig],
   ([$dataset, $parameters, $config]) => {
     const trainData = $dataset.data.filter(point => point.isTraining);
     const testData = $dataset.data.filter(point => !point.isTraining);
+    const noData = $config.noData ?? false;
 
     return {
-      trainLoss: trainData.length > 0 ? $config.computeLoss(trainData, $parameters) : 0,
-      testLoss: testData.length > 0 ? $config.computeLoss(testData, $parameters) : 0
+      trainLoss: trainData.length > 0 || noData ? $config.computeLoss(trainData, $parameters) : 0,
+      testLoss: testData.length > 0 || noData ? $config.computeLoss(testData, $parameters) : 0
     };
   }
 );
@@ -262,7 +276,7 @@ export const lossSceneStore = derived(
   [datasetStore, currentProblemConfig],
   ([$dataset, $config]): LossScene | null => {
     const trainData = $dataset.data.filter(point => point.isTraining);
-    if (trainData.length === 0) return null;
+    if (trainData.length === 0 && !$config.noData) return null;
 
     const range = $config.parameterRange ?? DEFAULT_PARAMETER_RANGE;
     const grid = computeLossGrid(trainData, $config, range);
@@ -280,10 +294,10 @@ export const lossSceneStore = derived(
 // mount and on every training reset so the loss chart always has an anchor.
 export function recordInitialHistory() {
   const { data } = get(datasetStore);
-  if (data.length === 0) return;
+  const config = get(currentProblemConfig);
+  if (data.length === 0 && !config.noData) return;
 
   const parameters = get(parametersStore);
-  const config = get(currentProblemConfig);
   const trainData = data.filter(d => d.isTraining);
   const testData = data.filter(d => !d.isTraining);
 
@@ -296,6 +310,28 @@ export function recordInitialHistory() {
     }
   ]);
 }
+
+// ========== Race Store ==========
+// Several optimizers descending from the same start, each with its own
+// parameters, internal state, and trail. Owned by the trainer's race loop;
+// the 2D landscape renders the trails.
+export interface Racer {
+  id: import('../utils/optimizers').OptimizerId;
+  color: string;
+  params: ModelParameters;
+  state: OptimizerState;
+  trail: ModelParameters[];
+  steps: number;
+  finished: boolean;
+  diverged: boolean;
+}
+
+export interface RaceState {
+  racers: Racer[];
+  running: boolean;
+}
+
+export const raceStore = writable<RaceState | null>(null);
 
 // ========== Landscape View Store ==========
 // Which rendering of the loss landscape is active. Persisted so returning

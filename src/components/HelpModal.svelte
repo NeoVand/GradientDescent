@@ -124,6 +124,11 @@
       { name: 'Circle Classifier', icon: Target, formula: 'σ((R²−d²)/τ)', tag: 'find a circle center' },
       { name: 'Source Localization', icon: Radio, formula: 'K / (d² + ε)', tag: 'inverse-square triangulation' },
       { name: 'Mean-Shift Cluster', icon: ScatterChart, formula: 'Σ(1 − kᵢ)/n', tag: 'two cluster modes' }
+    ],
+    'Pure surfaces (no data)': [
+      { name: 'Rosenbrock Valley', icon: null, customIcon: '∪', formula: '(1−α)² + 100(β−α²)²', tag: 'the classic banana benchmark' },
+      { name: 'Saddle Point', icon: null, customIcon: '±', formula: 'α² − β² + β⁴/8 + 2', tag: 'gradients die at dead center' },
+      { name: 'Himmelblau', icon: null, customIcon: '∷', formula: '(α²+β−11)² + (α+β²−7)²', tag: 'four equally deep minima' }
     ]
   };
 </script>

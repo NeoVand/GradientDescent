@@ -42,6 +42,50 @@
     problemType === 'circle-classifier' ||
     problemType === 'source-localization' ||
     problemType === 'mean-shift';
+
+  // 1D curve-fitting plots are hand-editable: click empty space to add a
+  // training point, click a point to remove it. The loss landscape morphs
+  // live — the landscape IS the data.
+  $: isEditable = !is2DPointProblem && problemType !== 'logistic-regression';
+
+  // Last-drawn scales, kept for click → data-space inversion
+  let lastXScale: d3.ScaleLinear<number, number> | null = null;
+  let lastYScale: d3.ScaleLinear<number, number> | null = null;
+
+  function handlePlotClick(event: MouseEvent) {
+    if (!isEditable || !lastXScale || !lastYScale || !svgElement) return;
+    const rect = svgElement.getBoundingClientRect();
+    const px = event.clientX - rect.left - margin.left;
+    const py = event.clientY - rect.top - margin.top;
+    const innerWidth = width - margin.left - margin.right;
+    const innerHeight = height - margin.top - margin.bottom;
+    if (px < 0 || px > innerWidth || py < 0 || py > innerHeight) return;
+
+    // Click near an existing point removes it…
+    const all = $datasetStore.data;
+    let best = -1;
+    let bestD = 10 * 10;
+    all.forEach((p, i) => {
+      const dx = lastXScale!(p.x) - px;
+      const dy = lastYScale!(p.y) - py;
+      const d = dx * dx + dy * dy;
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    });
+    if (best >= 0) {
+      datasetStore.removePoint(best);
+      return;
+    }
+
+    // …anywhere else adds a training point
+    datasetStore.addPoint({
+      x: lastXScale.invert(px),
+      y: lastYScale.invert(py),
+      isTraining: true
+    });
+  }
   
   // Redraw when data or theme changes
   $: if (svgElement && data && parameters && problemConfig) {
@@ -56,6 +100,10 @@
   let resizeTimer: number | null = null;
   
   onMount(() => {
+    // Attached imperatively (not via template) so the plot stays a plain
+    // graphic to assistive tech — editing is an auxiliary pointer affordance.
+    svgElement.addEventListener('click', handlePlotClick);
+
     // Set up resize observer with debouncing
     const resizeObserver = new ResizeObserver(entries => {
       const entry = entries[0];
@@ -77,11 +125,12 @@
     }
     
     return () => {
+      svgElement?.removeEventListener('click', handlePlotClick);
       resizeObserver.disconnect();
       if (resizeTimer) clearTimeout(resizeTimer);
     };
   });
-  
+
   function drawVisualization() {
     // Clear previous content
     d3.select(svgElement).selectAll('*').remove();
@@ -124,6 +173,10 @@
         .domain([yExtent[0] - yPadding, yExtent[1] + yPadding])
         .range([innerHeight, 0]);
     }
+
+    // Remember the scales for click-to-edit inversion
+    lastXScale = xScale;
+    lastYScale = yScale;
     
     // Create axes
     const xAxis = d3.axisBottom(xScale).tickSizeOuter(0);
@@ -844,6 +897,7 @@
           <span>True source</span>
         </div>
       {:else}
+        <span class="edit-hint" title="Click empty space to add a training point; click a point to remove it. The loss landscape reshapes live.">✎ editable</span>
         <div class="legend-item">
           <div class="legend-symbol">
             <svg width="18" height="18" viewBox="0 0 18 18">
@@ -864,7 +918,7 @@
     </div>
   </div>
   <div class="svg-container">
-    <svg bind:this={svgElement} width={width} height={height}></svg>
+    <svg bind:this={svgElement} width={width} height={height} class:editable={isEditable}></svg>
   </div>
 </div>
 
@@ -923,6 +977,19 @@
     display: flex;
     gap: 0.75rem;
     align-items: center;
+  }
+
+  .edit-hint {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--color-text-tertiary);
+    opacity: 0.75;
+    cursor: help;
+    white-space: nowrap;
+  }
+
+  svg.editable {
+    cursor: crosshair;
   }
   
   .legend-item {

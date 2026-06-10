@@ -1092,6 +1092,137 @@ const meanShift: ProblemConfig = {
   parameterRange: { min: -2, max: 2 }
 };
 
+/**
+ * ---------- Pure analytic surfaces (noData) ----------
+ * The classic optimizer test functions: no dataset, the loss IS f(α, β).
+ * They slot into the same ProblemConfig shape — generateData returns
+ * nothing and loss/gradient ignore the data argument.
+ */
+
+const NO_DATA = (_numPoints: number, _trainRatio: number, _noiseLevel?: number): DataPoint[] => [];
+
+/**
+ * Rosenbrock banana: f = (1−α)² + 100(β−α²)².
+ * The minimum hides at the end of a curved, nearly-flat valley — easy to
+ * reach the valley, brutal to traverse it. THE optimizer benchmark.
+ */
+const rosenbrock: ProblemConfig = {
+  type: 'rosenbrock',
+  name: 'Rosenbrock Valley',
+  description: 'The classic banana-shaped optimizer benchmark',
+  tagline: 'The banana valley: reaching it is easy, traversing it is the test.',
+  trueParameters: { a: 1, b: 1 },
+  noData: true,
+  generateData: NO_DATA,
+  predict: () => 0,
+
+  computeLoss: (_data: DataPoint[], p: ModelParameters): number => {
+    const u = 1 - p.a;
+    const v = p.b - p.a * p.a;
+    return u * u + 100 * v * v;
+  },
+
+  computeGradient: (_data: DataPoint[], p: ModelParameters): ModelParameters => {
+    const v = p.b - p.a * p.a;
+    return {
+      a: -2 * (1 - p.a) - 400 * p.a * v,
+      b: 200 * v
+    };
+  },
+
+  // Start on the far side of the valley so the run shows both phases:
+  // the quick drop INTO the valley, then the slow crawl ALONG it.
+  getInitialParameters: () => ({
+    a: -1.7 + Math.random() * 0.6,
+    b: -1.2 + Math.random() * 1.4
+  }),
+
+  // Valley-floor curvature is huge (the 100·(...)² term), so γ must be tiny;
+  // momentum makes progress along the floor bearable.
+  defaultLearningRate: 0.0002,
+  defaultMomentum: 0.9,
+  parameterRange: { min: -2, max: 2 }
+};
+
+/**
+ * Saddle point: f = α² − β² + β⁴/8 + 2.
+ * Bowl-shaped in α, double-well in β: a true saddle sits at the origin
+ * where the gradient vanishes while the loss is far from minimal. The two
+ * minima live at (0, ±2) with f = 0.
+ */
+const saddlePoint: ProblemConfig = {
+  type: 'saddle-point',
+  name: 'Saddle Point',
+  description: 'Downhill in α, uphill-then-down in β',
+  tagline: 'Gradients die at the dead-center saddle — escape depends on where you start.',
+  trueParameters: { a: 0, b: 2 },
+  noData: true,
+  generateData: NO_DATA,
+  predict: () => 0,
+
+  computeLoss: (_data: DataPoint[], p: ModelParameters): number => {
+    return p.a * p.a - p.b * p.b + Math.pow(p.b, 4) / 8 + 2;
+  },
+
+  computeGradient: (_data: DataPoint[], p: ModelParameters): ModelParameters => {
+    return {
+      a: 2 * p.a,
+      b: -2 * p.b + Math.pow(p.b, 3) / 2
+    };
+  },
+
+  // Start close to the β = 0 ridge so the slow saddle escape is visible:
+  // α collapses fast, then the marker lingers before sliding off to ±2.
+  getInitialParameters: () => ({
+    a: (Math.random() < 0.5 ? -1 : 1) * (1.5 + Math.random()),
+    b: (Math.random() - 0.5) * 0.8
+  }),
+
+  defaultLearningRate: 0.05,
+  parameterRange: { min: -3, max: 3 }
+};
+
+/**
+ * Himmelblau: f = (α²+β−11)² + (α+β²−7)².
+ * Four equally deep global minima — the canonical "your destination
+ * depends on your start" surface.
+ */
+const himmelblau: ProblemConfig = {
+  type: 'himmelblau',
+  name: 'Himmelblau',
+  description: 'Four equal minima in one surface',
+  tagline: 'Four equally deep minima — a different one for every start.',
+  trueParameters: { a: 3, b: 2 },
+  noData: true,
+  generateData: NO_DATA,
+  predict: () => 0,
+
+  computeLoss: (_data: DataPoint[], p: ModelParameters): number => {
+    const u = p.a * p.a + p.b - 11;
+    const v = p.a + p.b * p.b - 7;
+    return u * u + v * v;
+  },
+
+  computeGradient: (_data: DataPoint[], p: ModelParameters): ModelParameters => {
+    const u = p.a * p.a + p.b - 11;
+    const v = p.a + p.b * p.b - 7;
+    return {
+      a: 4 * p.a * u + 2 * v,
+      b: 2 * u + 4 * p.b * v
+    };
+  },
+
+  // Anywhere in the frame: every start belongs to one of the four basins.
+  getInitialParameters: () => ({
+    a: (Math.random() - 0.5) * 9,
+    b: (Math.random() - 0.5) * 9
+  }),
+
+  defaultLearningRate: 0.002,
+  defaultMomentum: 0.5,
+  parameterRange: { min: -5, max: 5 }
+};
+
 // Export all problem configurations
 export const problemConfigs: Record<string, ProblemConfig> = {
   'linear-regression': linearRegression,
@@ -1106,6 +1237,9 @@ export const problemConfigs: Record<string, ProblemConfig> = {
   'gaussian-mixture': gaussianMixture,
   'circle-classifier': circleClassifier,
   'source-localization': sourceLocalization,
-  'mean-shift': meanShift
+  'mean-shift': meanShift,
+  'rosenbrock': rosenbrock,
+  'saddle-point': saddlePoint,
+  'himmelblau': himmelblau
 };
 
