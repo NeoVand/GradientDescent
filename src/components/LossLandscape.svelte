@@ -714,46 +714,20 @@
 
 <div class="gradient-container">
   <div class="header">
-    <h2>
-      <Mountain size={20} strokeWidth={2} />
-      <span>Loss & Gradient</span>
-    </h2>
-    <div class="view-toggle" role="group" aria-label="Landscape view">
-      <button
-        class:active={view === '2d'}
-        on:click={() => landscapeViewStore.set('2d')}
-      >2D</button>
-      <button
-        class:active={view === '3d'}
-        on:click={() => landscapeViewStore.set('3d')}
-      >3D</button>
-    </div>
-    <div class="legend-group">
-      {#if view === '2d'}
-      <div class="vector-legend">
-        <span class="vec-item" title="Steepest-descent direction at the marker: −∇ℒ, straight downhill">
-          <svg width="20" height="10" viewBox="0 0 20 10" aria-hidden="true">
-            <line x1="1" y1="5" x2="12" y2="5" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" />
-            <path d="M12,1.5 L19,5 L12,8.5 Z" fill="#3b82f6" />
-          </svg>
-          <span>−∇ℒ</span>
-        </span>
-        <span class="vec-item" title="The optimizer's actual last step: Δθ (momentum and adaptive methods bend away from −∇ℒ)">
-          <svg width="20" height="10" viewBox="0 0 20 10" aria-hidden="true">
-            <line x1="1" y1="5" x2="12" y2="5" stroke="#ef4444" stroke-width="2" stroke-linecap="round" />
-            <path d="M12,1.5 L19,5 L12,8.5 Z" fill="#ef4444" />
-          </svg>
-          <span>Δθ</span>
-        </span>
-      </div>
-      {/if}
-      <div class="color-legend">
-        <span class="legend-label">Loss:</span>
-        <div class="legend-scale">
-          <span class="scale-value">{maxLossValue.toFixed(2)}</span>
-          <div class="color-bar"></div>
-          <span class="scale-value">{minLossValue.toFixed(2)}</span>
-        </div>
+    <div class="header-left">
+      <h2>
+        <Mountain size={20} strokeWidth={2} />
+        <span>Loss & Gradient</span>
+      </h2>
+      <div class="view-toggle" role="group" aria-label="Landscape view">
+        <button
+          class:active={view === '2d'}
+          on:click={() => landscapeViewStore.set('2d')}
+        >2D</button>
+        <button
+          class:active={view === '3d'}
+          on:click={() => landscapeViewStore.set('3d')}
+        >3D</button>
       </div>
     </div>
   </div>
@@ -777,6 +751,32 @@
       <span class="readout-item"><em>β</em> {fmtParam(parameters.b)}</span>
       <span class="readout-item"><em>‖∇ℒ‖</em> {fmtMag(gradMag)}</span>
     </div>
+    <!-- Loss color key: vertical, tucked into the bottom-right corner -->
+    <div class="loss-key" style="right: {margin.right + 8}px; bottom: {margin.bottom + 8}px;">
+      <span class="key-title">Loss</span>
+      <span class="key-val">{maxLossValue.toFixed(2)}</span>
+      <div class="vbar"></div>
+      <span class="key-val">{minLossValue.toFixed(2)}</span>
+    </div>
+    {#if view === '2d'}
+      <!-- Marker-arrow key, bottom-left corner -->
+      <div class="vec-key" style="left: {margin.left + 8}px; bottom: {margin.bottom + 8}px;">
+        <span class="vec-item" title="Steepest-descent direction at the marker: −∇ℒ, straight downhill">
+          <svg width="20" height="10" viewBox="0 0 20 10" aria-hidden="true">
+            <line x1="1" y1="5" x2="12" y2="5" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" />
+            <path d="M12,1.5 L19,5 L12,8.5 Z" fill="#3b82f6" />
+          </svg>
+          <span>−∇ℒ</span>
+        </span>
+        <span class="vec-item" title="The optimizer's actual last step: Δθ (momentum and adaptive methods bend away from −∇ℒ)">
+          <svg width="20" height="10" viewBox="0 0 20 10" aria-hidden="true">
+            <line x1="1" y1="5" x2="12" y2="5" stroke="#ef4444" stroke-width="2" stroke-linecap="round" />
+            <path d="M12,1.5 L19,5 L12,8.5 Z" fill="#ef4444" />
+          </svg>
+          <span>Δθ</span>
+        </span>
+      </div>
+    {/if}
     {#if race}
       <div class="race-legend">
         {#each race.racers as r (r.id)}
@@ -876,70 +876,84 @@
     color: #10b981;
   }
 
-  .legend-group {
+  .header-left {
     display: flex;
     align-items: center;
-    gap: 0.875rem;
     min-width: 0;
   }
 
-  /* Marker-arrow key: what the blue and red arrows on the marker mean */
-  .vector-legend {
+  /* ---------- In-plot corner keys ---------- */
+
+  /* Vertical loss color key, bottom-right of the plot */
+  .loss-key {
+    position: absolute;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 0.625rem;
+    gap: 3px;
+    padding: 0.35rem 0.45rem;
+    border-radius: 8px;
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 0.625rem;
+    font-weight: 600;
+    pointer-events: none;
+    z-index: 3;
+  }
+
+  .key-title {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .vbar {
+    width: 10px;
+    height: 56px;
+    border-radius: 5px;
+    background: linear-gradient(to bottom,
+      #440154, #31688e, #35b779, #fde724);
+    border: 1px solid var(--color-border);
+  }
+
+  /* Marker-arrow key (−∇ℒ vs Δθ), bottom-left of the plot, 2D only */
+  .vec-key {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 0.35rem 0.5rem;
+    border-radius: 8px;
+    z-index: 3;
+  }
+
+  :global([data-theme='light']) .loss-key,
+  :global([data-theme='light']) .vec-key {
+    background: rgba(255, 255, 255, 0.78);
+    color: #475569;
+  }
+
+  :global([data-theme='dark']) .loss-key,
+  :global([data-theme='dark']) .vec-key {
+    background: rgba(6, 9, 19, 0.68);
+    color: #94a3b8;
   }
 
   .vec-item {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.3rem;
     font-size: 0.6875rem;
     font-weight: 600;
     font-family: 'SF Mono', Monaco, monospace;
-    color: var(--color-text-tertiary);
     cursor: help;
     white-space: nowrap;
   }
 
   .vec-item svg {
     flex-shrink: 0;
-  }
-
-  .color-legend {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .legend-label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--color-text-tertiary);
-  }
-
-  .legend-scale {
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-  }
-
-  .color-bar {
-    width: 80px;
-    height: 12px;
-    border-radius: 6px;
-    background: linear-gradient(to right,
-      #440154, #31688e, #35b779, #fde724);
-    border: 1px solid var(--color-border);
-  }
-
-  .scale-value {
-    font-size: 0.625rem;
-    font-weight: 600;
-    font-family: 'SF Mono', Monaco, monospace;
-    color: var(--color-text-tertiary);
-    min-width: 2.5rem;
-    text-align: center;
   }
 
   /* Live α / β / gradient readout, pinned inside the plot frame */
@@ -1118,26 +1132,6 @@
     opacity: 1;
   }
 
-  /* When the panel itself is tight, give the legend room to shrink before
-     anything overflows. Container queries would be ideal; until then the
-     legend pieces are allowed to flex down. */
-  .legend-group {
-    flex-shrink: 1;
-    overflow: hidden;
-  }
-
-  .color-bar {
-    min-width: 36px;
-    flex-shrink: 1;
-  }
-
-  @media (max-width: 1500px) {
-    h2 { margin-left: 8px; }
-    .view-toggle { margin: 0 0.375rem; }
-    .legend-group { gap: 0.5rem; }
-    .color-bar { width: 56px; }
-  }
-
   @media (max-width: 768px) {
     h2 {
       margin-left: 0;
@@ -1145,13 +1139,11 @@
       gap: 0.375rem;
     }
     .header { margin-right: 0; margin-bottom: 0.125rem; }
-    .color-bar { width: 50px; height: 10px; }
-    .legend-label { font-size: 0.6875rem; }
-    .scale-value { font-size: 0.5625rem; min-width: 2rem; }
     .readout { font-size: 0.625rem; gap: 0.5rem; }
-    .legend-group { gap: 0.5rem; }
     .vec-item { font-size: 0.625rem; }
     .vec-item svg { width: 14px; }
+    .vbar { height: 40px; }
+    .loss-key { font-size: 0.5625rem; padding: 0.25rem 0.35rem; }
   }
 
   .svg-container {

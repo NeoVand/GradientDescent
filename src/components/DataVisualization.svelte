@@ -959,10 +959,6 @@
     flex-shrink: 0;
   }
 
-  @media (max-width: 1500px) {
-    h2 { margin-left: 8px; }
-  }
-
   @media (max-width: 768px) {
     h2 {
       margin-left: 0;

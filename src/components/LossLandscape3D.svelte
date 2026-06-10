@@ -346,7 +346,7 @@
     const axes: Array<{ dir: THREE.Vector3; label: string }> = [
       { dir: new THREE.Vector3(1, 0, 0), label: 'α' },
       { dir: new THREE.Vector3(0, 0, -1), label: 'β' },
-      { dir: new THREE.Vector3(0, 1, 0), label: 'L' }
+      { dir: new THREE.Vector3(0, 1, 0), label: 'ℒ' } // script L, matching the formulas
     ];
 
     for (const { dir, label } of axes) {
@@ -537,10 +537,13 @@
       r.render(scene3, camera);
 
       // Gizmo pass: small scissored viewport in the top-right corner whose
-      // camera mirrors the main camera's orientation.
+      // camera mirrors the main camera's orientation. autoClear must be off
+      // so the corner keeps the already-rendered surface pixels behind the
+      // arrows (otherwise the region clears to an opaque square).
       if (gizmoScene && w > GIZMO_SIZE * 2) {
         const gx = w - GIZMO_SIZE - 8;
         const gy = h - GIZMO_SIZE - 8; // viewport y counts from the bottom
+        r.autoClear = false;
         r.clearDepth();
         r.setScissorTest(true);
         r.setViewport(gx, gy, GIZMO_SIZE, GIZMO_SIZE);
@@ -555,6 +558,7 @@
         r.render(gizmoScene, gizmoCam);
         r.setScissorTest(false);
         r.setViewport(0, 0, w, h);
+        r.autoClear = true;
       }
 
       raf = requestAnimationFrame(loop);
