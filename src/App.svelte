@@ -342,7 +342,7 @@
      spacing interpolates off this one knob, so the layout is airy when
      there's room and only compresses when there isn't. */
   :global(:root) {
-    --air: clamp(0px, calc((100vh - 800px) / 28), 10px);
+    --air: clamp(0px, calc((100vh - 800px) / 30), 14px);
   }
 
   /* CSS Variables for Theming */
@@ -480,7 +480,7 @@
   /* Main app container using CSS Grid for layout */
   .app-container {
     display: grid;
-    grid-template-columns: 300px 1fr;
+    grid-template-columns: clamp(300px, 19vw, 360px) 1fr;
     height: 100vh;
     gap: 1.25rem;
     padding: 1.25rem;

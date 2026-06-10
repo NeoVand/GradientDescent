@@ -84,73 +84,38 @@
   }
 
   /**
-   * The editor's live preview: in add modes a ghost of the point a click
-   * would create rides the cursor (the ghost IS the cursor); in erase
-   * mode the doomed point gets a red ring. Cleared off-plot.
+   * Erase-mode hover: a red ring + ✗ on the point a click would remove.
+   * Add modes draw nothing here — the tool-shaped cursor already shows
+   * exactly what a click creates (one indicator, not two).
    */
   function handlePlotHover(event: PointerEvent) {
     if (!svgElement) return;
     const layer = d3.select(svgElement).select<SVGGElement>('.edit-preview');
     if (!isEditable || !lastXScale || !lastYScale || layer.empty()) return;
 
-    const pos = plotPos(event);
     layer.selectAll('*').remove();
+    if (editTool !== 'erase') return;
+    const pos = plotPos(event);
     if (!pos) return;
-    const { px, py } = pos;
 
-    if (editTool === 'erase') {
-      // Reach circle at the cursor…
+    const target = nearestPoint(pos.px, pos.py, 14);
+    if (target >= 0) {
+      const t = $datasetStore.data[target];
       layer.append('circle')
-        .attr('cx', px).attr('cy', py)
-        .attr('r', 14)
-        .attr('fill', 'none')
+        .attr('cx', lastXScale(t.x)).attr('cy', lastYScale(t.y))
+        .attr('r', 11)
+        .attr('fill', 'rgba(239, 68, 68, 0.12)')
         .attr('stroke', '#ef4444')
-        .attr('stroke-width', 1.2)
-        .attr('stroke-dasharray', '3,3')
-        .style('opacity', 0.55);
-      // …and a solid red ring on the point a click would remove
-      const target = nearestPoint(px, py, 14);
-      if (target >= 0) {
-        const t = $datasetStore.data[target];
-        layer.append('circle')
-          .attr('cx', lastXScale(t.x)).attr('cy', lastYScale(t.y))
-          .attr('r', 11)
-          .attr('fill', 'rgba(239, 68, 68, 0.12)')
-          .attr('stroke', '#ef4444')
-          .attr('stroke-width', 2);
-        layer.append('line')
-          .attr('x1', lastXScale(t.x) - 4).attr('y1', lastYScale(t.y) - 4)
-          .attr('x2', lastXScale(t.x) + 4).attr('y2', lastYScale(t.y) + 4)
-          .attr('stroke', '#ef4444').attr('stroke-width', 2).attr('stroke-linecap', 'round');
-        layer.append('line')
-          .attr('x1', lastXScale(t.x) - 4).attr('y1', lastYScale(t.y) + 4)
-          .attr('x2', lastXScale(t.x) + 4).attr('y2', lastYScale(t.y) - 4)
-          .attr('stroke', '#ef4444').attr('stroke-width', 2).attr('stroke-linecap', 'round');
-      }
-      return;
+        .attr('stroke-width', 2);
+      layer.append('line')
+        .attr('x1', lastXScale(t.x) - 4).attr('y1', lastYScale(t.y) - 4)
+        .attr('x2', lastXScale(t.x) + 4).attr('y2', lastYScale(t.y) + 4)
+        .attr('stroke', '#ef4444').attr('stroke-width', 2).attr('stroke-linecap', 'round');
+      layer.append('line')
+        .attr('x1', lastXScale(t.x) - 4).attr('y1', lastYScale(t.y) + 4)
+        .attr('x2', lastXScale(t.x) + 4).attr('y2', lastYScale(t.y) - 4)
+        .attr('stroke', '#ef4444').attr('stroke-width', 2).attr('stroke-linecap', 'round');
     }
-
-    // Add modes: the exact point a click creates, plus a small + tag
-    const isTrain = editTool === 'train';
-    layer.append('circle')
-      .attr('cx', px).attr('cy', py)
-      .attr('r', 7)
-      .attr('fill', isTrain ? 'rgba(59, 130, 246, 0.45)' : 'rgba(16, 185, 129, 0.35)')
-      .attr('stroke', isTrain ? '#3b82f6' : '#10b981')
-      .attr('stroke-width', 1.6)
-      .attr('stroke-dasharray', isTrain ? null : '3,2');
-    layer.append('line')
-      .attr('x1', px + 9).attr('y1', py - 9 - 3.5)
-      .attr('x2', px + 9).attr('y2', py - 9 + 3.5)
-      .attr('stroke', isTrain ? '#3b82f6' : '#10b981')
-      .attr('stroke-width', 1.8)
-      .attr('stroke-linecap', 'round');
-    layer.append('line')
-      .attr('x1', px + 9 - 3.5).attr('y1', py - 9)
-      .attr('x2', px + 9 + 3.5).attr('y2', py - 9)
-      .attr('stroke', isTrain ? '#3b82f6' : '#10b981')
-      .attr('stroke-width', 1.8)
-      .attr('stroke-linecap', 'round');
   }
 
   function clearPlotHover() {

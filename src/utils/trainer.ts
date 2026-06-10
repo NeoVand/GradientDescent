@@ -309,10 +309,27 @@ function evaluateRun(steps: number) {
   // Classify first, then report: the course panel consumes the verdict
   // silently (its reveal step does the talking); the coach narrates
   // otherwise.
+  //
+  // Order matters: a run whose loss is still falling is DESCENDING, never
+  // "stalled" — even if the gradient is small (slow ≠ stuck). Stalled is
+  // reserved for runs whose loss has genuinely flatlined away from the
+  // basin.
+  const hist = get(historyStore);
+  let stillDescending = false;
+  if (hist.length >= 3) {
+    const tail = hist.slice(-12);
+    const first = tail[0].trainLoss;
+    const last = tail[tail.length - 1].trainLoss;
+    stillDescending =
+      Number.isFinite(first) &&
+      Number.isFinite(last) &&
+      last < first - Math.abs(first) * 0.005 - 1e-12;
+  }
+
   let verdict: RunVerdict = 'descending';
   if (scene && normalizedLogLoss(scene.grid, loss) <= BASIN_LOG_THRESHOLD) {
     verdict = 'converged';
-  } else if (scene && mag < 0.004 * (scene.field.maxMag || 1)) {
+  } else if (!stillDescending && scene && mag < 0.004 * (scene.field.maxMag || 1)) {
     verdict = 'stalled';
   }
 
@@ -369,13 +386,12 @@ function evaluateRun(steps: number) {
   if (verdict === 'stalled') {
     showCoach(
       'warn',
-      `Stalled after ${steps} steps: ‖∇ℒ‖ ≈ ${fmtMag} but the loss is still high — a local minimum or flat plateau. Momentum, a larger γ, or a new start can help.`
+      `Stalled after ${steps} steps: ‖∇ℒ‖ ≈ ${fmtMag} and the loss has flatlined short of the basin — a local minimum or plateau. Momentum, a larger γ, or a fresh start can help.`
     );
     return;
   }
 
-  const h = get(historyStore);
-  if (h.length >= 2 && h[h.length - 1].trainLoss < h[h.length - 2].trainLoss - 1e-12) {
+  if (stillDescending) {
     showCoach('info', 'Out of steps while still descending — Train again to continue, or raise γ.');
   }
 }

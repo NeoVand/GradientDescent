@@ -218,6 +218,40 @@
   $: lrSliderPos =
     ((Math.log10(Math.max(1e-4, Math.min(1, learningRate))) - LR_LOG_MIN) / (LR_LOG_MAX - LR_LOG_MIN)) * 100;
 
+  // ---------- Informative slider colors ----------
+  // Each control speaks its own color: γ heats up from safe emerald to
+  // danger red as it grows (log scale, so the ramp starts around 0.1);
+  // the momentum family is violet (matching the race's Momentum trail);
+  // batch size is cyan (stochasticity); data points are blue; speed is
+  // neutral slate (it changes nothing about the math).
+  function lerpHex(c1: string, c2: string, t: number): string {
+    const a = parseInt(c1.slice(1), 16);
+    const b = parseInt(c2.slice(1), 16);
+    const ch = (sh: number) =>
+      Math.round(((a >> sh) & 255) + (((b >> sh) & 255) - ((a >> sh) & 255)) * t);
+    return `#${((ch(16) << 16) | (ch(8) << 8) | ch(0)).toString(16).padStart(6, '0')}`;
+  }
+
+  $: lrColor =
+    lrSliderPos <= 55
+      ? '#10b981'
+      : lrSliderPos <= 80
+        ? lerpHex('#10b981', '#f59e0b', (lrSliderPos - 55) / 25)
+        : lerpHex('#f59e0b', '#ef4444', (lrSliderPos - 80) / 20);
+
+  const HYPER_COLORS: Record<string, string> = {
+    mu: '#a855f7',
+    beta1: '#a855f7',
+    beta2: '#c084fc'
+  };
+
+  const SLIDER_COLORS = {
+    points: '#3b82f6',
+    batch: '#22d3ee',
+    steps: '#10b981',
+    speed: '#94a3b8'
+  };
+
   function handleLrSlider(e: Event) {
     const pos = parseFloat((e.target as HTMLInputElement).value);
     const lr = Math.pow(10, LR_LOG_MIN + (pos / 100) * (LR_LOG_MAX - LR_LOG_MIN));
@@ -341,7 +375,7 @@
           {/if}
         </div>
         <div class="row-spring"></div>
-        <span class="row-value points-value">{numPoints}</span>
+        <span class="row-value" style="color: {SLIDER_COLORS.points}">{numPoints}</span>
       </div>
       <input
         id="num-points"
@@ -351,7 +385,7 @@
         max="100"
         step="5"
         value={numPoints}
-        style="--fill: {((numPoints - 10) / 90) * 100}%"
+        style="--fill: {((numPoints - 10) / 90) * 100}%; --slider-color: {SLIDER_COLORS.points}"
         on:input={handleNumPointsChange}
       />
     </div>
@@ -497,7 +531,7 @@
             {/if}
           </div>
           <div class="row-spring"></div>
-          <span class="row-value momentum-value">{(optimizerSel.hyper[spec.key] ?? spec.default).toFixed(spec.step < 0.01 ? 3 : 2)}</span>
+          <span class="row-value" style="color: {HYPER_COLORS[spec.key] ?? '#10b981'}">{(optimizerSel.hyper[spec.key] ?? spec.default).toFixed(spec.step < 0.01 ? 3 : 2)}</span>
         </div>
         <input
           id={'hyper-' + spec.key}
@@ -507,7 +541,7 @@
           max={spec.max}
           step={spec.step}
           value={optimizerSel.hyper[spec.key] ?? spec.default}
-          style="--fill: {(((optimizerSel.hyper[spec.key] ?? spec.default) - spec.min) / (spec.max - spec.min)) * 100}%"
+          style="--fill: {(((optimizerSel.hyper[spec.key] ?? spec.default) - spec.min) / (spec.max - spec.min)) * 100}%; --slider-color: {HYPER_COLORS[spec.key] ?? '#10b981'}"
           on:input={(e) => setHyper(spec.key, parseFloat(e.currentTarget.value))}
         />
       </div>
@@ -534,7 +568,7 @@
           {/if}
         </div>
         <div class="row-spring"></div>
-        <span class="row-value lr-value">{formatLearningRate(learningRate)}</span>
+        <span class="row-value" style="color: {lrColor}">{formatLearningRate(learningRate)}</span>
       </div>
       <input
         id="learning-rate"
@@ -544,7 +578,7 @@
         max="100"
         step="0.5"
         value={lrSliderPos}
-        style="--fill: {lrSliderPos}%"
+        style="--fill: {lrSliderPos}%; --slider-color: {lrColor}"
         on:input={handleLrSlider}
       />
     </div>
@@ -603,7 +637,7 @@
           {/if}
         </div>
         <div class="row-spring"></div>
-        <span class="row-value momentum-value">{batchLabel}</span>
+        <span class="row-value" style="color: {SLIDER_COLORS.batch}">{batchLabel}</span>
       </div>
       <input
         id="batch-size"
@@ -613,7 +647,7 @@
         max={batchSizeSteps.length - 1}
         step="1"
         value={batchIndex(batchSize)}
-        style="--fill: {batchPos}%"
+        style="--fill: {batchPos}%; --slider-color: {SLIDER_COLORS.batch}"
         on:input={handleBatchSlider}
       />
     </div>
@@ -683,7 +717,7 @@
           {/if}
         </div>
         <div class="row-spring"></div>
-        <span class="row-value speed-value">{stepsPerSecond}/s</span>
+        <span class="row-value" style="color: {SLIDER_COLORS.speed}">{stepsPerSecond}/s</span>
       </div>
       <input
         id="speed"
@@ -693,7 +727,7 @@
         max="60"
         step="1"
         value={stepsPerSecond}
-        style="--fill: {((stepsPerSecond - 2) / 58) * 100}%"
+        style="--fill: {((stepsPerSecond - 2) / 58) * 100}%; --slider-color: {SLIDER_COLORS.speed}"
         on:input={(e) => {
           const v = parseInt(e.currentTarget.value);
           trainingStore.update(s => ({ ...s, stepsPerSecond: v }));
@@ -751,6 +785,7 @@
     display: flex;
     flex-direction: column;
     gap: calc(6px + 0.6 * var(--air));
+    justify-content: space-between;
     height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
@@ -806,12 +841,6 @@
     flex-direction: column;
     gap: calc(5px + 0.5 * var(--air));
     flex-shrink: 0;
-  }
-
-  /* The Run deck anchors to the bottom; leftover height collects in the
-     single gap above it instead of below the buttons. */
-  .run-section {
-    margin-top: auto;
   }
 
   .section-label {
@@ -952,7 +981,7 @@
 
   .problem-button {
     width: 100%;
-    height: calc(34px + 0.6 * var(--air));
+    height: calc(34px + 0.7 * var(--air));
     padding: 0 0.7rem;
     border: 2px solid var(--color-border);
     border-radius: 9px;
@@ -1238,12 +1267,13 @@
       var(--color-danger) 100%);
   }
 
-  /* Green-fill sliders — the active side fills green; --fill set inline. */
+  /* Value-fill sliders: the active side fills with the control's own
+     color (--slider-color, set inline per slider); --fill is the level. */
   .hyper-slider {
     background:
       linear-gradient(to right,
-        rgba(16, 185, 129, 0.25) 0%,
-        rgba(16, 185, 129, 1.0) var(--fill, 0%),
+        color-mix(in srgb, var(--slider-color, #10b981) 25%, transparent) 0%,
+        var(--slider-color, #10b981) var(--fill, 0%),
         rgba(127, 127, 127, 0.25) var(--fill, 0%),
         rgba(127, 127, 127, 0.25) 100%);
   }
@@ -1270,10 +1300,10 @@
   }
 
   .hyper-slider::-webkit-slider-thumb {
-    border-color: #10b981;
+    border-color: var(--slider-color, #10b981);
     box-shadow:
       0 2px 4px rgba(0, 0, 0, 0.2),
-      0 0 calc(var(--fill, 0%) * 0.12) rgba(16, 185, 129, 0.7);
+      0 0 calc(var(--fill, 0%) * 0.12) color-mix(in srgb, var(--slider-color, #10b981) 70%, transparent);
   }
 
   /* ---------- Split sub-labels with inline Random checkbox ---------- */
@@ -1317,11 +1347,7 @@
   .split-value.test { color: var(--color-success); }
   .split-separator { color: var(--color-text-tertiary); font-weight: 400; }
   .noise-value { color: var(--color-warning); }
-  .points-value,
-  .steps-value,
-  .lr-value,
-  .momentum-value,
-  .speed-value { color: #10b981; }
+  .steps-value { color: #10b981; }
 
   /* ---------- Dice / reroll ---------- */
   .reroll-btn {
@@ -1356,8 +1382,8 @@
   }
 
   .step-button {
-    width: calc(34px + 0.4 * var(--air));
-    height: calc(34px + 0.4 * var(--air));
+    width: calc(34px + 0.8 * var(--air));
+    height: calc(34px + 0.8 * var(--air));
     padding: 0;
     border: 2px solid var(--color-border);
     border-radius: 8px;
@@ -1392,7 +1418,7 @@
     font-size: 0.875rem;
     cursor: pointer;
     transition: all 0.2s;
-    min-height: calc(34px + 0.4 * var(--air));
+    min-height: calc(34px + 0.8 * var(--air));
     position: relative;
     overflow: hidden;
   }
@@ -1426,7 +1452,7 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    padding: calc(7px + 0.3 * var(--air)) 0.75rem;
+    padding: calc(7px + 0.4 * var(--air)) 0.75rem;
   }
 
   :global([data-theme='light']) .button-content {
@@ -1469,8 +1495,8 @@
   }
 
   .reset-button {
-    width: calc(34px + 0.4 * var(--air));
-    height: calc(34px + 0.4 * var(--air));
+    width: calc(34px + 0.8 * var(--air));
+    height: calc(34px + 0.8 * var(--air));
     padding: 0;
     border: 2px solid var(--color-border);
     border-radius: 8px;
@@ -1498,7 +1524,7 @@
     justify-content: center;
     gap: 0.45rem;
     width: 100%;
-    padding: calc(5.5px + 0.2 * var(--air));
+    padding: calc(5.5px + 0.35 * var(--air));
     border: 1px dashed rgba(16, 185, 129, 0.5);
     border-radius: 8px;
     background: rgba(16, 185, 129, 0.06);
