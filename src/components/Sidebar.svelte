@@ -661,6 +661,7 @@
   <!-- ===================== RUN: its own card, aligned with the app's
        bottom row (same shared height) ===================== -->
   <div class="panel run-panel">
+    <div class="section run-inner">
     <div class="section-label">
       <span>Run</span>
     </div>
@@ -783,6 +784,7 @@
       <Flag size={14} strokeWidth={2.25} />
       <span>{raceRunning ? 'Stop race' : 'Race optimizers'}</span>
     </button>
+    </div>
   </div>
 </div>
 
@@ -790,9 +792,12 @@
   /* Two sibling cards fill the left column: the controls panel grows,
      the run deck is its own piece pinned at the bottom, sized to match
      the app's bottom row so the whole bottom line of the app aligns. */
+  /* Leftover height collects in the gutter BETWEEN the two cards — the
+     top panel hugs its content instead of padding itself out. */
   .sidebar-stack {
     display: flex;
     flex-direction: column;
+    justify-content: space-between;
     gap: 1.25rem;
     height: 100%;
     min-height: 0;
@@ -805,7 +810,7 @@
   }
 
   .top-panel {
-    flex: 1;
+    flex: 0 1 auto;
     min-height: 0;
     display: flex;
     flex-direction: column;
@@ -816,16 +821,21 @@
     height: var(--bottom-h);
     display: flex;
     flex-direction: column;
+  }
+
+  /* The deck keeps the same inset-card look as every other section and
+     spreads its rows to fill the fixed-height card. */
+  .run-inner {
+    flex: 1;
+    min-height: 0;
     justify-content: space-between;
-    gap: calc(5px + 0.5 * var(--air));
   }
 
   .sidebar-content {
     display: flex;
     flex-direction: column;
     gap: calc(6px + 0.6 * var(--air));
-    justify-content: space-between;
-    flex: 1;
+    flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
