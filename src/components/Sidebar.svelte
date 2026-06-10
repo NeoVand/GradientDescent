@@ -793,12 +793,12 @@
   /* Two sibling cards fill the left column: the controls panel grows,
      the run deck is its own piece pinned at the bottom, sized to match
      the app's bottom row so the whole bottom line of the app aligns. */
-  /* Leftover height collects in the gutter BETWEEN the two cards — the
-     top panel hugs its content instead of padding itself out. */
+  /* The gutter between the two cards is the app's standard 1.25rem —
+     always. The top card fills the remaining height (its sections stay
+     compact at the top; the card surface carries the slack). */
   .sidebar-stack {
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
     gap: 1.25rem;
     height: 100%;
     min-height: 0;
@@ -811,7 +811,7 @@
   }
 
   .top-panel {
-    flex: 0 1 auto;
+    flex: 1;
     min-height: 0;
     display: flex;
     flex-direction: column;
@@ -836,7 +836,7 @@
     display: flex;
     flex-direction: column;
     gap: calc(6px + 0.6 * var(--air));
-    flex: 1 1 auto;
+    flex: 0 1 auto;
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
