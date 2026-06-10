@@ -30,10 +30,13 @@
     raceStore
   } from '../stores/stores';
   import { viridisRGB } from '../utils/lossGrid';
+  import { basinStore, BASIN_COLORS } from '../utils/basins';
 
   export let width = 400;
   export let height = 400;
   export let margin = { top: 20, right: 20, bottom: 50, left: 50 };
+  /** Parent-owned toggle: color the strip by destination basin instead. */
+  export let basinsOn = false;
 
   let svgElement: SVGSVGElement | null = null;
 
@@ -71,8 +74,11 @@
     return problemConfig.computeGradient(trainData, { a, b: parameters.b }).a;
   }
 
+  $: basin = $basinStore;
+  $: basinActive = basinsOn && basin.status === 'ready' && basin.scene?.oneParam === true;
+
   // Full rebuild when the curve shape itself can change.
-  $: if (svgElement && problemConfig && data && theme && width && height) {
+  $: if (svgElement && problemConfig && data && theme && width && height && basinActive !== undefined) {
     redraw();
   }
 
@@ -194,33 +200,58 @@
       .attr('class', 'plot-group')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // Viridis strip along the bottom: the 1D heatmap. Same log mapping and
-    // alpha as the 2D image so the two views speak the same color language.
-    const logMin = Math.log(yMin + LOG_EPS);
-    const logMax = Math.log(yMax + LOG_EPS);
-    const logSpan = logMax - logMin || 1;
-    const stripCanvas = document.createElement('canvas');
-    stripCanvas.width = CURVE_SAMPLES;
-    stripCanvas.height = 1;
-    const ctx = stripCanvas.getContext('2d')!;
-    const img = ctx.createImageData(CURVE_SAMPLES, 1);
-    for (let i = 0; i < CURVE_SAMPLES; i++) {
-      let t = (Math.log(curve[i].loss + LOG_EPS) - logMin) / logSpan;
-      t = t < 0 ? 0 : t > 1 ? 1 : t;
-      const [r, gg, b] = viridisRGB(1 - t); // bright = low loss
-      img.data[i * 4] = Math.round(r * 255);
-      img.data[i * 4 + 1] = Math.round(gg * 255);
-      img.data[i * 4 + 2] = Math.round(b * 255);
-      img.data[i * 4 + 3] = 217;
+    // Strip along the bottom. Default: the 1D heatmap — same log mapping
+    // and alpha as the 2D image so the two views speak the same color
+    // language. In basin mode: each α colored by which minimum GD reaches.
+    if (basinActive && basin.scene) {
+      plotGroup.append('image')
+        .attr('href', basin.scene.imageURL)
+        .attr('x', 0)
+        .attr('y', innerHeight - STRIP_HEIGHT)
+        .attr('width', innerWidth)
+        .attr('height', STRIP_HEIGHT)
+        .attr('preserveAspectRatio', 'none')
+        .style('image-rendering', 'pixelated');
+    } else {
+      const logMin = Math.log(yMin + LOG_EPS);
+      const logMax = Math.log(yMax + LOG_EPS);
+      const logSpan = logMax - logMin || 1;
+      const stripCanvas = document.createElement('canvas');
+      stripCanvas.width = CURVE_SAMPLES;
+      stripCanvas.height = 1;
+      const ctx = stripCanvas.getContext('2d')!;
+      const img = ctx.createImageData(CURVE_SAMPLES, 1);
+      for (let i = 0; i < CURVE_SAMPLES; i++) {
+        let t = (Math.log(curve[i].loss + LOG_EPS) - logMin) / logSpan;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        const [r, gg, b] = viridisRGB(1 - t); // bright = low loss
+        img.data[i * 4] = Math.round(r * 255);
+        img.data[i * 4 + 1] = Math.round(gg * 255);
+        img.data[i * 4 + 2] = Math.round(b * 255);
+        img.data[i * 4 + 3] = 217;
+      }
+      ctx.putImageData(img, 0, 0);
+      plotGroup.append('image')
+        .attr('href', stripCanvas.toDataURL())
+        .attr('x', 0)
+        .attr('y', innerHeight - STRIP_HEIGHT)
+        .attr('width', innerWidth)
+        .attr('height', STRIP_HEIGHT)
+        .attr('preserveAspectRatio', 'none');
     }
-    ctx.putImageData(img, 0, 0);
-    plotGroup.append('image')
-      .attr('href', stripCanvas.toDataURL())
-      .attr('x', 0)
-      .attr('y', innerHeight - STRIP_HEIGHT)
-      .attr('width', innerWidth)
-      .attr('height', STRIP_HEIGHT)
-      .attr('preserveAspectRatio', 'none');
+
+    // Basin destinations: a ringed dot on the curve at each minimum
+    if (basinActive && basin.scene) {
+      basin.scene.minima.forEach((m, i) => {
+        plotGroup.append('circle')
+          .attr('cx', xScale!(m.a))
+          .attr('cy', Math.max(0, Math.min(innerHeight, yScale!(lossAt(m.a)))))
+          .attr('r', 4)
+          .attr('fill', BASIN_COLORS[i % BASIN_COLORS.length])
+          .attr('stroke', '#ffffff')
+          .attr('stroke-width', 1.6);
+      });
+    }
 
     // Soft area under the curve, then the curve itself
     const area = d3.area<{ a: number; loss: number }>()

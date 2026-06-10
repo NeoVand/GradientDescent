@@ -27,8 +27,10 @@
     coachStore,
     clearCoach,
     landscapeViewStore,
-    raceStore
+    raceStore,
+    trainingStore
   } from '../stores/stores';
+  import { basinStore, ensureBasins, BASIN_COLORS } from '../utils/basins';
   import { optimizers } from '../utils/optimizers';
   import {
     computeHessian,
@@ -40,7 +42,7 @@
     type Eigen2
   } from '../utils/hessian';
   import type { ModelParameters } from '../types/types';
-  import { Mountain, Orbit } from 'lucide-svelte';
+  import { Mountain, Orbit, Map as MapIcon } from 'lucide-svelte';
   import LossCurve1D from './LossCurve1D.svelte';
 
   // Component references
@@ -139,6 +141,35 @@
     return k.toFixed(1);
   }
 
+  // ---------- Basins of attraction ----------
+  // Color every cell by which minimum plain GD (at the current γ) reaches
+  // from there. Computed in a Web Worker, cached per scenario.
+  let basinsOn = typeof window !== 'undefined' && localStorage.getItem('gd-basins') === '1';
+
+  function toggleBasins() {
+    basinsOn = !basinsOn;
+    if (typeof window !== 'undefined') localStorage.setItem('gd-basins', basinsOn ? '1' : '0');
+  }
+
+  $: basin = $basinStore;
+  $: learningRate = $trainingStore.learningRate;
+
+  // Keep the basin map in sync with the visible scenario while the toggle
+  // is on (debounced + cached inside ensureBasins).
+  $: if (basinsOn && scene && problemConfig) {
+    ensureBasins(
+      problemConfig.type,
+      trainData,
+      parameterRange,
+      learningRate,
+      oneParam,
+      oneParam ? 192 : 96
+    );
+  }
+
+  $: basinActive = basinsOn && basin.status === 'ready' && basin.scene !== null && basin.scene.oneParam === oneParam;
+  $: basinComputing = basinsOn && basin.status === 'computing';
+
   function computeGrad(
     train: typeof trainData,
     params: typeof parameters,
@@ -168,9 +199,9 @@
     return (v < 0 ? '−' : '') + s;
   }
 
-  // Full redraw whenever the cached scene or the theme changes (both cheap:
-  // the heavy work already happened in the store).
-  $: if (svgElement && scene && theme) {
+  // Full redraw whenever the cached scene, the theme, or the basin overlay
+  // changes (all cheap: the heavy work already happened off-thread).
+  $: if (svgElement && scene && theme && basinActive !== undefined) {
     redraw();
   }
 
@@ -337,6 +368,9 @@
     // Contour lines (above gradient field, below trail)
     drawContours(plotGroup, xScale, yScale);
 
+    // Basin destination dots (above contours so each region's target pops)
+    drawBasinMinima(plotGroup, xScale, yScale);
+
     // Training path with fade effect (above contours, below marker)
     drawTrainingPath(plotGroup, xScale, yScale);
 
@@ -395,6 +429,22 @@
     yScale: d3.ScaleLinear<number, number>
   ) {
     if (!scene) return;
+
+    if (basinActive && basin.scene) {
+      // Basin mode: categorical destination map over the VISIBLE range
+      // (the basin grid isn't extended). Pixelated on purpose — smoothing
+      // would blend category colors into lies at the boundaries.
+      g.append('image')
+        .attr('href', basin.scene.imageURL)
+        .attr('x', xScale(parameterRange.min))
+        .attr('y', yScale(parameterRange.max))
+        .attr('width', xScale(parameterRange.max) - xScale(parameterRange.min))
+        .attr('height', yScale(parameterRange.min) - yScale(parameterRange.max))
+        .attr('preserveAspectRatio', 'none')
+        .style('image-rendering', 'pixelated');
+      return;
+    }
+
     const { extMin, extMax } = scene.grid;
     g.append('image')
       .attr('href', scene.imageURL)
@@ -403,6 +453,25 @@
       .attr('width', xScale(extMax) - xScale(extMin))
       .attr('height', yScale(extMin) - yScale(extMax))
       .attr('preserveAspectRatio', 'none');
+  }
+
+  /** Destination dots: one ringed dot per basin, colored like its region. */
+  function drawBasinMinima(
+    g: d3.Selection<SVGGElement, unknown, null, undefined>,
+    xScale: d3.ScaleLinear<number, number>,
+    yScale: d3.ScaleLinear<number, number>
+  ) {
+    if (!basinActive || !basin.scene) return;
+    basin.scene.minima.forEach((m, i) => {
+      g.append('circle')
+        .attr('class', 'basin-minimum')
+        .attr('cx', xScale(m.a))
+        .attr('cy', yScale(m.b))
+        .attr('r', 4.5)
+        .attr('fill', BASIN_COLORS[i % BASIN_COLORS.length])
+        .attr('stroke', '#ffffff')
+        .attr('stroke-width', 1.8);
+    });
   }
 
   function drawContours(
@@ -918,24 +987,40 @@
         </div>
       {/if}
     </div>
-    {#if view === '2d' && !oneParam}
+    {#if view === '2d' || oneParam}
       <div class="header-tools">
+        {#if !oneParam}
+          <button
+            class="tool-toggle"
+            class:active={lensOn}
+            title="Curvature lens — the local Hessian's ellipse at the marker, condition number κ, and the Newton step a second-order method would take"
+            aria-pressed={lensOn}
+            on:click={toggleLens}
+          >
+            <Orbit size={14} strokeWidth={2.2} />
+            <span>Curvature</span>
+          </button>
+        {/if}
         <button
           class="tool-toggle"
-          class:active={lensOn}
-          title="Curvature lens — the local Hessian's ellipse at the marker, condition number κ, and the Newton step a second-order method would take"
-          aria-pressed={lensOn}
-          on:click={toggleLens}
+          class:active={basinsOn}
+          title="Basins of attraction — every point colored by WHICH minimum plain gradient descent (at the current γ) reaches from there. Same color = same destination."
+          aria-pressed={basinsOn}
+          on:click={toggleBasins}
         >
-          <Orbit size={14} strokeWidth={2.2} />
-          <span>Curvature</span>
+          {#if basinComputing}
+            <span class="tool-spinner" aria-hidden="true"></span>
+          {:else}
+            <MapIcon size={14} strokeWidth={2.2} />
+          {/if}
+          <span>Basins</span>
         </button>
       </div>
     {/if}
   </div>
   <div class="svg-container" bind:this={containerEl}>
     {#if oneParam}
-      <LossCurve1D {width} {height} {margin} />
+      <LossCurve1D {width} {height} {margin} {basinsOn} />
     {:else if view === '3d'}
       <!-- Inset to the same margins as the 2D plot frame, so the 3D window
            aligns exactly with the Data panel and the 2D view. -->
@@ -962,13 +1047,20 @@
         {/if}
       {/if}
     </div>
-    <!-- Loss color key: vertical, tucked into the bottom-right corner -->
-    <div class="loss-key" style="right: {margin.right + 8}px; bottom: {margin.bottom + 8}px;">
-      <span class="key-title">Loss</span>
-      <span class="key-val">{maxLossValue.toFixed(2)}</span>
-      <div class="vbar"></div>
-      <span class="key-val">{minLossValue.toFixed(2)}</span>
-    </div>
+    <!-- Loss color key — or, in basin mode, what the colors mean instead -->
+    {#if basinActive}
+      <div class="loss-key" style="right: {margin.right + 8}px; bottom: {margin.bottom + 8}px;">
+        <span class="key-title">Basins</span>
+        <span class="key-note">color =<br />destination</span>
+      </div>
+    {:else}
+      <div class="loss-key" style="right: {margin.right + 8}px; bottom: {margin.bottom + 8}px;">
+        <span class="key-title">Loss</span>
+        <span class="key-val">{maxLossValue.toFixed(2)}</span>
+        <div class="vbar"></div>
+        <span class="key-val">{minLossValue.toFixed(2)}</span>
+      </div>
+    {/if}
     {#if view === '2d' || oneParam}
       <!-- Marker-arrow key, bottom-left corner -->
       <div class="vec-key" style="left: {margin.left + 8}px; bottom: {margin.bottom + 8}px;">
@@ -1151,6 +1243,19 @@
     color: #10b981;
   }
 
+  .tool-spinner {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    border: 2px solid rgba(16, 185, 129, 0.25);
+    border-top-color: #10b981;
+    animation: toolSpin 0.7s linear infinite;
+  }
+
+  @keyframes toolSpin {
+    to { transform: rotate(360deg); }
+  }
+
   /* ---------- In-plot corner keys ---------- */
 
   /* Vertical loss color key, bottom-right of the plot */
@@ -1184,6 +1289,15 @@
     background: linear-gradient(to bottom,
       #440154, #31688e, #35b779, #fde724);
     border: 1px solid var(--color-border);
+  }
+
+  .key-note {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 600;
+    font-size: 0.625rem;
+    text-align: center;
+    line-height: 1.35;
+    opacity: 0.85;
   }
 
   /* Marker-arrow key (−∇ℒ vs Δθ), bottom-left of the plot, 2D only */
