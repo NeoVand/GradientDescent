@@ -97,6 +97,7 @@ function fixtureFor(type: string): DataPoint[] {
       ].map(p => ({ ...p, isTraining: true, label: signal(p.x, p.y) }));
     }
     case 'ar2':
+    case 'ar2-rollout':
       // A short series with integer time indices; values are arbitrary
       // but fixed — gradient correctness doesn't need the series to
       // follow the model.

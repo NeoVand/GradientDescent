@@ -1224,18 +1224,16 @@ const meanShift: ProblemConfig = {
 
 /**
  * AR(2) — an autoregressive time series: each value is a weighted blend of
- * the two before it, X_t = α·X_{t−1} + β·X_{t−2} + noise. Fitting it is
- * least squares on lagged copies of the series (the loss is a quadratic
- * valley shaped by the series' own autocorrelation), but the MODEL is a
- * dynamical system: outside the classic stability triangle
- * (β > −1, β < 1 ± α) its free-run forecast explodes. An AR model is a
- * tiny linear RNN — the first taste of learning dynamics, not curves.
+ * the two before it, X_t = α·X_{t−1} + β·X_{t−2} + noise. Scoring one-step
+ * predictions is least squares on lagged copies of the series, so the loss
+ * is a clean quadratic valley shaped by the series' own autocorrelation —
+ * the gentle introduction; its rollout sibling below is the wild one.
  */
 const ar2: ProblemConfig = {
   type: 'ar2',
   name: 'AR(2) Time Series',
   description: 'Predict each value from the two before it',
-  tagline: 'Fit yesterday to predict tomorrow — and mind the stability triangle.',
+  tagline: 'Fit yesterday to predict tomorrow — least squares on the series’ own past.',
   trueParameters: { a: 1.2, b: -0.5 },
 
   // x is the time index t (kept integer so lagged neighbors are exact);
@@ -1291,15 +1289,138 @@ const ar2: ProblemConfig = {
     return m > 0 ? { a: gA / m, b: gB / m } : { a: 0, b: 0 };
   },
 
-  // Start OUTSIDE the stability triangle (top corners): the free-run
-  // forecast on the data plot visibly explodes until training drags the
-  // parameters back inside.
-  getInitialParameters: () => {
-    const side = Math.random() < 0.5 ? -1 : 1;
-    return { a: side * (1.3 + Math.random() * 0.4), b: 1.2 + Math.random() * 0.5 };
+  // Start across the valley from the minimum at (1.2, −0.5) so the
+  // descent gets to ride the autocorrelation valley. Lagged copies of one
+  // series are correlated features, so the valley is ill-conditioned:
+  // plain GD descends honestly but slowly — switching to Momentum (μ=0.9)
+  // converges 20/20 simulated datasets in under 200 steps.
+  getInitialParameters: () => ({
+    a: -(0.8 + Math.random() * 0.6),
+    b: 0.7 + Math.random() * 0.5
+  }),
+
+  defaultLearningRate: 0.3,
+  defaultMomentum: 0.9,
+  parameterRange: { min: -2, max: 2 }
+};
+
+/**
+ * AR(2) Rollout — same model, same series, harsher question: instead of
+ * predicting one step with the true past in hand (teacher forcing), roll
+ * the model forward HORIZON steps on its OWN predictions and score the
+ * whole forecast. Forecast errors compound through the recursion, which
+ * does two things to the landscape:
+ *  - inside the stationarity triangle (β > −1, β < 1 ± α) sits a curved,
+ *    non-convex valley — the loss is now a degree-2k polynomial, not a
+ *    quadratic;
+ *  - outside it the model's own dynamics amplify every step, so the loss
+ *    rises like ρ^2k and the triangle's edge becomes a literal cliff.
+ * This is exploding gradients, the classic hazard of training recurrent
+ * networks (Bengio et al. 1994; Pascanu et al. 2013), in two parameters.
+ * The gradient is exact backprop-through-time, run in forward mode.
+ */
+const AR2_HORIZON = 6;
+
+const ar2Rollout: ProblemConfig = {
+  type: 'ar2-rollout',
+  name: 'AR(2) Rollout',
+  description: 'Roll the forecast forward on its own predictions',
+  tagline: 'Score the whole forecast: errors compound, and the stability edge becomes a cliff.',
+  trueParameters: { a: 1.2, b: -0.5 },
+
+  // The same process as AR(2): the two problems share a data story and
+  // differ only in the loss you descend.
+  generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] =>
+    ar2.generateData(numPoints, trainRatio, noiseLevel),
+
+  predict: (_x: number, _params: ModelParameters): number => 0,
+
+  // Every observed pair (X_t, X_{t+1}) seeds a rollout; each rolled step
+  // with an observed target contributes one squared error. The recursion
+  // keeps rolling across gaps (test points missing from the train subset)
+  // but only scores steps it can check.
+  computeLoss: (data: DataPoint[], params: ModelParameters): number => {
+    const byT = new Map<number, number>();
+    let maxT = -Infinity;
+    for (const p of data) {
+      byT.set(p.x, p.y);
+      if (p.x > maxT) maxT = p.x;
+    }
+    let total = 0;
+    let m = 0;
+    for (const p of data) {
+      const t = p.x;
+      const next = byT.get(t + 1);
+      if (next === undefined) continue;
+      let s2 = p.y;
+      let s1 = next;
+      for (let j = 1; j <= AR2_HORIZON && t + 1 + j <= maxT; j++) {
+        const pred = params.a * s1 + params.b * s2;
+        if (!Number.isFinite(pred)) break;
+        const target = byT.get(t + 1 + j);
+        if (target !== undefined) {
+          const e = pred - target;
+          total += e * e;
+          m++;
+        }
+        s2 = s1;
+        s1 = pred;
+      }
+    }
+    return m > 0 ? total / m : 0;
   },
 
+  // Forward-mode BPTT: carry ∂(state)/∂α and ∂(state)/∂β through the
+  // recursion alongside the states themselves. Exact, and FD-verified.
+  computeGradient: (data: DataPoint[], params: ModelParameters): ModelParameters => {
+    const byT = new Map<number, number>();
+    let maxT = -Infinity;
+    for (const p of data) {
+      byT.set(p.x, p.y);
+      if (p.x > maxT) maxT = p.x;
+    }
+    let gA = 0;
+    let gB = 0;
+    let m = 0;
+    for (const p of data) {
+      const t = p.x;
+      const next = byT.get(t + 1);
+      if (next === undefined) continue;
+      let s2 = p.y, s1 = next;
+      let d2a = 0, d2b = 0, d1a = 0, d1b = 0; // sensitivities of s2, s1
+      for (let j = 1; j <= AR2_HORIZON && t + 1 + j <= maxT; j++) {
+        const pred = params.a * s1 + params.b * s2;
+        if (!Number.isFinite(pred)) break;
+        const dpa = s1 + params.a * d1a + params.b * d2a;
+        const dpb = s2 + params.a * d1b + params.b * d2b;
+        const target = byT.get(t + 1 + j);
+        if (target !== undefined) {
+          const e = pred - target;
+          gA += 2 * e * dpa;
+          gB += 2 * e * dpb;
+          m++;
+        }
+        s2 = s1; d2a = d1a; d2b = d1b;
+        s1 = pred; d1a = dpa; d1b = dpb;
+      }
+    }
+    return m > 0 ? { a: gA / m, b: gB / m } : { a: 0, b: 0 };
+  },
+
+  // Start INSIDE the triangle (with margin — its left edge is β < 1 + α,
+  // and a start past the cliff diverges in a handful of steps) but on the
+  // wrong side of the valley: the fitted dynamics alternate sign (α < 0),
+  // so the descent travels the whole curved valley to (1.2, −0.5). Plain
+  // GD stalls along the shallow direction — like Rosenbrock, this valley
+  // is momentum's home turf (γ/μ tuned by simulation: 0 divergences in 20
+  // random datasets, 15/20 drop the loss 4×+ within 200 steps).
+  getInitialParameters: () => ({
+    a: -(0.6 + Math.random() * 0.4),
+    b: -0.3 + Math.random() * 0.2
+  }),
+
   defaultLearningRate: 0.1,
+  defaultMomentum: 0.85,
   parameterRange: { min: -2, max: 2 }
 };
 
@@ -1524,6 +1645,7 @@ export const problemConfigs: Record<string, ProblemConfig> = {
   'source-localization': sourceLocalization,
   'mean-shift': meanShift,
   'ar2': ar2,
+  'ar2-rollout': ar2Rollout,
   'tiny-net': tinyNet,
   'rosenbrock': rosenbrock,
   'saddle-point': saddlePoint,

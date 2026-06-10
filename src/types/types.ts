@@ -23,6 +23,7 @@ export type ProblemType =
   | 'source-localization'
   | 'mean-shift'
   | 'ar2'
+  | 'ar2-rollout'
   | 'tiny-net'
   | 'rosenbrock'
   | 'saddle-point'

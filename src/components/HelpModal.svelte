@@ -2,10 +2,11 @@
   /**
    * Help Modal
    *
-   * A guided tour: an animated hero, the prerequisites (loss & gradient
-   * intuition), the algorithm, the optimizer family tree (GD → Adam as
-   * 170 years of fixes), the knobs, the 21 problems, things to try, a key
-   * for the on-screen panels, and the keyboard map.
+   * A little book, in chapters: an animated hero, then 01 prerequisites
+   * (loss & gradient), 02 the algorithm and its one knob, 03 the optimizer
+   * story (GD → Adam as 170 years of fixes, opened by a real simulated
+   * race), 04 the 22 problems, 05 ready-made experiments, 06 a key for the
+   * on-screen panels, and 07 the keyboard map.
    */
 
   import { onMount, afterUpdate } from 'svelte';
@@ -13,11 +14,14 @@
     X,
     Activity, Mountain, TrendingUp, TrendingDown, Percent, Waves,
     Target, Radio, ScatterChart, Brain,
-    Sparkles, Compass, Rocket, Zap, RefreshCw,
+    Compass, Rocket, Zap,
     BookOpen, FlaskConical, Layers, Map, Play
   } from 'lucide-svelte';
   import katex from 'katex';
   import 'katex/dist/katex.min.css';
+  import { rgb, geoPath } from 'd3';
+  import { contours } from 'd3-contour';
+  import { interpolateViridis } from 'd3-scale-chromatic';
   import { experiments } from '../utils/experiments';
 
   function runExperiment(exp: (typeof experiments)[number]) {
@@ -25,9 +29,11 @@
     exp.apply();
   }
 
-  // ---------- The optimizer family tree ----------
-  // 170 years of "fix what just broke", told as cards. Formulas render
-  // straight to HTML — no element refs needed.
+  // ---------- The optimizer story ----------
+  // 170 years of "fix what just broke", told as cards in three acts plus
+  // a finale. Each act opens with the failure it exists to fix; the one
+  // prerequisite tool (the moving average) appears exactly where it is
+  // first needed. Formulas render straight to HTML — no element refs.
   const tex = (src: string) => katex.renderToString(src, { throwOnError: false });
 
   type OptChapter = {
@@ -39,19 +45,12 @@
     fix?: string;
     brk?: string;
     prereq?: boolean;
+    act?: { no: string; title: string };
   };
 
   const optTree: OptChapter[] = [
     {
-      prereq: true,
-      year: 'tool',
-      name: 'The moving average',
-      by: 'the one prerequisite for everything below',
-      idea:
-        'An exponential moving average is a leaky memory: keep a fraction β of what you believed, mix in a fraction (1−β) of what you just saw. Its horizon is roughly 1/(1−β) steps — β = 0.9 remembers about the last 10 values, β = 0.999 about the last 1000. Momentum is a moving average of gradients; RMSProp and Adam keep one of squared gradients.',
-      formula: String.raw`v \;\leftarrow\; \beta\, v + (1-\beta)\, x`
-    },
-    {
+      act: { no: 'Act I', title: 'Follow the slope' },
       year: '1847',
       name: 'Gradient Descent',
       by: 'Augustin-Louis Cauchy',
@@ -59,7 +58,17 @@
         'Cauchy, grinding through astronomical calculations by hand, writes down the move everything else builds on: measure the slope, step the other way. A century and a half later it is still the backbone of all of machine learning.',
       formula: String.raw`\boldsymbol{\theta} \;\leftarrow\; \boldsymbol{\theta} - \gamma\, \nabla \mathcal{L}`,
       fix: 'every step is locally downhill',
-      brk: 'one γ for every parameter, and it zig-zags across ravines (watch the grey path above)'
+      brk: 'one γ for every parameter, and it zig-zags across ravines (the grey racer above)'
+    },
+    {
+      act: { no: 'Act II', title: 'Add memory' },
+      prereq: true,
+      year: 'tool',
+      name: 'The moving average',
+      by: 'the one tool Acts II and III are built from',
+      idea:
+        'An exponential moving average is a leaky memory: keep a fraction β of what you believed, mix in a fraction (1−β) of what you just saw. Its horizon is roughly 1/(1−β) steps — β = 0.9 remembers about the last 10 values, β = 0.999 about the last 1000. Momentum is a moving average of gradients; RMSProp and Adam keep one of squared gradients.',
+      formula: String.raw`v \;\leftarrow\; \beta\, v + (1-\beta)\, x`
     },
     {
       year: '1964',
@@ -81,6 +90,7 @@
       fix: 'corrects the momentum mistake before making it'
     },
     {
+      act: { no: 'Act III', title: 'A learning rate per parameter' },
       year: '2011',
       name: 'AdaGrad',
       by: 'Duchi, Hazan & Singer',
@@ -100,6 +110,7 @@
       fix: 'forgetting keeps the step size alive'
     },
     {
+      act: { no: 'Finale', title: 'Combine everything' },
       year: '2014',
       name: 'Adam',
       by: 'Kingma & Ba — "adaptive moments"',
@@ -113,17 +124,149 @@
 
   const raceExperiment = experiments.find(e => e.id === 'banana-race');
 
+  // ---------- The opening picture: a real race on a real landscape ----------
+  // A curved ravine, ℒ = 9(y − c(x))² + 0.22(x − x*)² with a sine valley
+  // c(x), rendered exactly the way the app renders every landscape
+  // (log loss → reversed viridis, white contour lines) — and four
+  // optimizers ACTUALLY simulated on it, in the same colors as Race mode.
+  // Arrival times in the animation are the true step counts.
+  const RACE_W = 460;
+  const RACE_H = 230;
+  const raceDemo = (() => {
+    const X0 = -2.2, X1 = 2.2, Y0 = -1.15, Y1 = 1.15;
+    const XSTAR = 1.55;
+    const c = (x: number) => 0.55 * Math.sin(1.35 * x + 0.4);
+    const cp = (x: number) => 0.55 * 1.35 * Math.cos(1.35 * x + 0.4);
+    const loss = (x: number, y: number) => 9 * (y - c(x)) ** 2 + 0.22 * (x - XSTAR) ** 2;
+    const grad = (x: number, y: number): [number, number] => {
+      const d = y - c(x);
+      return [-18 * d * cp(x) + 0.44 * (x - XSTAR), 18 * d];
+    };
+    const px = (x: number) => ((x - X0) / (X1 - X0)) * RACE_W;
+    const py = (y: number) => ((Y1 - y) / (Y1 - Y0)) * RACE_H;
+
+    // Heatmap — same log → reversed-viridis mapping as lossGrid, one pixel
+    // per cell, scaled up smoothly by the <image>.
+    const gw = 110, gh = 55;
+    const vals: number[] = new Array(gw * gh);
+    let vMin = Infinity, vMax = -Infinity;
+    for (let j = 0; j < gh; j++) {
+      const y = Y1 - ((j + 0.5) / gh) * (Y1 - Y0); // row 0 = top of frame
+      for (let i = 0; i < gw; i++) {
+        const v = loss(X0 + ((i + 0.5) / gw) * (X1 - X0), y);
+        vals[j * gw + i] = v;
+        if (v < vMin) vMin = v;
+        if (v > vMax) vMax = v;
+      }
+    }
+    const EPS = 0.001;
+    const lMin = Math.log(vMin + EPS), lMax = Math.log(vMax + EPS);
+    const canvas = document.createElement('canvas');
+    canvas.width = gw;
+    canvas.height = gh;
+    const ctx = canvas.getContext('2d')!;
+    const img = ctx.createImageData(gw, gh);
+    for (let k = 0; k < vals.length; k++) {
+      const t = Math.min(1, Math.max(0, (Math.log(vals[k] + EPS) - lMin) / (lMax - lMin)));
+      const col = rgb(interpolateViridis(1 - t));
+      img.data[k * 4] = col.r;
+      img.data[k * 4 + 1] = col.g;
+      img.data[k * 4 + 2] = col.b;
+      img.data[k * 4 + 3] = 217;
+    }
+    ctx.putImageData(img, 0, 0);
+    const heatURL = canvas.toDataURL();
+
+    // Contour lines at log-spaced loss levels, in grid coordinates
+    // (template scales them up; non-scaling-stroke keeps lines crisp).
+    const levels: number[] = [];
+    for (let k = 1; k < 10; k++) levels.push(Math.exp(lMin + (k / 10) * (lMax - lMin)) - EPS);
+    const toPath = geoPath();
+    const contourPaths = contours().size([gw, gh]).thresholds(levels)(vals)
+      .map((poly, idx) => ({ d: toPath(poly) ?? '', o: 0.12 + 0.022 * idx }));
+
+    // The race: same start, each optimizer with the γ it likes; a run ends
+    // when it enters the basin around the minimum (or the step cap).
+    const start: [number, number] = [-1.85, -0.75];
+    const minPt: [number, number] = [XSTAR, c(XSTAR)];
+    type Stepper = (g: [number, number], st: Record<string, number>, s: number) => [number, number];
+    const simulate = (step: Stepper): [number, number][] => {
+      let [x, y] = start;
+      const pts: [number, number][] = [[x, y]];
+      const st: Record<string, number> = { vx: 0, vy: 0, sx: 0, sy: 0, mx: 0, my: 0 };
+      for (let s = 0; s < 170; s++) {
+        const [dx, dy] = step(grad(x, y), st, s);
+        x += dx;
+        y += dy;
+        pts.push([x, y]);
+        if (Math.hypot(x - minPt[0], y - minPt[1]) < 0.1) break;
+      }
+      return pts;
+    };
+    const E = 1e-8;
+    const runners = [
+      { name: 'GD', color: '#94a3b8', pts: simulate(g => [-0.085 * g[0], -0.085 * g[1]]) },
+      {
+        name: 'Momentum', color: '#a855f7',
+        pts: simulate((g, st) => {
+          st.vx = 0.86 * st.vx + g[0];
+          st.vy = 0.86 * st.vy + g[1];
+          return [-0.025 * st.vx, -0.025 * st.vy];
+        })
+      },
+      {
+        name: 'RMSProp', color: '#22d3ee',
+        pts: simulate((g, st) => {
+          st.sx = 0.94 * st.sx + 0.06 * g[0] ** 2;
+          st.sy = 0.94 * st.sy + 0.06 * g[1] ** 2;
+          return [-0.08 * g[0] / (Math.sqrt(st.sx) + E), -0.08 * g[1] / (Math.sqrt(st.sy) + E)];
+        })
+      },
+      {
+        name: 'Adam', color: '#f43f5e',
+        pts: simulate((g, st, s) => {
+          st.mx = 0.9 * st.mx + 0.1 * g[0];
+          st.my = 0.9 * st.my + 0.1 * g[1];
+          st.sx = 0.999 * st.sx + 0.001 * g[0] ** 2;
+          st.sy = 0.999 * st.sy + 0.001 * g[1] ** 2;
+          const b1 = 1 - 0.9 ** (s + 1), b2 = 1 - 0.999 ** (s + 1);
+          return [
+            -0.16 * (st.mx / b1) / (Math.sqrt(st.sx / b2) + E),
+            -0.16 * (st.my / b1) / (Math.sqrt(st.sy / b2) + E)
+          ];
+        })
+      }
+    ];
+    const slowest = Math.max(...runners.map(r => r.pts.length - 1));
+    const racers = runners.map(r => ({
+      name: r.name,
+      color: r.color,
+      d: 'M ' + r.pts.map(([x, y]) => `${px(x).toFixed(1)},${py(y).toFixed(1)}`).join(' L '),
+      // Fraction of the loop spent racing: true step count ÷ slowest,
+      // squeezed into 72% of the cycle so the finished picture lingers.
+      frac: +(((r.pts.length - 1) / slowest) * 0.72).toFixed(4),
+      steps: r.pts.length - 1
+    }));
+    return {
+      heatURL,
+      contourPaths,
+      racers,
+      gw,
+      gh,
+      start: [px(start[0]), py(start[1])],
+      min: [px(minPt[0]), py(minPt[1])]
+    };
+  })();
+
   export let isOpen = false;
   export let onClose: () => void;
 
   let updateRuleEl: HTMLSpanElement;
-  let momentumEl: HTMLSpanElement;
   let lossDefinitionEl: HTMLSpanElement;
   let gradientDefinitionEl: HTMLSpanElement;
 
   const formulas = {
     updateRule: String.raw`\boldsymbol{\theta}^{(t+1)} \leftarrow \boldsymbol{\theta}^{(t)} - \gamma\, \nabla \mathcal{L}(\boldsymbol{\theta}^{(t)})`,
-    momentum: String.raw`\mathbf{v}^{(t+1)} \leftarrow \mu\, \mathbf{v}^{(t)} + \nabla \mathcal{L},\quad \boldsymbol{\theta}^{(t+1)} \leftarrow \boldsymbol{\theta}^{(t)} - \gamma\, \mathbf{v}^{(t+1)}`,
     lossDefinition: String.raw`\mathcal{L}(\boldsymbol{\theta}) = \tfrac{1}{n}\sum_{i=1}^{n} \big(\hat{y}_i - y_i\big)^{2}`,
     gradientDefinition: String.raw`\nabla \mathcal{L} = \begin{bmatrix} \tfrac{\partial \mathcal{L}}{\partial \alpha} \\[2pt] \tfrac{\partial \mathcal{L}}{\partial \beta} \end{bmatrix}`
   };
@@ -135,7 +278,6 @@
       try { katex.render(src, el, opts); } catch (e) { console.error(e); }
     };
     safe(updateRuleEl, formulas.updateRule);
-    safe(momentumEl, formulas.momentum);
     safe(lossDefinitionEl, formulas.lossDefinition);
     safe(gradientDefinitionEl, formulas.gradientDefinition);
   }
@@ -220,7 +362,8 @@
       { name: 'Mean-Shift Cluster', icon: ScatterChart, formula: 'Σ(1 − kᵢ)/n', tag: 'two cluster modes' }
     ],
     'Time series': [
-      { name: 'AR(2)', icon: null, customIcon: 'xₜ', formula: 'αxₜ₋₁ + βxₜ₋₂', tag: 'free run explodes outside the stability triangle' }
+      { name: 'AR(2)', icon: null, customIcon: 'xₜ', formula: 'αxₜ₋₁ + βxₜ₋₂', tag: 'least squares on the series’ own past' },
+      { name: 'AR(2) Rollout', icon: null, customIcon: 'x̂ₜ', formula: 'αx̂ₜ₋₁ + βx̂ₜ₋₂, rolled 6×', tag: 'errors compound — the stability triangle becomes a cliff' }
     ],
     'Neural network': [
       { name: 'Tiny Neural Net', icon: Brain, formula: 'β tanh(αX)', tag: 'mirror minima; zero-init is a dead saddle' }
@@ -318,9 +461,9 @@
           </div>
         </div>
 
-        <!-- ============================== PREREQS ============================== -->
+        <!-- ============================== 01 · PREREQS ============================== -->
         <section>
-          <h3><BookOpen size={18} strokeWidth={2} /> Prerequisites</h3>
+          <h3><span class="chap">01</span><BookOpen size={18} strokeWidth={2} /> Prerequisites</h3>
 
           <div class="concept">
             <div class="concept-text">
@@ -400,9 +543,9 @@
           </div>
         </section>
 
-        <!-- ============================== ALGORITHM ============================== -->
+        <!-- ============================== 02 · ALGORITHM ============================== -->
         <section>
-          <h3><Compass size={18} strokeWidth={2} /> The algorithm</h3>
+          <h3><span class="chap">02</span><Compass size={18} strokeWidth={2} /> The algorithm</h3>
           <p>
             That's it. One step of gradient descent is just:
           </p>
@@ -413,53 +556,92 @@
             <li>Step in the negative-gradient direction with stride <strong>γ</strong> (learning rate).</li>
             <li>Repeat until loss stops dropping.</li>
           </ol>
-          <p class="aside">
-            All the art is in the step size — too small and you crawl, too big and you ricochet.
-          </p>
+
+          <div class="knob">
+            <div class="knob-head"><Zap size={16} strokeWidth={2} /> All the art is in the stride: learning rate <em class="g">γ</em></div>
+            <ul class="knob-bullets">
+              <li><strong>Too small:</strong> the marker creeps; you burn the whole step budget without arriving.</li>
+              <li><strong>Too big:</strong> overshoots the minimum; loss bounces or diverges to infinity.</li>
+              <li><strong>Just right:</strong> a smooth curve into the basin. Every problem ships with a sane default.</li>
+            </ul>
+            <p class="aside">
+              The other dial is <strong>Training steps</strong> — how many updates one click of
+              Train runs. Everything else in the optimizer panel exists to survive a γ you can't
+              hand-tune. That fight is the next chapter.
+            </p>
+          </div>
         </section>
 
-        <!-- ============================== OPTIMIZER FAMILY TREE ============================== -->
+        <!-- ============================== 03 · THE OPTIMIZER STORY ============================== -->
         <section>
-          <h3><Rocket size={18} strokeWidth={2} /> Six optimizers, one story</h3>
+          <h3><span class="chap">03</span><Rocket size={18} strokeWidth={2} /> Six optimizers, one story</h3>
           <p>
             Every optimizer in the picker is a patch for a specific failure of the one
             before it — 170 years of <em>fix what just broke</em>. The recurring villain
             is the <strong>ravine</strong>: a valley much steeper across than along.
+            Here are all four families on one, actually simulated — the dots arrive in
+            their true step counts:
           </p>
 
-          <div class="ravine-demo">
-            <svg viewBox="0 0 460 140" preserveAspectRatio="xMidYMid meet">
-              <!-- ravine contours -->
-              <ellipse cx="235" cy="70" rx="205" ry="50" class="rv-contour" style="stroke-opacity: 0.10" />
-              <ellipse cx="235" cy="70" rx="160" ry="38" class="rv-contour" style="stroke-opacity: 0.16" />
-              <ellipse cx="235" cy="70" rx="112" ry="27" class="rv-contour" style="stroke-opacity: 0.24" />
-              <ellipse cx="235" cy="70" rx="64"  ry="16" class="rv-contour" style="stroke-opacity: 0.34" />
-              <ellipse cx="235" cy="70" rx="22"  ry="7"  class="rv-contour" style="stroke-opacity: 0.5" />
-              <!-- plain GD: wall-to-wall -->
-              <path
-                class="rv-zig"
-                pathLength="100"
-                d="M 48,38 L 76,100 L 102,44 L 127,95 L 150,49 L 172,90 L 192,54 L 211,84 L 228,60 L 243,78 L 256,65"
-                fill="none"
-              />
-              <!-- momentum: averages the bounce away -->
-              <path
-                class="rv-mom"
-                pathLength="100"
-                d="M 48,38 C 95,115 160,90 234,72 C 290,60 330,68 352,70"
-                fill="none"
-              />
-              <circle class="rv-dot" cx="352" cy="70" r="4" />
-              <text x="262" y="58" class="rv-label rv-label-gd">GD</text>
-              <text x="360" y="62" class="rv-label rv-label-mom">Momentum</text>
+          <div class="race-demo">
+            <svg viewBox="0 0 {RACE_W} {RACE_H}" preserveAspectRatio="xMidYMid meet">
+              <defs>
+                <clipPath id="race-clip"><rect x="0" y="0" width={RACE_W} height={RACE_H} rx="10" /></clipPath>
+              </defs>
+              <g clip-path="url(#race-clip)">
+                <image href={raceDemo.heatURL} x="0" y="0" width={RACE_W} height={RACE_H} preserveAspectRatio="none" />
+                <g transform="scale({RACE_W / raceDemo.gw}, {RACE_H / raceDemo.gh})">
+                  {#each raceDemo.contourPaths as cp}
+                    <path d={cp.d} fill="none" stroke="#fff" stroke-opacity={cp.o} stroke-width="1" vector-effect="non-scaling-stroke" />
+                  {/each}
+                </g>
+                {#each raceDemo.racers as r (r.name)}
+                  <path
+                    d={r.d}
+                    fill="none"
+                    stroke={r.color}
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    pathLength="100"
+                    stroke-dasharray="100"
+                    stroke-dashoffset="100"
+                    opacity="0.92"
+                  >
+                    <animate attributeName="stroke-dashoffset" values="100;0;0" keyTimes="0;{r.frac};1" dur="7s" repeatCount="indefinite" />
+                  </path>
+                {/each}
+                <!-- the basin -->
+                <circle cx={raceDemo.min[0]} cy={raceDemo.min[1]} r="7" fill="none" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3,2.5" />
+                <!-- the shared start: the app's orange marker -->
+                <circle cx={raceDemo.start[0]} cy={raceDemo.start[1]} r="8" fill="none" stroke="#f59e0b" stroke-width="1.75" opacity="0.9" />
+                <circle cx={raceDemo.start[0]} cy={raceDemo.start[1]} r="4.5" fill="#f59e0b" stroke="#fff" stroke-width="1.5" />
+                {#each raceDemo.racers as r (r.name)}
+                  <circle r="3.4" fill={r.color} stroke="#fff" stroke-width="1.25">
+                    <animateMotion path={r.d} keyPoints="0;1;1" keyTimes="0;{r.frac};1" calcMode="linear" dur="7s" repeatCount="indefinite" />
+                  </circle>
+                {/each}
+              </g>
             </svg>
-            <div class="ravine-caption">
-              Same number of steps: plain GD spends its budget bouncing wall to wall;
-              momentum cancels the bounce and rides the valley floor.
+            <div class="race-legend">
+              {#each raceDemo.racers as r (r.name)}
+                <span class="race-chip"><span class="race-swatch" style="background:{r.color}"></span>{r.name} · {r.steps}</span>
+              {/each}
+            </div>
+            <div class="race-caption">
+              Same start, each optimizer with the γ it likes best. Plain GD burns its budget
+              bouncing wall to wall; Momentum cancels the bounce and glides; RMSProp and Adam
+              size every parameter's step from gradient history. The numbers are steps to the basin.
             </div>
           </div>
 
           {#each optTree as c (c.name)}
+            {#if c.act}
+              <div class="opt-act">
+                <span class="act-no">{c.act.no}</span>
+                <span class="act-title">{c.act.title}</span>
+              </div>
+            {/if}
             <div class="opt-card" class:prereq-card={c.prereq}>
               <div class="opt-head">
                 <span class="opt-year">{c.year}</span>
@@ -475,11 +657,19 @@
                 </div>
               {/if}
             </div>
+            {#if c.name === 'Nesterov'}
+              <p class="aside">
+                Feel Act II yourself: pick <strong>Gaussian Peak</strong> with μ = 0 — the
+                gradient out in the flats is so faint the marker stalls. Crank μ to 0.9 and
+                watch it power through. The blue arrow on the marker is raw steepest descent,
+                the red arrow is the step actually taken — the gap is the optimizer's personality.
+              </p>
+            {/if}
           {/each}
 
           {#if raceExperiment}
             <div class="opt-cta">
-              <span>The whole story in one picture:</span>
+              <span>Now run the real thing:</span>
               <button class="try-btn" on:click={() => runExperiment(raceExperiment)}>
                 <Play size={13} strokeWidth={2.5} />
                 <span>Race them on Rosenbrock</span>
@@ -488,61 +678,9 @@
           {/if}
         </section>
 
-        <!-- ============================== KNOBS ============================== -->
+        <!-- ============================== 04 · PROBLEMS ============================== -->
         <section>
-          <h3><Sparkles size={18} strokeWidth={2} /> Knobs to play with</h3>
-
-          <div class="knob">
-            <div class="knob-head"><Zap size={16} strokeWidth={2} /> Learning rate <em class="g">γ</em></div>
-            <p>How big each step is.</p>
-            <ul class="knob-bullets">
-              <li><strong>Too small:</strong> the marker creeps; you'll burn through your training-step budget without converging.</li>
-              <li><strong>Too big:</strong> overshoots the minimum; loss bounces or diverges to infinity.</li>
-              <li><strong>Just right:</strong> a smooth curve into the basin. Each problem ships with a sane default.</li>
-            </ul>
-          </div>
-
-          <div class="knob">
-            <div class="knob-head"><Compass size={16} strokeWidth={2} /> Optimizer</div>
-            <p>
-              How the step is computed from the gradient. Plain <strong>GD</strong> steps
-              straight downhill; <strong>Momentum</strong> and <strong>Nesterov</strong> accumulate
-              velocity; <strong>AdaGrad</strong>, <strong>RMSProp</strong>, and <strong>Adam</strong> adapt
-              each parameter's step size from gradient history. Watch the two arrows on the
-              marker: blue is the raw downhill direction, red is the step the optimizer
-              actually takes — the gap between them is the optimizer's personality.
-            </p>
-          </div>
-
-          <div class="knob">
-            <div class="knob-head"><Rocket size={16} strokeWidth={2} /> Momentum <em class="g">μ</em></div>
-            <p>
-              On the Momentum and Nesterov optimizers, the marker keeps a velocity.
-              Each step blends a fraction of the previous direction with the current
-              gradient:
-            </p>
-            <div class="formula-display" bind:this={momentumEl}></div>
-            <ul class="knob-bullets">
-              <li><strong>μ = 0:</strong> plain gradient descent.</li>
-              <li><strong>μ ≈ 0.9:</strong> the marker barrels through flat regions and shrugs off small noisy ridges.</li>
-              <li><strong>μ → 1:</strong> overshoots wildly and orbits the minimum before settling.</li>
-            </ul>
-            <p class="aside">
-              Try <strong>Gaussian Peak</strong> with μ = 0 — the gradient near the
-              edges is so faint the marker stalls. Crank μ up to 0.9 and watch it
-              power through.
-            </p>
-          </div>
-
-          <div class="knob">
-            <div class="knob-head"><RefreshCw size={16} strokeWidth={2} /> Training steps</div>
-            <p>How many gradient updates to run when you click Train. More = more time, more chances to refine.</p>
-          </div>
-        </section>
-
-        <!-- ============================== PROBLEMS ============================== -->
-        <section>
-          <h3><Layers size={18} strokeWidth={2} /> 21 problems to explore</h3>
+          <h3><span class="chap">04</span><Layers size={18} strokeWidth={2} /> 22 problems to explore</h3>
           <p>
             Each problem has two parameters (α, β), a loss surface you can see live, and a
             curated default for learning rate, momentum, and visible range.
@@ -571,9 +709,9 @@
           {/each}
         </section>
 
-        <!-- ============================== EXPERIMENTS ============================== -->
+        <!-- ============================== 05 · EXPERIMENTS ============================== -->
         <section>
-          <h3><FlaskConical size={18} strokeWidth={2} /> Things to try</h3>
+          <h3><span class="chap">05</span><FlaskConical size={18} strokeWidth={2} /> Things to try</h3>
           <p>
             Each card is a ready-made scenario — one click sets everything up,
             starts training, and tells you what to watch for.
@@ -593,9 +731,9 @@
           {/each}
         </section>
 
-        <!-- ============================== VIZ KEY ============================== -->
+        <!-- ============================== 06 · VIZ KEY ============================== -->
         <section>
-          <h3><Map size={18} strokeWidth={2} /> Reading the panels</h3>
+          <h3><span class="chap">06</span><Map size={18} strokeWidth={2} /> Reading the panels</h3>
           <ul class="viz-list">
             <li>
               <strong>Data plot</strong> — the data points and the current model.
@@ -618,9 +756,9 @@
           </ul>
         </section>
 
-        <!-- ============================== KEYBOARD ============================== -->
+        <!-- ============================== 07 · KEYBOARD ============================== -->
         <section>
-          <h3><Zap size={18} strokeWidth={2} /> Keyboard</h3>
+          <h3><span class="chap">07</span><Zap size={18} strokeWidth={2} /> Keyboard</h3>
           <div class="kbd-row">
             <span class="kbd-item"><kbd>Space</kbd> Train / Pause</span>
             <span class="kbd-item"><kbd>S</kbd> Step</span>
@@ -1101,8 +1239,20 @@
   .viz-list { padding-left: 1.25rem; }
   .viz-list li { margin-bottom: 0.5rem; }
 
-  /* ---------- Optimizer family tree ---------- */
-  .ravine-demo {
+  /* ---------- Chapter numbers ---------- */
+  .chap {
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 0.6875rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.1);
+    border-radius: 5px;
+    padding: 0.1rem 0.35rem;
+  }
+
+  /* ---------- The optimizer story ---------- */
+  .race-demo {
     border: 1px solid var(--color-border);
     border-radius: 10px;
     padding: 0.5rem 0.5rem 0.6rem;
@@ -1110,66 +1260,66 @@
     background: var(--color-bg-primary);
   }
 
-  .ravine-demo svg {
+  .race-demo svg {
     width: 100%;
     display: block;
   }
 
-  .rv-contour {
-    fill: none;
-    stroke: #10b981;
-    stroke-width: 1;
+  .race-legend {
+    display: flex;
+    justify-content: center;
+    gap: 0.9rem;
+    flex-wrap: wrap;
+    margin-top: 0.45rem;
   }
 
-  .rv-zig {
-    stroke: #94a3b8;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    stroke-dasharray: 100;
-    stroke-dashoffset: 100;
-    animation: rvDraw 4s ease-in-out infinite;
+  .race-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
   }
 
-  .rv-mom {
-    stroke: #a855f7;
-    stroke-width: 2.5;
-    stroke-linecap: round;
-    stroke-dasharray: 100;
-    stroke-dashoffset: 100;
-    animation: rvDraw 4s ease-in-out infinite;
+  .race-swatch {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    display: inline-block;
   }
 
-  .rv-dot {
-    fill: #a855f7;
-    opacity: 0;
-    animation: rvDot 4s ease-in-out infinite;
-  }
-
-  @keyframes rvDraw {
-    0% { stroke-dashoffset: 100; }
-    70%, 100% { stroke-dashoffset: 0; }
-  }
-
-  @keyframes rvDot {
-    0%, 62% { opacity: 0; }
-    72%, 100% { opacity: 1; }
-  }
-
-  .rv-label {
-    font-size: 11px;
-    font-weight: 700;
-  }
-
-  .rv-label-gd { fill: #94a3b8; }
-  .rv-label-mom { fill: #a855f7; }
-
-  .ravine-caption {
+  .race-caption {
     font-size: 0.75rem;
     color: var(--color-text-tertiary);
     text-align: center;
-    margin-top: 0.25rem;
+    margin-top: 0.3rem;
     line-height: 1.45;
+  }
+
+  .opt-act {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin: 1.1rem 0 0.5rem;
+    padding-top: 0.7rem;
+    border-top: 1px dashed var(--color-border);
+  }
+
+  .act-no {
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 0.625rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #f59e0b;
+  }
+
+  .act-title {
+    font-weight: 700;
+    font-size: 0.875rem;
+    color: var(--color-text-primary);
   }
 
   .opt-card {

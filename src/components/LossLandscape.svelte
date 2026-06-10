@@ -453,9 +453,10 @@
     // Basin destination dots (above contours so each region's target pops)
     drawBasinMinima(plotGroup, xScale, yScale);
 
-    // AR(2): the stationarity triangle — outside it the model's free-run
-    // forecast explodes even though the one-step loss stays finite.
-    if (problemConfig?.type === 'ar2') {
+    // AR(2) Rollout: the stationarity triangle — the rollout loss climbs
+    // like ρ^2k outside it, so the dashed edge traces the visible cliff.
+    // (The one-step AR(2) stays clean: its quadratic valley needs no map.)
+    if (problemConfig?.type === 'ar2-rollout') {
       const tri = [
         [0, 1],
         [2, -1],

@@ -132,7 +132,10 @@
     },
     {
       label: 'Time series',
-      items: [{ type: 'ar2', name: 'AR(2) Time Series', icon: null, customIcon: 'xₜ' }]
+      items: [
+        { type: 'ar2', name: 'AR(2) Time Series', icon: null, customIcon: 'xₜ' },
+        { type: 'ar2-rollout', name: 'AR(2) Rollout', icon: null, customIcon: 'x̂ₜ' }
+      ]
     },
     {
       label: 'Neural network',
