@@ -29,9 +29,10 @@ An interactive visualization tool for understanding gradient descent through bea
 - **Basins of Attraction**: one toggle colors every point by which minimum GD reaches from there (computed in a Web Worker) — Himmelblau becomes a four-color map, convexity becomes one color
 
 ### Built for teaching
+- **The Optimizer Story**: the help modal teaches all six optimizers as 170 years of fixes — Cauchy to Adam, with the moving-average prerequisite and an animated ravine demo
 - **A 10-Lesson Course**: guided lessons from "which way is down?" to a real tiny neural network — four explicit steps each (setup → predict → run → learn), freely navigable, draggable out of the way
 - **Challenge Links**: share a URL with a goal ("reach the basin in ≤ 80 steps") — zero-backend homework with a 🏆 verdict
-- **20 Problem Types**: 1D slopes and traps, curve fits, classifiers, localization, a tiny neural net (β·tanh(αX) — mirror minima, dead saddle at zero-init), and the classic benchmarks (Rosenbrock, saddle, Himmelblau); every analytic gradient verified against finite differences
+- **21 Problem Types**: 1D slopes and traps, curve fits, classifiers, localization, an AR(2) time series (watch its free-run forecast explode outside the stability triangle), a tiny neural net (β·tanh(αX) — mirror minima, dead saddle at zero-init), and the classic benchmarks (Rosenbrock, saddle, Himmelblau); every analytic gradient verified against finite differences
 - **Keyboard Shortcuts**: Space train/pause · S step · R reset · arrows nudge the marker · D 2D/3D
 - **Video Export**: render the last run to a WebM clip for slides
 - **Works Offline**: installable PWA — lecture-hall wifi is not a dependency

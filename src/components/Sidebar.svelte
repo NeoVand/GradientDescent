@@ -131,6 +131,10 @@
       ]
     },
     {
+      label: 'Time series',
+      items: [{ type: 'ar2', name: 'AR(2) Time Series', icon: null, customIcon: 'xₜ' }]
+    },
+    {
       label: 'Neural network',
       items: [{ type: 'tiny-net', name: 'Tiny Neural Net', icon: Brain }]
     },

@@ -3,8 +3,9 @@
    * Help Modal
    *
    * A guided tour: an animated hero, the prerequisites (loss & gradient
-   * intuition), the algorithm, the knobs, the 13 problems, things to try,
-   * and a key for the three on-screen panels.
+   * intuition), the algorithm, the optimizer family tree (GD → Adam as
+   * 170 years of fixes), the knobs, the 21 problems, things to try, a key
+   * for the on-screen panels, and the keyboard map.
    */
 
   import { onMount, afterUpdate } from 'svelte';
@@ -23,6 +24,94 @@
     onClose();
     exp.apply();
   }
+
+  // ---------- The optimizer family tree ----------
+  // 170 years of "fix what just broke", told as cards. Formulas render
+  // straight to HTML — no element refs needed.
+  const tex = (src: string) => katex.renderToString(src, { throwOnError: false });
+
+  type OptChapter = {
+    year: string;
+    name: string;
+    by: string;
+    idea: string;
+    formula: string;
+    fix?: string;
+    brk?: string;
+    prereq?: boolean;
+  };
+
+  const optTree: OptChapter[] = [
+    {
+      prereq: true,
+      year: 'tool',
+      name: 'The moving average',
+      by: 'the one prerequisite for everything below',
+      idea:
+        'An exponential moving average is a leaky memory: keep a fraction β of what you believed, mix in a fraction (1−β) of what you just saw. Its horizon is roughly 1/(1−β) steps — β = 0.9 remembers about the last 10 values, β = 0.999 about the last 1000. Momentum is a moving average of gradients; RMSProp and Adam keep one of squared gradients.',
+      formula: String.raw`v \;\leftarrow\; \beta\, v + (1-\beta)\, x`
+    },
+    {
+      year: '1847',
+      name: 'Gradient Descent',
+      by: 'Augustin-Louis Cauchy',
+      idea:
+        'Cauchy, grinding through astronomical calculations by hand, writes down the move everything else builds on: measure the slope, step the other way. A century and a half later it is still the backbone of all of machine learning.',
+      formula: String.raw`\boldsymbol{\theta} \;\leftarrow\; \boldsymbol{\theta} - \gamma\, \nabla \mathcal{L}`,
+      fix: 'every step is locally downhill',
+      brk: 'one γ for every parameter, and it zig-zags across ravines (watch the grey path above)'
+    },
+    {
+      year: '1964',
+      name: 'Momentum',
+      by: 'Boris Polyak — the "heavy ball"',
+      idea:
+        'Give the marker mass. Keep a velocity — a moving average of gradients — and let each new gradient push it. The side-to-side wobble cancels itself out while the consistent downhill component compounds into a tailwind of up to 1/(1−μ): μ = 0.9 is worth roughly ten plain steps along the valley floor.',
+      formula: String.raw`\mathbf{v} \leftarrow \mu \mathbf{v} + \nabla \mathcal{L}, \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \mathbf{v}`,
+      fix: 'damps the zig-zag, powers through plateaus',
+      brk: 'inertia overshoots — it orbits the minimum before settling'
+    },
+    {
+      year: '1983',
+      name: 'Nesterov',
+      by: 'Yurii Nesterov — accelerated gradient',
+      idea:
+        'Look before you leap: measure the gradient where the velocity is about to carry you, not where you stand. That one reordering acts like braking into a corner instead of after it — and provably achieves the best convergence rate any gradient-only method can have on smooth convex problems.',
+      formula: String.raw`\mathbf{v} \leftarrow \mu \mathbf{v} + \nabla \mathcal{L}(\boldsymbol{\theta}), \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\,(\nabla \mathcal{L} + \mu \mathbf{v})`,
+      fix: 'corrects the momentum mistake before making it'
+    },
+    {
+      year: '2011',
+      name: 'AdaGrad',
+      by: 'Duchi, Hazan & Singer',
+      idea:
+        'A different failure, a different cure: parameters are not equals. Divide each parameter’s step by the history of its own gradients — rarely-updated parameters take bold steps, busy ones calm down. This made it the workhorse of sparse problems like word embeddings.',
+      formula: String.raw`s \leftarrow s + (\nabla \mathcal{L})^2, \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \frac{\nabla \mathcal{L}}{\sqrt{s} + \varepsilon}`,
+      fix: 'every parameter gets its own learning rate',
+      brk: 'the history only grows, so the step shrinks toward zero — it strangles itself'
+    },
+    {
+      year: '2012',
+      name: 'RMSProp',
+      by: 'Geoffrey Hinton — famously never published; the world cites a Coursera slide ("Lecture 6.5")',
+      idea:
+        'AdaGrad with amnesia: replace the ever-growing sum with a moving average of squared gradients — the prerequisite tool, applied to ∇ℒ². Old gradients fade away, so the effective learning rate stays alive on long, non-convex runs.',
+      formula: String.raw`s \leftarrow \rho\, s + (1-\rho)(\nabla \mathcal{L})^2, \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \frac{\nabla \mathcal{L}}{\sqrt{s} + \varepsilon}`,
+      fix: 'forgetting keeps the step size alive'
+    },
+    {
+      year: '2014',
+      name: 'Adam',
+      by: 'Kingma & Ba — "adaptive moments"',
+      idea:
+        'The merger: momentum’s moving average of gradients (decay β₁) AND RMSProp’s moving average of squares (decay β₂) — plus one honest bookkeeping detail. Both averages start at zero and underestimate at first, so each is divided by 1−βᵗ to de-bias it. The result is the default optimizer of modern deep learning.',
+      formula: String.raw`\hat{\mathbf{m}} = \frac{\mathbf{m}}{1-\beta_1^t}, \quad \hat{s} = \frac{s}{1-\beta_2^t}, \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \frac{\hat{\mathbf{m}}}{\sqrt{\hat{s}} + \varepsilon}`,
+      fix: 'robust out of the box almost everywhere',
+      brk: 'sometimes generalizes worse than carefully tuned SGD — the story isn’t over'
+    }
+  ];
+
+  const raceExperiment = experiments.find(e => e.id === 'banana-race');
 
   export let isOpen = false;
   export let onClose: () => void;
@@ -129,6 +218,9 @@
       { name: 'Circle Classifier', icon: Target, formula: 'σ((R²−d²)/τ)', tag: 'find a circle center' },
       { name: 'Source Localization', icon: Radio, formula: 'K / (d² + ε)', tag: 'inverse-square triangulation' },
       { name: 'Mean-Shift Cluster', icon: ScatterChart, formula: 'Σ(1 − kᵢ)/n', tag: 'two cluster modes' }
+    ],
+    'Time series': [
+      { name: 'AR(2)', icon: null, customIcon: 'xₜ', formula: 'αxₜ₋₁ + βxₜ₋₂', tag: 'free run explodes outside the stability triangle' }
     ],
     'Neural network': [
       { name: 'Tiny Neural Net', icon: Brain, formula: 'β tanh(αX)', tag: 'mirror minima; zero-init is a dead saddle' }
@@ -326,6 +418,76 @@
           </p>
         </section>
 
+        <!-- ============================== OPTIMIZER FAMILY TREE ============================== -->
+        <section>
+          <h3><Rocket size={18} strokeWidth={2} /> Six optimizers, one story</h3>
+          <p>
+            Every optimizer in the picker is a patch for a specific failure of the one
+            before it — 170 years of <em>fix what just broke</em>. The recurring villain
+            is the <strong>ravine</strong>: a valley much steeper across than along.
+          </p>
+
+          <div class="ravine-demo">
+            <svg viewBox="0 0 460 140" preserveAspectRatio="xMidYMid meet">
+              <!-- ravine contours -->
+              <ellipse cx="235" cy="70" rx="205" ry="50" class="rv-contour" style="stroke-opacity: 0.10" />
+              <ellipse cx="235" cy="70" rx="160" ry="38" class="rv-contour" style="stroke-opacity: 0.16" />
+              <ellipse cx="235" cy="70" rx="112" ry="27" class="rv-contour" style="stroke-opacity: 0.24" />
+              <ellipse cx="235" cy="70" rx="64"  ry="16" class="rv-contour" style="stroke-opacity: 0.34" />
+              <ellipse cx="235" cy="70" rx="22"  ry="7"  class="rv-contour" style="stroke-opacity: 0.5" />
+              <!-- plain GD: wall-to-wall -->
+              <path
+                class="rv-zig"
+                pathLength="100"
+                d="M 48,38 L 76,100 L 102,44 L 127,95 L 150,49 L 172,90 L 192,54 L 211,84 L 228,60 L 243,78 L 256,65"
+                fill="none"
+              />
+              <!-- momentum: averages the bounce away -->
+              <path
+                class="rv-mom"
+                pathLength="100"
+                d="M 48,38 C 95,115 160,90 234,72 C 290,60 330,68 352,70"
+                fill="none"
+              />
+              <circle class="rv-dot" cx="352" cy="70" r="4" />
+              <text x="262" y="58" class="rv-label rv-label-gd">GD</text>
+              <text x="360" y="62" class="rv-label rv-label-mom">Momentum</text>
+            </svg>
+            <div class="ravine-caption">
+              Same number of steps: plain GD spends its budget bouncing wall to wall;
+              momentum cancels the bounce and rides the valley floor.
+            </div>
+          </div>
+
+          {#each optTree as c (c.name)}
+            <div class="opt-card" class:prereq-card={c.prereq}>
+              <div class="opt-head">
+                <span class="opt-year">{c.year}</span>
+                <span class="opt-name">{c.name}</span>
+                <span class="opt-by">{c.by}</span>
+              </div>
+              <p class="opt-idea">{c.idea}</p>
+              <div class="opt-formula">{@html tex(c.formula)}</div>
+              {#if c.fix || c.brk}
+                <div class="opt-foot">
+                  {#if c.fix}<span class="opt-fix">✓ {c.fix}</span>{/if}
+                  {#if c.brk}<span class="opt-break">✗ {c.brk}</span>{/if}
+                </div>
+              {/if}
+            </div>
+          {/each}
+
+          {#if raceExperiment}
+            <div class="opt-cta">
+              <span>The whole story in one picture:</span>
+              <button class="try-btn" on:click={() => runExperiment(raceExperiment)}>
+                <Play size={13} strokeWidth={2.5} />
+                <span>Race them on Rosenbrock</span>
+              </button>
+            </div>
+          {/if}
+        </section>
+
         <!-- ============================== KNOBS ============================== -->
         <section>
           <h3><Sparkles size={18} strokeWidth={2} /> Knobs to play with</h3>
@@ -380,7 +542,7 @@
 
         <!-- ============================== PROBLEMS ============================== -->
         <section>
-          <h3><Layers size={18} strokeWidth={2} /> 13 problems to explore</h3>
+          <h3><Layers size={18} strokeWidth={2} /> 21 problems to explore</h3>
           <p>
             Each problem has two parameters (α, β), a loss surface you can see live, and a
             curated default for learning rate, momentum, and visible range.
@@ -938,6 +1100,158 @@
   /* ---------- Viz list ---------- */
   .viz-list { padding-left: 1.25rem; }
   .viz-list li { margin-bottom: 0.5rem; }
+
+  /* ---------- Optimizer family tree ---------- */
+  .ravine-demo {
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 0.5rem 0.5rem 0.6rem;
+    margin: 0.75rem 0 0.9rem;
+    background: var(--color-bg-primary);
+  }
+
+  .ravine-demo svg {
+    width: 100%;
+    display: block;
+  }
+
+  .rv-contour {
+    fill: none;
+    stroke: #10b981;
+    stroke-width: 1;
+  }
+
+  .rv-zig {
+    stroke: #94a3b8;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    animation: rvDraw 4s ease-in-out infinite;
+  }
+
+  .rv-mom {
+    stroke: #a855f7;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    animation: rvDraw 4s ease-in-out infinite;
+  }
+
+  .rv-dot {
+    fill: #a855f7;
+    opacity: 0;
+    animation: rvDot 4s ease-in-out infinite;
+  }
+
+  @keyframes rvDraw {
+    0% { stroke-dashoffset: 100; }
+    70%, 100% { stroke-dashoffset: 0; }
+  }
+
+  @keyframes rvDot {
+    0%, 62% { opacity: 0; }
+    72%, 100% { opacity: 1; }
+  }
+
+  .rv-label {
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .rv-label-gd { fill: #94a3b8; }
+  .rv-label-mom { fill: #a855f7; }
+
+  .ravine-caption {
+    font-size: 0.75rem;
+    color: var(--color-text-tertiary);
+    text-align: center;
+    margin-top: 0.25rem;
+    line-height: 1.45;
+  }
+
+  .opt-card {
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-bg-primary);
+    padding: 0.7rem 0.85rem 0.6rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .opt-card.prereq-card {
+    border-style: dashed;
+  }
+
+  .opt-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.25rem;
+  }
+
+  .opt-year {
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 0.625rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.12);
+    border-radius: 5px;
+    padding: 0.1rem 0.4rem;
+  }
+
+  .opt-name {
+    font-weight: 700;
+    font-size: 0.9375rem;
+    color: var(--color-text-primary);
+  }
+
+  .opt-by {
+    font-size: 0.7188rem;
+    color: var(--color-text-tertiary);
+  }
+
+  .opt-idea {
+    font-size: 0.8125rem;
+    line-height: 1.55;
+    margin: 0.25rem 0 0.4rem;
+  }
+
+  .opt-formula {
+    overflow-x: auto;
+    padding: 0.15rem 0;
+  }
+
+  .opt-formula :global(.katex) {
+    font-size: 1rem;
+  }
+
+  .opt-foot {
+    display: flex;
+    gap: 0.5rem 1.25rem;
+    flex-wrap: wrap;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-top: 0.4rem;
+  }
+
+  .opt-fix { color: #10b981; }
+  .opt-break { color: #f59e0b; }
+
+  .opt-cta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-top: 0.75rem;
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+  }
 
   /* ---------- Keyboard ---------- */
   .kbd-row {

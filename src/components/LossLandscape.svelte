@@ -453,6 +453,33 @@
     // Basin destination dots (above contours so each region's target pops)
     drawBasinMinima(plotGroup, xScale, yScale);
 
+    // AR(2): the stationarity triangle — outside it the model's free-run
+    // forecast explodes even though the one-step loss stays finite.
+    if (problemConfig?.type === 'ar2') {
+      const tri = [
+        [0, 1],
+        [2, -1],
+        [-2, -1]
+      ] as const;
+      plotGroup.append('path')
+        .attr('d', `M ${tri.map(([a, b]) => `${xScale(a)},${yScale(b)}`).join(' L ')} Z`)
+        .attr('fill', 'none')
+        .attr('stroke', isDark ? '#e2e8f0' : '#334155')
+        .attr('stroke-width', 1.5)
+        .attr('stroke-dasharray', '7,5')
+        .style('opacity', 0.75);
+      plotGroup.append('text')
+        .attr('x', xScale(0))
+        .attr('y', yScale(-0.55))
+        .attr('fill', isDark ? '#e2e8f0' : '#334155')
+        .attr('font-size', '11px')
+        .attr('font-weight', '600')
+        .attr('letter-spacing', '0.08em')
+        .style('text-anchor', 'middle')
+        .style('opacity', 0.7)
+        .text('STABLE');
+    }
+
     // Training path with fade effect (above contours, below marker)
     drawTrainingPath(plotGroup, xScale, yScale);
 

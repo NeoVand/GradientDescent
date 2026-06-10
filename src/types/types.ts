@@ -22,6 +22,7 @@ export type ProblemType =
   | 'circle-classifier'
   | 'source-localization'
   | 'mean-shift'
+  | 'ar2'
   | 'tiny-net'
   | 'rosenbrock'
   | 'saddle-point'

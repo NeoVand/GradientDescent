@@ -45,8 +45,9 @@
 
   // 1D curve-fitting plots are hand-editable via the toolbar: add train
   // points, add test points, or erase. The loss landscape morphs live —
-  // the landscape IS the data.
-  $: isEditable = !is2DPointProblem && problemType !== 'logistic-regression';
+  // the landscape IS the data. (AR(2) is a time series — hand-placed
+  // points would break its lag structure, so it stays read-only.)
+  $: isEditable = !is2DPointProblem && problemType !== 'logistic-regression' && problemType !== 'ar2';
 
   // Active editor tool (the toolbar's pressed button)
   let editTool: 'train' | 'test' | 'erase' = 'train';
@@ -454,6 +455,70 @@
     const innerHeight = height - margin.top - margin.bottom;
     const isDarkTheme = document.documentElement.getAttribute('data-theme') === 'dark';
     const middleColor = isDarkTheme ? '#1e293b' : '#ffffff';
+
+    if (problemType === 'ar2') {
+      // A time series, not a curve: connect the observations in time
+      // order, overlay the model's one-step predictions (teacher-forced),
+      // and let the model free-run from the first two values — outside
+      // the stability triangle that forecast visibly explodes.
+      const ordered = [...data].sort((p, q) => p.x - q.x);
+      if (ordered.length < 3) return;
+      const seriesLine = d3.line<DataPoint>()
+        .x(d => xScale(d.x))
+        .y(d => yScale(d.y));
+
+      // Observed series: a quiet connective thread under the dots
+      g.append('path')
+        .datum(ordered)
+        .attr('fill', 'none')
+        .attr('stroke', isDarkTheme ? '#64748b' : '#94a3b8')
+        .attr('stroke-width', 1.25)
+        .attr('d', seriesLine)
+        .style('opacity', 0.6);
+
+      // One-step predictions x̂_t = α·x_{t−1} + β·x_{t−2}
+      const byT = new Map(ordered.map(d => [d.x, d.y]));
+      const oneStep: { x: number; y: number }[] = [];
+      for (const d of ordered) {
+        const y1 = byT.get(d.x - 1);
+        const y2 = byT.get(d.x - 2);
+        if (y1 === undefined || y2 === undefined) continue;
+        oneStep.push({ x: d.x, y: parameters.a * y1 + parameters.b * y2 });
+      }
+      const predLine = d3.line<{ x: number; y: number }>()
+        .x(d => xScale(d.x))
+        .y(d => yScale(d.y));
+      g.append('path')
+        .datum(oneStep)
+        .attr('fill', 'none')
+        .attr('stroke', '#3b82f6')
+        .attr('stroke-width', 2.5)
+        .attr('d', predLine)
+        .style('opacity', 0.95);
+
+      // Free-run forecast: seed with the first two observations, then let
+      // the model feed on its own output
+      const freeRun: { x: number; y: number }[] = [
+        { x: ordered[0].x, y: ordered[0].y },
+        { x: ordered[1].x, y: ordered[1].y }
+      ];
+      const lastT = ordered[ordered.length - 1].x;
+      for (let t = 2; freeRun[freeRun.length - 1].x < lastT && t < 400; t++) {
+        const n = freeRun.length;
+        const y = parameters.a * freeRun[n - 1].y + parameters.b * freeRun[n - 2].y;
+        if (!Number.isFinite(y)) break;
+        freeRun.push({ x: freeRun[n - 1].x + 1, y });
+      }
+      g.append('path')
+        .datum(freeRun)
+        .attr('fill', 'none')
+        .attr('stroke', '#fbbf24')
+        .attr('stroke-width', 2)
+        .attr('stroke-dasharray', '6,4')
+        .attr('d', predLine)
+        .style('opacity', 0.85);
+      return;
+    }
 
     if (problemType === 'circle-classifier') {
       // Probability heatmap: blue (outside) → mid → green (inside) of model circle
@@ -1004,6 +1069,25 @@
             <circle cx="9" cy="9" r="4" fill="#10b981" stroke="#10b981" stroke-width="2" stroke-dasharray="3,1.5" />
           </svg>
           <span>True source</span>
+        </span>
+      {:else if problemType === 'ar2'}
+        <span class="key-item">
+          <svg width="16" height="12" viewBox="0 0 24 18" aria-hidden="true">
+            <line x1="1" y1="9" x2="23" y2="9" stroke="#3b82f6" stroke-width="2.5" />
+          </svg>
+          <span>1-step fit</span>
+        </span>
+        <span class="key-item">
+          <svg width="16" height="12" viewBox="0 0 24 18" aria-hidden="true">
+            <line x1="1" y1="9" x2="23" y2="9" stroke="#fbbf24" stroke-width="2" stroke-dasharray="5,3" />
+          </svg>
+          <span>Free run</span>
+        </span>
+        <span class="key-item">
+          <svg width="12" height="12" viewBox="0 0 18 18" aria-hidden="true">
+            <circle cx="9" cy="9" r="6" fill="#3b82f6" stroke="#fff" stroke-width="1.5" />
+          </svg>
+          <span>Observed</span>
         </span>
       {:else}
         <span class="key-item">

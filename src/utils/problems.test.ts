@@ -96,6 +96,15 @@ function fixtureFor(type: string): DataPoint[] {
         { x: -1.6, y: -0.7 }
       ].map(p => ({ ...p, isTraining: true, label: signal(p.x, p.y) }));
     }
+    case 'ar2':
+      // A short series with integer time indices; values are arbitrary
+      // but fixed — gradient correctness doesn't need the series to
+      // follow the model.
+      return [0.8, 0.5, 0.3, -0.1, -0.35, -0.3, -0.05, 0.2].map((y, t) => ({
+        x: t,
+        y,
+        isTraining: true
+      }));
     case 'mean-shift':
       return [
         { x: -1.1, y: 0.9, isTraining: true },

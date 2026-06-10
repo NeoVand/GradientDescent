@@ -1223,6 +1223,87 @@ const meanShift: ProblemConfig = {
 };
 
 /**
+ * AR(2) — an autoregressive time series: each value is a weighted blend of
+ * the two before it, X_t = α·X_{t−1} + β·X_{t−2} + noise. Fitting it is
+ * least squares on lagged copies of the series (the loss is a quadratic
+ * valley shaped by the series' own autocorrelation), but the MODEL is a
+ * dynamical system: outside the classic stability triangle
+ * (β > −1, β < 1 ± α) its free-run forecast explodes. An AR model is a
+ * tiny linear RNN — the first taste of learning dynamics, not curves.
+ */
+const ar2: ProblemConfig = {
+  type: 'ar2',
+  name: 'AR(2) Time Series',
+  description: 'Predict each value from the two before it',
+  tagline: 'Fit yesterday to predict tomorrow — and mind the stability triangle.',
+  trueParameters: { a: 1.2, b: -0.5 },
+
+  // x is the time index t (kept integer so lagged neighbors are exact);
+  // y is the series value, built by running the true recursion forward.
+  generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
+    const trueA = ar2.trueParameters.a;
+    const trueB = ar2.trueParameters.b;
+    const numTrain = Math.floor(numPoints * trainRatio);
+    const ys: number[] = [0.4 + (rand() - 0.5) * 0.6, 1.0 + (rand() - 0.5) * 0.6];
+    for (let t = 2; t < numPoints; t++) {
+      ys.push(trueA * ys[t - 1] + trueB * ys[t - 2] + (rand() - 0.5) * noiseLevel * 0.8);
+    }
+    return ys.map((y, t) => ({ x: t, y, isTraining: t < numTrain }));
+  },
+
+  // One-step prediction needs the series' past, not a closed form of t —
+  // the data plot draws its own AR overlays instead of using this.
+  predict: (_x: number, _params: ModelParameters): number => 0,
+
+  // Teacher-forced one-step MSE over every triple (t−2, t−1, t) that is
+  // fully present in the given subset (train/test splits leave gaps).
+  computeLoss: (data: DataPoint[], params: ModelParameters): number => {
+    const byT = new Map<number, number>();
+    for (const p of data) byT.set(p.x, p.y);
+    let total = 0;
+    let m = 0;
+    for (const p of data) {
+      const y1 = byT.get(p.x - 1);
+      const y2 = byT.get(p.x - 2);
+      if (y1 === undefined || y2 === undefined) continue;
+      const e = p.y - params.a * y1 - params.b * y2;
+      total += e * e;
+      m++;
+    }
+    return m > 0 ? total / m : 0;
+  },
+
+  computeGradient: (data: DataPoint[], params: ModelParameters): ModelParameters => {
+    const byT = new Map<number, number>();
+    for (const p of data) byT.set(p.x, p.y);
+    let gA = 0;
+    let gB = 0;
+    let m = 0;
+    for (const p of data) {
+      const y1 = byT.get(p.x - 1);
+      const y2 = byT.get(p.x - 2);
+      if (y1 === undefined || y2 === undefined) continue;
+      const e = p.y - params.a * y1 - params.b * y2;
+      gA += -2 * e * y1;
+      gB += -2 * e * y2;
+      m++;
+    }
+    return m > 0 ? { a: gA / m, b: gB / m } : { a: 0, b: 0 };
+  },
+
+  // Start OUTSIDE the stability triangle (top corners): the free-run
+  // forecast on the data plot visibly explodes until training drags the
+  // parameters back inside.
+  getInitialParameters: () => {
+    const side = Math.random() < 0.5 ? -1 : 1;
+    return { a: side * (1.3 + Math.random() * 0.4), b: 1.2 + Math.random() * 0.5 };
+  },
+
+  defaultLearningRate: 0.1,
+  parameterRange: { min: -2, max: 2 }
+};
+
+/**
  * Tiny Neural Net
  * ŷ = β · tanh(α · X): a REAL neural network with one hidden tanh unit —
  * α is the input weight, β the output weight. Tiny, but it already shows
@@ -1442,6 +1523,7 @@ export const problemConfigs: Record<string, ProblemConfig> = {
   'circle-classifier': circleClassifier,
   'source-localization': sourceLocalization,
   'mean-shift': meanShift,
+  'ar2': ar2,
   'tiny-net': tinyNet,
   'rosenbrock': rosenbrock,
   'saddle-point': saddlePoint,
