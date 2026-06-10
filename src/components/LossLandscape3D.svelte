@@ -27,6 +27,7 @@
     currentProblemConfig,
     resetOptimizerState,
     divergenceStore,
+    clearCoach,
     type LossScene
   } from '../stores/stores';
   import { sampleLoss, normalizedLogLoss, viridisRGB } from '../utils/lossGrid';
@@ -166,6 +167,12 @@
     scene3.add(contourLines);
   }
 
+  /**
+   * Descent trail, matching the 2D look: a red tube that tapers from thin
+   * to thick and fades from transparent to solid as it approaches the
+   * marker. Taper is applied by rescaling each tube ring around its curve
+   * point; fade rides a 4-component (RGBA) vertex-color attribute.
+   */
   function buildPath(history: TrainingHistoryPoint[]) {
     if (pathTube) {
       scene3.remove(pathTube);
@@ -182,14 +189,60 @@
       const a = Math.max(min, Math.min(max, h.parameters.a));
       const b = Math.max(min, Math.min(max, h.parameters.b));
       if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
-      pts.push(new THREE.Vector3(toX(a), heightAt(a, b) + 0.012, toZ(b)));
+      const p = new THREE.Vector3(toX(a), heightAt(a, b) + 0.02, toZ(b));
+      // Skip near-duplicate consecutive points (converged steps, clamped
+      // drags): zero-length tangents give TubeGeometry NaN frames, which
+      // poisons the whole mesh into invisibility.
+      if (pts.length === 0 || pts[pts.length - 1].distanceToSquared(p) > 1e-10) {
+        pts.push(p);
+      }
     }
     if (pts.length < 2) return;
 
-    const curve = new THREE.CatmullRomCurve3(pts);
-    const geo = new THREE.TubeGeometry(curve, Math.min(220, pts.length * 4), 0.011, 6, false);
-    const mat = new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.85 });
+    const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+    const tubularSegments = Math.min(220, pts.length * 4);
+    const radialSegments = 6;
+    // Build at radius 1, then rescale every ring to its tapered radius
+    const geo = new THREE.TubeGeometry(curve, tubularSegments, 1, radialSegments, false);
+
+    const pos = geo.attributes.position as THREE.BufferAttribute;
+    const ringCount = tubularSegments + 1;
+    const ringVerts = radialSegments + 1;
+    const colors = new Float32Array(pos.count * 4);
+    const center = new THREE.Vector3();
+
+    for (let r = 0; r < ringCount; r++) {
+      const t = r / (ringCount - 1); // 0 = oldest, 1 = newest
+      const radius = 0.0035 + 0.0125 * t;
+      const alpha = 0.06 + 0.78 * t; // same fade ramp as the 2D trail
+      curve.getPointAt(t, center);
+      for (let k = 0; k < ringVerts; k++) {
+        const i = r * ringVerts + k;
+        pos.setXYZ(
+          i,
+          center.x + (pos.getX(i) - center.x) * radius,
+          center.y + (pos.getY(i) - center.y) * radius,
+          center.z + (pos.getZ(i) - center.z) * radius
+        );
+        colors[i * 4] = 0.937;     // #ef4444
+        colors[i * 4 + 1] = 0.267;
+        colors[i * 4 + 2] = 0.267;
+        colors[i * 4 + 3] = alpha;
+      }
+    }
+
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 4));
+    // depthTest off: the trail often descends INTO a basin where the near
+    // rim would occlude it — like the 2D view, the path should always be
+    // visible. Fade + taper keep the depth reading honest.
+    const mat = new THREE.MeshBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      depthWrite: false,
+      depthTest: false
+    });
     pathTube = new THREE.Mesh(geo, mat);
+    pathTube.renderOrder = 10;
     scene3.add(pathTube);
   }
 
@@ -222,8 +275,8 @@
     scene3.add(gridHelper);
   }
 
-  /** Axis label as a small always-facing sprite ('α' / 'β'). */
-  function makeLabel(text: string, dark: boolean): THREE.Sprite {
+  /** Axis label as a small always-facing sprite ('α' / 'β' / 'L'). */
+  function makeLabel(text: string, color: string): THREE.Sprite {
     const size = 64;
     const canvas = document.createElement('canvas');
     canvas.width = size;
@@ -232,7 +285,7 @@
     ctx.font = 'italic 44px Georgia, serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = dark ? '#527a75' : '#064e3b';
+    ctx.fillStyle = color;
     ctx.fillText(text, size / 2, size / 2);
     const tex = new THREE.CanvasTexture(canvas);
     const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
@@ -252,12 +305,58 @@
         l.material.dispose();
       }
     }
-    const dark = theme === 'dark';
-    labelA = makeLabel('α', dark);
+    const color = theme === 'dark' ? '#527a75' : '#064e3b';
+    labelA = makeLabel('α', color);
     labelA.position.set(1.3, 0.02, 0);
-    labelB = makeLabel('β', dark);
+    labelB = makeLabel('β', color);
     labelB.position.set(0, 0.02, -1.3);
     scene3.add(labelA, labelB);
+  }
+
+  // ---------- orientation gizmo (top-right corner, like 3D software) ----------
+  // A tiny second scene with three labeled axis arrows; its camera copies the
+  // main camera's orientation every frame, so the arrows always show where
+  // α, β, and the loss axis point in the current view.
+
+  const GIZMO_SIZE = 72; // CSS px
+  let gizmoScene: THREE.Scene | null = null;
+  const gizmoCam = new THREE.OrthographicCamera(-1.5, 1.5, 1.5, -1.5, 0.1, 10);
+
+  function disposeGizmo() {
+    if (!gizmoScene) return;
+    gizmoScene.traverse(obj => {
+      const mesh = obj as THREE.Mesh;
+      if (mesh.geometry) mesh.geometry.dispose();
+      const mat = mesh.material as THREE.Material | THREE.Material[] | undefined;
+      if (Array.isArray(mat)) mat.forEach(m => m.dispose());
+      else mat?.dispose();
+      const sprite = obj as THREE.Sprite;
+      if (sprite.isSprite) sprite.material.map?.dispose();
+    });
+    gizmoScene = null;
+  }
+
+  function buildGizmo(theme: string) {
+    disposeGizmo();
+    gizmoScene = new THREE.Scene();
+    const dark = theme === 'dark';
+    const arrowColor = dark ? 0x94a3b8 : 0x64748b;
+    const labelColor = dark ? '#cbd5e1' : '#475569';
+
+    const axes: Array<{ dir: THREE.Vector3; label: string }> = [
+      { dir: new THREE.Vector3(1, 0, 0), label: 'α' },
+      { dir: new THREE.Vector3(0, 0, -1), label: 'β' },
+      { dir: new THREE.Vector3(0, 1, 0), label: 'L' }
+    ];
+
+    for (const { dir, label } of axes) {
+      const arrow = new THREE.ArrowHelper(dir, new THREE.Vector3(0, 0, 0), 0.8, arrowColor, 0.24, 0.11);
+      gizmoScene.add(arrow);
+      const sprite = makeLabel(label, labelColor);
+      sprite.scale.setScalar(0.5);
+      sprite.position.copy(dir).multiplyScalar(1.12);
+      gizmoScene.add(sprite);
+    }
   }
 
   // ---------- pointer interaction ----------
@@ -279,6 +378,7 @@
       // Same semantics as 2D drag: fresh optimizer state, stale warnings gone
       resetOptimizerState();
       divergenceStore.set(null);
+      clearCoach();
       try {
         renderer.domElement.setPointerCapture(e.pointerId);
       } catch {
@@ -372,15 +472,20 @@
     fill.position.set(-1.5, 1.2, -1.5);
     scene3.add(fill);
 
+    // depthTest off + high renderOrder: a converged marker sits inside a
+    // basin depression, which the near rim would otherwise hide entirely.
     const markerGeo = new THREE.SphereGeometry(0.034, 24, 16);
     const markerMat = new THREE.MeshStandardMaterial({
       color: 0xf59e0b,
       emissive: 0xb45309,
       emissiveIntensity: 0.55,
       roughness: 0.4,
-      transparent: true
+      transparent: true,
+      depthTest: false,
+      depthWrite: false
     });
     markerSphere = new THREE.Mesh(markerGeo, markerMat);
+    markerSphere.renderOrder = 11;
     scene3.add(markerSphere);
 
     // Store subscriptions drive all updates
@@ -400,6 +505,7 @@
       themeStore.subscribe(t => {
         applyTheme(t);
         buildLabels(t);
+        buildGizmo(t);
       })
     );
 
@@ -425,7 +531,32 @@
     const loop = () => {
       if (disposed) return;
       controls.update();
-      renderer!.render(scene3, camera);
+      const r = renderer!;
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      r.render(scene3, camera);
+
+      // Gizmo pass: small scissored viewport in the top-right corner whose
+      // camera mirrors the main camera's orientation.
+      if (gizmoScene && w > GIZMO_SIZE * 2) {
+        const gx = w - GIZMO_SIZE - 8;
+        const gy = h - GIZMO_SIZE - 8; // viewport y counts from the bottom
+        r.clearDepth();
+        r.setScissorTest(true);
+        r.setViewport(gx, gy, GIZMO_SIZE, GIZMO_SIZE);
+        r.setScissor(gx, gy, GIZMO_SIZE, GIZMO_SIZE);
+        gizmoCam.position
+          .copy(camera.position)
+          .sub(controls.target)
+          .normalize()
+          .multiplyScalar(3);
+        gizmoCam.up.copy(camera.up);
+        gizmoCam.lookAt(0, 0, 0);
+        r.render(gizmoScene, gizmoCam);
+        r.setScissorTest(false);
+        r.setViewport(0, 0, w, h);
+      }
+
       raf = requestAnimationFrame(loop);
     };
     loop();
@@ -443,6 +574,7 @@
     disposed = true;
     cancelAnimationFrame(raf);
     for (const u of unsubs) u();
+    disposeGizmo();
     if (scene3) {
       scene3.traverse(obj => {
         const mesh = obj as THREE.Mesh;

@@ -24,6 +24,8 @@
     resetOptimizerState,
     lossSceneStore,
     divergenceStore,
+    coachStore,
+    clearCoach,
     landscapeViewStore
   } from '../stores/stores';
   import type { ModelParameters } from '../types/types';
@@ -580,9 +582,10 @@
         // Drag means the user is restarting from a new position, so any
         // accumulated optimizer state (velocity, moment estimates) from
         // prior steps shouldn't carry over — and any divergence warning
-        // is now stale.
+        // or coach verdict is now stale.
         resetOptimizerState();
         divergenceStore.set(null);
+        clearCoach();
         d3.select(this).style('cursor', 'grabbing');
       })
       .on('drag', function (event) {
@@ -703,9 +706,16 @@
   </div>
   <div class="svg-container" bind:this={containerEl}>
     {#if view === '3d'}
-      {#await import('./LossLandscape3D.svelte') then mod}
-        <svelte:component this={mod.default} />
-      {/await}
+      <!-- Inset to the same margins as the 2D plot frame, so the 3D window
+           aligns exactly with the Data panel and the 2D view. -->
+      <div
+        class="three-inset"
+        style="left: {margin.left}px; right: {margin.right}px; top: {margin.top}px; bottom: {margin.bottom}px;"
+      >
+        {#await import('./LossLandscape3D.svelte') then mod}
+          <svelte:component this={mod.default} />
+        {/await}
+      </div>
     {:else}
       <svg bind:this={svgElement} {width} {height}></svg>
     {/if}
@@ -723,6 +733,11 @@
         </span>
         <button class="banner-dismiss" on:click={() => divergenceStore.set(null)} aria-label="Dismiss">×</button>
       </div>
+    {:else if $coachStore}
+      <div class="divergence-banner coach-{$coachStore.kind}" role="status">
+        <span>{$coachStore.text}</span>
+        <button class="banner-dismiss" on:click={clearCoach} aria-label="Dismiss">×</button>
+      </div>
     {/if}
   </div>
 </div>
@@ -737,13 +752,18 @@
     overflow: hidden;
   }
 
+  /* Fixed-height, never-wrapping header: the plot area below always starts
+     at the same y in 2D, 3D, and the Data panel, so the frames stay aligned. */
   .header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: nowrap;
+    height: 28px;
     margin-bottom: 0.375rem;
     margin-right: 20px;
     flex-shrink: 0;
+    overflow: hidden;
   }
 
   h2 {
@@ -755,6 +775,9 @@
     align-items: center;
     gap: 0.5rem;
     opacity: 0.9;
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-width: 0;
   }
 
   /* 2D / 3D segmented toggle */
@@ -922,6 +945,43 @@
     color: #fecaca;
   }
 
+  /* Coach variants reuse the banner shell with their own palettes */
+  :global([data-theme='light']) .divergence-banner.coach-success {
+    background: #ecfdf5;
+    border-color: #a7f3d0;
+    color: #065f46;
+  }
+
+  :global([data-theme='dark']) .divergence-banner.coach-success {
+    background: #0a2620;
+    border-color: #047857;
+    color: #a7f3d0;
+  }
+
+  :global([data-theme='light']) .divergence-banner.coach-info {
+    background: #f0f9ff;
+    border-color: #bae6fd;
+    color: #075985;
+  }
+
+  :global([data-theme='dark']) .divergence-banner.coach-info {
+    background: #0c1f2e;
+    border-color: #0369a1;
+    color: #bae6fd;
+  }
+
+  :global([data-theme='light']) .divergence-banner.coach-warn {
+    background: #fffbeb;
+    border-color: #fde68a;
+    color: #92400e;
+  }
+
+  :global([data-theme='dark']) .divergence-banner.coach-warn {
+    background: #2a2008;
+    border-color: #b45309;
+    color: #fde68a;
+  }
+
   .divergence-banner strong {
     font-weight: 700;
   }
@@ -945,9 +1005,21 @@
     opacity: 1;
   }
 
-  /* Narrow desktop: reclaim header space so title + toggle + legend fit */
-  @media (max-width: 1280px) {
-    h2 { margin-left: 8px; white-space: nowrap; }
+  /* When the panel itself is tight, give the legend room to shrink before
+     anything overflows. Container queries would be ideal; until then the
+     legend pieces are allowed to flex down. */
+  .legend-group {
+    flex-shrink: 1;
+    overflow: hidden;
+  }
+
+  .color-bar {
+    min-width: 36px;
+    flex-shrink: 1;
+  }
+
+  @media (max-width: 1500px) {
+    h2 { margin-left: 8px; }
     .view-toggle { margin: 0 0.375rem; }
     .legend-group { gap: 0.5rem; }
     .color-bar { width: 56px; }
@@ -974,6 +1046,13 @@
     min-height: 0;
     max-height: 100%;
     position: relative;
+    overflow: hidden;
+  }
+
+  .three-inset {
+    position: absolute;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
     overflow: hidden;
   }
 

@@ -21,6 +21,8 @@ An interactive visualization tool for understanding gradient descent through bea
 - **Stochastic Gradients**: A batch-size control turns full-batch descent into noisy SGD — watch the path wobble
 - **13 Problem Types**: From linear regression to Gaussian mixtures, source localization, and mean-shift clustering, each with hand-derived analytic gradients
 - **Optimizer X-ray**: Two arrows on the marker show the steepest-descent direction (−∇ℒ) vs. the step the optimizer actually took
+- **A Coach That Watches**: every run ends with a verdict — converged, stalled on a plateau, or out of steps — and each problem introduces itself with what makes its loss surface interesting
+- **One-Click Experiments**: seven ready-made scenarios in the help modal (local-minimum traps, vanishing gradients, Adam vs. GD, …) that configure everything, train, and narrate what to watch
 - **Divergence Coaching**: Blow past a stable learning rate and the app stops, explains why, and keeps every chart alive
 - **Reproducible Data**: Seeded generation means sliders deform the same dataset smoothly; a dice button rolls a fresh one
 - **Beautiful LaTeX Formulas**: Professional mathematical notation rendered with KaTeX

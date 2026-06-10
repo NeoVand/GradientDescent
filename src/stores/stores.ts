@@ -165,6 +165,36 @@ export function resetOptimizerState() {
 // switch, or the next training attempt.
 export const divergenceStore = writable<{ step: number } | null>(null);
 
+// ========== Coach Store ==========
+// One-line observations about what just happened — "converged in N steps",
+// "stalled on a plateau", a problem's tagline on switch, an experiment's
+// narration. Rendered in the same overlay slot as the divergence banner
+// (divergence wins when both are set).
+export type CoachKind = 'success' | 'info' | 'warn';
+
+export interface CoachMessage {
+  kind: CoachKind;
+  text: string;
+}
+
+export const coachStore = writable<CoachMessage | null>(null);
+
+let coachTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** Show a coach message; auto-dismisses after ttlMs (0 = sticky). */
+export function showCoach(kind: CoachKind, text: string, ttlMs = 9000) {
+  if (coachTimer) clearTimeout(coachTimer);
+  coachStore.set({ kind, text });
+  if (ttlMs > 0) {
+    coachTimer = setTimeout(() => coachStore.set(null), ttlMs);
+  }
+}
+
+export function clearCoach() {
+  if (coachTimer) clearTimeout(coachTimer);
+  coachStore.set(null);
+}
+
 // ========== Training History Store ==========
 // Keeps track of all parameter updates and losses during training
 function createHistoryStore() {

@@ -21,6 +21,7 @@ const linearRegression: ProblemConfig = {
   type: 'linear-regression',
   name: 'Linear Regression',
   description: 'Fit a line to data points using least squares',
+  tagline: 'One convex bowl — gradient descent\'s home turf.',
   trueParameters: { a: 1.5, b: 0.5 },
   
   // Generate synthetic data with some noise
@@ -104,6 +105,7 @@ const logisticRegression: ProblemConfig = {
   type: 'logistic-regression',
   name: 'Logistic Regression',
   description: 'Classify points into two categories',
+  tagline: 'Separable classes mean no finite minimum — watch ‖θ‖ keep growing.',
   trueParameters: { a: 1.2, b: 0.2 },
   
   // Generate linearly separable data with clear clusters
@@ -238,6 +240,7 @@ const polynomialRegression: ProblemConfig = {
   type: 'polynomial-regression',
   name: 'Polynomial Regression',
   description: 'Fit a polynomial curve to data',
+  tagline: 'Still one bowl, but curvature differs by direction.',
   trueParameters: { a: 0.5, b: -0.3 },
   
   generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
@@ -313,6 +316,7 @@ const sineWave: ProblemConfig = {
   type: 'sine-wave',
   name: 'Sine Wave',
   description: 'Fit a sine wave: amplitude and frequency',
+  tagline: 'Frequency aliasing carves many local minima along β.',
   trueParameters: { a: 1.5, b: 3 },
 
   generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
@@ -385,6 +389,7 @@ const gaussianPeak: ProblemConfig = {
   type: 'gaussian-peak',
   name: 'Gaussian Peak',
   description: 'Fit a Gaussian: center and width',
+  tagline: 'Gradients vanish far from the peak — and two mirror basins at ±β.',
   trueParameters: { a: 0, b: 1 },
 
   generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
@@ -476,6 +481,7 @@ const exponentialDecay: ProblemConfig = {
   type: 'exponential-decay',
   name: 'Exponential Decay',
   description: 'Fit y = α·exp(−β·X): amplitude and rate',
+  tagline: 'A steep curved valley — momentum\'s favorite demo.',
   trueParameters: { a: 1, b: 0.5 },
 
   generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
@@ -554,6 +560,7 @@ const dampedOscillator: ProblemConfig = {
   type: 'damped-oscillator',
   name: 'Damped Oscillator',
   description: 'Fit y = e^(−α·t)·cos(β·t): damping and frequency',
+  tagline: 'Multimodal in β, with a symmetric twin at −β.',
   trueParameters: { a: 0.5, b: 3 },
 
   generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
@@ -629,6 +636,7 @@ const logisticGrowth: ProblemConfig = {
   type: 'logistic-growth',
   name: 'Logistic Growth',
   description: 'Fit a sigmoid: steepness and shift',
+  tagline: 'Sigmoid saturation flattens the loss at the edges.',
   trueParameters: { a: 2, b: 0 },
 
   generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
@@ -703,6 +711,7 @@ const powerLaw: ProblemConfig = {
   type: 'power-law',
   name: 'Power Law',
   description: 'Fit y = α·X^β: scale and exponent',
+  tagline: 'A long narrow trench: plain GD crawls, momentum flies.',
   trueParameters: { a: 1, b: 1.5 },
 
   generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
@@ -779,6 +788,7 @@ const gaussianMixture: ProblemConfig = {
   type: 'gaussian-mixture',
   name: 'Gaussian Mixture',
   description: 'Fit two Gaussian peaks: locations α and β',
+  tagline: 'Two interchangeable peaks — two equally good answers.',
   trueParameters: { a: -1, b: 1 },
 
   generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
@@ -858,6 +868,7 @@ const circleClassifier: ProblemConfig = {
   type: 'circle-classifier',
   name: 'Circle Classifier',
   description: 'Find a circle center to separate inside / outside points',
+  tagline: 'The marker IS the circle\'s center — drag it on the left plot too.',
   trueParameters: { a: 0, b: 0 },
 
   generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
@@ -938,6 +949,7 @@ const sourceLocalization: ProblemConfig = {
   type: 'source-localization',
   name: 'Source Localization',
   description: 'Find a hidden source from sensor signal strengths',
+  tagline: 'Triangulate a hidden source from sensor strengths.',
   trueParameters: { a: 0.5, b: -0.5 },
 
   generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
@@ -1017,6 +1029,7 @@ const meanShift: ProblemConfig = {
   type: 'mean-shift',
   name: 'Mean-Shift Cluster',
   description: 'Find a cluster mode in a 2D point cloud',
+  tagline: 'Each cluster is its own basin; the start decides which mode you find.',
   trueParameters: { a: -1, b: 1 },
 
   generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {

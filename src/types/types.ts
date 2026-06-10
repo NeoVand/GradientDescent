@@ -40,6 +40,9 @@ export interface ProblemConfig {
   type: ProblemType;
   name: string;
   description: string;
+  // One-line hook shown by the coach when the problem is selected — what
+  // makes this loss surface interesting.
+  tagline?: string;
   trueParameters: ModelParameters; // The true underlying model parameters
   generateData: (numPoints: number, trainRatio: number, noiseLevel?: number) => DataPoint[];
   predict: (x: number, params: ModelParameters) => number;

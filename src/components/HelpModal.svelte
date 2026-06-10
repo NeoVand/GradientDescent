@@ -13,10 +13,16 @@
     Activity, Mountain, TrendingUp, TrendingDown, Percent, Waves,
     Target, Radio, ScatterChart,
     Sparkles, Compass, Rocket, Zap, RefreshCw,
-    BookOpen, FlaskConical, Layers, Map
+    BookOpen, FlaskConical, Layers, Map, Play
   } from 'lucide-svelte';
   import katex from 'katex';
   import 'katex/dist/katex.min.css';
+  import { experiments } from '../utils/experiments';
+
+  function runExperiment(exp: (typeof experiments)[number]) {
+    onClose();
+    exp.apply();
+  }
 
   export let isOpen = false;
   export let onClose: () => void;
@@ -393,62 +399,23 @@
         <!-- ============================== EXPERIMENTS ============================== -->
         <section>
           <h3><FlaskConical size={18} strokeWidth={2} /> Things to try</h3>
+          <p>
+            Each card is a ready-made scenario — one click sets everything up,
+            starts training, and tells you what to watch for.
+          </p>
 
-          <div class="experiment">
-            <h4>Watch a local minimum trap you</h4>
-            <p>
-              Pick <strong>Sine Wave</strong>, set <em>μ = 0</em>, train. The frequency
-              landscape has many basins; the marker often gets stuck in one. Now bump μ up
-              and try again — does momentum let it escape?
-            </p>
-          </div>
-
-          <div class="experiment">
-            <h4>Symmetric pairs</h4>
-            <p>
-              <strong>Gaussian Peak</strong>, <strong>Damped Oscillator</strong>,
-              <strong>Mixture</strong>, and <strong>Mean-Shift</strong> each have
-              <em>two</em> equivalent global minima. Re-train a few times — the marker
-              picks a basin based on where it starts.
-            </p>
-          </div>
-
-          <div class="experiment">
-            <h4>The vanishing-gradient graveyard</h4>
-            <p>
-              In <strong>Gaussian Peak</strong>, drag the marker far from center. The
-              arrows thin out to nothing. Press Train and the marker barely moves — exactly
-              the issue that makes deep networks need careful initialization.
-            </p>
-          </div>
-
-          <div class="experiment">
-            <h4>Anisotropic valleys</h4>
-            <p>
-              <strong>Power Law</strong> has a long, narrow trench. With μ = 0 the marker
-              creeps along the floor; with μ = 0.9 it accelerates and shoots into the
-              basin in a fraction of the steps.
-            </p>
-          </div>
-
-          <div class="experiment">
-            <h4>Noise blurs the truth</h4>
-            <p>
-              Crank <strong>Noise</strong> to 2 on Linear Regression. The loss landscape
-              softens and the optimum drifts away from the true line. No amount of training
-              can undo noise — only collecting more data can.
-            </p>
-          </div>
-
-          <div class="experiment">
-            <h4>The marker is the parameters</h4>
-            <p>
-              For the four 2D problems (Logistic Regression, Circle Classifier, Source
-              Localization, Mean-Shift) the orange marker on the left plot <em>is</em> the
-              parameter (α, β). Drag it around and see the model update directly on the
-              data.
-            </p>
-          </div>
+          {#each experiments as exp (exp.id)}
+            <div class="experiment">
+              <div class="experiment-text">
+                <h4>{exp.title}</h4>
+                <p>{exp.blurb}</p>
+              </div>
+              <button class="try-btn" on:click={() => runExperiment(exp)}>
+                <Play size={13} strokeWidth={2.5} />
+                <span>Try it</span>
+              </button>
+            </div>
+          {/each}
         </section>
 
         <!-- ============================== VIZ KEY ============================== -->
@@ -909,13 +876,39 @@
     border-radius: 8px;
     padding: 0.75rem 1rem;
     margin-bottom: 0.625rem;
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
   }
+  .experiment-text { flex: 1; min-width: 0; }
   .experiment h4 {
     color: #10b981;
     font-size: 0.9rem;
     margin-bottom: 0.35rem;
   }
   .experiment p { margin-bottom: 0; font-size: 0.85rem; }
+
+  .try-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.8rem;
+    border: 1px solid rgba(16, 185, 129, 0.45);
+    border-radius: 8px;
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+  }
+  .try-btn:hover {
+    background: rgba(16, 185, 129, 0.22);
+    border-color: #10b981;
+    transform: translateY(-1px);
+  }
 
   /* ---------- Viz list ---------- */
   .viz-list { padding-left: 1.25rem; }

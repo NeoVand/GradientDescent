@@ -878,15 +878,20 @@
     overflow: hidden;
   }
   
+  /* Same fixed header height as the Loss & Gradient panel so the two plot
+     frames always start at the same y. */
   .header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: nowrap;
+    height: 28px;
     margin-bottom: 0.375rem;
     margin-right: 20px;
     flex-shrink: 0;
+    overflow: hidden;
   }
-  
+
   h2 {
     margin: 0 0 0 50px;
     font-size: 1.125rem;
@@ -896,6 +901,12 @@
     align-items: center;
     gap: 0.5rem;
     opacity: 0.9;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  @media (max-width: 1500px) {
+    h2 { margin-left: 8px; }
   }
 
   @media (max-width: 768px) {

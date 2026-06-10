@@ -1,18 +1,27 @@
 <script lang="ts">
   /**
-   * Sidebar Component
-   * 
-   * This component contains all the controls for the gradient descent app:
-   * - Problem selection with visual previews
-   * - Dataset configuration (size and train/test split)
-   * - Training hyperparameters (learning rate and steps)
-   * - Action buttons (Train and Reset)
+   * Sidebar Component — pure UI.
+   *
+   * Controls are grouped into workflow-ordered section cards:
+   *   Problem → Data → Optimizer → Run
+   * Every row follows the same grammar — [icon] Label (i) ........ value —
+   * with sliders spanning the full card width. All training behavior lives
+   * in utils/trainer.ts; this component only renders state and forwards
+   * intents.
    */
-  
-  import { selectedProblem, datasetStore, trainingStore, parametersStore, historyStore, optimizerStore, optimizerStateStore, resetOptimizerState, divergenceStore, recordInitialHistory } from '../stores/stores';
-  import type { ProblemType, DataPoint } from '../types/types';
-  import { problemConfigs } from '../utils/problems';
-  import { optimizers, optimizerOrder, defaultHyper, type OptimizerId } from '../utils/optimizers';
+
+  import { selectedProblem, datasetStore, trainingStore, historyStore, optimizerStore, resetOptimizerState } from '../stores/stores';
+  import type { ProblemType } from '../types/types';
+  import { optimizers, optimizerOrder, type OptimizerId } from '../utils/optimizers';
+  import {
+    startTraining,
+    stopTraining,
+    stepOnce,
+    resetRun,
+    applyProblem,
+    applyOptimizer,
+    runStartStep
+  } from '../utils/trainer';
   import {
     TrendingUp,
     TrendingDown,
@@ -27,37 +36,22 @@
     Activity,
     Droplets,
     Mountain,
-    Brain,
     Info,
     Rocket,
     Waves,
-    Sigma,
     Target,
     Radio,
     ScatterChart,
     Dices,
-    Route,
     StepForward,
     Gauge,
     Layers
   } from 'lucide-svelte';
-  
-  // Component state
-  let isTraining = false;
-  let trainingInterval: number | null = null;
-  
-  // Problem selection state
+
+  // Dropdown state
   let showProblemDropdown = false;
   let showOptimizerDropdown = false;
-  
-  // Edit state for number steppers
-  let editingNumPoints = false;
-  let editingTrainingSteps = false;
-  let editingLearningRate = false;
-  let draftNumPoints = '';
-  let draftTrainingSteps = '';
-  let draftLearningRate = '';
-  
+
   // Tooltip state
   let activeTooltip: string | null = null;
   const problems: { type: ProblemType; name: string; icon: any; customIcon?: string }[] = [
@@ -75,7 +69,7 @@
     { type: 'source-localization', name: 'Source Localization', icon: Radio },
     { type: 'mean-shift', name: 'Mean-Shift Cluster', icon: ScatterChart }
   ];
-  
+
   // Subscribe to stores
   $: currentProblem = $selectedProblem;
   $: numPoints = $datasetStore.numPoints;
@@ -87,88 +81,29 @@
   $: currentStep = $trainingStore.currentStep;
   $: batchSize = $trainingStore.batchSize;
   $: stepsPerSecond = $trainingStore.stepsPerSecond;
+  $: isTraining = $trainingStore.isTraining;
   $: optimizerSel = $optimizerStore;
   $: currentOptimizer = optimizers[optimizerSel.id];
-  
-  // Calculate training progress
-  $: trainingProgress = isTraining && $historyStore.length > 0 
-    ? ((currentStep - startingStepForProgress) / totalSteps) * 100 
+
+  // Training progress for the Train button fill
+  $: trainingProgress = isTraining && totalSteps > 0
+    ? Math.max(0, Math.min(100, ((currentStep - $runStartStep) / totalSteps) * 100))
     : 0;
-  
-  let startingStepForProgress = 0;
-  
-  // Update CSS variable for slider gradient
-  // Properly map slider value (0.1-0.9) to track position (0%-100%)
+
+  // Update CSS variable for the split slider's two-tone track
   $: if (typeof document !== 'undefined') {
-    const minValue = 0.1;
-    const maxValue = 0.9;
-    const normalizedPosition = ((trainRatio - minValue) / (maxValue - minValue)) * 100;
+    const normalizedPosition = ((trainRatio - 0.1) / 0.8) * 100;
     document.documentElement.style.setProperty('--train-percentage', `${normalizedPosition}%`);
   }
 
-  /**
-   * Resolve the learning rate to apply when problem or optimizer changes:
-   * adaptive optimizers carry their own γ (they're scale-robust), everyone
-   * else uses the problem's curated default. Always applying it on switch
-   * means a rate tuned for one surface can never silently carry over to
-   * another where it diverges.
-   */
-  function resolveLearningRate(optimizerId: OptimizerId, problemType: ProblemType): number {
-    return optimizers[optimizerId].fixedLearningRate
-      ?? problemConfigs[problemType]?.defaultLearningRate
-      ?? 0.01;
-  }
-
-  /** Hyper defaults for an optimizer, honoring the problem's curated μ. */
-  function hyperForProblem(optimizerId: OptimizerId, problemType: ProblemType): Record<string, number> {
-    const hyper = defaultHyper(optimizerId);
-    const mu = problemConfigs[problemType]?.defaultMomentum;
-    if ((optimizerId === 'momentum' || optimizerId === 'nesterov') && mu) {
-      hyper.mu = mu;
-    }
-    return hyper;
-  }
-
-  // Handle problem selection
   function selectProblem(type: ProblemType) {
-    selectedProblem.set(type);
     showProblemDropdown = false;
-    // Problems curated around momentum auto-select the Momentum optimizer
-    // (matching the old behavior where the μ slider was set per problem) —
-    // but only when the user is on a momentum-family/plain method; a
-    // deliberate Adam/RMSProp/AdaGrad choice is respected.
-    const cfg = problemConfigs[type];
-    let optimizerId = $optimizerStore.id;
-    if (optimizerId === 'gd' || optimizerId === 'momentum') {
-      optimizerId = (cfg?.defaultMomentum ?? 0) > 0 ? 'momentum' : 'gd';
-    }
-    optimizerStore.set({ id: optimizerId, hyper: hyperForProblem(optimizerId, type) });
-    trainingStore.update(store => ({
-      ...store,
-      learningRate: resolveLearningRate(optimizerId, type),
-      // Per-problem γ/μ are curated for full-batch gradients; a sticky
-      // batch of 1 can blast a momentum run out of a narrow basin.
-      batchSize: 'all'
-    }));
-    // Regenerate data for the new problem, then reset on top of it so the
-    // initial history point reflects the new dataset.
-    datasetStore.regenerateData();
-    resetTraining();
+    applyProblem(type);
   }
 
-  // Handle optimizer selection: keep the marker where it is (comparing
-  // optimizers from the same start is the whole point), reset only the
-  // optimizer's internal state and apply its learning rate.
   function selectOptimizer(id: OptimizerId) {
     showOptimizerDropdown = false;
-    if (id === $optimizerStore.id) return;
-    optimizerStore.set({ id, hyper: hyperForProblem(id, $selectedProblem) });
-    resetOptimizerState();
-    divergenceStore.set(null);
-    trainingStore.update(store => ({
-      ...store,
-      learningRate: resolveLearningRate(id, $selectedProblem)
-    }));
+    applyOptimizer(id);
   }
 
   // Hyperparameter slider change: store the value and restart accumulation
@@ -177,219 +112,46 @@
     optimizerStore.update(sel => ({ ...sel, hyper: { ...sel.hyper, [key]: value } }));
     resetOptimizerState();
   }
-  
-  // Handle dataset size change
-  function handleNumPointsChange(e: Event) {
-    const value = parseInt((e.target as HTMLInputElement).value);
-    datasetStore.setNumPoints(value);
-    datasetStore.regenerateData();
-  }
-  
-  // Handle train/test ratio change
+
   function handleTrainRatioChange(e: Event) {
     const value = parseFloat((e.target as HTMLInputElement).value);
     datasetStore.setTrainRatio(value);
     datasetStore.regenerateData();
   }
-  
-  // Handle noise level change
+
   function handleNoiseLevelChange(e: Event) {
     const value = parseFloat((e.target as HTMLInputElement).value);
     datasetStore.setNoiseLevel(value);
     datasetStore.regenerateData();
   }
-  
-  // Handle learning rate change
-  function handleLearningRateChange(e: Event) {
-    const value = parseFloat((e.target as HTMLInputElement).value);
-    trainingStore.update(store => ({ ...store, learningRate: value }));
-  }
-  
-  // Handle total steps change
-  function handleTotalStepsChange(e: Event) {
+
+  function handleNumPointsChange(e: Event) {
     const value = parseInt((e.target as HTMLInputElement).value);
-    trainingStore.update(store => ({ ...store, totalSteps: value }));
-  }
-  
-  // Parameters this far outside any visible range mean the run has blown
-  // up: stop, explain, and never feed non-finite values to the charts.
-  const DIVERGENCE_LIMIT = 1e4;
-
-  function hasDiverged(params: { a: number; b: number }, loss: number): boolean {
-    return (
-      !Number.isFinite(params.a) ||
-      !Number.isFinite(params.b) ||
-      !Number.isFinite(loss) ||
-      Math.abs(params.a) > DIVERGENCE_LIMIT ||
-      Math.abs(params.b) > DIVERGENCE_LIMIT
-    );
+    datasetStore.setNumPoints(value);
+    datasetStore.regenerateData();
   }
 
-  /**
-   * Sample a minibatch for this step. Full batch ('all' or batch ≥ n)
-   * returns the data as-is; otherwise a uniform sample without replacement.
-   * Deliberately unseeded — per-step SGD noise is the phenomenon on display.
-   */
-  function sampleBatch(trainData: DataPoint[]): DataPoint[] {
-    const bs = $trainingStore.batchSize;
-    if (bs === 'all' || bs >= trainData.length) return trainData;
-    const idx = trainData.map((_, i) => i);
-    for (let i = idx.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [idx[i], idx[j]] = [idx[j], idx[i]];
-    }
-    return idx.slice(0, bs).map(i => trainData[i]);
+  // Learning rate rides a log-scale slider: position 0..100 maps to
+  // γ ∈ [1e-4, 1]. Every curated default lands exactly on the scale.
+  const LR_LOG_MIN = -4;
+  const LR_LOG_MAX = 0;
+
+  $: lrSliderPos =
+    ((Math.log10(Math.max(1e-4, Math.min(1, learningRate))) - LR_LOG_MIN) / (LR_LOG_MAX - LR_LOG_MIN)) * 100;
+
+  function handleLrSlider(e: Event) {
+    const pos = parseFloat((e.target as HTMLInputElement).value);
+    const lr = Math.pow(10, LR_LOG_MIN + (pos / 100) * (LR_LOG_MAX - LR_LOG_MIN));
+    trainingStore.update(store => ({ ...store, learningRate: lr }));
   }
 
-  /**
-   * One optimizer update: gradient on the (mini)batch, step via the
-   * selected optimizer, record full-batch losses. Shared by the animated
-   * loop and the single-Step button. Returns false when the step diverged
-   * (nothing is committed and the run should stop).
-   */
-  function doOneStep(): boolean {
-    const trainData = $datasetStore.data.filter(point => point.isTraining);
-    if (trainData.length === 0) return false;
-    const testData = $datasetStore.data.filter(point => !point.isTraining);
-    const config = problemConfigs[$selectedProblem];
-    const opt = optimizers[$optimizerStore.id];
-
-    const gradient = config.computeGradient(sampleBatch(trainData), $parametersStore);
-    const result = opt.step(
-      $parametersStore,
-      gradient,
-      $optimizerStateStore,
-      $trainingStore.learningRate,
-      $optimizerStore.hyper
-    );
-
-    // The chart always shows the loss over the full training set, so curve
-    // wobble under small batches reflects parameter noise, not measurement.
-    const trainLoss = config.computeLoss(trainData, result.params);
-    const history = $historyStore;
-    const nextStepNumber = (history.length > 0 ? history[history.length - 1].step : 0) + 1;
-
-    // Divergence check BEFORE committing anything: the marker stays at
-    // its last sane position and the loss chart never sees NaN.
-    if (hasDiverged(result.params, trainLoss)) {
-      divergenceStore.set({ step: nextStepNumber });
-      return false;
-    }
-
-    parametersStore.set(result.params);
-    optimizerStateStore.set(result.state);
-    trainingStore.update(store => ({ ...store, currentStep: nextStepNumber }));
-    historyStore.addPoint({
-      step: nextStepNumber,
-      trainLoss,
-      testLoss: config.computeLoss(testData, result.params),
-      parameters: result.params
-    });
-    return true;
-  }
-
-  // Loop bookkeeping lives at component scope so the speed slider can
-  // rebuild the interval mid-run without losing progress.
-  let stepsToTrain = 0;
-  let stepsCompleted = 0;
-  let runningIntervalSps = 0;
-
-  function startLoop() {
-    if (trainingInterval !== null) clearInterval(trainingInterval);
-    runningIntervalSps = $trainingStore.stepsPerSecond;
-    const intervalMs = Math.max(8, Math.round(1000 / runningIntervalSps));
-    trainingInterval = window.setInterval(() => {
-      if (stepsCompleted >= stepsToTrain || !doOneStep()) {
-        stopTraining();
-        return;
-      }
-      stepsCompleted++;
-    }, intervalMs);
-  }
-
-  // Live speed change: rebuild the ticker at the new rate mid-run.
-  $: if (isTraining && stepsPerSecond !== runningIntervalSps) {
-    startLoop();
-  }
-
-  // Training logic
-  function startTraining() {
-    if (isTraining) return;
-
-    isTraining = true;
-    divergenceStore.set(null);
-    trainingStore.update(store => ({ ...store, isTraining: true }));
-
-    stepsToTrain = $trainingStore.totalSteps;
-    stepsCompleted = 0;
-
-    const history = $historyStore;
-    startingStepForProgress = history.length > 0 ? history[history.length - 1].step : 0;
-
-    startLoop();
-  }
-
-  // Single step: same code path as the loop, one click at a time.
-  function stepOnce() {
-    if (isTraining) return;
-    divergenceStore.set(null);
-    doOneStep();
-  }
-
-  function stopTraining() {
-    if (trainingInterval !== null) {
-      clearInterval(trainingInterval);
-      trainingInterval = null;
-    }
-    isTraining = false;
-    runningIntervalSps = 0;
-    trainingStore.update(store => ({ ...store, isTraining: false }));
-  }
-
-  function resetTraining() {
-    stopTraining();
-    parametersStore.reset();
-    resetOptimizerState();
-    divergenceStore.set(null);
-    trainingStore.update(store => ({
-      ...store,
-      currentStep: 0,
-      isTraining: false
-    }));
-    // Restart history at the new initial position (step 0)
-    recordInitialHistory();
-  }
-  
-  // 1-2-5 sequence: two intermediate stops between each decade so the
-  // stepper feels gradual instead of jumping by 10× per click.
-  const learningRateSteps = [
-    0.0001, 0.0002, 0.0005,
-    0.001,  0.002,  0.005,
-    0.01,   0.02,   0.05,
-    0.1,    0.2,    0.5,
-    1
-  ];
-  const lrEpsilon = 1e-9;
-
-  function nextLearningRate(current: number): number {
-    const next = learningRateSteps.find(v => v > current + lrEpsilon);
-    return next ?? learningRateSteps[learningRateSteps.length - 1];
-  }
-
-  function prevLearningRate(current: number): number {
-    for (let i = learningRateSteps.length - 1; i >= 0; i--) {
-      if (learningRateSteps[i] < current - lrEpsilon) return learningRateSteps[i];
-    }
-    return learningRateSteps[0];
-  }
-
-  // Format learning rate for display
   function formatLearningRate(rate: number): string {
+    if (rate >= 0.0995) return rate.toFixed(2);
     if (rate >= 0.001) return rate.toFixed(3);
     return rate.toFixed(4);
   }
 
-  // Batch size cycles through powers of two, then full batch.
+  // Batch size slides across the discrete stop list, ending at full batch.
   const batchSizeSteps: (number | 'all')[] = [1, 2, 4, 8, 16, 32, 'all'];
 
   function batchIndex(bs: number | 'all'): number {
@@ -397,23 +159,13 @@
     return i === -1 ? batchSizeSteps.length - 1 : i;
   }
 
-  function nextBatchSize() {
-    const i = Math.min(batchSizeSteps.length - 1, batchIndex(batchSize) + 1);
-    trainingStore.update(store => ({ ...store, batchSize: batchSizeSteps[i] }));
-  }
-
-  function prevBatchSize() {
-    const i = Math.max(0, batchIndex(batchSize) - 1);
+  function handleBatchSlider(e: Event) {
+    const i = parseInt((e.target as HTMLInputElement).value);
     trainingStore.update(store => ({ ...store, batchSize: batchSizeSteps[i] }));
   }
 
   $: batchLabel = batchSize === 'all' ? 'All' : String(batchSize);
-  
-  // Focus action for inputs
-  function focusOnMount(node: HTMLElement) {
-    node.focus();
-    return {};
-  }
+  $: batchPos = (batchIndex(batchSize) / (batchSizeSteps.length - 1)) * 100;
 </script>
 
 <div class="sidebar-content">
@@ -421,29 +173,14 @@
     <span class="app-icon">∂</span>
     <span>Gradient Descent</span>
   </h1>
-  
-  <!-- Problem Selection -->
-  <div class="control-group">
-    <div class="control-header">
-      <span class="icon"><Brain size={18} strokeWidth={2} /></span>
-      <span class="control-label">Problem</span>
-      <div class="tooltip-container">
-        <button 
-          class="info-btn" 
-          on:mouseenter={() => activeTooltip = 'problem'}
-          on:mouseleave={() => activeTooltip = null}
-        >
-          <Info size={14} strokeWidth={2} />
-        </button>
-        {#if activeTooltip === 'problem'}
-          <div class="tooltip">
-            Select the machine learning problem type to explore
-          </div>
-        {/if}
-      </div>
+
+  <!-- ===================== PROBLEM ===================== -->
+  <div class="section">
+    <div class="section-label">
+      <span>Problem</span>
     </div>
     <div class="problem-selector" class:open={showProblemDropdown}>
-      <button 
+      <button
         class="problem-button"
         on:click={() => showProblemDropdown = !showProblemDropdown}
       >
@@ -451,7 +188,7 @@
           {#if problems.find(p => p.type === currentProblem)?.customIcon}
             <span class="custom-icon">{problems.find(p => p.type === currentProblem)?.customIcon}</span>
           {:else}
-            <svelte:component this={problems.find(p => p.type === currentProblem)?.icon} size={20} strokeWidth={2} />
+            <svelte:component this={problems.find(p => p.type === currentProblem)?.icon} size={18} strokeWidth={2} />
           {/if}
         </span>
         <span class="problem-name">
@@ -459,7 +196,7 @@
         </span>
         <span class="dropdown-arrow">▼</span>
       </button>
-      
+
       {#if showProblemDropdown}
         <div class="problem-dropdown">
           {#each problems as problem}
@@ -483,27 +220,146 @@
     </div>
   </div>
 
-  <!-- Optimizer -->
-  <div class="control-group">
-    <div class="control-header">
-      <span class="icon"><Route size={18} strokeWidth={2} /></span>
-      <span class="control-label">Optimizer</span>
-      <div class="tooltip-container">
-        <button
-          class="info-btn"
-          on:mouseenter={() => activeTooltip = 'optimizer'}
-          on:mouseleave={() => activeTooltip = null}
-        >
-          <Info size={14} strokeWidth={2} />
-        </button>
-        {#if activeTooltip === 'optimizer'}
-          <div class="tooltip">
-            How each step is computed from the gradient<br/>
-            <span style="opacity: 0.8; font-size: 0.7rem;">Adaptive methods (AdaGrad, RMSProp, Adam) rescale per parameter</span>
-          </div>
-        {/if}
+  <!-- ===================== DATA ===================== -->
+  <div class="section">
+    <div class="section-label">
+      <span>Data</span>
+      <button
+        class="reroll-btn"
+        title="Generate a new random dataset"
+        on:click={() => datasetStore.reroll()}
+      >
+        <Dices size={14} strokeWidth={2} />
+      </button>
+    </div>
+
+    <!-- Points -->
+    <div class="ctl">
+      <div class="row">
+        <span class="icon"><MapPin size={16} strokeWidth={2} /></span>
+        <span class="row-label">Points</span>
+        <div class="tooltip-container">
+          <button
+            class="info-btn"
+            on:mouseenter={() => activeTooltip = 'dataPoints'}
+            on:mouseleave={() => activeTooltip = null}
+          >
+            <Info size={13} strokeWidth={2} />
+          </button>
+          {#if activeTooltip === 'dataPoints'}
+            <div class="tooltip">
+              Number of synthetic data points to generate<br/>
+              <span style="opacity: 0.8; font-size: 0.7rem;">The dice rolls a fresh dataset</span>
+            </div>
+          {/if}
+        </div>
+        <div class="row-spring"></div>
+        <span class="row-value points-value">{numPoints}</span>
+      </div>
+      <input
+        id="num-points"
+        class="hyper-slider"
+        type="range"
+        min="10"
+        max="100"
+        step="5"
+        value={numPoints}
+        style="--fill: {((numPoints - 10) / 90) * 100}%"
+        on:input={handleNumPointsChange}
+      />
+    </div>
+
+    <!-- Noise -->
+    <div class="ctl">
+      <div class="row">
+        <span class="icon"><Droplets size={16} strokeWidth={2} /></span>
+        <span class="row-label">Noise</span>
+        <div class="tooltip-container">
+          <button
+            class="info-btn"
+            on:mouseenter={() => activeTooltip = 'noise'}
+            on:mouseleave={() => activeTooltip = null}
+          >
+            <Info size={13} strokeWidth={2} />
+          </button>
+          {#if activeTooltip === 'noise'}
+            <div class="tooltip">
+              Amount of random noise added to synthetic data<br/>
+              <span style="opacity: 0.8; font-size: 0.7rem;">0 = clean, 2 = very noisy</span>
+            </div>
+          {/if}
+        </div>
+        <div class="row-spring"></div>
+        <span class="row-value noise-value">{noiseLevel.toFixed(2)}</span>
+      </div>
+      <input
+        id="noise-level"
+        type="range"
+        min="0"
+        max="2"
+        step="0.05"
+        value={noiseLevel}
+        on:input={handleNoiseLevelChange}
+      />
+    </div>
+
+    <!-- Train/Test Split -->
+    <div class="ctl">
+      <div class="row">
+        <span class="icon"><PieChart size={16} strokeWidth={2} /></span>
+        <span class="row-label">Train/Test Split</span>
+        <div class="tooltip-container">
+          <button
+            class="info-btn"
+            on:mouseenter={() => activeTooltip = 'trainTest'}
+            on:mouseleave={() => activeTooltip = null}
+          >
+            <Info size={13} strokeWidth={2} />
+          </button>
+          {#if activeTooltip === 'trainTest'}
+            <div class="tooltip">
+              Ratio of data used for training vs. testing the model
+            </div>
+          {/if}
+        </div>
+        <div class="row-spring"></div>
+        <span class="row-value">
+          <span class="split-value train">{Math.round(trainRatio * 100)}</span><span class="split-separator">/</span><span class="split-value test">{Math.round((1 - trainRatio) * 100)}</span>
+        </span>
+      </div>
+      <input
+        id="train-ratio"
+        type="range"
+        min="0.1"
+        max="0.9"
+        step="0.1"
+        value={trainRatio}
+        on:input={handleTrainRatioChange}
+      />
+      <div class="sub-labels">
+        <span class="sub-train">Train</span>
+        <label class="checkbox-label">
+          <input
+            type="checkbox"
+            checked={randomSplit}
+            on:change={(e) => {
+              datasetStore.setRandomSplit(e.currentTarget.checked);
+              datasetStore.regenerateData();
+            }}
+          />
+          <span>Random</span>
+        </label>
+        <span class="sub-test">Test</span>
       </div>
     </div>
+  </div>
+
+  <!-- ===================== OPTIMIZER ===================== -->
+  <div class="section">
+    <div class="section-label">
+      <span>Optimizer</span>
+    </div>
+
     <div class="problem-selector" class:open={showOptimizerDropdown}>
       <button
         class="problem-button"
@@ -533,144 +389,90 @@
         </div>
       {/if}
     </div>
-  </div>
 
-  <!-- Per-optimizer hyperparameters (rendered from the optimizer's spec);
-       Adam's two β sliders sit side by side, single sliders go full width -->
-  {#if currentOptimizer.hyperparams.length > 0}
-    <div class="control-row" class:single={currentOptimizer.hyperparams.length === 1}>
-      {#each currentOptimizer.hyperparams as spec (optimizerSel.id + '-' + spec.key)}
-        <div class="control-group" class:compact={currentOptimizer.hyperparams.length > 1}>
-          <div class="control-header">
-            <span class="icon"><Rocket size={currentOptimizer.hyperparams.length > 1 ? 15 : 18} strokeWidth={2} /></span>
-            <label for={'hyper-' + spec.key}>{spec.label} <span class="greek-label"> ({spec.symbol})</span></label>
-            <div class="tooltip-container">
-              <button
-                class="info-btn"
-                on:mouseenter={() => activeTooltip = 'hyper-' + spec.key}
-                on:mouseleave={() => activeTooltip = null}
-              >
-                <Info size={14} strokeWidth={2} />
-              </button>
-              {#if activeTooltip === 'hyper-' + spec.key}
-                <div class="tooltip">{spec.hint}</div>
-              {/if}
-            </div>
+    <!-- Per-optimizer hyperparameters (rendered from the optimizer's spec) -->
+    {#each currentOptimizer.hyperparams as spec (optimizerSel.id + '-' + spec.key)}
+      <div class="ctl">
+        <div class="row">
+          <span class="icon"><Rocket size={16} strokeWidth={2} /></span>
+          <span class="row-label">{spec.label} <span class="greek-label">({spec.symbol})</span></span>
+          <div class="tooltip-container">
+            <button
+              class="info-btn"
+              on:mouseenter={() => activeTooltip = 'hyper-' + spec.key}
+              on:mouseleave={() => activeTooltip = null}
+            >
+              <Info size={13} strokeWidth={2} />
+            </button>
+            {#if activeTooltip === 'hyper-' + spec.key}
+              <div class="tooltip">{spec.hint}</div>
+            {/if}
           </div>
-          <div class="slider-container">
-            <div class="slider-value-display">
-              <span class="momentum-value">{(optimizerSel.hyper[spec.key] ?? spec.default).toFixed(spec.step < 0.01 ? 3 : 2)}</span>
-            </div>
-            <input
-              id={'hyper-' + spec.key}
-              class="hyper-slider"
-              type="range"
-              min={spec.min}
-              max={spec.max}
-              step={spec.step}
-              value={optimizerSel.hyper[spec.key] ?? spec.default}
-              style="--fill: {(((optimizerSel.hyper[spec.key] ?? spec.default) - spec.min) / (spec.max - spec.min)) * 100}%"
-              on:input={(e) => setHyper(spec.key, parseFloat(e.currentTarget.value))}
-            />
-            <div class="slider-labels">
-              <span>{spec.min}</span>
-              <span>{spec.max}</span>
-            </div>
-          </div>
+          <div class="row-spring"></div>
+          <span class="row-value momentum-value">{(optimizerSel.hyper[spec.key] ?? spec.default).toFixed(spec.step < 0.01 ? 3 : 2)}</span>
         </div>
-      {/each}
-    </div>
-  {/if}
+        <input
+          id={'hyper-' + spec.key}
+          class="hyper-slider"
+          type="range"
+          min={spec.min}
+          max={spec.max}
+          step={spec.step}
+          value={optimizerSel.hyper[spec.key] ?? spec.default}
+          style="--fill: {(((optimizerSel.hyper[spec.key] ?? spec.default) - spec.min) / (spec.max - spec.min)) * 100}%"
+          on:input={(e) => setHyper(spec.key, parseFloat(e.currentTarget.value))}
+        />
+      </div>
+    {/each}
 
-  <!-- Learning Rate | Batch Size -->
-  <div class="control-row">
-    <div class="control-group compact">
-      <div class="control-header">
-        <span class="icon"><Zap size={15} strokeWidth={2} /></span>
-        <label for="learning-rate">Learn Rate <span class="greek-label"> (γ)</span></label>
+    <!-- Learning Rate (log scale) -->
+    <div class="ctl">
+      <div class="row">
+        <span class="icon"><Zap size={16} strokeWidth={2} /></span>
+        <span class="row-label">Learn Rate <span class="greek-label">(γ)</span></span>
         <div class="tooltip-container">
           <button
             class="info-btn"
             on:mouseenter={() => activeTooltip = 'learningRate'}
             on:mouseleave={() => activeTooltip = null}
           >
-            <Info size={14} strokeWidth={2} />
+            <Info size={13} strokeWidth={2} />
           </button>
           {#if activeTooltip === 'learningRate'}
             <div class="tooltip">
-              Step size for gradient descent updates<br/>
+              Step size for gradient descent updates (log scale, 10⁻⁴ … 1)<br/>
               <span style="opacity: 0.8; font-size: 0.7rem;">Higher = faster but less stable</span>
             </div>
           {/if}
         </div>
+        <div class="row-spring"></div>
+        <span class="row-value lr-value">{formatLearningRate(learningRate)}</span>
       </div>
-      <div class="number-stepper">
-        <button
-          class="stepper-btn"
-          disabled={learningRate <= 0.0001 + lrEpsilon}
-          on:click={() => {
-            trainingStore.update(store => ({ ...store, learningRate: prevLearningRate(learningRate) }));
-          }}
-        >
-          −
-        </button>
-        {#if editingLearningRate}
-          <input
-            class="stepper-input"
-            type="text"
-            value={draftLearningRate}
-            on:input={(e) => draftLearningRate = e.currentTarget.value.replace(/[^0-9.eE\-]/g, '')}
-            on:blur={() => {
-              const parsed = parseFloat(draftLearningRate);
-              if (!isNaN(parsed)) {
-                const clamped = Math.max(0.0001, Math.min(1, parsed));
-                trainingStore.update(store => ({ ...store, learningRate: clamped }));
-              }
-              editingLearningRate = false;
-            }}
-            on:keydown={(e) => {
-              if (e.key === 'Enter') e.currentTarget.blur();
-              if (e.key === 'Escape') {
-                editingLearningRate = false;
-                draftLearningRate = formatLearningRate(learningRate);
-              }
-            }}
-            use:focusOnMount
-          />
-        {:else}
-          <button
-            class="stepper-value"
-            on:click={() => {
-              editingLearningRate = true;
-              draftLearningRate = formatLearningRate(learningRate);
-            }}
-          >
-            {formatLearningRate(learningRate)}
-          </button>
-        {/if}
-        <button
-          class="stepper-btn"
-          disabled={learningRate >= 1 - lrEpsilon}
-          on:click={() => {
-            trainingStore.update(store => ({ ...store, learningRate: nextLearningRate(learningRate) }));
-          }}
-        >
-          +
-        </button>
-      </div>
+      <input
+        id="learning-rate"
+        class="hyper-slider"
+        type="range"
+        min="0"
+        max="100"
+        step="0.5"
+        value={lrSliderPos}
+        style="--fill: {lrSliderPos}%"
+        on:input={handleLrSlider}
+      />
     </div>
 
-    <div class="control-group compact">
-      <div class="control-header">
-        <span class="icon"><Layers size={15} strokeWidth={2} /></span>
-        <span class="control-label">Batch</span>
+    <!-- Batch Size -->
+    <div class="ctl">
+      <div class="row">
+        <span class="icon"><Layers size={16} strokeWidth={2} /></span>
+        <span class="row-label">Batch Size</span>
         <div class="tooltip-container">
           <button
             class="info-btn"
             on:mouseenter={() => activeTooltip = 'batch'}
             on:mouseleave={() => activeTooltip = null}
           >
-            <Info size={14} strokeWidth={2} />
+            <Info size={13} strokeWidth={2} />
           </button>
           {#if activeTooltip === 'batch'}
             <div class="tooltip">
@@ -679,224 +481,41 @@
             </div>
           {/if}
         </div>
-      </div>
-      <div class="number-stepper">
-        <button
-          class="stepper-btn"
-          disabled={batchIndex(batchSize) === 0}
-          on:click={prevBatchSize}
-        >
-          −
-        </button>
-        <span class="stepper-value stepper-static">{batchLabel}</span>
-        <button
-          class="stepper-btn"
-          disabled={batchSize === 'all'}
-          on:click={nextBatchSize}
-        >
-          +
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Data Points | Noise -->
-  <div class="control-row">
-    <div class="control-group compact">
-      <div class="control-header">
-        <span class="icon"><MapPin size={15} strokeWidth={2} /></span>
-        <label for="num-points">Points</label>
-        <button
-          class="reroll-btn"
-          title="Generate a new random dataset"
-          on:click={() => datasetStore.reroll()}
-        >
-          <Dices size={15} strokeWidth={2} />
-        </button>
-        <div class="tooltip-container">
-          <button
-            class="info-btn"
-            on:mouseenter={() => activeTooltip = 'dataPoints'}
-            on:mouseleave={() => activeTooltip = null}
-          >
-            <Info size={14} strokeWidth={2} />
-          </button>
-          {#if activeTooltip === 'dataPoints'}
-            <div class="tooltip">
-              Number of synthetic data points to generate<br/>
-              <span style="opacity: 0.8; font-size: 0.7rem;">The dice rolls a fresh dataset</span>
-            </div>
-          {/if}
-        </div>
-      </div>
-      <div class="number-stepper">
-        <button
-          class="stepper-btn"
-          disabled={numPoints <= 10}
-          on:click={() => {
-            const newValue = Math.max(10, numPoints - 5);
-            datasetStore.setNumPoints(newValue);
-            datasetStore.regenerateData();
-          }}
-        >
-          −
-        </button>
-        {#if editingNumPoints}
-          <input
-            class="stepper-input"
-            type="text"
-            value={draftNumPoints}
-            on:input={(e) => draftNumPoints = e.currentTarget.value.replace(/[^0-9]/g, '')}
-            on:blur={() => {
-              const parsed = parseInt(draftNumPoints, 10);
-              if (!isNaN(parsed)) {
-                const clamped = Math.max(10, Math.min(100, parsed));
-                datasetStore.setNumPoints(clamped);
-                datasetStore.regenerateData();
-              }
-              editingNumPoints = false;
-            }}
-            on:keydown={(e) => {
-              if (e.key === 'Enter') e.currentTarget.blur();
-              if (e.key === 'Escape') {
-                editingNumPoints = false;
-                draftNumPoints = String(numPoints);
-              }
-            }}
-            use:focusOnMount
-          />
-        {:else}
-          <button
-            class="stepper-value"
-            on:click={() => {
-              editingNumPoints = true;
-              draftNumPoints = String(numPoints);
-            }}
-          >
-            {numPoints}
-          </button>
-        {/if}
-        <button
-          class="stepper-btn"
-          disabled={numPoints >= 100}
-          on:click={() => {
-            const newValue = Math.min(100, numPoints + 5);
-            datasetStore.setNumPoints(newValue);
-            datasetStore.regenerateData();
-          }}
-        >
-          +
-        </button>
-      </div>
-    </div>
-
-    <div class="control-group compact">
-      <div class="control-header">
-        <span class="icon"><Droplets size={15} strokeWidth={2} /></span>
-        <label for="noise-level">Noise</label>
-        <div class="tooltip-container">
-          <button
-            class="info-btn"
-            on:mouseenter={() => activeTooltip = 'noise'}
-            on:mouseleave={() => activeTooltip = null}
-          >
-            <Info size={14} strokeWidth={2} />
-          </button>
-          {#if activeTooltip === 'noise'}
-            <div class="tooltip">
-              Amount of random noise added to synthetic data<br/>
-              <span style="opacity: 0.8; font-size: 0.7rem;">0 = clean, 2 = very noisy</span>
-            </div>
-          {/if}
-        </div>
-      </div>
-      <div class="slider-container">
-        <div class="slider-value-display">
-          <span class="noise-value">{noiseLevel.toFixed(2)}</span>
-        </div>
-        <input
-          id="noise-level"
-          type="range"
-          min="0"
-          max="2"
-          step="0.05"
-          value={noiseLevel}
-          on:input={handleNoiseLevelChange}
-        />
-        <div class="slider-labels">
-          <span>Low</span>
-          <span>High</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Train/Test Ratio -->
-  <div class="control-group">
-    <div class="control-header">
-      <span class="icon"><PieChart size={18} strokeWidth={2} /></span>
-      <label for="train-ratio">Train/Test Split</label>
-      <div class="tooltip-container">
-        <button
-          class="info-btn"
-          on:mouseenter={() => activeTooltip = 'trainTest'}
-          on:mouseleave={() => activeTooltip = null}
-        >
-          <Info size={14} strokeWidth={2} />
-        </button>
-        {#if activeTooltip === 'trainTest'}
-          <div class="tooltip">
-            Ratio of data used for training vs. testing the model
-          </div>
-        {/if}
-      </div>
-    </div>
-    <div class="slider-container">
-      <div class="slider-value-display split-display">
-        <span class="split-value train">{Math.round(trainRatio * 100)}%</span>
-        <span class="split-separator">/</span>
-        <span class="split-value test">{Math.round((1 - trainRatio) * 100)}%</span>
-        <label class="checkbox-label inline-check">
-          <input
-            type="checkbox"
-            checked={randomSplit}
-            on:change={(e) => {
-              datasetStore.setRandomSplit(e.currentTarget.checked);
-              datasetStore.regenerateData();
-            }}
-          />
-          <span class="checkbox-text">Random</span>
-        </label>
+        <div class="row-spring"></div>
+        <span class="row-value momentum-value">{batchLabel}</span>
       </div>
       <input
-        id="train-ratio"
+        id="batch-size"
+        class="hyper-slider"
         type="range"
-        min="0.1"
-        max="0.9"
-        step="0.1"
-        value={trainRatio}
-        on:input={handleTrainRatioChange}
+        min="0"
+        max={batchSizeSteps.length - 1}
+        step="1"
+        value={batchIndex(batchSize)}
+        style="--fill: {batchPos}%"
+        on:input={handleBatchSlider}
       />
-      <div class="slider-labels">
-        <span>Train</span>
-        <span>Test</span>
-      </div>
     </div>
   </div>
 
-  <!-- Training Steps | Speed -->
-  <div class="control-row">
-    <div class="control-group compact">
-      <div class="control-header">
-        <span class="icon"><RefreshCw size={15} strokeWidth={2} /></span>
-        <label for="training-steps">Steps</label>
+  <!-- ===================== RUN ===================== -->
+  <div class="section run-section">
+    <div class="section-label">
+      <span>Run</span>
+    </div>
+
+    <!-- Steps -->
+    <div class="ctl">
+      <div class="row">
+        <span class="icon"><RefreshCw size={16} strokeWidth={2} /></span>
+        <span class="row-label">Steps</span>
         <div class="tooltip-container">
           <button
             class="info-btn"
             on:mouseenter={() => activeTooltip = 'steps'}
             on:mouseleave={() => activeTooltip = null}
           >
-            <Info size={14} strokeWidth={2} />
+            <Info size={13} strokeWidth={2} />
           </button>
           {#if activeTooltip === 'steps'}
             <div class="tooltip">
@@ -904,74 +523,37 @@
             </div>
           {/if}
         </div>
+        <div class="row-spring"></div>
+        <span class="row-value steps-value">{totalSteps}</span>
       </div>
-      <div class="number-stepper">
-        <button
-          class="stepper-btn"
-          disabled={totalSteps <= 10}
-          on:click={() => {
-            trainingStore.update(store => ({ ...store, totalSteps: Math.max(10, totalSteps - 10) }));
-          }}
-        >
-          −
-        </button>
-        {#if editingTrainingSteps}
-          <input
-            class="stepper-input"
-            type="text"
-            value={draftTrainingSteps}
-            on:input={(e) => draftTrainingSteps = e.currentTarget.value.replace(/[^0-9]/g, '')}
-            on:blur={() => {
-              const parsed = parseInt(draftTrainingSteps, 10);
-              if (!isNaN(parsed)) {
-                const clamped = Math.max(10, Math.min(1000, parsed));
-                trainingStore.update(store => ({ ...store, totalSteps: clamped }));
-              }
-              editingTrainingSteps = false;
-            }}
-            on:keydown={(e) => {
-              if (e.key === 'Enter') e.currentTarget.blur();
-              if (e.key === 'Escape') {
-                editingTrainingSteps = false;
-                draftTrainingSteps = String(totalSteps);
-              }
-            }}
-            use:focusOnMount
-          />
-        {:else}
-          <button
-            class="stepper-value"
-            on:click={() => {
-              editingTrainingSteps = true;
-              draftTrainingSteps = String(totalSteps);
-            }}
-          >
-            {totalSteps}
-          </button>
-        {/if}
-        <button
-          class="stepper-btn"
-          disabled={totalSteps >= 1000}
-          on:click={() => {
-            trainingStore.update(store => ({ ...store, totalSteps: Math.min(1000, totalSteps + 10) }));
-          }}
-        >
-          +
-        </button>
-      </div>
+      <input
+        id="training-steps"
+        class="hyper-slider"
+        type="range"
+        min="10"
+        max="1000"
+        step="10"
+        value={totalSteps}
+        style="--fill: {((totalSteps - 10) / 990) * 100}%"
+        on:input={(e) => {
+          const v = parseInt(e.currentTarget.value);
+          trainingStore.update(s => ({ ...s, totalSteps: v }));
+        }}
+      />
     </div>
 
-    <div class="control-group compact">
-      <div class="control-header">
-        <span class="icon"><Gauge size={15} strokeWidth={2} /></span>
-        <label for="speed">Speed</label>
+    <!-- Speed -->
+    <div class="ctl">
+      <div class="row">
+        <span class="icon"><Gauge size={16} strokeWidth={2} /></span>
+        <span class="row-label">Speed</span>
         <div class="tooltip-container">
           <button
             class="info-btn"
             on:mouseenter={() => activeTooltip = 'speed'}
             on:mouseleave={() => activeTooltip = null}
           >
-            <Info size={14} strokeWidth={2} />
+            <Info size={13} strokeWidth={2} />
           </button>
           {#if activeTooltip === 'speed'}
             <div class="tooltip">
@@ -979,62 +561,55 @@
             </div>
           {/if}
         </div>
+        <div class="row-spring"></div>
+        <span class="row-value speed-value">{stepsPerSecond}/s</span>
       </div>
-      <div class="slider-container">
-        <div class="slider-value-display">
-          <span class="speed-value">{stepsPerSecond}/s</span>
-        </div>
-        <input
-          id="speed"
-          class="hyper-slider"
-          type="range"
-          min="2"
-          max="60"
-          step="1"
-          value={stepsPerSecond}
-          style="--fill: {((stepsPerSecond - 2) / 58) * 100}%"
-          on:input={(e) => {
-            const v = parseInt(e.currentTarget.value);
-            trainingStore.update(s => ({ ...s, stepsPerSecond: v }));
-          }}
-        />
-        <div class="slider-labels">
-          <span>Slow</span>
-          <span>Fast</span>
-        </div>
-      </div>
+      <input
+        id="speed"
+        class="hyper-slider"
+        type="range"
+        min="2"
+        max="60"
+        step="1"
+        value={stepsPerSecond}
+        style="--fill: {((stepsPerSecond - 2) / 58) * 100}%"
+        on:input={(e) => {
+          const v = parseInt(e.currentTarget.value);
+          trainingStore.update(s => ({ ...s, stepsPerSecond: v }));
+        }}
+      />
     </div>
-  </div>
 
-  <!-- Action Buttons - pinned to bottom -->
-  <div class="action-buttons">
-    <button
-      class="step-button"
-      on:click={stepOnce}
-      disabled={isTraining}
-      title="Single gradient step"
-    >
-      <StepForward size={18} strokeWidth={2} />
-    </button>
-    <button
-      class="train-button"
-      class:training={isTraining}
-      on:click={isTraining ? stopTraining : startTraining}
-      style="--progress: {trainingProgress}%;"
-    >
-      <div class="button-content">
-        {#if isTraining}
-          <Pause size={16} strokeWidth={2} />
-          <span>{Math.round(trainingProgress)}%</span>
-        {:else}
-          <Play size={16} strokeWidth={2} />
-          <span>Train</span>
-        {/if}
-      </div>
-    </button>
-    <button class="reset-button" on:click={resetTraining} title="Reset">
-      <RotateCcw size={18} strokeWidth={2} />
-    </button>
+    <!-- Actions -->
+    <div class="action-buttons">
+      <button
+        class="step-button"
+        on:click={stepOnce}
+        disabled={isTraining}
+        title="Single gradient step"
+      >
+        <StepForward size={18} strokeWidth={2} />
+      </button>
+      <button
+        class="train-button"
+        class:training={isTraining}
+        on:click={() => (isTraining ? stopTraining() : startTraining())}
+        style="--progress: {trainingProgress}%;"
+      >
+        <div class="button-content">
+          {#if isTraining}
+            <Pause size={16} strokeWidth={2} />
+            <span>{Math.round(trainingProgress)}%</span>
+          {:else}
+            <Play size={16} strokeWidth={2} />
+            <span>Train</span>
+          {/if}
+        </div>
+      </button>
+      <button class="reset-button" on:click={resetRun} title="Reset">
+        <RotateCcw size={18} strokeWidth={2} />
+      </button>
+    </div>
   </div>
 </div>
 
@@ -1042,113 +617,41 @@
   .sidebar-content {
     display: flex;
     flex-direction: column;
-    gap: 0.875rem;
+    gap: 0.75rem;
     height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
   }
 
-  /* Two-column rows for compact paired controls */
-  .control-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.625rem;
-    align-items: start;
-  }
-
-  .control-row.single {
-    grid-template-columns: 1fr;
-  }
-  
   /* Custom scrollbar for sidebar */
   .sidebar-content::-webkit-scrollbar {
     width: 6px;
   }
-  
+
   .sidebar-content::-webkit-scrollbar-track {
     background: transparent;
   }
-  
+
   .sidebar-content::-webkit-scrollbar-thumb {
     background: rgba(16, 185, 129, 0.2);
     border-radius: 3px;
   }
-  
+
   .sidebar-content::-webkit-scrollbar-thumb:hover {
     background: rgba(16, 185, 129, 0.4);
   }
-  
-  /* Compact variant for paired controls: smaller header, tighter stepper */
-  .control-group.compact .control-header {
-    gap: 0.375rem;
-  }
 
-  .control-group.compact .control-header label,
-  .control-group.compact .control-header .control-label {
-    font-size: 0.71rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    min-width: 0;
-  }
-
-  .control-group.compact .number-stepper {
-    grid-template-columns: 26px 1fr 26px;
-    padding: 0.25rem;
-    gap: 0.25rem;
-  }
-
-  .control-group.compact .stepper-btn {
-    width: 26px;
-    height: 26px;
-    font-size: 0.875rem;
-  }
-
-  .control-group.compact .stepper-value,
-  .control-group.compact .stepper-input {
-    min-width: 0;
-    width: 100%;
-    font-size: 0.8125rem;
-    padding: 0.25rem 0.125rem;
-  }
-
-  .control-group.compact .slider-labels {
-    font-size: 0.625rem;
-  }
-
-  .control-group.compact .reroll-btn {
-    width: 18px;
-    height: 18px;
-  }
-
-  /* Inline "Random" checkbox inside the split value row */
-  .split-display {
-    position: relative;
-  }
-
-  .inline-check {
-    position: absolute;
-    right: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 0.72rem;
-  }
-
-  .inline-check input[type='checkbox'] {
-    width: 14px;
-    height: 14px;
-  }
-  
   h1 {
     font-size: 1.125rem;
     font-weight: 700;
-    margin: 0 0 0.75rem 0;
+    margin: 0 0 0.125rem 0;
     color: var(--color-text-primary);
     display: flex;
     align-items: center;
     gap: 0.625rem;
+    flex-shrink: 0;
   }
-  
+
   .app-icon {
     color: #10b981;
     display: flex;
@@ -1160,40 +663,88 @@
     font-style: italic;
     line-height: 1;
   }
-  
-  .control-group {
+
+  /* ---------- Section cards: one elevation level below the sidebar ---------- */
+  .section {
+    background: var(--color-bg-primary);
+    border-radius: 12px;
+    padding: 0.625rem 0.75rem 0.75rem;
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
+    gap: 0.625rem;
+    flex-shrink: 0;
   }
-  
-  .control-header {
+
+  /* The Run deck anchors to the bottom; leftover height collects in the
+     single gap above it instead of below the buttons. */
+  .run-section {
+    margin-top: auto;
+  }
+
+  .section-label {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    justify-content: space-between;
+    font-size: 0.625rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #10b981;
+    min-height: 18px;
   }
-  
-  .control-header .icon {
+
+  /* ---------- Row grammar: [icon] Label (i) ······· value ---------- */
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-height: 22px;
+  }
+
+  .row .icon {
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    justify-content: center;
+    color: var(--color-text-tertiary);
   }
-  
-  .control-header label,
-  .control-header .control-label {
+
+  .row-label {
+    font-size: 0.78rem;
     font-weight: 600;
     color: var(--color-text-secondary);
-    font-size: 0.8125rem;
-    flex: 1;
+    white-space: nowrap;
     line-height: 1.2;
-    display: flex;
-    align-items: center;
   }
-  
+
+  .row-spring {
+    flex: 1;
+  }
+
+  .row-value {
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+  }
+
+  .ctl {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .greek-label {
+    font-family: 'Georgia', serif;
+    font-style: italic;
+    font-weight: 400;
+    opacity: 0.7;
+  }
+
+  /* ---------- Info tooltips ---------- */
   .info-btn {
-    width: 16px;
-    height: 16px;
+    width: 15px;
+    height: 15px;
     padding: 0;
     border: none;
     background: none;
@@ -1204,53 +755,20 @@
     justify-content: center;
     transition: all 0.2s;
     flex-shrink: 0;
-    opacity: 0.35;
-    margin-left: auto;
+    opacity: 0.4;
   }
 
-  .reroll-btn {
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    border: none;
-    border-radius: 6px;
-    background: none;
-    color: var(--color-text-tertiary);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
-    flex-shrink: 0;
-    opacity: 0.55;
-  }
-
-  .reroll-btn:hover {
-    opacity: 1;
-    color: #10b981;
-    background: rgba(16, 185, 129, 0.1);
-    transform: rotate(-12deg) scale(1.1);
-  }
-  
   .info-btn:hover {
     opacity: 1;
     color: #10b981;
-    transform: scale(1.15);
   }
-  
-  .greek-label {
-    font-family: 'Georgia', serif;
-    font-style: italic;
-    font-weight: 400;
-    opacity: 0.7;
-  }
-  
+
   .tooltip-container {
     position: relative;
     display: flex;
     align-items: center;
   }
-  
+
   .tooltip {
     position: fixed;
     left: 312px;
@@ -1270,21 +788,19 @@
   @media (hover: none), (max-width: 768px) {
     .tooltip { display: none; }
   }
-  
-  /* Light mode tooltip */
+
   :global([data-theme='light']) .tooltip {
     background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
     border: 1px solid #a7f3d0;
     color: #064e3b;
   }
-  
-  /* Dark mode tooltip */
+
   :global([data-theme='dark']) .tooltip {
     background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
     border: 1px solid #047857;
     color: #d1fae5;
   }
-  
+
   @keyframes tooltipFadeIn {
     from {
       opacity: 0;
@@ -1295,17 +811,18 @@
       transform: translateY(-50%) translateX(0);
     }
   }
-  
-  /* Problem Selector */
+
+  /* ---------- Dropdown selectors (problem + optimizer share styles) ---------- */
   .problem-selector {
     position: relative;
   }
-  
+
   .problem-button {
     width: 100%;
-    padding: 0.625rem 0.75rem;
+    height: 40px;
+    padding: 0 0.7rem;
     border: 2px solid var(--color-border);
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--color-bg-secondary);
     color: var(--color-text-primary);
     display: flex;
@@ -1313,45 +830,44 @@
     justify-content: flex-start;
     gap: 0.625rem;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: border-color 0.2s;
     font-size: 0.875rem;
     outline: none;
   }
-  
-  .problem-button:hover {
-    border-color: #10b981;
-  }
-  
-  .problem-button:focus {
-    outline: none;
-    border-color: #10b981;
-  }
-  
+
+  .problem-button:hover,
+  .problem-button:focus,
   .problem-selector.open .problem-button {
     border-color: #10b981;
   }
-  
+
   .problem-preview {
     display: flex;
     align-items: center;
     color: #10b981;
+    flex-shrink: 0;
   }
-  
+
   .problem-name {
     flex: 1;
     text-align: left;
     font-weight: 500;
-    font-size: 0.875rem;
+    font-size: 0.84rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  
+
   .dropdown-arrow {
     transition: transform 0.2s;
+    font-size: 0.625rem;
+    color: var(--color-text-tertiary);
   }
-  
+
   .problem-selector.open .dropdown-arrow {
     transform: rotate(180deg);
   }
-  
+
   .problem-dropdown {
     position: absolute;
     top: 100%;
@@ -1360,15 +876,15 @@
     margin-top: 0.25rem;
     background: var(--color-bg-secondary);
     border: 2px solid var(--color-border);
-    border-radius: 8px;
+    border-radius: 9px;
     overflow: hidden;
-    box-shadow: 0 4px 12px var(--color-shadow);
-    z-index: 10;
+    box-shadow: 0 8px 24px var(--color-shadow);
+    z-index: 30;
   }
-  
+
   .problem-option {
     width: 100%;
-    padding: 0.625rem 0.75rem;
+    padding: 0.55rem 0.7rem;
     border: none;
     border-radius: 0;
     background: var(--color-bg-secondary);
@@ -1378,393 +894,33 @@
     justify-content: flex-start;
     gap: 0.625rem;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: background 0.15s;
     text-align: left;
     font-size: 0.875rem;
     outline: none;
   }
-  
+
   .problem-option .problem-icon {
     color: var(--color-text-tertiary);
     transition: color 0.2s;
+    display: flex;
+    align-items: center;
   }
-  
+
   .problem-option:hover {
     background: rgba(16, 185, 129, 0.1);
-    outline: none;
   }
-  
-  .problem-option:focus {
-    outline: none;
-  }
-  
+
   .problem-option.selected {
     background: rgba(16, 185, 129, 0.15);
-    color: var(--color-text-primary);
   }
-  
+
   .problem-option.selected .problem-icon {
     color: #10b981;
   }
-  
-  .problem-option.selected:hover {
-    background: rgba(16, 185, 129, 0.2);
-  }
-  
-  /* Number Stepper */
-  .number-stepper {
-    display: grid;
-    grid-template-columns: 32px 1fr 32px;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.375rem;
-    border-radius: 8px;
-    background: rgba(16, 185, 129, 0.06);
-  }
-  
-  .stepper-btn {
-    width: 32px;
-    height: 32px;
-    border: none;
-    border-radius: 6px;
-    background: rgba(16, 185, 129, 0.12);
-    color: #10b981;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 1rem;
-    transition: all 0.2s;
-    flex-shrink: 0;
-  }
-  
-  .stepper-btn:hover:not(:disabled) {
-    background: rgba(16, 185, 129, 0.2);
-    transform: scale(1.05);
-  }
-  
-  .stepper-btn:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-  }
-  
-  .stepper-value {
-    min-width: 60px;
-    padding: 0.375rem;
-    border: none;
-    background: transparent;
-    color: var(--color-text-primary);
-    text-align: center;
-    font-weight: 600;
-    font-size: 0.875rem;
-    cursor: text;
-    border-radius: 4px;
-    transition: background 0.2s;
-  }
-  
-  .stepper-value:hover {
-    background: rgba(16, 185, 129, 0.08);
-  }
-  
-  .stepper-input {
-    min-width: 60px;
-    padding: 0.375rem;
-    border: 2px solid #10b981;
-    border-radius: 4px;
-    background: var(--color-bg-secondary);
-    color: var(--color-text-primary);
-    text-align: center;
-    font-weight: 600;
-    font-size: 0.875rem;
-    outline: none;
-  }
-  
-  .stepper-input::-webkit-inner-spin-button,
-  .stepper-input::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-  }
-  
-  /* Slider */
-  .slider-container {
-    display: flex;
-    flex-direction: column;
-    gap: 0.375rem;
-  }
-  
-  .slider-value-display {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.375rem;
-    font-weight: 600;
-    font-size: 0.875rem;
-  }
-  
-  .split-value {
-    font-family: 'SF Mono', Monaco, monospace;
-  }
-  
-  .split-value.train {
-    color: var(--color-primary);
-  }
-  
-  .split-value.test {
-    color: var(--color-success);
-  }
-  
-  .split-separator {
-    color: var(--color-text-tertiary);
-    font-weight: 400;
-  }
-  
-  .slider-container input[type="range"] {
-    width: 100%;
-    height: 6px;
-    border-radius: 3px;
-    outline: none;
-    -webkit-appearance: none;
-    appearance: none;
-    cursor: pointer;
-  }
-  
-  /* Train/test split slider with gradient */
-  #train-ratio {
-    background: linear-gradient(to right, 
-      var(--color-primary) 0%, 
-      var(--color-primary) var(--train-percentage, 80%), 
-      var(--color-success) var(--train-percentage, 80%), 
-      var(--color-success) 100%);
-  }
-  
-  /* Noise level slider with warning color */
-  #noise-level {
-    background: linear-gradient(to right, 
-      var(--color-success) 0%, 
-      var(--color-warning) 50%, 
-      var(--color-danger) 100%);
-  }
-  
-  .slider-container input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: white;
-    border: 3px solid var(--color-primary);
-    cursor: grab;
-    transition: all 0.2s;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  }
-  
-  .slider-container input[type="range"]::-webkit-slider-thumb:hover {
-    transform: scale(1.15);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  }
-  
-  .slider-container input[type="range"]::-webkit-slider-thumb:active {
-    cursor: grabbing;
-    transform: scale(1.1);
-  }
-  
-  .slider-labels {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.6875rem;
-    color: var(--color-text-tertiary);
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-  
-  /* Checkbox */
-  .checkbox-label {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    cursor: pointer;
-    font-size: 0.8125rem;
-    color: var(--color-text-secondary);
-    user-select: none;
-  }
-  
-  .checkbox-label input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
-    accent-color: #10b981;
-  }
-  
-  .checkbox-text {
-    font-weight: 500;
-  }
-  
-  /* Action Buttons: pushed to the bottom and sticky, so Train is always
-     reachable even if a short viewport forces the controls to scroll */
-  .action-buttons {
-    display: flex;
-    gap: 0.5rem;
-    align-items: stretch;
-    margin-top: auto;
-    position: sticky;
-    bottom: 0;
-    z-index: 2;
-    background: var(--color-bg-secondary);
-    padding-top: 0.5rem;
-  }
-  
-  .train-button {
-    flex: 1;
-    padding: 0;
-    border: none;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: all 0.2s;
-    min-height: 38px;
-    position: relative;
-    overflow: hidden;
-  }
-  
-  /* Light mode train button */
-  :global([data-theme='light']) .train-button {
-    background: linear-gradient(135deg, #a7f3d0 0%, #6ee7b7 100%);
-    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
-  }
-  
-  /* Dark mode train button */
-  :global([data-theme='dark']) .train-button {
-    background: linear-gradient(135deg, #047857 0%, #065f46 100%);
-    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
-  }
-  
-  .train-button::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    width: var(--progress, 0%);
-    background: rgba(255, 255, 255, 0.2);
-    transition: width 0.3s ease;
-    z-index: 0;
-  }
-  
-  .button-content {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 0.625rem 0.75rem;
-  }
-  
-  /* Light mode button text */
-  :global([data-theme='light']) .button-content {
-    color: #000000;
-  }
-  
-  /* Dark mode button text */
-  :global([data-theme='dark']) .button-content {
-    color: #d1fae5;
-  }
-  
-  /* Training state always uses white text */
-  .train-button.training .button-content {
-    color: white !important;
-  }
-  
-  :global([data-theme='light']) .train-button:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-  }
-  
-  :global([data-theme='dark']) .train-button:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.5);
-  }
-  
-  .train-button.training {
-    background: linear-gradient(135deg, #f87171 0%, #dc2626 100%);
-    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
-  }
-  
-  .train-button.training::before {
-    background: rgba(255, 255, 255, 0.25);
-  }
-  
-  .train-button.training:hover {
-    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
-  }
-  
-  .train-button.training .button-content {
-    font-size: 0.8125rem;
-  }
-  
-  .reset-button {
-    width: 38px;
-    height: 38px;
-    padding: 0;
-    border: 2px solid var(--color-border);
-    border-radius: 8px;
-    background: var(--color-bg-secondary);
-    color: var(--color-text-secondary);
-    cursor: pointer;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-  
-  .reset-button:hover {
-    background: var(--color-bg-tertiary);
-    border-color: var(--color-danger);
-    color: var(--color-danger);
-    transform: translateY(-1px);
-  }
-  
-  .noise-value {
-    font-family: 'SF Mono', Monaco, monospace;
-    color: var(--color-warning);
-    font-weight: 600;
-  }
 
-  .momentum-value,
-  .speed-value {
-    font-family: 'SF Mono', Monaco, monospace;
-    color: #10b981;
-    font-weight: 600;
-  }
-
-  /* Hyperparameter sliders — left (active) side fills with a soft-to-vibrant
-     green gradient as the value grows; the unfilled side is muted so the eye
-     reads the slider position at a glance. --fill is set inline per slider. */
-  .hyper-slider {
-    background:
-      linear-gradient(to right,
-        rgba(16, 185, 129, 0.25) 0%,
-        rgba(16, 185, 129, 1.0) var(--fill, 0%),
-        rgba(127, 127, 127, 0.25) var(--fill, 0%),
-        rgba(127, 127, 127, 0.25) 100%);
-  }
-
-  /* Thumb gets a green glow that intensifies with the value — visual cue
-     that the slider is doing something energetic. */
-  .hyper-slider::-webkit-slider-thumb {
-    border-color: #10b981;
-    box-shadow:
-      0 2px 4px rgba(0, 0, 0, 0.2),
-      0 0 calc(var(--fill, 0%) * 0.12) rgba(16, 185, 129, 0.7);
-  }
-
-  /* Optimizer dropdown rows: name + one-line description */
   .optimizer-option {
-    padding: 0.5rem 0.75rem;
+    padding: 0.45rem 0.7rem;
   }
 
   .optimizer-text {
@@ -1789,19 +945,165 @@
 
   .optimizer-glyph {
     font-family: 'Times New Roman', Georgia, serif;
-    font-size: 1.25rem;
+    font-size: 1.125rem;
+    line-height: 1;
     font-weight: 400;
   }
 
-  .stepper-static {
-    cursor: default;
+  .custom-icon {
+    font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
-  .stepper-static:hover {
-    background: transparent;
+  /* ---------- Sliders (always full card width) ---------- */
+  .section input[type='range'] {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    cursor: pointer;
+    margin: 2px 0;
   }
 
-  /* Step button: same footprint as reset, sits left of Train */
+  #train-ratio {
+    background: linear-gradient(to right,
+      var(--color-primary) 0%,
+      var(--color-primary) var(--train-percentage, 80%),
+      var(--color-success) var(--train-percentage, 80%),
+      var(--color-success) 100%);
+  }
+
+  #noise-level {
+    background: linear-gradient(to right,
+      var(--color-success) 0%,
+      var(--color-warning) 50%,
+      var(--color-danger) 100%);
+  }
+
+  /* Green-fill sliders — the active side fills green; --fill set inline. */
+  .hyper-slider {
+    background:
+      linear-gradient(to right,
+        rgba(16, 185, 129, 0.25) 0%,
+        rgba(16, 185, 129, 1.0) var(--fill, 0%),
+        rgba(127, 127, 127, 0.25) var(--fill, 0%),
+        rgba(127, 127, 127, 0.25) 100%);
+  }
+
+  .section input[type='range']::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: white;
+    border: 3px solid var(--color-primary);
+    cursor: grab;
+    transition: transform 0.15s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  .section input[type='range']::-webkit-slider-thumb:hover {
+    transform: scale(1.12);
+  }
+
+  .section input[type='range']::-webkit-slider-thumb:active {
+    cursor: grabbing;
+  }
+
+  .hyper-slider::-webkit-slider-thumb {
+    border-color: #10b981;
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.2),
+      0 0 calc(var(--fill, 0%) * 0.12) rgba(16, 185, 129, 0.7);
+  }
+
+  /* ---------- Split sub-labels with inline Random checkbox ---------- */
+  .sub-labels {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.625rem;
+    color: var(--color-text-tertiary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .sub-train { color: var(--color-primary); }
+  .sub-test { color: var(--color-success); }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    cursor: pointer;
+    font-size: 0.66rem;
+    color: var(--color-text-secondary);
+    user-select: none;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 500;
+  }
+
+  .checkbox-label input[type='checkbox'] {
+    width: 13px;
+    height: 13px;
+    cursor: pointer;
+    accent-color: #10b981;
+    margin: 0;
+  }
+
+  /* ---------- Value accents ---------- */
+  .split-value.train { color: var(--color-primary); }
+  .split-value.test { color: var(--color-success); }
+  .split-separator { color: var(--color-text-tertiary); font-weight: 400; }
+  .noise-value { color: var(--color-warning); }
+  .points-value,
+  .steps-value,
+  .lr-value,
+  .momentum-value,
+  .speed-value { color: #10b981; }
+
+  /* ---------- Dice / reroll ---------- */
+  .reroll-btn {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    color: #10b981;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    opacity: 0.7;
+  }
+
+  .reroll-btn:hover {
+    opacity: 1;
+    background: rgba(16, 185, 129, 0.12);
+    transform: rotate(-12deg) scale(1.12);
+  }
+
+  /* ---------- Action buttons ---------- */
+  .action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    align-items: stretch;
+    margin-top: 0.125rem;
+  }
+
   .step-button {
     width: 38px;
     height: 38px;
@@ -1829,13 +1131,112 @@
     opacity: 0.35;
     cursor: not-allowed;
   }
-  
-  .custom-icon {
-    font-family: 'SF Mono', Monaco, 'Courier New', monospace;
-    font-size: 1.125rem;
-    font-weight: 700;
+
+  .train-button {
+    flex: 1;
+    padding: 0;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-height: 38px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  :global([data-theme='light']) .train-button {
+    background: linear-gradient(135deg, #a7f3d0 0%, #6ee7b7 100%);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
+  }
+
+  :global([data-theme='dark']) .train-button {
+    background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+  }
+
+  .train-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: var(--progress, 0%);
+    background: rgba(255, 255, 255, 0.2);
+    transition: width 0.3s ease;
+    z-index: 0;
+  }
+
+  .button-content {
+    position: relative;
+    z-index: 1;
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 0.5rem;
+    padding: 0.625rem 0.75rem;
+  }
+
+  :global([data-theme='light']) .button-content {
+    color: #000000;
+  }
+
+  :global([data-theme='dark']) .button-content {
+    color: #d1fae5;
+  }
+
+  .train-button.training .button-content {
+    color: white !important;
+  }
+
+  :global([data-theme='light']) .train-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  }
+
+  :global([data-theme='dark']) .train-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.5);
+  }
+
+  .train-button.training {
+    background: linear-gradient(135deg, #f87171 0%, #dc2626 100%);
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+  }
+
+  .train-button.training::before {
+    background: rgba(255, 255, 255, 0.25);
+  }
+
+  .train-button.training:hover {
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
+  }
+
+  .train-button.training .button-content {
+    font-size: 0.8125rem;
+  }
+
+  .reset-button {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 2px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-bg-secondary);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .reset-button:hover {
+    background: var(--color-bg-tertiary);
+    border-color: var(--color-danger);
+    color: var(--color-danger);
+    transform: translateY(-1px);
   }
 </style>

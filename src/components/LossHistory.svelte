@@ -15,6 +15,11 @@
   let svgElement: SVGSVGElement;
   let width = 400;
   let height = 150;
+
+  // Log-scale toggle: loss curves usually span orders of magnitude, so the
+  // interesting tail is invisible on a linear axis.
+  let logScale = false;
+  $: if (typeof logScale === 'boolean' && svgElement) drawChart();
   // Margins shrink on narrow viewports to claw back vertical space
   $: compact = width < 480;
   $: margin = compact
@@ -92,42 +97,72 @@
     const allLosses = windowedHistory.flatMap(d => [d.trainLoss, d.testLoss]);
     const minLoss = Math.min(...allLosses);
     const maxLoss = Math.max(...allLosses);
-    
+
     // Add padding to prevent edge bleeding (especially important for stroke width)
     const lossRange = maxLoss - minLoss;
     const lossPadding = lossRange * 0.08;  // 8% padding
     const stepPadding = Math.max((maxStep - minStep) * 0.02, 1);  // 2% padding or at least 1 step
-    
+
     // Create scales with sliding window and padding
     const xScale = d3.scaleLinear()
       .domain([minStep - stepPadding, Math.max(maxStep, minStep + 10) + stepPadding])
       .range([0, innerWidth]);
-    
-    const yScale = d3.scaleLinear()
-      .domain([minLoss - lossPadding, maxLoss + lossPadding])
-      .range([innerHeight, 0]);
-    
+
+    // Log scale clamps to the smallest positive loss in view (zero can't be
+    // drawn on a log axis); linear keeps the padded range.
+    const minPositive = allLosses.reduce(
+      (lo, v) => (v > 0 && v < lo ? v : lo),
+      Infinity
+    );
+    const logFloor = Number.isFinite(minPositive) ? minPositive * 0.8 : 1e-12;
+    const yScale = logScale
+      ? d3.scaleLog()
+          .domain([logFloor, Math.max(maxLoss, logFloor * 10)])
+          .range([innerHeight, 0])
+      : d3.scaleLinear()
+          .domain([minLoss - lossPadding, maxLoss + lossPadding])
+          .range([innerHeight, 0]);
+
+    const yOf = (v: number) => yScale(logScale ? Math.max(v, logFloor) : v);
+
     // Create line generators with smooth curves
     const trainLine = d3.line<typeof history[0]>()
       .x(d => xScale(d.step))
-      .y(d => yScale(d.trainLoss))
+      .y(d => yOf(d.trainLoss))
       .curve(d3.curveCatmullRom.alpha(0.5));
-    
+
     const testLine = d3.line<typeof history[0]>()
       .x(d => xScale(d.step))
-      .y(d => yScale(d.testLoss))
+      .y(d => yOf(d.testLoss))
       .curve(d3.curveCatmullRom.alpha(0.5));
-    
+
     // Create axes
     const xAxis = d3.axisBottom(xScale)
       .ticks(5)
       .tickFormat(d3.format('d'))
       .tickSizeOuter(0);
-    
-    const yAxis = d3.axisLeft(yScale)
-      .ticks(compact ? 4 : 5)
-      .tickFormat(d3.format(compact ? 'd' : '.1f'))
-      .tickSizeOuter(0);
+
+    // Log axes otherwise emit every minor tick (1..9 per decade) — restrict
+    // to powers of ten, thinned to at most ~5 labels.
+    let yAxis: d3.Axis<d3.NumberValue>;
+    if (logScale) {
+      const [d0, d1] = yScale.domain() as [number, number];
+      let powers: number[] = [];
+      for (let e = Math.ceil(Math.log10(d0)); e <= Math.floor(Math.log10(d1)); e++) {
+        powers.push(Math.pow(10, e));
+      }
+      const stride = Math.max(1, Math.ceil(powers.length / 5));
+      powers = powers.filter((_, i) => i % stride === 0);
+      yAxis = d3.axisLeft(yScale)
+        .tickValues(powers.length >= 2 ? powers : (yScale.ticks(3) as number[]))
+        .tickFormat(d3.format('.0e'))
+        .tickSizeOuter(0);
+    } else {
+      yAxis = d3.axisLeft(yScale)
+        .ticks(compact ? 4 : 5)
+        .tickFormat(d3.format(compact ? 'd' : '.1f'))
+        .tickSizeOuter(0);
+    }
     
     // Get theme-aware colors
     const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
@@ -246,15 +281,15 @@
       // Train loss current position
       g.append('circle')
         .attr('cx', xScale(lastPoint.step))
-        .attr('cy', yScale(lastPoint.trainLoss))
+        .attr('cy', yOf(lastPoint.trainLoss))
         .attr('r', 4)
         .attr('fill', '#3b82f6')
         .style('opacity', 1);
-      
+
       // Test loss current position
       g.append('circle')
         .attr('cx', xScale(lastPoint.step))
-        .attr('cy', yScale(lastPoint.testLoss))
+        .attr('cy', yOf(lastPoint.testLoss))
         .attr('r', 4)
         .attr('fill', '#10b981')
         .style('opacity', 1);
@@ -269,6 +304,12 @@
       <Activity size={18} strokeWidth={2} />
       <span>Loss during training</span>
     </h3>
+    <button
+      class="log-toggle"
+      class:active={logScale}
+      title="Toggle logarithmic loss axis"
+      on:click={() => (logScale = !logScale)}
+    >log</button>
     <div class="legend-controls">
       <div class="legend-item">
         <svg width="24" height="3" viewBox="0 0 24 3">
@@ -319,10 +360,29 @@
     opacity: 0.9;
   }
   
-  .legend-controls {
-    display: flex;
-    gap: 0.75rem;
-    align-items: center;
+  .log-toggle {
+    border: 1px solid var(--color-border);
+    border-radius: 7px;
+    background: transparent;
+    color: var(--color-text-tertiary);
+    font-size: 0.6563rem;
+    font-weight: 700;
+    font-family: 'SF Mono', Monaco, monospace;
+    padding: 0.15rem 0.5rem;
+    margin-left: 0.625rem;
+    margin-right: auto;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .log-toggle:hover {
+    color: #10b981;
+  }
+
+  .log-toggle.active {
+    background: rgba(16, 185, 129, 0.16);
+    border-color: rgba(16, 185, 129, 0.5);
+    color: #10b981;
   }
   
   .legend-item {
