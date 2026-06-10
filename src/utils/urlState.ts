@@ -18,7 +18,7 @@ import {
 } from '../stores/stores';
 import { problemConfigs } from './problems';
 import { defaultHyper, optimizers, type OptimizerId } from './optimizers';
-import type { ModelParameters, ProblemType } from '../types/types';
+import type { ModelParameters, ProblemType, ScheduleId } from '../types/types';
 
 export function encodeStateUrl(): string {
   const t = get(trainingStore);
@@ -33,6 +33,7 @@ export function encodeStateUrl(): string {
   q.set('lr', t.learningRate.toPrecision(3));
   q.set('bs', String(t.batchSize));
   q.set('st', String(t.totalSteps));
+  if (t.schedule !== 'constant') q.set('sch', t.schedule);
   q.set('n', String(d.numPoints));
   q.set('no', d.noiseLevel.toFixed(2));
   q.set('tr', d.trainRatio.toFixed(1));
@@ -84,11 +85,15 @@ export function applyUrlState(): { params: ModelParameters } | null {
 
   const bsRaw = q.get('bs');
   const batchSize = bsRaw === 'all' || bsRaw === null ? ('all' as const) : Math.max(1, parseInt(bsRaw) || 1);
+  const schRaw = q.get('sch');
+  const schedule: ScheduleId =
+    schRaw === 'step' || schRaw === 'cosine' || schRaw === 'warmup-cosine' ? schRaw : 'constant';
   trainingStore.update(s => ({
     ...s,
     learningRate: num('lr', 1e-4, 1, 0.01),
     totalSteps: Math.round(num('st', 10, 1000, 200)),
-    batchSize
+    batchSize,
+    schedule
   }));
 
   if (q.get('v') === '3d') landscapeViewStore.set('3d');

@@ -147,7 +147,8 @@ export const trainingStore = writable<TrainingConfig>({
   currentStep: 0,
   isTraining: false,
   batchSize: 'all',
-  stepsPerSecond: 20
+  stepsPerSecond: 20,
+  schedule: 'constant'
 });
 
 // ========== Optimizer Stores ==========

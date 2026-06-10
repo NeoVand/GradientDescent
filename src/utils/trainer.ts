@@ -34,6 +34,7 @@ import {
 import { problemConfigs } from './problems';
 import { optimizers, defaultHyper, type OptimizerId } from './optimizers';
 import { normalizedLogLoss } from './lossGrid';
+import { schedules } from './schedules';
 import type { DataPoint, ProblemType } from '../types/types';
 
 /**
@@ -96,7 +97,13 @@ function doOneStep(): boolean {
 
   const params = get(parametersStore);
   const gradient = config.computeGradient(sampleBatch(trainData), params);
-  const result = opt.step(params, gradient, get(optimizerStateStore), get(trainingStore).learningRate, sel.hyper);
+
+  // Effective γ under the schedule, measured by progress through this run.
+  const t = get(trainingStore);
+  const tInRun = Math.max(0, t.currentStep - get(runStartStep));
+  const effLr = t.learningRate * schedules[t.schedule].factor(tInRun, t.totalSteps);
+
+  const result = opt.step(params, gradient, get(optimizerStateStore), effLr, sel.hyper);
 
   // The chart always shows the loss over the full training set, so curve
   // wobble under small batches reflects parameter noise, not measurement.
@@ -196,6 +203,7 @@ export function resetRun() {
   resetOptimizerState();
   divergenceStore.set(null);
   clearCoach();
+  runStartStep.set(0);
   trainingStore.update(store => ({ ...store, currentStep: 0, isTraining: false }));
   // Restart history at the new initial position (step 0)
   recordInitialHistory();
@@ -241,8 +249,10 @@ export function applyProblem(type: ProblemType) {
     ...store,
     learningRate: resolveLearningRate(optimizerId, type),
     // Per-problem γ/μ are curated for full-batch gradients; a sticky batch
-    // of 1 can blast a momentum run out of a narrow basin.
-    batchSize: 'all'
+    // of 1 can blast a momentum run out of a narrow basin. The schedule
+    // resets too — curated defaults assume a constant γ.
+    batchSize: 'all',
+    schedule: 'constant'
   }));
   // Regenerate data for the new problem, then reset on top of it so the
   // initial history point reflects the new dataset.

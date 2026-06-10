@@ -11,9 +11,10 @@
    */
 
   import { selectedProblem, datasetStore, trainingStore, historyStore, optimizerStore, resetOptimizerState, raceStore } from '../stores/stores';
-  import type { ProblemType } from '../types/types';
+  import type { ProblemType, ScheduleId } from '../types/types';
   import { problemConfigs } from '../utils/problems';
   import { optimizers, optimizerOrder, type OptimizerId } from '../utils/optimizers';
+  import { schedules, scheduleOrder } from '../utils/schedules';
   import {
     startTraining,
     stopTraining,
@@ -50,8 +51,17 @@
     Gauge,
     Layers,
     Flag,
-    Brain
+    Brain,
+    Timer
   } from 'lucide-svelte';
+
+  // Compact labels for the schedule segmented control
+  const SCHEDULE_LABELS: Record<ScheduleId, string> = {
+    constant: 'Const',
+    step: 'Step',
+    cosine: 'Cosine',
+    'warmup-cosine': 'Warmup'
+  };
 
   // Dropdown state
   let showProblemDropdown = false;
@@ -128,6 +138,7 @@
   $: totalSteps = $trainingStore.totalSteps;
   $: currentStep = $trainingStore.currentStep;
   $: batchSize = $trainingStore.batchSize;
+  $: schedule = $trainingStore.schedule;
   $: stepsPerSecond = $trainingStore.stepsPerSecond;
   $: isTraining = $trainingStore.isTraining;
   $: optimizerSel = $optimizerStore;
@@ -514,6 +525,39 @@
         style="--fill: {lrSliderPos}%"
         on:input={handleLrSlider}
       />
+    </div>
+
+    <!-- LR Schedule -->
+    <div class="ctl">
+      <div class="row">
+        <span class="icon"><Timer size={16} strokeWidth={2} /></span>
+        <span class="row-label">Schedule</span>
+        <div class="tooltip-container">
+          <button
+            class="info-btn"
+            on:mouseenter={() => activeTooltip = 'schedule'}
+            on:mouseleave={() => activeTooltip = null}
+          >
+            <Info size={13} strokeWidth={2} />
+          </button>
+          {#if activeTooltip === 'schedule'}
+            <div class="tooltip">
+              How γ evolves over the run<br/>
+              <span style="opacity: 0.8; font-size: 0.7rem;">Step drops ×0.3 at ⅓ and ⅔; cosine glides to 5%; warmup ramps up first. The dotted γ line in the loss chart shows the shape.</span>
+            </div>
+          {/if}
+        </div>
+        <div class="row-spring"></div>
+      </div>
+      <div class="seg-control" role="group" aria-label="Learning-rate schedule">
+        {#each scheduleOrder as sid}
+          <button
+            class:active={schedule === sid}
+            title={schedules[sid].description}
+            on:click={() => trainingStore.update(s => ({ ...s, schedule: sid }))}
+          >{SCHEDULE_LABELS[sid]}</button>
+        {/each}
+      </div>
     </div>
 
     <!-- Batch Size -->
@@ -1006,6 +1050,40 @@
 
   .optimizer-option {
     padding: 0.45rem 0.7rem;
+  }
+
+  /* Segmented control (schedule picker): same family as the 2D/3D toggle */
+  .seg-control {
+    display: flex;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .seg-control button {
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: var(--color-text-tertiary);
+    font-size: 0.6563rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    padding: 0.3rem 0;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .seg-control button:not(:last-child) {
+    border-right: 1px solid var(--color-border);
+  }
+
+  .seg-control button:hover {
+    color: #10b981;
+  }
+
+  .seg-control button.active {
+    background: rgba(16, 185, 129, 0.16);
+    color: #10b981;
   }
 
   .optimizer-text {

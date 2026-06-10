@@ -10,6 +10,8 @@
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
   import { historyStore, trainingStore, themeStore } from '../stores/stores';
+  import { runStartStep } from '../utils/trainer';
+  import { schedules } from '../utils/schedules';
   import { Activity } from 'lucide-svelte';
   
   let svgElement: SVGSVGElement;
@@ -31,7 +33,9 @@
   // Reactive data
   $: history = $historyStore;
   $: currentStep = $trainingStore.currentStep;
+  $: schedule = $trainingStore.schedule;
   $: theme = $themeStore;
+  $: if (svgElement && schedule) drawChart();
   
   // Redraw when history updates
   $: if (svgElement && history) {
@@ -274,6 +278,46 @@
         .style('opacity', 0.9);
     }
     
+    // γ(t) hairline: the schedule's shape over this run, drawn in a thin
+    // band along the top of the plot (shape is what matters, not scale).
+    if (schedule !== 'constant') {
+      const sched = schedules[schedule];
+      const T = $trainingStore.totalSteps;
+      const start = $runStartStep;
+      const bandTop = 6;
+      const bandH = innerHeight * 0.18;
+      const pts: { step: number; f: number }[] = [];
+      const lo = Math.max(minStep, 0);
+      const hi = Math.max(maxStep, lo + 1);
+      const n = 80;
+      for (let k = 0; k <= n; k++) {
+        const s = lo + (k / n) * (hi - lo);
+        pts.push({ step: s, f: sched.factor(Math.max(0, s - start), T) });
+      }
+      const schedLine = d3.line<{ step: number; f: number }>()
+        .x(d => xScale(d.step))
+        .y(d => bandTop + (1 - d.f) * bandH);
+      const schedColor = isDarkMode ? '#94a3b8' : '#64748b';
+      g.append('path')
+        .datum(pts)
+        .attr('fill', 'none')
+        .attr('stroke', schedColor)
+        .attr('stroke-width', 1.3)
+        .attr('stroke-dasharray', '2,3')
+        .attr('d', schedLine)
+        .style('opacity', 0.75);
+      g.append('text')
+        .attr('x', xScale(pts[pts.length - 1].step) - 4)
+        .attr('y', bandTop + (1 - pts[pts.length - 1].f) * bandH - 5)
+        .attr('fill', schedColor)
+        .attr('font-size', '11px')
+        .attr('font-style', 'italic')
+        .attr('font-family', 'Georgia, serif')
+        .style('text-anchor', 'end')
+        .style('opacity', 0.85)
+        .text('γ(t)');
+    }
+
     // Always draw current position markers (last point in history)
     if (windowedHistory.length > 0) {
       const lastPoint = windowedHistory[windowedHistory.length - 1];

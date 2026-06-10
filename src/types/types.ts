@@ -80,6 +80,9 @@ export interface ProblemConfig {
   parameterRange?: { min: number; max: number };
 }
 
+// Learning-rate schedules: γ_eff(t) = γ · factor(t, T) over a run.
+export type ScheduleId = 'constant' | 'step' | 'cosine' | 'warmup-cosine';
+
 // Training configuration
 export interface TrainingConfig {
   learningRate: number;
@@ -92,6 +95,8 @@ export interface TrainingConfig {
   batchSize: number | 'all';
   // Animation speed of the training loop.
   stepsPerSecond: number;
+  // How γ evolves over the run (constant, step decay, cosine, warmup).
+  schedule: ScheduleId;
 }
 
 // A single point in our training history
