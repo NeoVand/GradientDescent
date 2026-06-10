@@ -22,9 +22,10 @@
     landscapeViewStore,
     historyStore,
     resetOptimizerState,
-    courseStore
+    courseStore,
+    challengeStore
   } from './stores/stores';
-  import { startTraining, stopTraining, stepOnce, resetRun } from './utils/trainer';
+  import { startTraining, stopTraining, stepOnce, resetRun, runEndStore } from './utils/trainer';
   import { startCourse, closeCourse } from './utils/lessons';
   import { applyUrlState, encodeStateUrl } from './utils/urlState';
   import { Sun, Moon, HelpCircle, Menu, X, Share2, Presentation, GraduationCap } from 'lucide-svelte';
@@ -62,7 +63,10 @@
     }
     recordInitialHistory();
 
-    if (shared) {
+    if (shared?.goal) {
+      challengeStore.set({ target: shared.goal, status: 'open' });
+      showCoach('info', `🎯 Challenge loaded — reach the basin in ≤ ${shared.goal} steps. Tune anything you like, then Train.`, 0);
+    } else if (shared) {
       // Sticky: someone opening a shared link looks around before acting;
       // any training action clears it.
       showCoach('info', 'Loaded a shared scenario — same data, same start. Hit Train to run it.', 0);
@@ -73,16 +77,41 @@
     }
   });
 
-  async function shareScenario() {
-    const url = encodeStateUrl();
+  // ---------- Share popover ----------
+  let showSharePopover = false;
+  let challengeTarget = 100;
+
+  function toggleSharePopover() {
+    if (!showSharePopover) {
+      // Prefill the target from the last converged run — "beat my score"
+      const lastRun = $runEndStore;
+      challengeTarget = lastRun?.verdict === 'converged' ? lastRun.steps : 100;
+    }
+    showSharePopover = !showSharePopover;
+  }
+
+  async function copyUrl(url: string, successNote: string) {
+    showSharePopover = false;
     try {
       await navigator.clipboard.writeText(url);
-      showCoach('success', 'Link copied — it reproduces this exact data, settings, and marker position.');
+      showCoach('success', successNote);
     } catch {
       // Clipboard can be unavailable (permissions); fall back to the URL bar
       location.hash = url.split('#')[1] ?? '';
       showCoach('info', 'Link is in the address bar — copy it from there.');
     }
+  }
+
+  function sharePlain() {
+    copyUrl(encodeStateUrl(), 'Link copied — it reproduces this exact data, settings, and marker position.');
+  }
+
+  function shareChallenge() {
+    const target = Math.max(1, Math.min(10000, Math.round(challengeTarget) || 100));
+    copyUrl(
+      encodeStateUrl(target),
+      `Challenge link copied — "reach the basin in ≤ ${target} steps." Send it to your students.`
+    );
   }
   
   function toggleTheme() {
@@ -251,7 +280,7 @@
   >
     <Presentation size={18} strokeWidth={2.5} />
   </button>
-  <button class="help-btn" on:click={shareScenario} title="Copy a link to this exact scenario">
+  <button class="help-btn" class:presenter-active={showSharePopover} on:click={toggleSharePopover} title="Share this exact scenario — or turn it into a challenge">
     <Share2 size={18} strokeWidth={2.5} />
   </button>
   <button class="help-btn" on:click={() => showHelpModal = true} title="Help & Guide">
@@ -265,6 +294,28 @@
     {/if}
   </button>
 </div>
+
+{#if showSharePopover}
+  <div class="popover-backdrop" on:click={() => (showSharePopover = false)} on:keydown={(e) => e.key === 'Escape' && (showSharePopover = false)} role="button" tabindex="-1" aria-label="Close share menu"></div>
+  <div class="share-popover" role="menu" aria-label="Share options">
+    <button class="share-row" on:click={sharePlain}>
+      <Share2 size={14} strokeWidth={2.4} />
+      <span>Copy link to this scenario</span>
+    </button>
+    <div class="share-divider"></div>
+    <div class="share-challenge">
+      <button class="share-row" on:click={shareChallenge}>
+        <span class="target-emoji">🎯</span>
+        <span>Copy as challenge</span>
+      </button>
+      <label class="target-label">
+        basin in ≤
+        <input type="number" min="1" max="10000" bind:value={challengeTarget} />
+        steps
+      </label>
+    </div>
+  </div>
+{/if}
 
 <!-- Help Modal (outside main) -->
 <HelpModal isOpen={showHelpModal} onClose={() => showHelpModal = false} />
@@ -401,6 +452,90 @@
     border-color: rgba(16, 185, 129, 0.6);
     color: #10b981 !important;
     background: rgba(16, 185, 129, 0.14) !important;
+  }
+
+  /* ---------- Share popover ---------- */
+  .popover-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 98;
+    background: transparent;
+    border: none;
+  }
+
+  .share-popover {
+    position: fixed;
+    bottom: 4.25rem;
+    right: 1.5rem;
+    z-index: 99;
+    width: 250px;
+    border-radius: 12px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-secondary);
+    box-shadow: 0 12px 32px var(--color-shadow);
+    padding: 0.4rem;
+    animation: popIn 0.16s ease;
+  }
+
+  @keyframes popIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .share-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--color-text-primary);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-align: left;
+    padding: 0.5rem 0.55rem;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  .share-row:hover {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+  }
+
+  .share-divider {
+    height: 1px;
+    background: var(--color-border);
+    margin: 0.25rem 0.35rem;
+  }
+
+  .target-emoji { font-size: 0.8125rem; }
+
+  .target-label {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0 0.55rem 0.45rem 2rem;
+    font-size: 0.7188rem;
+    color: var(--color-text-tertiary);
+  }
+
+  .target-label input {
+    width: 58px;
+    padding: 0.15rem 0.3rem;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 0.7188rem;
+    font-weight: 600;
+  }
+
+  .target-label input:focus {
+    outline: none;
+    border-color: #10b981;
   }
 
   /* ---------- Presenter mode ----------

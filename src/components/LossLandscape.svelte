@@ -29,7 +29,8 @@
     landscapeViewStore,
     raceStore,
     trainingStore,
-    presenterStore
+    presenterStore,
+    challengeStore
   } from '../stores/stores';
   import { basinStore, ensureBasins, BASIN_COLORS } from '../utils/basins';
   import { optimizers } from '../utils/optimizers';
@@ -1187,6 +1188,18 @@
         {/if}
       </div>
     {/if}
+    {#if $challengeStore}
+      <div
+        class="challenge-pill {$challengeStore.status}"
+        style="top: {margin.top + 8}px; right: {margin.right + 8}px;"
+        title="A challenge link sets a goal — the coach judges every finished run against it"
+      >
+        <span>🎯</span>
+        <span>basin in ≤ {$challengeStore.target} steps</span>
+        {#if $challengeStore.status === 'beaten'}<span class="pill-mark">✓</span>{/if}
+        {#if $challengeStore.status === 'missed'}<span class="pill-mark">↻</span>{/if}
+      </div>
+    {/if}
     <CoursePanel />
     {#if race}
       <div class="race-legend">
@@ -1454,6 +1467,57 @@
     font-weight: 400;
     opacity: 0.7;
     margin-right: 0.2rem;
+  }
+
+  /* Challenge target pill: top-right corner of the plot (readout owns
+     the top-left) */
+  .challenge-pill {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.22rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    font-family: 'SF Mono', Monaco, monospace;
+    white-space: nowrap;
+    pointer-events: auto;
+    cursor: help;
+    z-index: 4;
+    border: 1px solid;
+  }
+
+  :global([data-theme='light']) .challenge-pill.open {
+    background: rgba(255, 255, 255, 0.85);
+    border-color: #cbd5e1;
+    color: #334155;
+  }
+
+  :global([data-theme='dark']) .challenge-pill.open {
+    background: rgba(6, 9, 19, 0.75);
+    border-color: #475569;
+    color: #cbd5e1;
+  }
+
+  .challenge-pill.beaten {
+    background: rgba(16, 185, 129, 0.16) !important;
+    border-color: rgba(16, 185, 129, 0.6) !important;
+    color: #10b981 !important;
+  }
+
+  .challenge-pill.missed {
+    background: rgba(245, 158, 11, 0.14) !important;
+    border-color: rgba(245, 158, 11, 0.55) !important;
+    color: #d97706 !important;
+  }
+
+  :global([data-theme='dark']) .challenge-pill.missed {
+    color: #fbbf24 !important;
+  }
+
+  .pill-mark {
+    font-size: 0.75rem;
   }
 
   /* Race legend: who's which color, bottom center of the plot */

@@ -30,6 +30,7 @@ import {
   showCoach,
   clearCoach,
   courseStore,
+  challengeStore,
   type Racer
 } from '../stores/stores';
 import { problemConfigs } from './problems';
@@ -250,6 +251,8 @@ export function hyperForProblem(optimizerId: OptimizerId, problemType: ProblemTy
  */
 export function applyProblem(type: ProblemType) {
   selectedProblem.set(type);
+  // A challenge is bound to its exact scenario; switching problems ends it.
+  challengeStore.set(null);
   const cfg = problemConfigs[type];
   let optimizerId = get(optimizerStore).id;
   if (optimizerId === 'gd' || optimizerId === 'momentum') {
@@ -313,11 +316,51 @@ function evaluateRun(steps: number) {
   } else if (scene && mag < 0.004 * (scene.field.maxMag || 1)) {
     verdict = 'stalled';
   }
-  runEndStore.set({ steps, verdict });
+
+  // "Steps to the basin" = when the run FIRST entered it, not the run's
+  // length — a 200-step run that arrived at step 70 scored a 70. A run
+  // that STARTED inside the basin isn't an arrival at all.
+  let basinSteps = steps;
+  let startedInBasin = false;
+  if (scene) {
+    const start = get(runStartStep);
+    for (const pt of get(historyStore)) {
+      if (pt.step === start) {
+        startedInBasin = normalizedLogLoss(scene.grid, pt.trainLoss) <= BASIN_LOG_THRESHOLD;
+      }
+      if (verdict === 'converged' && pt.step > start && normalizedLogLoss(scene.grid, pt.trainLoss) <= BASIN_LOG_THRESHOLD) {
+        basinSteps = pt.step - start;
+        break;
+      }
+    }
+  }
+
+  runEndStore.set({ steps: basinSteps, verdict });
   if (courseActive()) return;
 
+  const stepWord = (n: number) => (n === 1 ? 'step' : 'steps');
+
+  // An open challenge gets judged before the generic coach verdicts —
+  // but only for honest attempts that started outside the basin.
+  const challenge = get(challengeStore);
+  if (challenge) {
+    if (startedInBasin) {
+      showCoach('info', 'This run started inside the basin — hit Reset for a fresh start, then try to beat the target.');
+    } else if (verdict === 'converged' && basinSteps <= challenge.target) {
+      challengeStore.set({ ...challenge, status: 'beaten' });
+      showCoach('success', `🏆 Challenge beaten — basin in ${basinSteps} ${stepWord(basinSteps)} (target ≤ ${challenge.target}).`, 0);
+    } else if (verdict === 'converged') {
+      challengeStore.set({ ...challenge, status: 'missed' });
+      showCoach('warn', `Reached the basin in ${basinSteps} ${stepWord(basinSteps)} — the target is ≤ ${challenge.target}. Tune γ, μ, or the optimizer and try again.`);
+    } else {
+      challengeStore.set({ ...challenge, status: 'missed' });
+      showCoach('warn', `No convergence within ${steps} steps — the challenge wants the basin in ≤ ${challenge.target}. Try a different setup.`);
+    }
+    return;
+  }
+
   if (verdict === 'converged') {
-    showCoach('success', `Converged — reached the basin in ${steps} steps (‖∇ℒ‖ = ${fmtMag}).`);
+    showCoach('success', `Converged — entered the basin after ${basinSteps} steps (‖∇ℒ‖ = ${fmtMag} at the end).`);
     return;
   }
   if (verdict === 'stalled') {

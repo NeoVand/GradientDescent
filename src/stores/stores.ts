@@ -360,6 +360,16 @@ function createLandscapeViewStore() {
 
 export const landscapeViewStore = createLandscapeViewStore();
 
+// ========== Challenge Store ==========
+// A shared link can carry a goal: "reach the basin in ≤ N steps". The
+// landscape shows the target pill; the trainer judges each finished run.
+export interface ChallengeState {
+  target: number;
+  status: 'open' | 'beaten' | 'missed';
+}
+
+export const challengeStore = writable<ChallengeState | null>(null);
+
 // ========== Course Store ==========
 // Predict-then-run lessons: each lesson configures a scenario, asks for a
 // prediction, runs it, and explains. The panel lives on the landscape;
