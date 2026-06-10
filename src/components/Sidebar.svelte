@@ -240,9 +240,10 @@
         : lerpHex('#f59e0b', '#ef4444', (lrSliderPos - 80) / 20);
 
   const HYPER_COLORS: Record<string, string> = {
-    mu: '#a855f7',
-    beta1: '#a855f7',
-    beta2: '#c084fc'
+    mu: '#a855f7',    // momentum family: violet
+    beta1: '#a855f7', // Adam's momentum decay: same violet — same concept
+    beta2: '#14b8a6', // Adam's scale decay: teal — the RMS memory
+    rho: '#14b8a6'    // RMSProp's decay: same teal — same concept
   };
 
   const SLIDER_COLORS = {
@@ -806,7 +807,7 @@
   .panel {
     background-color: var(--color-bg-secondary);
     border-radius: 16px;
-    padding: calc(10px + 0.6 * var(--air)) calc(16px + 0.2 * var(--air));
+    padding: calc(10px + 0.7 * var(--air));
   }
 
   .top-panel {
