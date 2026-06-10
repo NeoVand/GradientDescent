@@ -14,34 +14,49 @@ An interactive visualization tool for understanding gradient descent through bea
 
 ## ✨ Features
 
-- **Interactive Loss Landscape**: Color-coded heatmap, smooth contour lines, and gradient vector field all in one view
-- **2D & 3D Loss Landscapes**: Flip between the classic heatmap+contours view and a fully rotatable 3D surface — same data, same colors, draggable marker in both
-- **Six Optimizers**: Gradient Descent, Momentum, Nesterov, AdaGrad, RMSProp, and Adam — each with its own hyperparameter sliders and live-updating LaTeX update rule
-- **Race Mode**: launch GD, Momentum, RMSProp, and Adam from the same start and watch colored trails compete to the basin, with a steps-to-finish scoreboard
-- **Classic Test Surfaces**: Rosenbrock's banana valley, a true saddle point, and Himmelblau's four minima — pure f(α, β) surfaces with no dataset, full-width landscape
-- **Editable Data**: click the data plot to add points, click a point to remove it, and watch the loss landscape reshape in real time
-- **Shareable Links**: one click copies a URL that reproduces your exact dataset (seeded), optimizer, hyperparameters, and marker position
-- **Real-time Training**: Watch the optimizer descend with animated parameter trails, single-step through updates, and tune the animation speed
-- **Stochastic Gradients**: A batch-size control turns full-batch descent into noisy SGD — watch the path wobble
-- **16 Problem Types**: From linear regression to Gaussian mixtures, source localization, mean-shift clustering, and the classic optimizer benchmarks, each with hand-derived analytic gradients verified against finite differences
-- **Optimizer X-ray**: Two arrows on the marker show the steepest-descent direction (−∇ℒ) vs. the step the optimizer actually took
-- **A Coach That Watches**: every run ends with a verdict — converged, stalled on a plateau, or out of steps — and each problem introduces itself with what makes its loss surface interesting
-- **One-Click Experiments**: seven ready-made scenarios in the help modal (local-minimum traps, vanishing gradients, Adam vs. GD, …) that configure everything, train, and narrate what to watch
-- **Divergence Coaching**: Blow past a stable learning rate and the app stops, explains why, and keeps every chart alive
-- **Reproducible Data**: Seeded generation means sliders deform the same dataset smoothly; a dice button rolls a fresh one
-- **Beautiful LaTeX Formulas**: Professional mathematical notation rendered with KaTeX
-- **Dark/Light Themes**: Elegant emerald-themed interface with seamless theme switching
-- **Educational**: Comprehensive help modal with theory and suggested experiments
+### The landscape, three ways
+- **1D Loss Curves**: one-parameter problems render the whole landscape as a single curve — marker on the curve, live tangent line, a ghost preview of the next GD step, and a viridis strip that bridges directly to the 2D heatmap
+- **Interactive 2D Landscape**: color-coded heatmap, smooth contour lines, and gradient vector field in one view
+- **Rotatable 3D Surface**: same cached grid, same colors, draggable marker, tapered fading descent trail, and a corner axes gizmo
+
+### Optimization, end to end
+- **Six Optimizers**: Gradient Descent, Momentum, Nesterov, AdaGrad, RMSProp, and Adam — each with hyperparameter sliders and a live LaTeX update rule
+- **Learning-Rate Schedules**: constant, step decay, cosine, and warmup+cosine, with the γ(t) shape drawn on the loss chart
+- **Race Mode**: GD, Momentum, RMSProp, and Adam from the same start — colored trails in 2D *and* 3D, steps-to-basin scoreboard
+- **Stochastic Gradients**: a batch-size control turns descent into SGD, and a fan of faint batch-gradient rays at the marker makes the noise distribution visible
+- **Optimizer X-ray**: blue −∇ℒ vs. red Δθ arrows at the marker — the gap IS the optimizer
+- **Curvature Lens**: the local Hessian's principal-axis ellipse, condition number κ, saddle escape directions, and a violet Newton-step ghost
+- **Basins of Attraction**: one toggle colors every point by which minimum GD reaches from there (computed in a Web Worker) — Himmelblau becomes a four-color map, convexity becomes one color
+
+### Built for teaching
+- **A 10-Lesson Course**: predict-then-run lessons from "which way is down?" to a real tiny neural network — answer first, watch the run, get the explanation
+- **Challenge Links**: share a URL with a goal ("reach the basin in ≤ 80 steps") — zero-backend homework with a 🏆 verdict
+- **20 Problem Types**: 1D slopes and traps, curve fits, classifiers, localization, a tiny neural net (β·tanh(αX) — mirror minima, dead saddle at zero-init), and the classic benchmarks (Rosenbrock, saddle, Himmelblau); every analytic gradient verified against finite differences
+- **Presenter Mode**: one key (P) scales fonts, markers, and trails for the projector
+- **Keyboard Shortcuts**: Space train/pause · S step · R reset · arrows nudge the marker · D 2D/3D
+- **Video Export**: render the last run to a WebM clip for slides
+- **Works Offline**: installable PWA — lecture-hall wifi is not a dependency
+
+### Always-on guidance
+- **A Coach That Watches**: every run ends with a verdict — converged (with steps-to-basin), stalled, or out of steps — and every problem introduces itself
+- **Divergence Coaching**: blow past a stable learning rate and the app stops, explains why, and keeps every chart alive
+- **One-Click Experiments**: ready-made scenarios in the help modal that configure everything, train, and narrate
+- **Editable Data**: click the data plot to add/remove points and watch the landscape reshape live
+- **Shareable Links**: one click reproduces your exact dataset (seeded), optimizer, hyperparameters, schedule, and marker
+- **Beautiful LaTeX Formulas**: KaTeX-rendered model, loss, gradient, and update rule, always in sync
+- **Dark/Light Themes**: elegant emerald-themed interface with seamless switching
 
 ## 🎯 What It Does
 
 Gradient Descent Explorer helps you understand optimization algorithms through visual experimentation:
 
+- **Learn** with the built-in course: ten predict-then-run lessons from 1D slopes to a tiny neural network
 - **Drag** the orange marker to manually explore parameter space
 - **Train** the model — or **Step** through one update at a time — and watch the optimizer find solutions
-- **Compare** optimizers: switch between GD, Momentum, Nesterov, AdaGrad, RMSProp, and Adam from the same starting point
-- **Experiment** with learning rates, momentum, batch sizes, noise levels, and data splits
-- **Observe** how loss landscapes change with different configurations
+- **Compare** optimizers: race them, or switch between GD, Momentum, Nesterov, AdaGrad, RMSProp, and Adam from the same starting point
+- **Experiment** with learning rates, schedules, momentum, batch sizes, noise levels, and data splits
+- **See deeper** with the curvature lens and the basins-of-attraction map
+- **Assign** challenge links as homework: "reach the basin in ≤ N steps"
 
 > **💡 Tip**: Drag the orange marker on the Loss & Gradient diagram to explore the connection between parameters, the model, and loss in real-time.
 

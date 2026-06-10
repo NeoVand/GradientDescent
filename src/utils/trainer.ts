@@ -359,7 +359,11 @@ function evaluateRun(steps: number) {
   }
 
   if (verdict === 'converged') {
-    showCoach('success', `Converged — entered the basin after ${basinSteps} steps (‖∇ℒ‖ = ${fmtMag} at the end).`);
+    if (startedInBasin) {
+      showCoach('success', `Still in the basin — this run started at the bottom (‖∇ℒ‖ = ${fmtMag}). Reset for a fresh start.`);
+    } else {
+      showCoach('success', `Converged — entered the basin after ${basinSteps} ${stepWord(basinSteps)} (‖∇ℒ‖ = ${fmtMag} at the end).`);
+    }
     return;
   }
   if (verdict === 'stalled') {
