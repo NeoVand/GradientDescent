@@ -750,7 +750,7 @@
   .sidebar-content {
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
+    gap: calc(6px + 0.6 * var(--air));
     height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
@@ -801,10 +801,10 @@
   .section {
     background: var(--color-bg-primary);
     border-radius: 12px;
-    padding: 0.45rem 0.7rem 0.55rem;
+    padding: calc(7px + 0.3 * var(--air)) 0.7rem calc(9px + 0.3 * var(--air));
     display: flex;
     flex-direction: column;
-    gap: 0.3rem;
+    gap: calc(5px + 0.5 * var(--air));
     flex-shrink: 0;
   }
 
@@ -823,7 +823,7 @@
     text-transform: uppercase;
     letter-spacing: 0.12em;
     color: #10b981;
-    min-height: 15px;
+    min-height: calc(15px + 0.3 * var(--air));
   }
 
   /* ---------- Row grammar: [icon] Label (i) ······· value ---------- */
@@ -831,7 +831,7 @@
     display: flex;
     align-items: center;
     gap: 0.45rem;
-    min-height: 20px;
+    min-height: calc(20px + 0.2 * var(--air));
   }
 
   .row .icon {
@@ -864,7 +864,7 @@
   .ctl {
     display: flex;
     flex-direction: column;
-    gap: 0.1rem;
+    gap: calc(2px + 0.3 * var(--air));
   }
 
   .greek-label {
@@ -952,7 +952,7 @@
 
   .problem-button {
     width: 100%;
-    height: 34px;
+    height: calc(34px + 0.6 * var(--air));
     padding: 0 0.7rem;
     border: 2px solid var(--color-border);
     border-radius: 9px;
@@ -1042,36 +1042,40 @@
     background: rgba(16, 185, 129, 0.6);
   }
 
-  /* Edge fades: content melts into the dropdown background where there's
-     more to scroll — darkens in dark mode, whitens in light, for free. */
+  /* Edge shadows: a short DARK gradient (an inner shadow, not a fade to
+     the background) — content visibly slips under it in both themes. */
   .scroll-fade {
     position: absolute;
     left: 0;
     right: 0;
-    height: 64px;
+    height: 18px;
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.18s ease;
   }
 
+  :global([data-theme='light']) .fade-top {
+    background: linear-gradient(to bottom, rgba(15, 23, 42, 0.16), transparent);
+  }
+
+  :global([data-theme='dark']) .fade-top {
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), transparent);
+  }
+
+  :global([data-theme='light']) .fade-bottom {
+    background: linear-gradient(to top, rgba(15, 23, 42, 0.16), transparent);
+  }
+
+  :global([data-theme='dark']) .fade-bottom {
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent);
+  }
+
   .fade-top {
     top: 0;
-    background: linear-gradient(
-      to bottom,
-      var(--color-bg-secondary) 22%,
-      color-mix(in srgb, var(--color-bg-secondary) 72%, transparent) 55%,
-      transparent
-    );
   }
 
   .fade-bottom {
     bottom: 0;
-    background: linear-gradient(
-      to top,
-      var(--color-bg-secondary) 22%,
-      color-mix(in srgb, var(--color-bg-secondary) 72%, transparent) 55%,
-      transparent
-    );
   }
 
   .scroll-fade.visible {
@@ -1152,7 +1156,7 @@
     font-size: 0.6563rem;
     font-weight: 700;
     letter-spacing: 0.02em;
-    padding: 0.22rem 0;
+    padding: calc(3.5px + 0.15 * var(--air)) 0;
     cursor: pointer;
     transition: all 0.15s ease;
   }
@@ -1352,8 +1356,8 @@
   }
 
   .step-button {
-    width: 34px;
-    height: 34px;
+    width: calc(34px + 0.4 * var(--air));
+    height: calc(34px + 0.4 * var(--air));
     padding: 0;
     border: 2px solid var(--color-border);
     border-radius: 8px;
@@ -1388,7 +1392,7 @@
     font-size: 0.875rem;
     cursor: pointer;
     transition: all 0.2s;
-    min-height: 34px;
+    min-height: calc(34px + 0.4 * var(--air));
     position: relative;
     overflow: hidden;
   }
@@ -1422,7 +1426,7 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    padding: 0.45rem 0.75rem;
+    padding: calc(7px + 0.3 * var(--air)) 0.75rem;
   }
 
   :global([data-theme='light']) .button-content {
@@ -1465,8 +1469,8 @@
   }
 
   .reset-button {
-    width: 34px;
-    height: 34px;
+    width: calc(34px + 0.4 * var(--air));
+    height: calc(34px + 0.4 * var(--air));
     padding: 0;
     border: 2px solid var(--color-border);
     border-radius: 8px;
@@ -1494,7 +1498,7 @@
     justify-content: center;
     gap: 0.45rem;
     width: 100%;
-    padding: 0.35rem;
+    padding: calc(5.5px + 0.2 * var(--air));
     border: 1px dashed rgba(16, 185, 129, 0.5);
     border-radius: 8px;
     background: rgba(16, 185, 129, 0.06);

@@ -328,6 +328,14 @@
     padding: 0;
   }
   
+  /* Vertical breathing room: 0px on short screens (≤800px viewport),
+     growing linearly to 10px on tall ones (≥1080px). Every sidebar
+     spacing interpolates off this one knob, so the layout is airy when
+     there's room and only compresses when there isn't. */
+  :global(:root) {
+    --air: clamp(0px, calc((100vh - 800px) / 28), 10px);
+  }
+
   /* CSS Variables for Theming */
   :global(:root) {
     /* Light theme colors with subtle emerald tint */
@@ -593,7 +601,7 @@
     background-color: var(--color-bg-secondary);
     border-radius: 16px;
     box-shadow: none;
-    padding: 0.875rem 1.125rem;
+    padding: calc(14px + 0.6 * var(--air)) calc(18px + 0.2 * var(--air));
     overflow: hidden;
     min-height: 0;
   }

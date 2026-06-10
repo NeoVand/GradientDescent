@@ -55,38 +55,135 @@
   let lastXScale: d3.ScaleLinear<number, number> | null = null;
   let lastYScale: d3.ScaleLinear<number, number> | null = null;
 
-  function handlePlotClick(event: MouseEvent) {
-    if (!isEditable || !lastXScale || !lastYScale || !svgElement) return;
+  /** Inner-plot pixel position of a pointer event, or null outside. */
+  function plotPos(event: MouseEvent): { px: number; py: number } | null {
+    if (!svgElement) return null;
     const rect = svgElement.getBoundingClientRect();
     const px = event.clientX - rect.left - margin.left;
     const py = event.clientY - rect.top - margin.top;
     const innerWidth = width - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
-    if (px < 0 || px > innerWidth || py < 0 || py > innerHeight) return;
+    if (px < 0 || px > innerWidth || py < 0 || py > innerHeight) return null;
+    return { px, py };
+  }
+
+  /** Index of the data point nearest to (px, py) within reach, or −1. */
+  function nearestPoint(px: number, py: number, reach: number): number {
+    let best = -1;
+    let bestD = reach * reach;
+    $datasetStore.data.forEach((p, i) => {
+      const dx = lastXScale!(p.x) - px;
+      const dy = lastYScale!(p.y) - py;
+      const d = dx * dx + dy * dy;
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    });
+    return best;
+  }
+
+  /**
+   * The editor's live preview: in add modes a ghost of the point a click
+   * would create rides the cursor (the ghost IS the cursor); in erase
+   * mode the doomed point gets a red ring. Cleared off-plot.
+   */
+  function handlePlotHover(event: PointerEvent) {
+    if (!svgElement) return;
+    const layer = d3.select(svgElement).select<SVGGElement>('.edit-preview');
+    if (!isEditable || !lastXScale || !lastYScale || layer.empty()) return;
+
+    const pos = plotPos(event);
+    layer.selectAll('*').remove();
+    if (!pos) {
+      svgElement.style.cursor = '';
+      return;
+    }
+    svgElement.style.cursor = 'none';
+    const { px, py } = pos;
 
     if (editTool === 'erase') {
-      // Remove the nearest point within reach
-      const all = $datasetStore.data;
-      let best = -1;
-      let bestD = 14 * 14;
-      all.forEach((p, i) => {
-        const dx = lastXScale!(p.x) - px;
-        const dy = lastYScale!(p.y) - py;
-        const d = dx * dx + dy * dy;
-        if (d < bestD) {
-          bestD = d;
-          best = i;
-        }
-      });
-      if (best >= 0) datasetStore.removePoint(best);
+      // Reach circle at the cursor…
+      layer.append('circle')
+        .attr('cx', px).attr('cy', py)
+        .attr('r', 14)
+        .attr('fill', 'none')
+        .attr('stroke', '#ef4444')
+        .attr('stroke-width', 1.2)
+        .attr('stroke-dasharray', '3,3')
+        .style('opacity', 0.55);
+      // …and a solid red ring on the point a click would remove
+      const target = nearestPoint(px, py, 14);
+      if (target >= 0) {
+        const t = $datasetStore.data[target];
+        layer.append('circle')
+          .attr('cx', lastXScale(t.x)).attr('cy', lastYScale(t.y))
+          .attr('r', 11)
+          .attr('fill', 'rgba(239, 68, 68, 0.12)')
+          .attr('stroke', '#ef4444')
+          .attr('stroke-width', 2);
+        layer.append('line')
+          .attr('x1', lastXScale(t.x) - 4).attr('y1', lastYScale(t.y) - 4)
+          .attr('x2', lastXScale(t.x) + 4).attr('y2', lastYScale(t.y) + 4)
+          .attr('stroke', '#ef4444').attr('stroke-width', 2).attr('stroke-linecap', 'round');
+        layer.append('line')
+          .attr('x1', lastXScale(t.x) - 4).attr('y1', lastYScale(t.y) + 4)
+          .attr('x2', lastXScale(t.x) + 4).attr('y2', lastYScale(t.y) - 4)
+          .attr('stroke', '#ef4444').attr('stroke-width', 2).attr('stroke-linecap', 'round');
+      }
       return;
     }
 
-    datasetStore.addPoint({
-      x: lastXScale.invert(px),
-      y: lastYScale.invert(py),
-      isTraining: editTool === 'train'
-    });
+    // Add modes: the exact point a click creates, plus a small + tag
+    const isTrain = editTool === 'train';
+    layer.append('circle')
+      .attr('cx', px).attr('cy', py)
+      .attr('r', 7)
+      .attr('fill', isTrain ? 'rgba(59, 130, 246, 0.45)' : 'rgba(16, 185, 129, 0.35)')
+      .attr('stroke', isTrain ? '#3b82f6' : '#10b981')
+      .attr('stroke-width', 1.6)
+      .attr('stroke-dasharray', isTrain ? null : '3,2');
+    layer.append('line')
+      .attr('x1', px + 9).attr('y1', py - 9 - 3.5)
+      .attr('x2', px + 9).attr('y2', py - 9 + 3.5)
+      .attr('stroke', isTrain ? '#3b82f6' : '#10b981')
+      .attr('stroke-width', 1.8)
+      .attr('stroke-linecap', 'round');
+    layer.append('line')
+      .attr('x1', px + 9 - 3.5).attr('y1', py - 9)
+      .attr('x2', px + 9 + 3.5).attr('y2', py - 9)
+      .attr('stroke', isTrain ? '#3b82f6' : '#10b981')
+      .attr('stroke-width', 1.8)
+      .attr('stroke-linecap', 'round');
+  }
+
+  function clearPlotHover() {
+    if (!svgElement) return;
+    svgElement.style.cursor = '';
+    d3.select(svgElement).select('.edit-preview').selectAll('*').remove();
+  }
+
+  // Tool switches restyle the preview in place
+  $: if (editTool && svgElement) clearPlotHover();
+
+  function handlePlotClick(event: MouseEvent) {
+    if (!isEditable || !lastXScale || !lastYScale || !svgElement) return;
+    const pos = plotPos(event);
+    if (!pos) return;
+    const { px, py } = pos;
+
+    if (editTool === 'erase') {
+      const best = nearestPoint(px, py, 14);
+      if (best >= 0) datasetStore.removePoint(best);
+    } else {
+      datasetStore.addPoint({
+        x: lastXScale.invert(px),
+        y: lastYScale.invert(py),
+        isTraining: editTool === 'train'
+      });
+    }
+    // Re-render the hover preview against the updated dataset
+    handlePlotHover(event as PointerEvent);
   }
   
   // Redraw when data or theme changes
@@ -105,6 +202,8 @@
     // Attached imperatively (not via template) so the plot stays a plain
     // graphic to assistive tech — editing is an auxiliary pointer affordance.
     svgElement.addEventListener('click', handlePlotClick);
+    svgElement.addEventListener('pointermove', handlePlotHover);
+    svgElement.addEventListener('pointerleave', clearPlotHover);
 
     // Set up resize observer with debouncing
     const resizeObserver = new ResizeObserver(entries => {
@@ -128,6 +227,8 @@
     
     return () => {
       svgElement?.removeEventListener('click', handlePlotClick);
+      svgElement?.removeEventListener('pointermove', handlePlotHover);
+      svgElement?.removeEventListener('pointerleave', clearPlotHover);
       resizeObserver.disconnect();
       if (resizeTimer) clearTimeout(resizeTimer);
     };
@@ -312,6 +413,11 @@
     if (is2DPointProblem) {
       drawParamsMarker(plotGroup, xScale, yScale);
     }
+
+    // Editor hover preview rides above everything (filled on pointermove)
+    g.append('g')
+      .attr('class', 'edit-preview')
+      .style('pointer-events', 'none');
   }
 
   /**
@@ -1037,14 +1143,6 @@
   .tool-btn.active {
     background: rgba(16, 185, 129, 0.16);
     color: #10b981;
-  }
-
-  svg.editable {
-    cursor: crosshair;
-  }
-
-  svg.erasing {
-    cursor: pointer;
   }
 
   /* ---------- In-plot point legend (mirrors the landscape's corner keys) ---------- */

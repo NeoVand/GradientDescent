@@ -29,10 +29,15 @@
     divergenceStore,
     clearCoach,
     raceStore,
+    optimizerStore,
+    optimizerStateStore,
+    trainingStore,
     type LossScene,
     type RaceState
   } from '../stores/stores';
   import { sampleLoss, normalizedLogLoss, viridisRGB } from '../utils/lossGrid';
+  import { runStartStep } from '../utils/trainer';
+  import { previewNextStep } from '../utils/preview';
   import type { TrainingHistoryPoint } from '../types/types';
 
   let container: HTMLDivElement;
@@ -323,6 +328,130 @@
     markerSphere.position.set(toX(ca), heightAt(ca, cb) + 0.02, toZ(cb));
     const offMap = ca !== a || cb !== b;
     (markerSphere.material as THREE.MeshStandardMaterial).opacity = offMap ? 0.55 : 1;
+    updateMarkerExtras(offMap);
+  }
+
+  /**
+   * The marker's direction language, same as 2D: blue −∇ℒ arrow, red Δθ
+   * (last step) arrow, and the amber next-step ghost — a dry run of the
+   * selected optimizer's update via the shared preview helper.
+   */
+  let markerExtras: THREE.Group | null = null;
+
+  function disposeMarkerExtras() {
+    if (!markerExtras) return;
+    scene3.remove(markerExtras);
+    markerExtras.traverse(obj => {
+      const mesh = obj as THREE.Mesh;
+      if (mesh.geometry) mesh.geometry.dispose();
+      const mat = mesh.material as THREE.Material | THREE.Material[] | undefined;
+      if (Array.isArray(mat)) mat.forEach(m => m.dispose());
+      else mat?.dispose();
+    });
+    markerExtras = null;
+  }
+
+  /** Param-space direction (da, db) → unit world direction on the floor. */
+  function dirVec(da: number, db: number): THREE.Vector3 | null {
+    const v = new THREE.Vector3(da, 0, -db);
+    return v.lengthSq() < 1e-18 ? null : v.normalize();
+  }
+
+  function overlayArrow(
+    origin: THREE.Vector3,
+    dir: THREE.Vector3,
+    length: number,
+    color: number
+  ): THREE.ArrowHelper {
+    const arrow = new THREE.ArrowHelper(dir, origin, length, color, length * 0.32, length * 0.16);
+    for (const part of [arrow.line, arrow.cone]) {
+      const m = part.material as THREE.Material;
+      m.depthTest = false;
+      m.depthWrite = false;
+      m.transparent = true;
+      part.renderOrder = 11;
+    }
+    return arrow;
+  }
+
+  function updateMarkerExtras(offMap: boolean) {
+    disposeMarkerExtras();
+    if (!currentScene || offMap) return;
+    const config = get(currentProblemConfig);
+    const train = get(datasetStore).data.filter(d => d.isTraining);
+    if (!config || (train.length === 0 && !config.noData)) return;
+
+    const params = get(parametersStore);
+    const grad = config.computeGradient(train, params);
+    if (!Number.isFinite(grad.a) || !Number.isFinite(grad.b)) return;
+
+    const { min, max } = currentScene.range;
+    const origin = new THREE.Vector3(
+      toX(params.a),
+      heightAt(params.a, params.b) + 0.025,
+      toZ(params.b)
+    );
+    markerExtras = new THREE.Group();
+
+    // Blue: steepest descent −∇ℒ
+    const down = dirVec(-grad.a, -grad.b);
+    if (down) markerExtras.add(overlayArrow(origin, down, 0.16, 0x3b82f6));
+
+    // Red: the optimizer's actual last step Δθ
+    const h = get(historyStore);
+    if (h.length >= 2) {
+      const da = h[h.length - 1].parameters.a - h[h.length - 2].parameters.a;
+      const db = h[h.length - 1].parameters.b - h[h.length - 2].parameters.b;
+      const dir = dirVec(da, db);
+      if (dir) markerExtras.add(overlayArrow(origin, dir, 0.12, 0xef4444));
+    }
+
+    // Amber ghost: where the selected optimizer's next update lands
+    const preview = previewNextStep(
+      params,
+      grad,
+      get(optimizerStore),
+      get(optimizerStateStore),
+      get(trainingStore),
+      get(runStartStep)
+    );
+    if (preview && !get(raceStore)) {
+      const na = Math.max(min, Math.min(max, preview.a));
+      const nb = Math.max(min, Math.min(max, preview.b));
+      const ghostPos = new THREE.Vector3(toX(na), heightAt(na, nb) + 0.025, toZ(nb));
+      if (ghostPos.distanceTo(origin) > 0.012) {
+        const lineGeo = new THREE.BufferGeometry().setFromPoints([origin, ghostPos]);
+        const lineMat = new THREE.LineDashedMaterial({
+          color: 0xfbbf24,
+          dashSize: 0.022,
+          gapSize: 0.016,
+          transparent: true,
+          opacity: 0.9,
+          depthTest: false,
+          depthWrite: false
+        });
+        const line = new THREE.Line(lineGeo, lineMat);
+        line.computeLineDistances();
+        line.renderOrder = 11;
+        markerExtras.add(line);
+
+        const ghost = new THREE.Mesh(
+          new THREE.SphereGeometry(0.024, 16, 12),
+          new THREE.MeshBasicMaterial({
+            color: 0xfbbf24,
+            transparent: true,
+            opacity: 0.55,
+            depthTest: false,
+            depthWrite: false
+          })
+        );
+        ghost.renderOrder = 11;
+        ghost.position.copy(ghostPos);
+        markerExtras.add(ghost);
+      }
+    }
+
+    scene3.add(markerExtras);
   }
 
   function applyTheme(theme: string) {
@@ -568,10 +697,26 @@
       }),
       parametersStore.subscribe(() => updateMarker()),
       historyStore.subscribe(h => {
-        if (currentScene) buildPath(h);
+        if (currentScene) {
+          buildPath(h);
+          updateMarker();
+        }
       }),
       raceStore.subscribe(rs => {
         if (currentScene) buildRaceTrails(rs);
+        if (currentScene) updateMarker();
+      }),
+      optimizerStore.subscribe(() => {
+        if (currentScene) updateMarker();
+      }),
+      optimizerStateStore.subscribe(() => {
+        if (currentScene) updateMarker();
+      }),
+      trainingStore.subscribe(() => {
+        if (currentScene) updateMarker();
+      }),
+      runStartStep.subscribe(() => {
+        if (currentScene) updateMarker();
       }),
       themeStore.subscribe(t => {
         applyTheme(t);
@@ -651,6 +796,7 @@
     for (const u of unsubs) u();
     disposeGizmo();
     disposeRaceGroup();
+    disposeMarkerExtras();
     if (scene3) {
       scene3.traverse(obj => {
         const mesh = obj as THREE.Mesh;

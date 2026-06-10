@@ -36,8 +36,8 @@
   } from '../stores/stores';
   import { basinStore, ensureBasins, BASIN_COLORS } from '../utils/basins';
   import { optimizers } from '../utils/optimizers';
-  import { schedules } from '../utils/schedules';
   import { runStartStep } from '../utils/trainer';
+  import { previewNextStep } from '../utils/preview';
   import {
     computeHessian,
     eigenSym2,
@@ -204,8 +204,7 @@
   // ---------- Next-step ghost ----------
   // A dry run of the SELECTED optimizer's next update from the current
   // position — velocity and adaptive state included, schedule applied.
-  // Step functions are pure (they return new state), so nothing leaks.
-  $: nextPreview = computeNextPreview(
+  $: nextPreview = previewNextStep(
     parameters,
     currentGradient,
     $optimizerStore,
@@ -214,20 +213,11 @@
     $runStartStep
   );
 
-  function computeNextPreview(
-    params: ModelParameters,
-    grad: ModelParameters | null,
-    sel: typeof $optimizerStore,
-    state: typeof $optimizerStateStore,
-    t: typeof $trainingStore,
-    startStep: number
-  ): ModelParameters | null {
-    if (!grad) return null;
-    const tInRun = Math.max(0, t.currentStep - startStep);
-    const effLr = t.learningRate * schedules[t.schedule].factor(tInRun, t.totalSteps);
-    const out = optimizers[sel.id].step(params, grad, state, effLr, sel.hyper);
-    if (!Number.isFinite(out.params.a) || !Number.isFinite(out.params.b)) return null;
-    return out.params;
+  // Repaint the marker layer whenever the preview moves — this is what
+  // makes the ghost track the γ slider, schedule, and optimizer switches
+  // live, not just training steps.
+  $: if (svgElement && nextPreview !== undefined && !isDragging) {
+    updateTrail();
   }
 
   // ---------- SGD gradient fan ----------
@@ -820,18 +810,22 @@
     layer.append('line')
       .attr('x1', 0).attr('y1', 0)
       .attr('x2', dx).attr('y2', dy)
-      .attr('stroke', '#f59e0b')
-      .attr('stroke-width', 1)
-      .attr('stroke-dasharray', '2,3')
-      .style('opacity', 0.55);
-    layer.append('circle')
-      .attr('cx', dx).attr('cy', dy)
-      .attr('r', 6 * pm)
-      .attr('fill', 'none')
-      .attr('stroke', '#f59e0b')
+      .attr('stroke', '#fbbf24')
       .attr('stroke-width', 1.5)
       .attr('stroke-dasharray', '3,3')
       .style('opacity', 0.8);
+    layer.append('circle')
+      .attr('cx', dx).attr('cy', dy)
+      .attr('r', 7 * pm)
+      .attr('fill', 'rgba(251, 191, 36, 0.15)')
+      .attr('stroke', '#fbbf24')
+      .attr('stroke-width', 2)
+      .attr('stroke-dasharray', '4,3')
+      .style('opacity', 1);
+    layer.append('circle')
+      .attr('cx', dx).attr('cy', dy)
+      .attr('r', 1.8 * pm)
+      .attr('fill', '#fbbf24');
   }
 
   /** The minibatch noise cloud: faint −∇ℒ_batch rays around the marker. */
@@ -1250,9 +1244,8 @@
         <span class="key-val">{minLossValue.toFixed(2)}</span>
       </div>
     {/if}
-    {#if view === '2d' || oneParam}
-      <!-- Marker-arrow key, bottom-left corner -->
-      <div class="vec-key" style="left: {margin.left + 8}px; bottom: {margin.bottom + 8}px;">
+    <!-- Marker-arrow key, bottom-left corner (all views speak this language) -->
+    <div class="vec-key" style="left: {margin.left + 8}px; bottom: {margin.bottom + 8}px;">
         <span class="vec-item" title="Steepest-descent direction at the marker: −∇ℒ, straight downhill">
           <svg width="20" height="10" viewBox="0 0 20 10" aria-hidden="true">
             <line x1="1" y1="5" x2="12" y2="5" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" />
@@ -1269,11 +1262,11 @@
         </span>
         <span class="vec-item" title="Where the selected optimizer's next update would land from here — momentum velocity, adaptive scaling, and the γ schedule all included. A dry run of the real step.">
           <svg width="20" height="10" viewBox="0 0 20 10" aria-hidden="true">
-            <circle cx="10" cy="5" r="4" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="2.5,2" />
+            <circle cx="10" cy="5" r="4" fill="rgba(251,191,36,0.18)" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="2.5,2" />
           </svg>
           <span>next step</span>
         </span>
-        {#if fanActive}
+        {#if fanActive && view === '2d' && !oneParam}
           <span class="vec-item" title="Each faint ray is −∇ℒ on a different random minibatch — the gradient is a noisy estimate, and this is its spread. The solid blue arrow is the full-batch direction.">
             <svg width="20" height="10" viewBox="0 0 20 10" aria-hidden="true">
               <line x1="2" y1="8" x2="17" y2="5" stroke="#3b82f6" stroke-width="1.3" opacity="0.35" stroke-linecap="round" />
@@ -1283,7 +1276,7 @@
             <span>batch ∇ spread</span>
           </span>
         {/if}
-        {#if lensInfo}
+        {#if lensInfo && view === '2d'}
           <span class="vec-item" title="The Newton step −H⁻¹∇ℒ: where a second-order method would head. It points straight at the local quadratic's minimum, regardless of how stretched the bowl is.">
             <svg width="20" height="10" viewBox="0 0 20 10" aria-hidden="true">
               <line x1="1" y1="5" x2="12" y2="5" stroke="#8b5cf6" stroke-width="2" stroke-dasharray="3,2" stroke-linecap="round" />
@@ -1298,8 +1291,7 @@
             <span>curvature</span>
           </span>
         {/if}
-      </div>
-    {/if}
+    </div>
     {#if $challengeStore}
       <div
         class="challenge-pill {$challengeStore.status}"

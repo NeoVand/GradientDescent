@@ -33,9 +33,8 @@
   } from '../stores/stores';
   import { viridisRGB } from '../utils/lossGrid';
   import { basinStore, BASIN_COLORS } from '../utils/basins';
-  import { optimizers } from '../utils/optimizers';
-  import { schedules } from '../utils/schedules';
   import { runStartStep } from '../utils/trainer';
+  import { previewNextStep } from '../utils/preview';
   import { optimizerStore, optimizerStateStore } from '../stores/stores';
 
   export let width = 400;
@@ -58,7 +57,8 @@
   $: history = $historyStore;
   $: problemConfig = $currentProblemConfig;
   $: theme = $themeStore;
-  $: learningRate = $trainingStore.learningRate;
+  $: trainingCfg = $trainingStore;
+  $: learningRate = trainingCfg.learningRate;
   $: optimizerSel = $optimizerStore;
   $: optimizerState = $optimizerStateStore;
   $: race = $raceStore;
@@ -92,9 +92,11 @@
     redraw();
   }
 
-  // Light updates while training / dragging elsewhere (the next-step ghost
-  // also depends on the optimizer and its internal state)
-  $: if (svgElement && (parameters || history) && learningRate && optimizerSel && optimizerState && !isDragging) {
+  // Light updates while training / dragging elsewhere. The next-step ghost
+  // depends on the optimizer, its internal state, AND the full training
+  // config (γ, schedule, step budget) — referencing them all here is what
+  // keeps the ghost live under every slider.
+  $: if (svgElement && (parameters || history) && trainingCfg && optimizerSel && optimizerState && $runStartStep !== undefined && !isDragging) {
     updateDynamics();
   }
 
@@ -476,45 +478,49 @@
     const ghostLayer = plotGroup.select<SVGGElement>('.ghost-layer');
     ghostLayer.selectAll('*').remove();
     if (Number.isFinite(slope) && !pos.offMap && !race) {
-      const t = $trainingStore;
-      const tInRun = Math.max(0, t.currentStep - $runStartStep);
-      const effLr = t.learningRate * schedules[t.schedule].factor(tInRun, t.totalSteps);
       const grad = problemConfig.computeGradient(trainData, { a: a0, b: parameters.b });
-      // Optimizer steps are pure (state returned, never mutated), so this
-      // is a true dry run of the next update.
-      const preview = optimizers[optimizerSel.id].step(
+      const preview = previewNextStep(
         { a: a0, b: parameters.b },
         grad,
+        optimizerSel,
         optimizerState,
-        effLr,
-        optimizerSel.hyper
+        trainingCfg,
+        $runStartStep
       );
-      const aNext = Math.max(parameterRange.min, Math.min(parameterRange.max, preview.params.a));
+      if (!preview) {
+        // nothing to preview
+      } else {
+      const aNext = Math.max(parameterRange.min, Math.min(parameterRange.max, preview.a));
       if (Math.abs(aNext - a0) > span * 0.005) {
         const gx = xScale(aNext);
         const gy = Math.max(0, Math.min(innerHeight, yScale(lossAt(aNext))));
         ghostLayer.append('line')
           .attr('x1', pos.x).attr('y1', pos.y)
           .attr('x2', gx).attr('y2', pos.y)
-          .attr('stroke', '#f59e0b')
-          .attr('stroke-width', 1)
-          .attr('stroke-dasharray', '2,3')
-          .style('opacity', 0.55);
-        ghostLayer.append('line')
-          .attr('x1', gx).attr('y1', pos.y)
-          .attr('x2', gx).attr('y2', gy)
-          .attr('stroke', '#f59e0b')
-          .attr('stroke-width', 1)
-          .attr('stroke-dasharray', '2,3')
-          .style('opacity', 0.55);
-        ghostLayer.append('circle')
-          .attr('cx', gx).attr('cy', gy)
-          .attr('r', 6 * pm)
-          .attr('fill', 'none')
-          .attr('stroke', '#f59e0b')
+          .attr('stroke', '#fbbf24')
           .attr('stroke-width', 1.5)
           .attr('stroke-dasharray', '3,3')
           .style('opacity', 0.8);
+        ghostLayer.append('line')
+          .attr('x1', gx).attr('y1', pos.y)
+          .attr('x2', gx).attr('y2', gy)
+          .attr('stroke', '#fbbf24')
+          .attr('stroke-width', 1.5)
+          .attr('stroke-dasharray', '3,3')
+          .style('opacity', 0.8);
+        ghostLayer.append('circle')
+          .attr('cx', gx).attr('cy', gy)
+          .attr('r', 7 * pm)
+          .attr('fill', 'rgba(251, 191, 36, 0.15)')
+          .attr('stroke', '#fbbf24')
+          .attr('stroke-width', 2)
+          .attr('stroke-dasharray', '4,3')
+          .style('opacity', 1);
+        ghostLayer.append('circle')
+          .attr('cx', gx).attr('cy', gy)
+          .attr('r', 1.8 * pm)
+          .attr('fill', '#fbbf24');
+      }
       }
     }
 
