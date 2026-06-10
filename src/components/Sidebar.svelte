@@ -281,11 +281,13 @@
   $: batchPos = (batchIndex(batchSize) / (batchSizeSteps.length - 1)) * 100;
 </script>
 
-<div class="sidebar-content">
-  <h1>
-    <span class="app-icon">∂</span>
-    <span>Gradient Descent</span>
-  </h1>
+<div class="sidebar-stack">
+  <div class="panel top-panel">
+    <h1>
+      <span class="app-icon">∂</span>
+      <span>Gradient Descent</span>
+    </h1>
+    <div class="sidebar-content">
 
   <!-- ===================== PROBLEM ===================== -->
   <div class="section">
@@ -653,8 +655,12 @@
     </div>
   </div>
 
-  <!-- ===================== RUN ===================== -->
-  <div class="section run-section">
+    </div>
+  </div>
+
+  <!-- ===================== RUN: its own card, aligned with the app's
+       bottom row (same shared height) ===================== -->
+  <div class="panel run-panel">
     <div class="section-label">
       <span>Run</span>
     </div>
@@ -781,14 +787,49 @@
 </div>
 
 <style>
+  /* Two sibling cards fill the left column: the controls panel grows,
+     the run deck is its own piece pinned at the bottom, sized to match
+     the app's bottom row so the whole bottom line of the app aligns. */
+  .sidebar-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .panel {
+    background-color: var(--color-bg-secondary);
+    border-radius: 16px;
+    padding: calc(10px + 0.6 * var(--air)) calc(16px + 0.2 * var(--air));
+  }
+
+  .top-panel {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .run-panel {
+    flex-shrink: 0;
+    height: var(--bottom-h);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: calc(5px + 0.5 * var(--air));
+  }
+
   .sidebar-content {
     display: flex;
     flex-direction: column;
     gap: calc(6px + 0.6 * var(--air));
     justify-content: space-between;
-    height: 100%;
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
+    margin-top: calc(2px + 0.8 * var(--air));
   }
 
   /* Custom scrollbar for sidebar */
@@ -1549,5 +1590,10 @@
   .race-button:disabled {
     opacity: 0.35;
     cursor: not-allowed;
+  }
+  @media (max-width: 768px) {
+    .sidebar-stack { gap: 0.625rem; }
+    .run-panel { height: auto; }
+    .panel { padding: 0.75rem; }
   }
 </style>

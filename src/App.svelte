@@ -10,6 +10,7 @@
   import LossHistory from './components/LossHistory.svelte';
   import GuidePanel from './components/GuidePanel.svelte';
   import HelpModal from './components/HelpModal.svelte';
+import CoursePanel from './components/CoursePanel.svelte';
   import {
     datasetStore,
     parametersStore,
@@ -326,6 +327,9 @@
   </div>
 {/if}
 
+<!-- Course card: app-level overlay, always on top -->
+<CoursePanel />
+
 <!-- Help Modal (outside main) -->
 <HelpModal isOpen={showHelpModal} onClose={() => showHelpModal = false} />
 
@@ -343,6 +347,9 @@
      there's room and only compresses when there isn't. */
   :global(:root) {
     --air: clamp(0px, calc((100vh - 800px) / 30), 14px);
+    /* One height for the whole bottom line of the app: the run deck on
+       the left and the loss-chart/formulas row share it, so they align. */
+    --bottom-h: clamp(200px, 25vh, 300px);
   }
 
   /* CSS Variables for Theming */
@@ -488,12 +495,13 @@
     box-sizing: border-box;
   }
   
-  /* Sidebar styling */
+  /* Sidebar column: a transparent rail — the cards inside carry the
+     surface styling. */
   .sidebar {
-    background-color: var(--color-bg-secondary);
-    border-radius: 16px;
+    background-color: transparent;
+    border-radius: 0;
     box-shadow: none;
-    padding: calc(14px + 0.6 * var(--air)) calc(18px + 0.2 * var(--air));
+    padding: 0;
     overflow: hidden;
     min-height: 0;
   }
@@ -520,12 +528,13 @@
     grid-template-columns: 1fr;
   }
   
-  /* Bottom row with loss history and guide panel */
+  /* Bottom row with loss history and guide panel — same height as the
+     run deck across the gutter. */
   .bottom-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1.25rem;
-    height: 260px;
+    height: var(--bottom-h);
     flex-shrink: 0;
     position: relative;
   }
@@ -709,7 +718,9 @@
       z-index: 100;
       border-radius: 0 16px 16px 0;
       box-shadow: 8px 0 24px rgba(0, 0, 0, 0.25);
-      padding-top: 3rem;
+      padding: 3rem 0.75rem 0.75rem;
+      background-color: var(--color-bg-primary);
+      overflow-y: auto;
     }
     .sidebar.drawer-open {
       transform: translateX(0);

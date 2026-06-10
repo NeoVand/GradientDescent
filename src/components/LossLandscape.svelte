@@ -50,7 +50,6 @@
   import type { ModelParameters } from '../types/types';
   import { Mountain, Orbit, Map as MapIcon, Video } from 'lucide-svelte';
   import LossCurve1D from './LossCurve1D.svelte';
-  import CoursePanel from './CoursePanel.svelte';
 
   // Component references
   let svgElement: SVGSVGElement | null = null;
@@ -1299,7 +1298,6 @@
         {#if $challengeStore.status === 'missed'}<span class="pill-mark">↻</span>{/if}
       </div>
     {/if}
-    <CoursePanel />
     {#if race}
       <div class="race-legend">
         {#each race.racers as r (r.id)}

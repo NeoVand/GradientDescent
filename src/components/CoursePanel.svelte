@@ -69,9 +69,11 @@
 
   function onWindowMove(e: PointerEvent) {
     if (!dragging) return;
-    // Clamped so the header always stays reachable inside the panel
-    dragX = Math.max(-320, Math.min(320, startOffset.x + (e.clientX - startPointer.x)));
-    dragY = Math.max(-440, Math.min(0, startOffset.y + (e.clientY - startPointer.y)));
+    // Clamped to the viewport so the header always stays reachable
+    const mx = Math.max(120, window.innerWidth / 2 - 120);
+    const my = Math.max(80, window.innerHeight / 2 - 60);
+    dragX = Math.max(-mx, Math.min(mx, startOffset.x + (e.clientX - startPointer.x)));
+    dragY = Math.max(-my, Math.min(my, startOffset.y + (e.clientY - startPointer.y)));
   }
 
   function onWindowUp() {
@@ -85,7 +87,7 @@
   <div
     class="course-card"
     class:dragging
-    style="transform: translateX(-50%) translate({dragX}px, {dragY}px);"
+    style="transform: translate(-50%, -50%) translate({dragX}px, {dragY}px);"
     role="dialog"
     aria-label="Course lesson"
   >
@@ -226,17 +228,18 @@
 {/if}
 
 <style>
+  /* App-level overlay: centered, above everything, never clipped */
   .course-card {
-    position: absolute;
-    bottom: 6px;
+    position: fixed;
+    top: 50%;
     left: 50%;
-    width: min(94%, 470px);
+    width: min(94vw, 480px);
     border-radius: 12px;
     border: 1px solid var(--color-border);
     padding: 0.7rem 0.85rem 0.6rem;
-    z-index: 6;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
-    backdrop-filter: blur(8px);
+    z-index: 500;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(10px);
     animation: cardIn 0.25s ease;
   }
 
@@ -246,7 +249,7 @@
   }
 
   @keyframes cardIn {
-    from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+    from { opacity: 0; }
     to   { opacity: 1; }
   }
 
