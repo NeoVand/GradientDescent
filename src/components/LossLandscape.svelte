@@ -43,8 +43,9 @@
     type Hessian2,
     type Eigen2
   } from '../utils/hessian';
+  import { canExportVideo, exportRunWebM } from '../utils/replay';
   import type { ModelParameters } from '../types/types';
-  import { Mountain, Orbit, Map as MapIcon } from 'lucide-svelte';
+  import { Mountain, Orbit, Map as MapIcon, Video } from 'lucide-svelte';
   import LossCurve1D from './LossCurve1D.svelte';
   import CoursePanel from './CoursePanel.svelte';
 
@@ -175,6 +176,26 @@
 
   $: basinActive = basinsOn && basin.status === 'ready' && basin.scene !== null && basin.scene.oneParam === oneParam;
   $: basinComputing = basinsOn && basin.status === 'computing';
+
+  // ---------- Run export ----------
+  const videoSupported = canExportVideo();
+  let exporting = false;
+  $: canExport = videoSupported && !exporting && history.length >= 2 && !!scene;
+
+  async function exportRun() {
+    if (!canExport || !scene) return;
+    exporting = true;
+    try {
+      await exportRunWebM({
+        scene,
+        history,
+        problemName: problemConfig?.name ?? '',
+        isDark: document.documentElement.getAttribute('data-theme') === 'dark'
+      });
+    } finally {
+      exporting = false;
+    }
+  }
 
   // ---------- SGD gradient fan ----------
   // With a minibatch selected, the gradient is a random variable: each
@@ -1090,6 +1111,23 @@
           {/if}
           <span>Basins</span>
         </button>
+        {#if videoSupported && !oneParam}
+          <button
+            class="tool-toggle"
+            disabled={!canExport}
+            title={canExport
+              ? 'Export the last run as a WebM video for slides'
+              : 'Run a training first — then export it as a video'}
+            on:click={exportRun}
+          >
+            {#if exporting}
+              <span class="tool-spinner" aria-hidden="true"></span>
+            {:else}
+              <Video size={14} strokeWidth={2.2} />
+            {/if}
+            <span>{exporting ? 'Recording' : 'Export'}</span>
+          </button>
+        {/if}
       </div>
     {/if}
   </div>
@@ -1339,6 +1377,13 @@
     background: rgba(16, 185, 129, 0.16);
     border-color: rgba(16, 185, 129, 0.5);
     color: #10b981;
+  }
+
+  .tool-toggle:disabled {
+    opacity: 0.45;
+    cursor: default;
+    color: var(--color-text-tertiary);
+    border-color: var(--color-border);
   }
 
   .tool-spinner {
