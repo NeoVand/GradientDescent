@@ -345,7 +345,7 @@
 <div class="chart-container">
   <div class="header">
     <h3>
-      <Activity size={18} strokeWidth={2} />
+      <Activity size={20} strokeWidth={2} />
       <span>Loss during training</span>
     </h3>
     <button
@@ -388,14 +388,15 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    height: 28px;
     margin-bottom: 0.375rem;
     margin-right: 20px;
     flex-shrink: 0;
   }
-  
+
   h3 {
     margin: 0 0 0 50px;
-    font-size: 0.95rem;
+    font-size: 1.125rem;
     font-weight: 600;
     color: var(--color-text-primary);
     display: flex;
@@ -429,6 +430,14 @@
     color: #10b981;
   }
   
+  /* Train + Test sit side by side on one line (no wasted vertical space). */
+  .legend-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    flex-shrink: 0;
+  }
+
   .legend-item {
     display: flex;
     align-items: center;
@@ -436,6 +445,7 @@
     font-size: 0.8125rem;
     color: var(--color-text-tertiary);
     font-weight: 500;
+    white-space: nowrap;
   }
   
   .svg-container {

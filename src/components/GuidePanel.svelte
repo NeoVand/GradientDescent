@@ -5,7 +5,7 @@
    * Educational panel showing key formulas with real LaTeX rendering
    */
   
-  import { onMount, afterUpdate } from 'svelte';
+  import { onMount, afterUpdate, onDestroy } from 'svelte';
   import { selectedProblem, optimizerStore } from '../stores/stores';
   import { optimizers } from '../utils/optimizers';
   import { problemConfigs } from '../utils/problems';
@@ -167,42 +167,103 @@
     }
   }
   
+  // ---------- Responsive fit ----------
+  // The formulas live in a fixed-height box. Rather than a uniformly tiny
+  // font, render at a base size, then scale the whole block (via font-size,
+  // so KaTeX stays crisp) to FILL the available area — large when there's
+  // room, smaller when cramped. The available height stops above the
+  // floating tools/gear button so the two never overlap.
+  let viewportEl: HTMLDivElement;
+  let fitEl: HTMLDivElement;
+  let ro: ResizeObserver | undefined;
+
+  const BASE_PX = 16;   // measurement baseline
+  const MIN_PX = 11.5;  // never smaller than this
+  const MAX_PX = 23;    // never larger than this
+
+  function fitFormulas() {
+    if (!viewportEl || !fitEl) return;
+    const cur = parseFloat(getComputedStyle(fitEl).fontSize) || BASE_PX;
+    const natW = fitEl.offsetWidth;
+    const natH = fitEl.offsetHeight;
+    if (!natW || !natH) return;
+
+    const vpRect = viewportEl.getBoundingClientRect();
+
+    // Reserve real bottom space (as padding) so the vertically-centred block
+    // stays clear of the floating tools button — which is fixed to the
+    // viewport's bottom-right and overlaps this panel — and its expanding tray.
+    let reserve = 0;
+    const fab = document.querySelector('.floating-buttons') as HTMLElement | null;
+    if (fab && getComputedStyle(fab).display !== 'none') {
+      const f = fab.getBoundingClientRect();
+      const intrudes = f.top < vpRect.bottom && f.bottom > vpRect.top && f.right > vpRect.left;
+      if (intrudes) reserve = Math.max(0, vpRect.bottom - (f.top - 10));
+    }
+    viewportEl.style.paddingBottom = reserve ? `${reserve}px` : '';
+
+    const availW = viewportEl.clientWidth;
+    const availH = Math.max(40, viewportEl.clientHeight - reserve);
+
+    const scale = Math.min(availW / natW, availH / natH);
+    const px = Math.max(MIN_PX, Math.min(MAX_PX, cur * scale));
+    fitEl.style.fontSize = `${px}px`;
+  }
+
   onMount(() => {
     renderLatex();
+    fitFormulas();
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => fitFormulas());
+      if (viewportEl) ro.observe(viewportEl);
+    }
+    window.addEventListener('resize', fitFormulas);
   });
-  
+
   afterUpdate(() => {
     renderLatex();
+    fitFormulas();
+  });
+
+  onDestroy(() => {
+    ro?.disconnect();
+    window.removeEventListener('resize', fitFormulas);
   });
 </script>
 
 <div class="guide-panel">
-  <h3>
-    <BookOpen size={18} strokeWidth={2} />
-    <span>Formulas</span>
-  </h3>
-  
-  <div class="equation-row">
-    <span class="equation-label">Model:</span>
-    <div class="equation-content">
-      <span class="latex-inline" bind:this={modelFormulaElement}></span>
-      <span class="latex-inline parameters" bind:this={parametersFormulaElement}></span>
+  <div class="header">
+    <h3>
+      <BookOpen size={20} strokeWidth={2} />
+      <span>Formulas</span>
+    </h3>
+  </div>
+
+  <div class="formula-viewport" bind:this={viewportEl}>
+    <div class="formula-fit" bind:this={fitEl}>
+      <div class="equation-row">
+        <span class="equation-label">Model:</span>
+        <span class="equation-formula">
+          <span class="latex-inline" bind:this={modelFormulaElement}></span>
+          <span class="latex-inline parameters" bind:this={parametersFormulaElement}></span>
+        </span>
+      </div>
+
+      <div class="equation-row">
+        <span class="equation-label">Loss:</span>
+        <span class="latex-inline" bind:this={lossFormulaElement}></span>
+      </div>
+
+      <div class="equation-row">
+        <span class="equation-label">Gradient:</span>
+        <span class="latex-inline" bind:this={gradientFormulaElement}></span>
+      </div>
+
+      <div class="equation-row">
+        <span class="equation-label">Update:</span>
+        <span class="latex-inline" bind:this={updateFormulaElement}></span>
+      </div>
     </div>
-  </div>
-  
-  <div class="equation-row">
-    <span class="equation-label">Loss:</span>
-    <span class="latex-inline" bind:this={lossFormulaElement}></span>
-  </div>
-  
-  <div class="equation-row">
-    <span class="equation-label">Gradient:</span>
-    <span class="latex-inline" bind:this={gradientFormulaElement}></span>
-  </div>
-  
-  <div class="equation-row">
-    <span class="equation-label">Update:</span>
-    <span class="latex-inline" bind:this={updateFormulaElement}></span>
   </div>
 </div>
 
@@ -212,111 +273,91 @@
     height: 100%;
     display: flex;
     flex-direction: column;
-    /* Spacing scales with viewport height so all four rows fit inside the
-       fixed-height bottom row, even at the short-viewport floor. */
-    gap: clamp(0.2rem, 0.7vh, 0.6rem);
-    padding-bottom: 0.5rem;
     padding-left: 50px;
+    min-height: 0;
     overflow: hidden;
   }
 
+  /* Title bar — same height/size/offset as the Data, Loss & Gradient and
+     Loss-history panels, so all four plot titles match and align. */
+  .header {
+    height: 28px;
+    margin-bottom: 0.375rem;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
   h3 {
-    margin: 0 0 0.2rem 0;
-    font-size: 0.95rem;
+    margin: 0;
+    font-size: 1.125rem;
     font-weight: 600;
     color: var(--color-text-primary);
     display: flex;
     align-items: center;
     gap: 0.5rem;
     opacity: 0.9;
-    flex-shrink: 0;
+    white-space: nowrap;
   }
-  
+
+  /* The box the formulas fill. fitFormulas() scales .formula-fit to the
+     largest size that fits this box (and clears the floating tools button). */
+  .formula-viewport {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+  }
+
+  .formula-fit {
+    width: max-content;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;          /* em → scales with the fitted font size */
+    font-size: 1rem;     /* base; overwritten by fitFormulas() */
+  }
+
   .equation-row {
     display: flex;
     align-items: center;
-    gap: 0.625rem;
-    padding: clamp(0.08rem, 0.45vh, 0.4rem) 0;
-    min-width: 0;
+    gap: 0.55em;
+    white-space: nowrap;
   }
 
   .equation-label {
-    font-size: 0.78rem;
     font-weight: 600;
     flex-shrink: 0;
-    min-width: 4.6rem;
-  }
-  
-  /* Light mode labels */
-  :global([data-theme='light']) .equation-label {
-    color: #059669;
-  }
-  
-  /* Dark mode labels */
-  :global([data-theme='dark']) .equation-label {
-    color: #10b981;
-  }
-  
-  .equation-content {
-    flex: 1 1 0;
-    min-width: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    overflow-x: auto;
+    min-width: 5em;
+    font-size: 0.82em;
   }
 
-  /* The formula area takes the row's remaining width and may shrink below
-     its content; overflow-x then scrolls long formulas instead of pushing
-     the panel off-screen. */
-  .equation-row > .latex-inline {
-    flex: 1 1 0;
+  :global([data-theme='light']) .equation-label { color: #059669; }
+  :global([data-theme='dark']) .equation-label { color: #10b981; }
+
+  .equation-formula {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
   }
 
   .latex-inline {
     color: var(--color-text-primary);
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    min-width: 0;
-    overflow-x: auto;
   }
-  
-  /* Hide scrollbar */
-  .latex-inline::-webkit-scrollbar {
-    display: none;
-  }
-  
-  .latex-inline {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-  
+
   .latex-inline.parameters {
     opacity: 0.7;
     font-size: 0.9em;
   }
-  
-  .equation-content {
-    overflow-x: auto;
-  }
-  
-  /* Hide scrollbar for equation content */
-  .equation-content::-webkit-scrollbar {
-    display: none;
-  }
-  
-  .equation-content {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-  
-  /* Style KaTeX output — smaller and viewport-scaled so the tallest /
-     widest formulas (matrix gradients, the tiny-net and AR rollout rows)
-     fit the fixed-height panel at every screen size. */
+
+  /* KaTeX inherits the fitted container's font-size, so it stays crisp at
+     any scale (no transform blur). */
   .latex-inline :global(.katex) {
-    font-size: clamp(0.76rem, 1.55vh, 0.98rem);
+    font-size: 1em;
   }
-  
+
   .latex-inline :global(.katex-html) {
     white-space: nowrap;
   }
