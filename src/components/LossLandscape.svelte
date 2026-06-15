@@ -1398,34 +1398,40 @@
   }
 
   /* 2D / 3D segmented toggle */
+  /* Same clean segmented-control language as the sidebar's Schedule toggle:
+     subtle track, no dividers, selected = bordered emerald pill. */
   .view-toggle {
     display: flex;
-    border: 1px solid var(--color-border);
-    border-radius: 8px;
-    overflow: hidden;
+    gap: 3px;
+    padding: 3px;
+    border-radius: 9px;
+    background: rgba(127, 127, 127, 0.1);
     flex-shrink: 0;
     margin: 0 0.75rem;
   }
 
   .view-toggle button {
-    border: none;
+    border: 1px solid transparent;
     background: transparent;
     color: var(--color-text-tertiary);
     font-size: 0.6875rem;
     font-weight: 700;
-    padding: 0.2rem 0.55rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
     cursor: pointer;
     transition: all 0.15s ease;
     letter-spacing: 0.03em;
   }
 
-  .view-toggle button:hover {
-    color: #10b981;
+  .view-toggle button:hover:not(.active) {
+    color: var(--color-text-secondary);
   }
 
   .view-toggle button.active {
     background: rgba(16, 185, 129, 0.16);
+    border-color: rgba(16, 185, 129, 0.55);
     color: #10b981;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
   }
 
   .header-left {

@@ -1240,37 +1240,39 @@
   }
 
   /* Segmented control (schedule picker): same family as the 2D/3D toggle */
+  /* Segmented control: a subtle track with NO dividers — only the selected
+     segment is a clean emerald pill (bordered + tinted). */
   .seg-control {
     display: flex;
-    border: 1px solid var(--color-border);
-    border-radius: 8px;
-    overflow: hidden;
+    gap: 3px;
+    padding: 3px;
+    border-radius: 9px;
+    background: rgba(127, 127, 127, 0.1);
   }
 
   .seg-control button {
     flex: 1;
-    border: none;
+    border: 1px solid transparent;     /* reserve space; no layout shift when selected */
     background: transparent;
     color: var(--color-text-tertiary);
     font-size: 0.6563rem;
     font-weight: 700;
     letter-spacing: 0.02em;
     padding: calc(3.5px + 0.15 * var(--air)) 0;
+    border-radius: 6px;
     cursor: pointer;
     transition: all 0.15s ease;
   }
 
-  .seg-control button:not(:last-child) {
-    border-right: 1px solid var(--color-border);
-  }
-
-  .seg-control button:hover {
-    color: #10b981;
+  .seg-control button:hover:not(.active) {
+    color: var(--color-text-secondary);
   }
 
   .seg-control button.active {
     background: rgba(16, 185, 129, 0.16);
+    border-color: rgba(16, 185, 129, 0.55);
     color: #10b981;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
   }
 
   .optimizer-text {
@@ -1319,10 +1321,13 @@
     -webkit-appearance: none;
     appearance: none;
     cursor: pointer;
-    margin: 0;
+    /* Breathing room so the 16px knob (which overhangs the 6px track) never
+       collides with the labels above/below. Knob size is unchanged. */
+    margin: 5px 0;
   }
 
   #train-ratio {
+    --slider-color: var(--color-primary);
     background: linear-gradient(to right,
       var(--color-primary) 0%,
       var(--color-primary) var(--train-percentage, 80%),
@@ -1331,6 +1336,7 @@
   }
 
   #noise-level {
+    --slider-color: var(--color-warning);
     background: linear-gradient(to right,
       var(--color-success) 0%,
       var(--color-warning) 50%,
@@ -1348,6 +1354,8 @@
         rgba(127, 127, 127, 0.25) 100%);
   }
 
+  /* The knob takes the slider's own colour (--slider-color, set per slider);
+     falls back to the primary only if a slider doesn't declare one. */
   .section input[type='range']::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
@@ -1355,9 +1363,19 @@
     height: 16px;
     border-radius: 50%;
     background: white;
-    border: 3px solid var(--color-primary);
+    border: 3px solid var(--slider-color, var(--color-primary));
     cursor: grab;
     transition: transform 0.15s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  .section input[type='range']::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: white;
+    border: 3px solid var(--slider-color, var(--color-primary));
+    cursor: grab;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   }
 
@@ -1588,6 +1606,8 @@
   }
 
   /* Race button: full-width secondary action under the transport row */
+  /* Secondary action: a clearly-visible emerald outline + tint (theme-aware
+     via --color-success), distinct from the filled Train button. */
   .race-button {
     display: flex;
     align-items: center;
@@ -1595,10 +1615,10 @@
     gap: 0.45rem;
     width: 100%;
     padding: calc(5.5px + 0.35 * var(--air));
-    border: 1px dashed rgba(16, 185, 129, 0.5);
+    border: 1.5px solid var(--color-success);
     border-radius: 8px;
-    background: rgba(16, 185, 129, 0.06);
-    color: #10b981;
+    background: color-mix(in srgb, var(--color-success) 14%, transparent);
+    color: var(--color-success);
     font-size: 0.75rem;
     font-weight: 700;
     cursor: pointer;
@@ -1606,14 +1626,13 @@
   }
 
   .race-button:hover:not(:disabled) {
-    background: rgba(16, 185, 129, 0.15);
-    border-style: solid;
+    background: color-mix(in srgb, var(--color-success) 24%, transparent);
   }
 
   .race-button.racing {
-    border-color: rgba(244, 63, 94, 0.6);
-    background: rgba(244, 63, 94, 0.08);
-    color: #f43f5e;
+    border-color: var(--color-danger);
+    background: color-mix(in srgb, var(--color-danger) 16%, transparent);
+    color: var(--color-danger);
   }
 
   .race-button:disabled {
