@@ -1,0 +1,5 @@
+# Gradient Lab — https://gradientlab.ai
+User-agent: *
+Allow: /
+
+Sitemap: https://gradientlab.ai/sitemap.xml

@@ -6,11 +6,13 @@
 [![D3.js](https://img.shields.io/badge/D3.js-7.9-F9A03C?style=flat&logo=d3.js&logoColor=white)](https://d3js.org/)
 [![License](https://img.shields.io/badge/License-MIT-10b981?style=flat)](LICENSE)
 
-An interactive visualization tool for understanding gradient descent through beautiful, real-time animations and mathematical rigor.
+Gradient Lab is a free, interactive tool for understanding gradient descent and optimization through beautiful, real-time animations and mathematical rigor.
 
 **[🚀 Live at gradientlab.ai](https://gradientlab.ai/)**
 
-![Gradient Lab](public/screenshot.gif)
+![Gradient Lab — see how machines learn](public/og-image.png)
+
+![Gradient Lab in action](public/screenshot.gif)
 
 ## ✨ Features
 
@@ -71,7 +73,7 @@ Gradient Lab helps you understand optimization algorithms through visual experim
 
 ```bash
 # Clone the repository
-git clone https://github.com/neovand/GradientDescent.git
+git clone https://github.com/NeoVand/GradientDescent.git
 cd GradientDescent
 
 # Install dependencies
@@ -89,6 +91,10 @@ The app will open at `http://localhost:5173`
 npm run build
 npm run preview
 ```
+
+### Deployment
+
+The live site at **[gradientlab.ai](https://gradientlab.ai/)** (and **[www.gradientlab.ai](https://www.gradientlab.ai/)**) is hosted on **Cloudflare Pages**, which rebuilds and deploys automatically on every push to `main` (build command `npm run build`, output `dist`). GitHub Actions runs the type-check and test suite as a CI gate on every push and pull request. The app is fully static — no backend — and ships as an installable PWA. SEO basics (canonical URL, Open Graph / Twitter cards, JSON-LD, `robots.txt`, and `sitemap.xml`) are baked in.
 
 ## 🛠️ Built With
 

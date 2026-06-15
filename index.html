@@ -4,25 +4,71 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gradient Lab — see how machines learn</title>
+
+    <!-- Primary SEO -->
+    <title>Gradient Lab — Interactive Gradient Descent &amp; Optimizer Visualizer</title>
     <meta
       name="description"
-      content="An interactive playground for gradient-based optimization: loss landscapes in 1D, 2D and 3D, six optimizers, races, basins of attraction, and a built-in course."
+      content="A free, interactive playground for gradient descent: explore loss landscapes in 1D, 2D and 3D, compare optimizers like Adam, RMSProp, Momentum and Nesterov, race them, map basins of attraction, and learn by doing."
     />
+    <meta
+      name="keywords"
+      content="gradient descent, optimization, machine learning, deep learning, Adam, RMSProp, Momentum, Nesterov, AdaGrad, loss landscape, neural network, visualization, interactive, education, SGD"
+    />
+    <meta name="author" content="Neo Mohsenvand" />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#0a1218" />
+    <meta name="application-name" content="Gradient Lab" />
+    <link rel="canonical" href="https://gradientlab.ai/" />
+    <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml" />
 
-    <!-- Social sharing -->
+    <!-- Open Graph (Facebook, LinkedIn, Slack, …) -->
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Gradient Lab" />
     <meta property="og:title" content="Gradient Lab — see how machines learn" />
     <meta
       property="og:description"
-      content="An interactive playground for gradient-based optimization: loss landscapes, six optimizers, races, basins of attraction, and a built-in course."
+      content="An interactive playground for gradient-based optimization: loss landscapes in 1D/2D/3D, six optimizers, races, basins of attraction, and a built-in course."
     />
     <meta property="og:url" content="https://gradientlab.ai/" />
+    <meta property="og:image" content="https://gradientlab.ai/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Gradient Lab — a loss landscape with a descent path converging to the minimum" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Gradient Lab — see how machines learn" />
+    <meta
+      name="twitter:description"
+      content="An interactive playground for gradient-based optimization: loss landscapes in 1D/2D/3D, six optimizers, races, basins of attraction, and a built-in course."
+    />
+    <meta name="twitter:image" content="https://gradientlab.ai/og-image.png" />
+    <meta name="twitter:image:alt" content="Gradient Lab — a loss landscape with a descent path converging to the minimum" />
+
+    <!-- Structured data: this is a free educational web app -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Gradient Lab",
+        "url": "https://gradientlab.ai/",
+        "description": "An interactive playground for understanding gradient descent and optimization, with loss landscapes in 1D, 2D and 3D, six optimizers, race mode, basins of attraction, and a built-in course.",
+        "applicationCategory": "EducationalApplication",
+        "operatingSystem": "Any (web browser)",
+        "browserRequirements": "Requires JavaScript.",
+        "image": "https://gradientlab.ai/og-image.png",
+        "inLanguage": "en",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "author": { "@type": "Person", "name": "Neo Mohsenvand" },
+        "keywords": "gradient descent, optimization, machine learning, Adam, RMSProp, momentum, loss landscape, neural network, education, visualization"
+      }
+    </script>
 
     <!-- Google Analytics (GA4) — loaded only on the live domain, so local dev
-         and Cloudflare preview deployments never pollute the stats. The
-         measurement ID is filled in once the property is created. -->
+         and Cloudflare preview deployments never pollute the stats. -->
     <script>
       (function () {
         var host = location.hostname;
@@ -42,6 +88,20 @@
   </head>
   <body>
     <div id="app"></div>
+    <noscript>
+      <section style="max-width: 42rem; margin: 4rem auto; padding: 0 1.5rem; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: #e2e8f0; background: #0a1218; line-height: 1.6;">
+        <h1>Gradient Lab — see how machines learn</h1>
+        <p>
+          Gradient Lab is a free, interactive playground for understanding
+          <strong>gradient descent</strong> and optimization. Watch the loss
+          landscape in 1D, 2D and 3D; compare optimizers — Gradient Descent,
+          Momentum, Nesterov, AdaGrad, RMSProp and Adam — from the same start;
+          race them; map the basins of attraction; and work through a built-in
+          course from "which way is down?" to a real tiny neural network.
+        </p>
+        <p>This application is interactive and requires JavaScript. Please enable JavaScript to use it.</p>
+      </section>
+    </noscript>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
