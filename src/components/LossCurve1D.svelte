@@ -28,7 +28,8 @@
     resetOptimizerState,
     divergenceStore,
     clearCoach,
-    raceStore
+    raceStore,
+    markerDragging
   } from '../stores/stores';
   import { viridisRGB } from '../utils/lossGrid';
   import { basinStore, BASIN_COLORS } from '../utils/basins';
@@ -386,6 +387,7 @@
       .touchable(() => true)
       .on('start', function () {
         isDragging = true;
+        markerDragging.set(true);
         resetOptimizerState();
         divergenceStore.set(null);
         clearCoach();
@@ -410,6 +412,7 @@
       })
       .on('end', function () {
         isDragging = false;
+        markerDragging.set(false);
         d3.select(this).style('cursor', 'grab');
       }));
   }

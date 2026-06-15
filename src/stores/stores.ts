@@ -148,8 +148,14 @@ export const trainingStore = writable<TrainingConfig>({
   isTraining: false,
   batchSize: 'all',
   stepsPerSecond: 20,
-  schedule: 'constant'
+  schedule: 'constant',
+  continuous: false
 });
+
+// True while the user is dragging the marker on the landscape. The training
+// loop holds its steps during a drag so the marker follows the cursor
+// cleanly, then resumes (springing back) on release.
+export const markerDragging = writable(false);
 
 // ========== Optimizer Stores ==========
 // Which optimizer is selected, with its current hyperparameter values

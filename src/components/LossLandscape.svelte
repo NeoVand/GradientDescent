@@ -31,7 +31,8 @@
     trainingStore,
     challengeStore,
     optimizerStore,
-    optimizerStateStore
+    optimizerStateStore,
+    markerDragging
   } from '../stores/stores';
   import { basinStore, ensureBasins, BASIN_COLORS } from '../utils/basins';
   import { optimizers } from '../utils/optimizers';
@@ -1077,6 +1078,9 @@
       .touchable(() => true)
       .on('start', function () {
         isDragging = true;
+        // Hold any running (esp. continuous/∞) training so the marker
+        // tracks the cursor cleanly; it resumes and springs back on release.
+        markerDragging.set(true);
         // Drag means the user is restarting from a new position, so any
         // accumulated optimizer state (velocity, moment estimates) from
         // prior steps shouldn't carry over — and any divergence warning
@@ -1127,6 +1131,7 @@
       })
       .on('end', function () {
         isDragging = false;
+        markerDragging.set(false);
         d3.select(this).style('cursor', 'grab');
       }));
   }

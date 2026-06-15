@@ -160,6 +160,7 @@
   $: noiseLevel = $datasetStore.noiseLevel;
   $: learningRate = $trainingStore.learningRate;
   $: totalSteps = $trainingStore.totalSteps;
+  $: continuous = $trainingStore.continuous;
   $: currentStep = $trainingStore.currentStep;
   $: batchSize = $trainingStore.batchSize;
   $: schedule = $trainingStore.schedule;
@@ -170,10 +171,15 @@
   $: isAnalytic = problemConfigs[currentProblem]?.noData ?? false;
   $: raceRunning = $raceStore?.running ?? false;
 
-  // Training progress for the Train button fill
-  $: trainingProgress = isTraining && totalSteps > 0
-    ? Math.max(0, Math.min(100, ((currentStep - $runStartStep) / totalSteps) * 100))
-    : 0;
+  // Training progress for the Train button fill. A continuous (∞) run has
+  // no end, so the bar reads full while it loops.
+  $: trainingProgress = !isTraining
+    ? 0
+    : continuous
+      ? 100
+      : totalSteps > 0
+        ? Math.max(0, Math.min(100, ((currentStep - $runStartStep) / totalSteps) * 100))
+        : 0;
 
   // Update CSS variable for the split slider's two-tone track
   $: if (typeof document !== 'undefined') {
@@ -598,24 +604,28 @@
       <div class="row">
         <span class="icon"><RefreshCw size={16} strokeWidth={2} /></span>
         <span class="row-label">Steps</span>
-        <button class="info-btn" aria-label="About steps" use:tooltip={'Number of gradient descent iterations to perform when training'}>
+        <button class="info-btn" aria-label="About steps" use:tooltip={'Gradient steps per Train click — pull all the way right for ∞: training loops until you pause, so you can drag the marker and watch it spring back'}>
           <Info size={13} strokeWidth={2} />
         </button>
         <div class="row-spring"></div>
-        <span class="row-value steps-value">{totalSteps}</span>
+        <span class="row-value steps-value" class:infinite={continuous}>{continuous ? '∞' : totalSteps}</span>
       </div>
       <input
         id="training-steps"
         class="hyper-slider"
         type="range"
         min="10"
-        max="1000"
+        max="1010"
         step="10"
-        value={totalSteps}
-        style="--fill: {((totalSteps - 10) / 990) * 100}%; --slider-color: {SLIDER_COLORS.steps}"
+        value={continuous ? 1010 : totalSteps}
+        style="--fill: {continuous ? 100 : ((totalSteps - 10) / 990) * 100}%; --slider-color: {SLIDER_COLORS.steps}"
         on:input={(e) => {
           const v = parseInt(e.currentTarget.value);
-          trainingStore.update(s => ({ ...s, totalSteps: v }));
+          if (v > 1000) {
+            trainingStore.update(s => ({ ...s, continuous: true }));
+          } else {
+            trainingStore.update(s => ({ ...s, continuous: false, totalSteps: v }));
+          }
         }}
       />
     </div>
@@ -666,10 +676,10 @@
         <div class="button-content">
           {#if isTraining}
             <Pause size={16} strokeWidth={2} />
-            <span>{Math.round(trainingProgress)}%</span>
+            <span>{continuous ? '∞' : Math.round(trainingProgress) + '%'}</span>
           {:else}
             <Play size={16} strokeWidth={2} />
-            <span>Train</span>
+            <span>{continuous ? 'Train ∞' : 'Train'}</span>
           {/if}
         </div>
       </button>
@@ -1284,6 +1294,7 @@
   .split-separator { color: var(--color-text-tertiary); font-weight: 400; }
   .noise-value { color: var(--color-warning); }
   .steps-value { color: #10b981; }
+  .steps-value.infinite { font-size: 1.05rem; font-weight: 800; line-height: 1; }
 
   /* ---------- Dice / reroll ---------- */
   .reroll-btn {

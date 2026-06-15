@@ -281,7 +281,8 @@
     
     // γ(t) hairline: the schedule's shape over this run, drawn in a thin
     // band along the top of the plot (shape is what matters, not scale).
-    if (schedule !== 'constant') {
+    // A continuous (∞) run holds γ constant, so no decay curve is drawn.
+    if (schedule !== 'constant' && !$trainingStore.continuous) {
       const sched = schedules[schedule];
       const T = $trainingStore.totalSteps;
       const start = $runStartStep;

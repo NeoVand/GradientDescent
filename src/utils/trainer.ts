@@ -30,6 +30,7 @@ import {
   clearCoach,
   courseStore,
   challengeStore,
+  markerDragging,
   type Racer
 } from '../stores/stores';
 import { problemConfigs } from './problems';
@@ -109,9 +110,14 @@ function doOneStep(): boolean {
   const gradient = config.computeGradient(sampleBatch(trainData), params);
 
   // Effective γ under the schedule, measured by progress through this run.
+  // A continuous (∞) run has no horizon, so the schedule doesn't apply —
+  // γ stays constant so dragging the marker always springs back at full
+  // strength.
   const t = get(trainingStore);
   const tInRun = Math.max(0, t.currentStep - get(runStartStep));
-  const effLr = t.learningRate * schedules[t.schedule].factor(tInRun, t.totalSteps);
+  const effLr = t.continuous
+    ? t.learningRate
+    : t.learningRate * schedules[t.schedule].factor(tInRun, t.totalSteps);
 
   const result = opt.step(params, gradient, get(optimizerStateStore), effLr, sel.hyper);
 
@@ -145,7 +151,12 @@ function startLoop() {
   runningSps = get(trainingStore).stepsPerSecond;
   const intervalMs = Math.max(8, Math.round(1000 / runningSps));
   interval = window.setInterval(() => {
-    if (stepsCompleted >= stepsToTrain) {
+    // Hold the run while the user is dragging the marker, so it follows the
+    // cursor cleanly and springs back only once released.
+    if (get(markerDragging)) return;
+    // Continuous mode never finishes on its own — it loops until paused.
+    // (Checked live so toggling ∞ mid-run takes effect immediately.)
+    if (!get(trainingStore).continuous && stepsCompleted >= stepsToTrain) {
       finishRun();
       return;
     }

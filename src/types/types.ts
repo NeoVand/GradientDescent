@@ -99,6 +99,10 @@ export interface TrainingConfig {
   stepsPerSecond: number;
   // How γ evolves over the run (constant, step decay, cosine, warmup).
   schedule: ScheduleId;
+  // When true the run never ends on its own — it loops until paused (the
+  // Steps slider pulled past its max). γ stays constant (no schedule decay)
+  // so dragging the marker always springs it back toward a minimum.
+  continuous: boolean;
 }
 
 // A single point in our training history
