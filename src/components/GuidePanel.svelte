@@ -212,14 +212,16 @@
     height: 100%;
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    /* Spacing scales with viewport height so all four rows fit inside the
+       fixed-height bottom row, even at the short-viewport floor. */
+    gap: clamp(0.2rem, 0.7vh, 0.6rem);
     padding-bottom: 0.5rem;
     padding-left: 50px;
     overflow: hidden;
   }
-  
+
   h3 {
-    margin: 0 0 0.375rem 0;
+    margin: 0 0 0.2rem 0;
     font-size: 0.95rem;
     font-weight: 600;
     color: var(--color-text-primary);
@@ -234,14 +236,15 @@
     display: flex;
     align-items: center;
     gap: 0.625rem;
-    padding: 0.5rem 0;
+    padding: clamp(0.08rem, 0.45vh, 0.4rem) 0;
+    min-width: 0;
   }
-  
+
   .equation-label {
-    font-size: 0.825rem;
+    font-size: 0.78rem;
     font-weight: 600;
     flex-shrink: 0;
-    min-width: 5.5rem;
+    min-width: 4.6rem;
   }
   
   /* Light mode labels */
@@ -255,17 +258,26 @@
   }
   
   .equation-content {
-    flex: 1;
+    flex: 1 1 0;
+    min-width: 0;
     display: flex;
     align-items: center;
     gap: 0.5rem;
     overflow-x: auto;
   }
-  
+
+  /* The formula area takes the row's remaining width and may shrink below
+     its content; overflow-x then scrolls long formulas instead of pushing
+     the panel off-screen. */
+  .equation-row > .latex-inline {
+    flex: 1 1 0;
+  }
+
   .latex-inline {
     color: var(--color-text-primary);
     display: flex;
     align-items: center;
+    min-width: 0;
     overflow-x: auto;
   }
   
@@ -298,9 +310,11 @@
     scrollbar-width: none;
   }
   
-  /* Style KaTeX output */
+  /* Style KaTeX output — smaller and viewport-scaled so the tallest /
+     widest formulas (matrix gradients, the tiny-net and AR rollout rows)
+     fit the fixed-height panel at every screen size. */
   .latex-inline :global(.katex) {
-    font-size: 1.1rem;
+    font-size: clamp(0.76rem, 1.55vh, 0.98rem);
   }
   
   .latex-inline :global(.katex-html) {
