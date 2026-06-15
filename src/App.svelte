@@ -30,7 +30,7 @@ import CoursePanel from './components/CoursePanel.svelte';
   import { startTraining, stopTraining, stepOnce, resetRun, runEndStore, applyProblem } from './utils/trainer';
   import { startCourse, closeCourse } from './utils/lessons';
   import { applyUrlState, encodeStateUrl } from './utils/urlState';
-  import { Sun, Moon, HelpCircle, Menu, X, Share2, GraduationCap } from 'lucide-svelte';
+  import { Sun, Moon, HelpCircle, Menu, X, Share2, GraduationCap, Maximize, Minimize } from 'lucide-svelte';
 
   // The main app orchestrates all our components and manages the overall layout.
   // We use CSS Grid for a responsive, flexible layout that adapts to different screen sizes.
@@ -42,6 +42,22 @@ import CoursePanel from './components/CoursePanel.svelte';
 
   function closeDrawer() { drawerOpen = false; }
   function openDrawer() { drawerOpen = true; }
+
+  // ---------- Full screen (browser Fullscreen API) ----------
+  let isFullscreen = false;
+
+  function toggleFullscreen() {
+    const d = document as any;
+    if (d.fullscreenElement || d.webkitFullscreenElement) {
+      (d.exitFullscreen || d.webkitExitFullscreen)?.call(document);
+    } else {
+      const el = document.documentElement as any;
+      const req = el.requestFullscreen || el.webkitRequestFullscreen;
+      // Called from a click (user gesture), so this is allowed; swallow the
+      // rejection some browsers throw if it's somehow blocked.
+      Promise.resolve(req?.call(el)).catch(() => {});
+    }
+  }
 
   // Lock body scroll while the drawer is open on mobile
   $: if (typeof document !== 'undefined') {
@@ -56,6 +72,13 @@ import CoursePanel from './components/CoursePanel.svelte';
   onMount(() => {
     // Set initial theme on mount
     document.documentElement.setAttribute('data-theme', theme);
+
+    // Keep the full-screen button's icon in sync, incl. exiting via Esc.
+    const syncFs = () => {
+      isFullscreen = !!((document as any).fullscreenElement || (document as any).webkitFullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', syncFs);
+    document.addEventListener('webkitfullscreenchange', syncFs);
 
     // A shared link restores the full scenario (settings + seed + marker)
     const shared = applyUrlState();
@@ -78,6 +101,11 @@ import CoursePanel from './components/CoursePanel.svelte';
       // button is one click away whenever it's wanted.
       applyProblem(get(selectedProblem));
     }
+
+    return () => {
+      document.removeEventListener('fullscreenchange', syncFs);
+      document.removeEventListener('webkitfullscreenchange', syncFs);
+    };
   });
 
   // Problem switches redraw every panel at once — a brief veil washing
@@ -293,6 +321,19 @@ import CoursePanel from './components/CoursePanel.svelte';
   </button>
   <button class="help-btn" on:click={() => showHelpModal = true} title="Help & Guide">
     <HelpCircle size={20} strokeWidth={2.5} />
+  </button>
+  <button
+    class="help-btn"
+    class:tool-on={isFullscreen}
+    on:click={toggleFullscreen}
+    title={isFullscreen ? 'Exit full screen' : 'Full screen'}
+    aria-label={isFullscreen ? 'Exit full screen' : 'Enter full screen'}
+  >
+    {#if isFullscreen}
+      <Minimize size={18} strokeWidth={2.5} />
+    {:else}
+      <Maximize size={18} strokeWidth={2.5} />
+    {/if}
   </button>
   <button class="help-btn" on:click={() => themeStore.toggle()} title="Toggle theme">
     {#if theme === 'light'}
