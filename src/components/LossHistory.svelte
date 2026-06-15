@@ -13,6 +13,7 @@
   import { runStartStep } from '../utils/trainer';
   import { schedules } from '../utils/schedules';
   import { Activity } from 'lucide-svelte';
+  import { tooltip } from '../utils/tooltip';
   
   let svgElement: SVGSVGElement;
   let width = 400;
@@ -351,7 +352,7 @@
     <button
       class="log-toggle"
       class:active={logScale}
-      title="Toggle logarithmic loss axis"
+      use:tooltip={'Toggle logarithmic loss axis — see early-training detail when loss spans orders of magnitude'}
       on:click={() => (logScale = !logScale)}
     >log</button>
     <div class="legend-controls">

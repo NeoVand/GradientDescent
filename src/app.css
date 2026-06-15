@@ -201,13 +201,49 @@ code, .mono {
   outline-offset: 2px;
 }
 
+/* ---------- App-wide tooltip (used via the `tooltip` action) ---------- */
+.app-tooltip {
+  position: fixed;
+  z-index: 10000;
+  max-width: 260px;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  pointer-events: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  animation: appTooltipIn 0.12s ease;
+}
+
+[data-theme='light'] .app-tooltip {
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  border: 1px solid #a7f3d0;
+  color: #064e3b;
+}
+
+[data-theme='dark'] .app-tooltip {
+  background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+  border: 1px solid #047857;
+  color: #d1fae5;
+}
+
+@keyframes appTooltipIn {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* No real hover on touch devices — don't show stuck tooltips */
+@media (hover: none) {
+  .app-tooltip { display: none; }
+}
+
 /* Print styles */
 @media print {
   body {
     background: white;
     color: black;
   }
-  
+
   .no-print {
     display: none !important;
   }

@@ -49,6 +49,7 @@
   import { canExportVideo, exportRunWebM } from '../utils/replay';
   import type { ModelParameters } from '../types/types';
   import { Mountain, Orbit, Map as MapIcon, Video } from 'lucide-svelte';
+  import { tooltip } from '../utils/tooltip';
   import LossCurve1D from './LossCurve1D.svelte';
 
   // Component references
@@ -1182,7 +1183,7 @@
           <button
             class="tool-btn"
             class:active={lensOn}
-            title="Curvature lens — the local Hessian's ellipse at the marker, condition number κ, and the Newton step a second-order method would take"
+            use:tooltip={"Curvature lens — the local Hessian's ellipse at the marker, condition number κ, and the Newton step a second-order method would take"}
             aria-label="Curvature lens"
             aria-pressed={lensOn}
             on:click={toggleLens}
@@ -1193,7 +1194,7 @@
         <button
           class="tool-btn"
           class:active={basinsOn}
-          title="Basins of attraction — every point colored by WHICH minimum plain gradient descent (at the current γ) reaches from there. Same color = same destination."
+          use:tooltip={'Basins of attraction — every point colored by WHICH minimum plain gradient descent (at the current γ) reaches from there. Same color = same destination.'}
           aria-label="Basins of attraction"
           aria-pressed={basinsOn}
           on:click={toggleBasins}
@@ -1208,7 +1209,7 @@
           <button
             class="tool-btn"
             disabled={!canExport}
-            title={exporting
+            use:tooltip={exporting
               ? 'Recording…'
               : canExport
                 ? 'Export the last run as a WebM video for slides'

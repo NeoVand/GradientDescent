@@ -15,6 +15,7 @@
   import { datasetStore, parametersStore, currentProblemConfig, selectedProblem, themeStore } from '../stores/stores';
   import type { DataPoint, ModelParameters } from '../types/types';
   import { ScatterChart, Eraser } from 'lucide-svelte';
+  import { tooltip } from '../utils/tooltip';
   
   let svgElement: SVGSVGElement;
   let width = 400;
@@ -993,7 +994,7 @@
         <button
           class="tool-btn"
           class:active={editTool === 'train'}
-          title="Add training points — click anywhere on the plot. The loss landscape reshapes live."
+          use:tooltip={'Add training points — click anywhere on the plot. The loss landscape reshapes live.'}
           aria-label="Add training points"
           aria-pressed={editTool === 'train'}
           on:click={() => (editTool = 'train')}
@@ -1006,7 +1007,7 @@
         <button
           class="tool-btn"
           class:active={editTool === 'test'}
-          title="Add test points — held out of training, they only score the fit"
+          use:tooltip={'Add test points — held out of training, they only score the fit'}
           aria-label="Add test points"
           aria-pressed={editTool === 'test'}
           on:click={() => (editTool = 'test')}
@@ -1019,7 +1020,7 @@
         <button
           class="tool-btn erase-btn"
           class:active={editTool === 'erase'}
-          title="Erase points — click a point to remove it (a dataset keeps at least 3)"
+          use:tooltip={'Erase points — click a point to remove it (a dataset keeps at least 3)'}
           aria-label="Erase points"
           aria-pressed={editTool === 'erase'}
           on:click={() => (editTool = 'erase')}

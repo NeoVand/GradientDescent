@@ -15,6 +15,7 @@
   import { problemConfigs } from '../utils/problems';
   import { optimizers, optimizerOrder, type OptimizerId } from '../utils/optimizers';
   import { schedules, scheduleOrder } from '../utils/schedules';
+  import { tooltip } from '../utils/tooltip';
   import {
     startTraining,
     stopTraining,
@@ -85,8 +86,6 @@
     requestAnimationFrame(updateDropdownFades);
   }
 
-  // Tooltip state
-  let activeTooltip: string | null = null;
 
   interface ProblemEntry {
     type: ProblemType;
@@ -369,21 +368,9 @@
       <div class="row">
         <span class="icon"><MapPin size={16} strokeWidth={2} /></span>
         <span class="row-label">Points</span>
-        <div class="tooltip-container">
-          <button
-            class="info-btn"
-            on:mouseenter={() => activeTooltip = 'dataPoints'}
-            on:mouseleave={() => activeTooltip = null}
-          >
-            <Info size={13} strokeWidth={2} />
-          </button>
-          {#if activeTooltip === 'dataPoints'}
-            <div class="tooltip">
-              Number of synthetic data points to generate<br/>
-              <span style="opacity: 0.8; font-size: 0.7rem;">The dice rolls a fresh dataset</span>
-            </div>
-          {/if}
-        </div>
+        <button class="info-btn" aria-label="About data points" use:tooltip={'Number of synthetic data points to generate<br/><span style="opacity:0.8;font-size:0.7rem">The dice rolls a fresh dataset</span>'}>
+          <Info size={13} strokeWidth={2} />
+        </button>
         <div class="row-spring"></div>
         <span class="row-value" style="color: {SLIDER_COLORS.points}">{numPoints}</span>
       </div>
@@ -405,21 +392,9 @@
       <div class="row">
         <span class="icon"><Droplets size={16} strokeWidth={2} /></span>
         <span class="row-label">Noise</span>
-        <div class="tooltip-container">
-          <button
-            class="info-btn"
-            on:mouseenter={() => activeTooltip = 'noise'}
-            on:mouseleave={() => activeTooltip = null}
-          >
-            <Info size={13} strokeWidth={2} />
-          </button>
-          {#if activeTooltip === 'noise'}
-            <div class="tooltip">
-              Amount of random noise added to synthetic data<br/>
-              <span style="opacity: 0.8; font-size: 0.7rem;">0 = clean, 2 = very noisy</span>
-            </div>
-          {/if}
-        </div>
+        <button class="info-btn" aria-label="About noise" use:tooltip={'Amount of random noise added to synthetic data<br/><span style="opacity:0.8;font-size:0.7rem">0 = clean, 2 = very noisy</span>'}>
+          <Info size={13} strokeWidth={2} />
+        </button>
         <div class="row-spring"></div>
         <span class="row-value noise-value">{noiseLevel.toFixed(2)}</span>
       </div>
@@ -439,20 +414,9 @@
       <div class="row">
         <span class="icon"><PieChart size={16} strokeWidth={2} /></span>
         <span class="row-label">Train/Test Split</span>
-        <div class="tooltip-container">
-          <button
-            class="info-btn"
-            on:mouseenter={() => activeTooltip = 'trainTest'}
-            on:mouseleave={() => activeTooltip = null}
-          >
-            <Info size={13} strokeWidth={2} />
-          </button>
-          {#if activeTooltip === 'trainTest'}
-            <div class="tooltip">
-              Ratio of data used for training vs. testing the model
-            </div>
-          {/if}
-        </div>
+        <button class="info-btn" aria-label="About train/test split" use:tooltip={'Ratio of data used for training vs. testing the model'}>
+          <Info size={13} strokeWidth={2} />
+        </button>
         <div class="row-spring"></div>
         <span class="row-value">
           <span class="split-value train">{Math.round(trainRatio * 100)}</span><span class="split-separator">/</span><span class="split-value test">{Math.round((1 - trainRatio) * 100)}</span>
@@ -528,18 +492,9 @@
         <div class="row">
           <span class="icon"><Rocket size={16} strokeWidth={2} /></span>
           <span class="row-label">{spec.label} <span class="greek-label">({spec.symbol})</span></span>
-          <div class="tooltip-container">
-            <button
-              class="info-btn"
-              on:mouseenter={() => activeTooltip = 'hyper-' + spec.key}
-              on:mouseleave={() => activeTooltip = null}
-            >
-              <Info size={13} strokeWidth={2} />
-            </button>
-            {#if activeTooltip === 'hyper-' + spec.key}
-              <div class="tooltip">{spec.hint}</div>
-            {/if}
-          </div>
+          <button class="info-btn" aria-label="About {spec.label}" use:tooltip={spec.hint}>
+            <Info size={13} strokeWidth={2} />
+          </button>
           <div class="row-spring"></div>
           <span class="row-value" style="color: {HYPER_COLORS[spec.key] ?? '#10b981'}">{(optimizerSel.hyper[spec.key] ?? spec.default).toFixed(spec.step < 0.01 ? 3 : 2)}</span>
         </div>
@@ -562,21 +517,9 @@
       <div class="row">
         <span class="icon"><Zap size={16} strokeWidth={2} /></span>
         <span class="row-label">Learn Rate <span class="greek-label">(γ)</span></span>
-        <div class="tooltip-container">
-          <button
-            class="info-btn"
-            on:mouseenter={() => activeTooltip = 'learningRate'}
-            on:mouseleave={() => activeTooltip = null}
-          >
-            <Info size={13} strokeWidth={2} />
-          </button>
-          {#if activeTooltip === 'learningRate'}
-            <div class="tooltip">
-              Step size for gradient descent updates (log scale, 10⁻⁴ … 1)<br/>
-              <span style="opacity: 0.8; font-size: 0.7rem;">Higher = faster but less stable</span>
-            </div>
-          {/if}
-        </div>
+        <button class="info-btn" aria-label="About learning rate" use:tooltip={'Step size for gradient descent updates (log scale, 10⁻⁴ … 1)<br/><span style="opacity:0.8;font-size:0.7rem">Higher = faster but less stable</span>'}>
+          <Info size={13} strokeWidth={2} />
+        </button>
         <div class="row-spring"></div>
         <span class="row-value" style="color: {lrColor}">{formatLearningRate(learningRate)}</span>
       </div>
@@ -598,21 +541,9 @@
       <div class="row">
         <span class="icon"><Timer size={16} strokeWidth={2} /></span>
         <span class="row-label">Schedule</span>
-        <div class="tooltip-container">
-          <button
-            class="info-btn"
-            on:mouseenter={() => activeTooltip = 'schedule'}
-            on:mouseleave={() => activeTooltip = null}
-          >
-            <Info size={13} strokeWidth={2} />
-          </button>
-          {#if activeTooltip === 'schedule'}
-            <div class="tooltip">
-              How γ evolves over the run<br/>
-              <span style="opacity: 0.8; font-size: 0.7rem;">Step drops ×0.3 at ⅓ and ⅔; cosine glides to 5%; warmup ramps up first. The dotted γ line in the loss chart shows the shape.</span>
-            </div>
-          {/if}
-        </div>
+        <button class="info-btn" aria-label="About schedule" use:tooltip={'How γ evolves over the run<br/><span style="opacity:0.8;font-size:0.7rem">Step drops ×0.3 at ⅓ and ⅔; cosine glides to 5%; warmup ramps up first. The dotted γ line in the loss chart shows the shape.</span>'}>
+          <Info size={13} strokeWidth={2} />
+        </button>
         <div class="row-spring"></div>
       </div>
       <div class="seg-control" role="group" aria-label="Learning-rate schedule">
@@ -631,21 +562,9 @@
       <div class="row">
         <span class="icon"><Layers size={16} strokeWidth={2} /></span>
         <span class="row-label">Batch Size</span>
-        <div class="tooltip-container">
-          <button
-            class="info-btn"
-            on:mouseenter={() => activeTooltip = 'batch'}
-            on:mouseleave={() => activeTooltip = null}
-          >
-            <Info size={13} strokeWidth={2} />
-          </button>
-          {#if activeTooltip === 'batch'}
-            <div class="tooltip">
-              Points sampled per gradient step<br/>
-              <span style="opacity: 0.8; font-size: 0.7rem;">Small batches = noisy, stochastic descent (SGD)</span>
-            </div>
-          {/if}
-        </div>
+        <button class="info-btn" aria-label="About batch size" use:tooltip={'Points sampled per gradient step<br/><span style="opacity:0.8;font-size:0.7rem">Small batches = noisy, stochastic descent (SGD)</span>'}>
+          <Info size={13} strokeWidth={2} />
+        </button>
         <div class="row-spring"></div>
         <span class="row-value" style="color: {SLIDER_COLORS.batch}">{batchLabel}</span>
       </div>
@@ -679,20 +598,9 @@
       <div class="row">
         <span class="icon"><RefreshCw size={16} strokeWidth={2} /></span>
         <span class="row-label">Steps</span>
-        <div class="tooltip-container">
-          <button
-            class="info-btn"
-            on:mouseenter={() => activeTooltip = 'steps'}
-            on:mouseleave={() => activeTooltip = null}
-          >
-            <Info size={13} strokeWidth={2} />
-          </button>
-          {#if activeTooltip === 'steps'}
-            <div class="tooltip">
-              Number of gradient descent iterations to perform when training
-            </div>
-          {/if}
-        </div>
+        <button class="info-btn" aria-label="About steps" use:tooltip={'Number of gradient descent iterations to perform when training'}>
+          <Info size={13} strokeWidth={2} />
+        </button>
         <div class="row-spring"></div>
         <span class="row-value steps-value">{totalSteps}</span>
       </div>
@@ -704,7 +612,7 @@
         max="1000"
         step="10"
         value={totalSteps}
-        style="--fill: {((totalSteps - 10) / 990) * 100}%"
+        style="--fill: {((totalSteps - 10) / 990) * 100}%; --slider-color: {SLIDER_COLORS.steps}"
         on:input={(e) => {
           const v = parseInt(e.currentTarget.value);
           trainingStore.update(s => ({ ...s, totalSteps: v }));
@@ -717,20 +625,9 @@
       <div class="row">
         <span class="icon"><Gauge size={16} strokeWidth={2} /></span>
         <span class="row-label">Speed</span>
-        <div class="tooltip-container">
-          <button
-            class="info-btn"
-            on:mouseenter={() => activeTooltip = 'speed'}
-            on:mouseleave={() => activeTooltip = null}
-          >
-            <Info size={13} strokeWidth={2} />
-          </button>
-          {#if activeTooltip === 'speed'}
-            <div class="tooltip">
-              Animation speed — gradient steps per second
-            </div>
-          {/if}
-        </div>
+        <button class="info-btn" aria-label="About speed" use:tooltip={'Animation speed — gradient steps per second'}>
+          <Info size={13} strokeWidth={2} />
+        </button>
         <div class="row-spring"></div>
         <span class="row-value" style="color: {SLIDER_COLORS.speed}">{stepsPerSecond}/s</span>
       </div>
@@ -993,55 +890,6 @@
   .info-btn:hover {
     opacity: 1;
     color: #10b981;
-  }
-
-  .tooltip-container {
-    position: relative;
-    display: flex;
-    align-items: center;
-  }
-
-  .tooltip {
-    position: fixed;
-    left: 312px;
-    transform: translateY(-50%);
-    padding: 0.625rem 0.875rem;
-    border-radius: 8px;
-    font-size: 0.75rem;
-    line-height: 1.4;
-    white-space: nowrap;
-    z-index: 10000;
-    pointer-events: none;
-    animation: tooltipFadeIn 0.2s ease;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  }
-
-  /* Hover-only tooltips: hide on small screens (no real hover) */
-  @media (hover: none), (max-width: 768px) {
-    .tooltip { display: none; }
-  }
-
-  :global([data-theme='light']) .tooltip {
-    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
-    border: 1px solid #a7f3d0;
-    color: #064e3b;
-  }
-
-  :global([data-theme='dark']) .tooltip {
-    background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
-    border: 1px solid #047857;
-    color: #d1fae5;
-  }
-
-  @keyframes tooltipFadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(-50%) translateX(-5px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(-50%) translateX(0);
-    }
   }
 
   /* ---------- Dropdown selectors (problem + optimizer share styles) ---------- */
