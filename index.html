@@ -4,7 +4,41 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gradient Descent</title>
+    <title>Gradient Lab — see how machines learn</title>
+    <meta
+      name="description"
+      content="An interactive playground for gradient-based optimization: loss landscapes in 1D, 2D and 3D, six optimizers, races, basins of attraction, and a built-in course."
+    />
+
+    <!-- Social sharing -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Gradient Lab — see how machines learn" />
+    <meta
+      property="og:description"
+      content="An interactive playground for gradient-based optimization: loss landscapes, six optimizers, races, basins of attraction, and a built-in course."
+    />
+    <meta property="og:url" content="https://gradientlab.ai/" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- Google Analytics (GA4) — loaded only on the live domain, so local dev
+         and Cloudflare preview deployments never pollute the stats. The
+         measurement ID is filled in once the property is created. -->
+    <script>
+      (function () {
+        var host = location.hostname;
+        if (host !== 'gradientlab.ai' && host !== 'www.gradientlab.ai') return;
+        var GA_ID = 'G-XXXXXXXXXX'; // TODO: replace with the real GA4 Measurement ID
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
+        document.head.appendChild(s);
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        window.gtag = gtag;
+        gtag('js', new Date());
+        gtag('config', GA_ID);
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>

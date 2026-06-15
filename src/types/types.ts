@@ -1,5 +1,5 @@
 /**
- * Type definitions for our Gradient Descent Learning App
+ * Type definitions for Gradient Lab
  * These types help us maintain consistency across the application
  * and provide excellent IDE support with TypeScript.
  */

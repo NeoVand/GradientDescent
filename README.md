@@ -1,4 +1,4 @@
-# ∂ Gradient Descent Explorer
+# ∂ Gradient Lab
 
 [![Svelte](https://img.shields.io/badge/Svelte-5.55-FF3E00?style=flat&logo=svelte&logoColor=white)](https://svelte.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -8,9 +8,9 @@
 
 An interactive visualization tool for understanding gradient descent through beautiful, real-time animations and mathematical rigor.
 
-**[🚀 Live Demo](https://neovand.github.io/GradientDescent/)**
+**[🚀 Live at gradientlab.ai](https://gradientlab.ai/)**
 
-![Gradient Descent Explorer](public/screenshot.gif)
+![Gradient Lab](public/screenshot.gif)
 
 ## ✨ Features
 
@@ -48,7 +48,7 @@ An interactive visualization tool for understanding gradient descent through bea
 
 ## 🎯 What It Does
 
-Gradient Descent Explorer helps you understand optimization algorithms through visual experimentation:
+Gradient Lab helps you understand optimization algorithms through visual experimentation:
 
 - **Learn** with the built-in course: ten predict-then-run lessons from 1D slopes to a tiny neural network
 - **Drag** the orange marker to manually explore parameter space

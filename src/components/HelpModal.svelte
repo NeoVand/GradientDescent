@@ -388,7 +388,7 @@
       <div class="modal-header">
         <div class="modal-title">
           <span class="modal-icon">∂</span>
-          <h2>Gradient Descent Explorer</h2>
+          <h2>Gradient Lab</h2>
         </div>
         <button class="close-btn" on:click={onClose}>
           <X size={24} strokeWidth={2} />

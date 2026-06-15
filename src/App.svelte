@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Welcome to our Gradient Descent Learning App!
+  // Welcome to Gradient Lab!
   // This is an interactive educational tool to understand how gradient descent works
   // through visual experiments with machine learning algorithms.
   
@@ -218,7 +218,7 @@ import CoursePanel from './components/CoursePanel.svelte';
   <button class="topbar-btn menu-btn" on:click={openDrawer} aria-label="Open controls">
     <Menu size={22} strokeWidth={2.5} />
   </button>
-  <h1 class="topbar-title"><span class="topbar-mark">∂</span> Gradient Descent</h1>
+  <h1 class="topbar-title"><span class="topbar-mark">∂</span> Gradient Lab</h1>
   <button class="topbar-btn" on:click={() => showHelpModal = true} aria-label="Help">
     <HelpCircle size={20} strokeWidth={2.5} />
   </button>

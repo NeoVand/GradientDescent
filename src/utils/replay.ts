@@ -170,7 +170,7 @@ export async function exportRunWebM({ scene, history, problemName, isDark }: Rep
 
     ctx.globalAlpha = 0.55;
     ctx.font = '600 20px Georgia, serif';
-    ctx.fillText('∂ Gradient Descent Explorer', SIZE - MARGIN, SIZE - 22);
+    ctx.fillText('∂ Gradient Lab', SIZE - MARGIN, SIZE - 22);
     ctx.globalAlpha = 1;
   }
 
@@ -190,7 +190,7 @@ export async function exportRunWebM({ scene, history, problemName, isDark }: Rep
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'gradient-descent-run.webm';
+      a.download = 'gradient-lab-run.webm';
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 5000);
       resolve();

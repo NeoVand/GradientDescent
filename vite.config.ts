@@ -4,7 +4,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/GradientDescent/',
+  // Served from the apex domain gradientlab.ai, so assets live at the root.
+  base: '/',
   plugins: [
     svelte(),
     // Offline support: lecture-hall wifi is not a dependency. Precaches the
@@ -17,8 +18,8 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,woff2}']
       },
       manifest: {
-        name: 'Gradient Descent Explorer',
-        short_name: '∂ Descent',
+        name: 'Gradient Lab',
+        short_name: 'Gradient Lab',
         description:
           'Interactive playground for learning gradient-based optimization: loss landscapes in 1D/2D/3D, six optimizers, races, basins of attraction, and a built-in course.',
         theme_color: '#0a1218',

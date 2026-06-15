@@ -293,7 +293,7 @@
   <div class="panel top-panel">
     <h1>
       <span class="app-icon">∂</span>
-      <span>Gradient Descent</span>
+      <span>Gradient Lab</span>
     </h1>
     <div class="sidebar-content">
 
