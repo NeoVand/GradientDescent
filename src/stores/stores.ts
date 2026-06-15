@@ -27,8 +27,10 @@ import {
 } from '../utils/lossGrid';
 
 // ========== Problem Selection Store ==========
-// Controls which ML problem we're currently exploring
-export const selectedProblem = writable<ProblemType>('linear-regression');
+// Controls which ML problem we're currently exploring. The app lands on
+// Gaussian Mixture: two equivalent minima, and a default start that gives
+// a long, satisfying descent trajectory.
+export const selectedProblem = writable<ProblemType>('gaussian-mixture');
 
 // ========== Dataset Store ==========
 // Manages our data points and train/test split.
@@ -127,7 +129,9 @@ function createParametersStore() {
     return config?.getInitialParameters ? config.getInitialParameters() : initializeDefault();
   };
 
-  const { subscribe, set, update } = writable<ModelParameters>(initializeDefault());
+  // Start the marker at the current (default) problem's own initial point,
+  // not a random corner — so the app lands with a sensible, in-range start.
+  const { subscribe, set, update } = writable<ModelParameters>(initializeForCurrentProblem());
 
   return {
     subscribe,
@@ -165,15 +169,17 @@ export interface OptimizerSelection {
   hyper: Record<string, number>;
 }
 
+// Default optimizer is Momentum (the app lands on Gaussian Mixture, where
+// the heavy ball traces a nicer trajectory than plain GD).
 export const optimizerStore = writable<OptimizerSelection>({
-  id: 'gd',
-  hyper: defaultHyper('gd')
+  id: 'momentum',
+  hyper: defaultHyper('momentum')
 });
 
 // Mutable per-run optimizer state (velocity / moment estimates / step
 // count). Kept separate so it can be reset independently: training reset,
 // problem or optimizer switch, hyperparameter change, manual marker drag.
-export const optimizerStateStore = writable<OptimizerState>(optimizers.gd.init());
+export const optimizerStateStore = writable<OptimizerState>(optimizers.momentum.init());
 
 export function resetOptimizerState() {
   optimizerStateStore.set(optimizers[get(optimizerStore).id].init());

@@ -4,6 +4,7 @@
   // through visual experiments with machine learning algorithms.
   
   import { onMount } from 'svelte';
+  import { get } from 'svelte/store';
   import Sidebar from './components/Sidebar.svelte';
   import DataVisualization from './components/DataVisualization.svelte';
   import LossLandscape from './components/LossLandscape.svelte';
@@ -23,12 +24,13 @@ import CoursePanel from './components/CoursePanel.svelte';
     historyStore,
     resetOptimizerState,
     courseStore,
-    challengeStore
+    challengeStore,
+    selectedProblem
   } from './stores/stores';
-  import { startTraining, stopTraining, stepOnce, resetRun, runEndStore } from './utils/trainer';
+  import { startTraining, stopTraining, stepOnce, resetRun, runEndStore, applyProblem } from './utils/trainer';
   import { startCourse, closeCourse } from './utils/lessons';
   import { applyUrlState, encodeStateUrl } from './utils/urlState';
-  import { Sun, Moon, HelpCircle, Menu, X, Share2, GraduationCap, Wrench } from 'lucide-svelte';
+  import { Sun, Moon, HelpCircle, Menu, X, Share2, GraduationCap } from 'lucide-svelte';
 
   // The main app orchestrates all our components and manages the overall layout.
   // We use CSS Grid for a responsive, flexible layout that adapts to different screen sizes.
@@ -57,28 +59,26 @@ import CoursePanel from './components/CoursePanel.svelte';
 
     // A shared link restores the full scenario (settings + seed + marker)
     const shared = applyUrlState();
-    datasetStore.regenerateData();
     if (shared) {
+      datasetStore.regenerateData();
       parametersStore.set(shared.params);
-    }
-    recordInitialHistory();
-
-    if (shared?.goal) {
-      challengeStore.set({ target: shared.goal, status: 'open' });
-      showCoach('info', `🎯 Challenge loaded — reach the basin in ≤ ${shared.goal} steps. Tune anything you like, then Train.`, 0);
-    } else if (shared) {
-      // Sticky: someone opening a shared link looks around before acting;
-      // any training action clears it.
-      showCoach('info', 'Loaded a shared scenario — same data, same start. Hit Train to run it.', 0);
-    } else if (!localStorage.getItem('gd-visited')) {
-      // First visit: open the guide (it has the one-click experiments)
-      localStorage.setItem('gd-visited', '1');
-      showHelpModal = true;
+      recordInitialHistory();
+      if (shared.goal) {
+        challengeStore.set({ target: shared.goal, status: 'open' });
+        showCoach('info', `🎯 Challenge loaded — reach the basin in ≤ ${shared.goal} steps. Tune anything you like, then Train.`, 0);
+      } else {
+        // Sticky: someone opening a shared link looks around before acting;
+        // any training action clears it.
+        showCoach('info', 'Loaded a shared scenario — same data, same start. Hit Train to run it.', 0);
+      }
+    } else {
+      // Fresh load: set up the default problem with its curated optimizer
+      // (Momentum), learning rate, fresh data and starting marker. The app
+      // opens straight into the playground — no guide modal; the Help
+      // button is one click away whenever it's wanted.
+      applyProblem(get(selectedProblem));
     }
   });
-
-  // Desktop tool corner: collapsed to one button by default
-  let toolsOpen = false;
 
   // Problem switches redraw every panel at once — a brief veil washing
   // out over the new scene turns the hard cut into a gentle transition.
@@ -276,46 +276,29 @@ import CoursePanel from './components/CoursePanel.svelte';
   </div>
 </main>
 
-<!-- Desktop tool corner (hidden on mobile, replaced by topbar): a single
-     collapsed button that expands into the tool row, so it never crowds
-     the Formulas panel. -->
-<div class="floating-buttons" class:expanded={toolsOpen}>
-  {#if toolsOpen}
-    <div class="tool-tray">
-      <button
-        class="help-btn"
-        class:tool-on={$courseStore.active}
-        on:click={() => ($courseStore.active ? closeCourse() : startCourse())}
-        title="Course — ten predict-then-run lessons, from slopes to a tiny neural net"
-      >
-        <GraduationCap size={19} strokeWidth={2.5} />
-      </button>
-      <button class="help-btn" class:tool-on={showSharePopover} on:click={toggleSharePopover} title="Share this exact scenario — or turn it into a challenge">
-        <Share2 size={18} strokeWidth={2.5} />
-      </button>
-      <button class="help-btn" on:click={() => showHelpModal = true} title="Help & Guide">
-        <HelpCircle size={20} strokeWidth={2.5} />
-      </button>
-      <button class="help-btn" on:click={() => themeStore.toggle()} title="Toggle theme">
-        {#if theme === 'light'}
-          <Moon size={20} strokeWidth={2.5} />
-        {:else}
-          <Sun size={20} strokeWidth={2.5} />
-        {/if}
-      </button>
-    </div>
-  {/if}
+<!-- Desktop tool corner (hidden on mobile, replaced by topbar): course,
+     share, help and theme, always available. The Formulas panel keeps
+     clear of this corner, so the buttons can live here permanently. -->
+<div class="floating-buttons">
   <button
-    class="help-btn tools-fab"
-    class:tool-on={toolsOpen}
-    on:click={() => (toolsOpen = !toolsOpen)}
-    title={toolsOpen ? 'Collapse tools' : 'Tools — course, share, help, theme'}
-    aria-expanded={toolsOpen}
+    class="help-btn"
+    class:tool-on={$courseStore.active}
+    on:click={() => ($courseStore.active ? closeCourse() : startCourse())}
+    title="Course — ten predict-then-run lessons, from slopes to a tiny neural net"
   >
-    {#if toolsOpen}
-      <X size={18} strokeWidth={2.5} />
+    <GraduationCap size={19} strokeWidth={2.5} />
+  </button>
+  <button class="help-btn" class:tool-on={showSharePopover} on:click={toggleSharePopover} title="Share this exact scenario — or turn it into a challenge">
+    <Share2 size={18} strokeWidth={2.5} />
+  </button>
+  <button class="help-btn" on:click={() => showHelpModal = true} title="Help & Guide">
+    <HelpCircle size={20} strokeWidth={2.5} />
+  </button>
+  <button class="help-btn" on:click={() => themeStore.toggle()} title="Toggle theme">
+    {#if theme === 'light'}
+      <Moon size={20} strokeWidth={2.5} />
     {:else}
-      <Wrench size={17} strokeWidth={2.5} />
+      <Sun size={20} strokeWidth={2.5} />
     {/if}
   </button>
 </div>
@@ -488,18 +471,6 @@ import CoursePanel from './components/CoursePanel.svelte';
     border-color: rgba(16, 185, 129, 0.6);
     color: #10b981 !important;
     background: rgba(16, 185, 129, 0.14) !important;
-  }
-
-  /* Expanded tool tray slides out of the collapsed button */
-  .tool-tray {
-    display: flex;
-    gap: 0.5rem;
-    animation: trayIn 0.18s ease;
-  }
-
-  @keyframes trayIn {
-    from { opacity: 0; transform: translateX(10px); }
-    to   { opacity: 1; transform: translateX(0); }
   }
 
   /* Main app container using CSS Grid for layout */

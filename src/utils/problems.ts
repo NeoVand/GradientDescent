@@ -970,18 +970,20 @@ const gaussianMixture: ProblemConfig = {
     return { a: gA / data.length, b: gB / data.length };
   },
 
-  // Initialize off-diagonal so the marker isn't on the saddle a=b. Random
-  // sign pairing surfaces the symmetric pair of global minima.
-  getInitialParameters: () => {
-    const flip = Math.random() < 0.5;
-    const aMag = 1.8 + Math.random() * 0.6;
-    const bMag = 1.8 + Math.random() * 0.6;
-    return flip
-      ? { a: -aMag, b: bMag }
-      : { a: aMag, b: -bMag };
-  },
+  // Start up in the top-right (≈ 2.5, 1.1): well off the a=b saddle and a
+  // good distance from the (1, −1) minimum, so the descent traces a long,
+  // satisfying diagonal trajectory down into the basin. (This is also the
+  // app's default landing problem.) A little jitter keeps re-rolls lively.
+  getInitialParameters: () => ({
+    a: 2.5 + (Math.random() - 0.5) * 0.4,
+    b: 1.1 + (Math.random() - 0.5) * 0.4
+  }),
 
-  defaultLearningRate: 0.3,
+  // The app's default landing problem runs on Momentum: γ tuned so the
+  // heavy ball curves down from (2.5, 1.1) into the (1, −1) minimum in
+  // ~30 steps without overshooting out of the basin.
+  defaultLearningRate: 0.1,
+  defaultMomentum: 0.9,
   parameterRange: { min: -3, max: 3 }
 };
 
