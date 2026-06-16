@@ -1648,6 +1648,9 @@ const customRegression: ProblemConfig = {
   predict: (x, params) => regressionPredict(x, params),
   computeLoss: (data, params) => regressionLoss(data, params),
   computeGradient: (data, params) => regressionGrad(data, params),
+  // Start at the origin — a neutral, in-range flat line the learner trains to
+  // fit, instead of a random far corner that reads as "fitting to nothing".
+  getInitialParameters: () => ({ a: 0, b: 0 }),
   defaultLearningRate: 0.02
 };
 

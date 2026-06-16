@@ -41,6 +41,7 @@
   // fold the custom problem into those existing paths so nothing is duplicated.
   $: cmodelClass = $customModelStore.classification;
   $: isClassEditor = problemType === 'custom-classification';
+  $: isCustomProblem = problemType === 'custom-regression' || problemType === 'custom-classification';
   $: renderCircle =
     problemType === 'circle-classifier' || (isClassEditor && cmodelClass === 'circle');
   $: renderLogistic =
@@ -251,13 +252,19 @@
       const range = problemConfig.parameterRange ?? { min: -2, max: 2 };
       xScale = d3.scaleLinear().domain([range.min, range.max]).range([0, innerWidth]);
       yScale = d3.scaleLinear().domain([range.min, range.max]).range([innerHeight, 0]);
-    } else if (data.length < 2) {
-      // Custom problems can start empty (or hold a single point): a 0-width
-      // extent makes a broken scale, so place the first points on a stable
-      // neutral canvas instead.
-      const range = problemConfig.parameterRange ?? { min: -4, max: 4 };
-      xScale = d3.scaleLinear().domain([range.min, range.max]).range([0, innerWidth]);
-      yScale = d3.scaleLinear().domain([range.min, range.max]).range([innerHeight, 0]);
+    } else if (isCustomProblem) {
+      // A stable canvas for hand-placing: a fixed baseline box that only ever
+      // grows to swallow out-of-range points. Placing points inside it never
+      // shifts the view, so the plot doesn't jump/zoom as you click — and it
+      // still works when empty (the spreads collapse to the baseline).
+      const base = 4;
+      const xs = data.map(d => d.x);
+      const ys = data.map(d => d.y);
+      const xMin = Math.min(-base, ...xs), xMax = Math.max(base, ...xs);
+      const yMin = Math.min(-base, ...ys), yMax = Math.max(base, ...ys);
+      const xPad = (xMax - xMin) * 0.05, yPad = (yMax - yMin) * 0.05;
+      xScale = d3.scaleLinear().domain([xMin - xPad, xMax + xPad]).range([0, innerWidth]);
+      yScale = d3.scaleLinear().domain([yMin - yPad, yMax + yPad]).range([innerHeight, 0]);
     } else {
       const xExtent = d3.extent(data, d => d.x) as [number, number];
       const yExtent = d3.extent(data, d => d.y) as [number, number];

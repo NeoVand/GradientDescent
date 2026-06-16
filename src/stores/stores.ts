@@ -11,6 +11,7 @@ import type {
   ProblemType,
   DataPoint,
   ModelParameters,
+  ProblemConfig,
   TrainingConfig,
   TrainingHistoryPoint
 } from '../types/types';
@@ -328,6 +329,32 @@ export interface LossScene {
 
 const DEFAULT_PARAMETER_RANGE: ParameterRange = { min: -7, max: 7 };
 
+/**
+ * An adaptive parameter window for custom regression, where the fit's optimum
+ * lives wherever the learner's data puts it (not in a fixed [-7, 7] box). A
+ * coarse grid search finds the approximate loss minimum (model-agnostic — works
+ * for every model including a typed formula), then we frame a square window
+ * around it (always including the origin, so the (0,0) start is visible). This
+ * keeps the bowl filling the view instead of collapsing to a thin streak.
+ */
+function adaptiveRegressionRange(config: ProblemConfig, data: DataPoint[]): ParameterRange {
+  if (data.length < 2) return { min: -5, max: 5 }; // under-determined: a neutral box
+  const W = 12, N = 25;
+  let bestA = 0, bestB = 0, bestL = Infinity;
+  for (let i = 0; i < N; i++) {
+    const a = -W + (2 * W * i) / (N - 1);
+    for (let j = 0; j < N; j++) {
+      const b = -W + (2 * W * j) / (N - 1);
+      const l = config.computeLoss(data, { a, b });
+      if (Number.isFinite(l) && l < bestL) { bestL = l; bestA = a; bestB = b; }
+    }
+  }
+  const lo = Math.min(bestA, bestB, 0);
+  const hi = Math.max(bestA, bestB, 0);
+  const pad = Math.max(2.5, (hi - lo) * 0.5);
+  return { min: lo - pad, max: hi + pad };
+}
+
 export const lossSceneStore = derived(
   [datasetStore, currentProblemConfig],
   ([$dataset, $config]): LossScene | null => {
@@ -339,7 +366,11 @@ export const lossSceneStore = derived(
     const isCustom = $config.type === 'custom-regression' || $config.type === 'custom-classification';
     if (trainData.length === 0 && !$config.noData && !isCustom) return null;
 
-    const range = $config.parameterRange ?? DEFAULT_PARAMETER_RANGE;
+    const range =
+      $config.parameterRange ??
+      ($config.type === 'custom-regression'
+        ? adaptiveRegressionRange($config, trainData)
+        : DEFAULT_PARAMETER_RANGE);
     const grid = computeLossGrid(trainData, $config, range);
     return {
       grid,
