@@ -92,13 +92,18 @@ function createDatasetStore() {
     /** Hand-edit: append a point (click-to-add on the data plot). */
     addPoint: (point: DataPoint) =>
       update(state => ({ ...state, data: [...state.data, point] })),
-    /** Hand-edit: remove the point at an index (click-to-remove). */
+    /**
+     * Hand-edit: remove the point at an index (click-to-remove). Built-in
+     * problems keep a floor of 3 so their loss surface stays meaningful; the
+     * custom problems may be emptied completely (and started from scratch).
+     */
     removePoint: (index: number) =>
-      update(state =>
-        state.data.length > 3
+      update(state => {
+        const minKeep = get(selectedProblem).startsWith('custom-') ? 0 : 3;
+        return state.data.length > minKeep
           ? { ...state, data: state.data.filter((_, i) => i !== index) }
-          : state
-      ),
+          : state;
+      }),
     /** Replace the entire dataset — the single ingestion path for CSV/paste import. */
     setData: (points: DataPoint[]) => update(state => ({ ...state, data: points })),
     /** Restore settings from a shared URL (data rebuilt separately). */
@@ -327,7 +332,12 @@ export const lossSceneStore = derived(
   [datasetStore, currentProblemConfig],
   ([$dataset, $config]): LossScene | null => {
     const trainData = $dataset.data.filter(point => point.isTraining);
-    if (trainData.length === 0 && !$config.noData) return null;
+    // Custom problems can legitimately be empty (the learner hasn't placed any
+    // points yet); compute a flat scene for them so the landscape stays in sync
+    // and updates live, rather than freezing on a stale surface. Other data
+    // problems keep returning null when momentarily empty.
+    const isCustom = $config.type === 'custom-regression' || $config.type === 'custom-classification';
+    if (trainData.length === 0 && !$config.noData && !isCustom) return null;
 
     const range = $config.parameterRange ?? DEFAULT_PARAMETER_RANGE;
     const grid = computeLossGrid(trainData, $config, range);

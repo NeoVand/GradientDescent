@@ -1643,18 +1643,8 @@ const customRegression: ProblemConfig = {
   description: 'Bring your own data and choose the model that fits it',
   tagline: 'Your data, your model — place points or paste a dataset.',
   trueParameters: { a: 1, b: 0 }, // no ground truth; the true-line overlay is hidden
-  generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
-    // A small, sensible starter cloud (~a noisy line) the learner edits or replaces.
-    const n = Math.max(6, Math.min(numPoints, 14));
-    const numTrain = Math.floor(n * trainRatio);
-    const data: DataPoint[] = [];
-    for (let i = 0; i < n; i++) {
-      const x = (i / (n - 1)) * 4 - 2 + (rand() - 0.5) * 0.15;
-      const y = 0.8 * x + 0.3 + (rand() - 0.5) * noiseLevel * 2;
-      data.push({ x, y, isTraining: i < numTrain });
-    }
-    return shuffle(data);
-  },
+  // Start blank — the learner places (or pastes) their own points.
+  generateData: (): DataPoint[] => [],
   predict: (x, params) => regressionPredict(x, params),
   computeLoss: (data, params) => regressionLoss(data, params),
   computeGradient: (data, params) => regressionGrad(data, params),
@@ -1672,17 +1662,8 @@ const customClassification: ProblemConfig = {
   description: 'Place two classes and choose a 2-parameter boundary',
   tagline: 'Two classes, one boundary you control.',
   trueParameters: { a: 1, b: 1 },
-  generateData: (numPoints: number, trainRatio: number): DataPoint[] => {
-    // A tiny starter set with both classes present so the BCE loss is defined.
-    const pts: DataPoint[] = [];
-    const add = (x: number, y: number, label: number) => pts.push({ x, y, label, isTraining: true });
-    add(-1.4, -1.0, 0); add(-1.0, -1.5, 0); add(-1.7, -0.6, 0); add(-0.8, -0.9, 0);
-    add(1.3, 1.1, 1); add(1.0, 1.6, 1); add(1.7, 0.7, 1); add(0.9, 1.0, 1);
-    const numTrain = Math.floor(pts.length * trainRatio);
-    shuffle(pts);
-    pts.forEach((p, i) => { p.isTraining = i < numTrain; });
-    return pts;
-  },
+  // Start blank — the learner places (or pastes) their own labelled points.
+  generateData: (): DataPoint[] => [],
   predict: () => 0, // the data plot draws the decision boundary itself
   computeLoss: (data, params) => classificationLoss(data, params),
   computeGradient: (data, params) => classificationGrad(data, params),

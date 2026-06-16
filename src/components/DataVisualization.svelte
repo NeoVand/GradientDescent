@@ -251,11 +251,18 @@
       const range = problemConfig.parameterRange ?? { min: -2, max: 2 };
       xScale = d3.scaleLinear().domain([range.min, range.max]).range([0, innerWidth]);
       yScale = d3.scaleLinear().domain([range.min, range.max]).range([innerHeight, 0]);
+    } else if (data.length < 2) {
+      // Custom problems can start empty (or hold a single point): a 0-width
+      // extent makes a broken scale, so place the first points on a stable
+      // neutral canvas instead.
+      const range = problemConfig.parameterRange ?? { min: -4, max: 4 };
+      xScale = d3.scaleLinear().domain([range.min, range.max]).range([0, innerWidth]);
+      yScale = d3.scaleLinear().domain([range.min, range.max]).range([innerHeight, 0]);
     } else {
       const xExtent = d3.extent(data, d => d.x) as [number, number];
       const yExtent = d3.extent(data, d => d.y) as [number, number];
-      const xPadding = (xExtent[1] - xExtent[0]) * 0.1;
-      const yPadding = (yExtent[1] - yExtent[0]) * 0.1;
+      const xPadding = (xExtent[1] - xExtent[0]) * 0.1 || 0.5;
+      const yPadding = (yExtent[1] - yExtent[0]) * 0.1 || 0.5;
       xScale = d3.scaleLinear()
         .domain([xExtent[0] - xPadding, xExtent[1] + xPadding])
         .range([0, innerWidth]);
@@ -1103,6 +1110,22 @@
       class:tool-test={isEditable && editTool === 'test'}
       class:tool-erase={isEditable && editTool === 'erase'}
     ></svg>
+
+    <!-- Empty state: an inviting prompt to start placing points. pointer-events
+         off so a click lands on the plot and adds the very first point. -->
+    {#if isEditable && data.length === 0}
+      <div class="empty-hint" aria-hidden="true">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9" stroke-dasharray="2.5 3" opacity="0.6" />
+          <path d="M12 8.5v7M8.5 12h7" />
+        </svg>
+        <span class="empty-title">Add points</span>
+        <span class="empty-sub">
+          {#if isClassEditor}Pick a class above, then click the plot{:else}Click the plot to place your data{/if}
+        </span>
+      </div>
+    {/if}
+
     <!-- Point legend, tucked into the plot like the landscape's keys -->
     <div class="data-key" style="right: {margin.right + 8}px; bottom: {margin.bottom + 8}px;">
       {#if renderLogistic || renderCircle}
@@ -1298,6 +1321,36 @@
   .key-item svg {
     flex-shrink: 0;
   }
+
+  /* Empty-state prompt, centered over the blank plot. */
+  .empty-hint {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    pointer-events: none;
+    text-align: center;
+    padding: 1rem;
+  }
+  .empty-hint svg {
+    opacity: 0.9;
+    margin-bottom: 0.2rem;
+  }
+  .empty-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+  .empty-sub {
+    font-size: 0.72rem;
+    font-weight: 500;
+    opacity: 0.72;
+  }
+  :global([data-theme='light']) .empty-hint { color: #64748b; }
+  :global([data-theme='dark']) .empty-hint { color: #8595ad; }
 
   .svg-container {
     flex: 1;
