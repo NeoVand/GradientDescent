@@ -370,6 +370,13 @@
     d3.select(svgElement).selectAll('*').remove();
 
     const svg = d3.select(svgElement);
+    // The whole 2D landscape sits on a dark canvas in both themes (day mode
+    // too): the viridis heatmap, field and contours read richest on black,
+    // where a light canvas washed them out. The surrounding app stays light.
+    svg.append('rect')
+      .attr('x', 0).attr('y', 0)
+      .attr('width', width).attr('height', height)
+      .attr('fill', '#060913');
     const g = svg.append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
@@ -393,7 +400,10 @@
     const xAxis = d3.axisBottom(xScale).tickSizeOuter(0);
     const yAxis = d3.axisLeft(yScale).tickSizeOuter(0);
 
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    // The landscape canvas is always dark (see the dark rect above), so every
+    // in-plot element — axes, field, contours — uses the dark-mode palette
+    // regardless of the app theme.
+    const isDark = true;
     const axisColor = isDark ? '#527a75' : '#064e3b';
 
     // Bottom axis
@@ -787,10 +797,13 @@
     // where the streamlines actually pool (which is why light mode looked
     // almost blank). So each line gets a contrasting halo under a core stroke:
     // the halo carries it over same-tone regions, the core over the rest.
-    const coreColor = isDark ? '#e8eefa' : '#1e293b';
-    const haloColor = isDark ? '#070b14' : '#ffffff';
-    const coreOpacity = isDark ? 0.62 : 0.82;
-    const haloOpacity = isDark ? 0.42 : 0.6;
+    // One toned-down treatment (the landscape canvas is always dark): a soft,
+    // muted core over a dark halo — bright enough to read over the dark basins
+    // and the bright peaks, without the glaring near-white lines from before.
+    const coreColor = '#9fb0c9';
+    const haloColor = '#070b14';
+    const coreOpacity = 0.5;
+    const haloOpacity = 0.4;
 
     // Spatial hash (cell = d_sep) for O(1) "any line point within d?" queries.
     const cell = dSep;
@@ -1082,7 +1095,7 @@
     if (!lensInfo || markerOffMap) return;
 
     const { eig, newton, posDef } = lensInfo;
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const isDark = true; // the lens draws over the always-dark landscape canvas
 
     // Radii from |λ|: the shallow axis gets the long radius.
     const R_MAX = 42;
