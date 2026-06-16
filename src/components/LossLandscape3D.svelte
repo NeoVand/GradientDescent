@@ -35,9 +35,14 @@
     vizLayersStore,
     type LossScene,
     type RaceState,
-    type Colormap
+    type Colormap,
+    type FieldDensity
   } from '../stores/stores';
-  import { sampleLoss, normalizedLogLoss, viridisRGB } from '../utils/lossGrid';
+  import { sampleLoss, normalizedLogLoss, viridisRGB, computeVectorField, contourThresholds, CONTOUR_COUNT } from '../utils/lossGrid';
+
+  // Field sampling resolution per density (the draped field is recomputed at
+  // this resolution, decoupled from the cached scene — same idea as the 2D view).
+  const FIELD_RES_3D: Record<FieldDensity, number> = { sparse: 11, normal: 16, dense: 24 };
   import { runStartStep } from '../utils/trainer';
 
   // Visualization layers, kept in sync with the 2D view via vizLayersStore.
@@ -45,7 +50,7 @@
   let layers3d = get(vizLayersStore);
   let vectorField3d: THREE.LineSegments | null = null;
   import { previewNextStep } from '../utils/preview';
-  import type { TrainingHistoryPoint } from '../types/types';
+  import type { TrainingHistoryPoint, DataPoint, ProblemConfig } from '../types/types';
 
   let container: HTMLDivElement;
 
@@ -150,7 +155,9 @@
     if (!layers3d.contours) return;
 
     const { grid } = currentScene;
-    const gen = contours().size([grid.res, grid.res]).smooth(true).thresholds(grid.thresholds);
+    // Density sets the ring count, mirroring the 2D view.
+    const thresholds = contourThresholds(grid, CONTOUR_COUNT[layers3d.density] ?? 16);
+    const gen = contours().size([grid.res, grid.res]).smooth(true).thresholds(thresholds);
     const polys = gen(grid.values as unknown as number[]);
     const extSpan = grid.extMax - grid.extMin;
     const { min, max } = currentScene.range;
@@ -207,26 +214,54 @@
       vectorField3d = null;
     }
     if (!currentScene || layers3d.field === 'off') return;
-    const { arrows, maxMag } = currentScene.field;
-    if (!arrows.length) return;
+
+    // Recompute from the live config/data (not the cached scene field) so the
+    // density control actually changes how dense the field is, exactly like 2D.
+    const config = get(currentProblemConfig);
+    if (!config) return;
+    const trainData = get(datasetStore).data.filter(d => d.isTraining);
+    const range = currentScene.range;
 
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     const c: [number, number, number] = isDark ? [0.62, 0.69, 0.8] : [0.27, 0.32, 0.41];
-    const LEN = 0.085;
+    const LIFT = 0.012;
 
     const verts: number[] = [];
     const cols: number[] = [];
-    for (const ar of arrows) {
-      const d = dirVec(-ar.ga, -ar.gb);
-      if (!d) continue;
-      const norm = maxMag > 0 ? ar.mag / maxMag : 0;
-      const len = LEN * (0.3 + 0.7 * norm);
-      const y = heightAt(ar.a, ar.b) + 0.012;
-      const x0 = toX(ar.a), z0 = toZ(ar.b);
-      verts.push(x0, y, z0, x0 + d.x * len, y, z0 + d.z * len);
-      cols.push(c[0] * 0.25, c[1] * 0.25, c[2] * 0.25, c[0], c[1], c[2]); // base dim → tip bright (downhill)
+
+    if (layers3d.field === 'streamlines') {
+      // Flowing draped lines (evenly-spaced, Jobard–Lefebvre), colored
+      // dim → bright downhill so the flow direction reads from any angle.
+      for (const line of buildStreamlines3d(config, trainData, range)) {
+        const last = line.length - 1;
+        for (let i = 0; i < last; i++) {
+          const p = line[i], q = line[i + 1];
+          const f0 = 0.25 + 0.75 * (i / last);
+          const f1 = 0.25 + 0.75 * ((i + 1) / last);
+          verts.push(toX(p.a), heightAt(p.a, p.b) + LIFT, toZ(p.b),
+                     toX(q.a), heightAt(q.a, q.b) + LIFT, toZ(q.b));
+          cols.push(c[0] * f0, c[1] * f0, c[2] * f0, c[0] * f1, c[1] * f1, c[2] * f1);
+        }
+      }
+    } else {
+      // Arrows: a short downhill segment at each field sample, length ∝ |∇|.
+      const { arrows, maxMag } = computeVectorField(
+        trainData, config, range, FIELD_RES_3D[layers3d.density] ?? 16
+      );
+      const LEN = 0.085;
+      for (const ar of arrows) {
+        const d = dirVec(-ar.ga, -ar.gb);
+        if (!d) continue;
+        const norm = maxMag > 0 ? ar.mag / maxMag : 0;
+        const len = LEN * (0.3 + 0.7 * norm);
+        const y = heightAt(ar.a, ar.b) + LIFT;
+        const x0 = toX(ar.a), z0 = toZ(ar.b);
+        verts.push(x0, y, z0, x0 + d.x * len, y, z0 + d.z * len);
+        cols.push(c[0] * 0.25, c[1] * 0.25, c[2] * 0.25, c[0], c[1], c[2]); // base dim → tip bright (downhill)
+      }
     }
 
+    if (!verts.length) return;
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
     geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(cols), 3));
@@ -240,6 +275,98 @@
     vectorField3d = new THREE.LineSegments(geo, mat);
     vectorField3d.renderOrder = 7;
     scene3.add(vectorField3d);
+  }
+
+  /**
+   * Evenly-spaced streamlines (Jobard & Lefebvre) in (α, β) space — a new line
+   * is seeded only where none is within d_sep, and integration stops near
+   * another line — so the spacing stays uniform instead of bunching in basins.
+   * Returns polylines in parameter space; the caller drapes them on the surface.
+   */
+  function buildStreamlines3d(
+    config: ProblemConfig,
+    trainData: DataPoint[],
+    range: { min: number; max: number }
+  ): { a: number; b: number }[][] {
+    const span = range.max - range.min;
+    const sepDiv = ({ sparse: 14, normal: 24, dense: 42 } as Record<FieldDensity, number>)[layers3d.density] ?? 24;
+    const dSep = span / sepDiv;
+    const dTest = dSep * 0.5;
+    const stepLen = dSep * 0.4;
+    const MAX_STEPS = 600;
+
+    const hash = new Map<string, { a: number; b: number }[]>();
+    const cidx = (v: number) => Math.floor((v - range.min) / dSep);
+    const addPt = (p: { a: number; b: number }) => {
+      const k = `${cidx(p.a)},${cidx(p.b)}`;
+      const arr = hash.get(k);
+      if (arr) arr.push(p); else hash.set(k, [p]);
+    };
+    const nearAny = (a: number, b: number, d: number): boolean => {
+      const ci = cidx(a), cj = cidx(b), d2 = d * d;
+      for (let di = -1; di <= 1; di++)
+        for (let dj = -1; dj <= 1; dj++) {
+          const arr = hash.get(`${ci + di},${cj + dj}`);
+          if (!arr) continue;
+          for (const p of arr) {
+            const dx = p.a - a, dy = p.b - b;
+            if (dx * dx + dy * dy < d2) return true;
+          }
+        }
+      return false;
+    };
+    const stepDir = (a: number, b: number, sign: 1 | -1) => {
+      const gr = config.computeGradient(trainData, { a, b });
+      const m = Math.hypot(gr.a, gr.b);
+      if (!Number.isFinite(m) || m < 1e-5) return null; // flat / at a minimum
+      return { a: sign * (-gr.a / m), b: sign * (-gr.b / m) };
+    };
+    const march = (a0: number, b0: number, sign: 1 | -1) => {
+      const pts: { a: number; b: number }[] = [];
+      let a = a0, b = b0;
+      for (let s = 0; s < MAX_STEPS; s++) {
+        const d1 = stepDir(a, b, sign);
+        if (!d1) break;
+        const d2 = stepDir(a + d1.a * stepLen * 0.5, b + d1.b * stepLen * 0.5, sign) ?? d1; // RK2
+        a += d2.a * stepLen;
+        b += d2.b * stepLen;
+        if (a < range.min || a > range.max || b < range.min || b > range.max) break;
+        if (nearAny(a, b, dTest)) break;
+        pts.push({ a, b });
+      }
+      return pts;
+    };
+
+    const out: { a: number; b: number }[][] = [];
+    const queue: { a: number; b: number }[] = [];
+    const seed0 = 5;
+    for (let i = 0; i < seed0; i++)
+      for (let j = 0; j < seed0; j++)
+        queue.push({ a: range.min + ((i + 0.5) / seed0) * span, b: range.min + ((j + 0.5) / seed0) * span });
+
+    let guard = 0;
+    let totalPts = 0;
+    while (queue.length && guard++ < 6000 && totalPts < 18000) {
+      const seed = queue.shift()!;
+      if (seed.a < range.min || seed.a > range.max || seed.b < range.min || seed.b > range.max) continue;
+      if (nearAny(seed.a, seed.b, dSep)) continue;
+      const back = march(seed.a, seed.b, -1).reverse();
+      const fwd = march(seed.a, seed.b, 1);
+      const line = back.concat([{ a: seed.a, b: seed.b }], fwd);
+      if (line.length < 3) continue;
+      for (const p of line) addPt(p);
+      totalPts += line.length;
+      out.push(line);
+      for (let i = 0; i < line.length - 1; i += 2) {
+        const p = line[i], q = line[i + 1];
+        const tx = q.a - p.a, ty = q.b - p.b, tm = Math.hypot(tx, ty);
+        if (tm < 1e-9) continue;
+        const nx = -ty / tm, ny = tx / tm;
+        queue.push({ a: p.a + nx * dSep, b: p.b + ny * dSep });
+        queue.push({ a: p.a - nx * dSep, b: p.b - ny * dSep });
+      }
+    }
+    return out;
   }
 
   /**
@@ -794,11 +921,11 @@
         buildVectorField3d(); // re-tint the field for the new theme
       }),
       // Mirror the 2D Layers controls: colormap re-tints the surface, the
-      // contour toggle adds/removes the rings, and field/density rebuild the
-      // draped gradient field.
+      // contour toggle (and density) rebuild the rings, and field/density
+      // rebuild the draped gradient field.
       vizLayersStore.subscribe(v => {
         const colorChanged = v.colormap !== cmap;
-        const contoursChanged = v.contours !== layers3d.contours;
+        const contoursChanged = v.contours !== layers3d.contours || v.density !== layers3d.density;
         const fieldChanged = v.field !== layers3d.field || v.density !== layers3d.density;
         cmap = v.colormap;
         layers3d = v;

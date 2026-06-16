@@ -25,7 +25,7 @@ import {
 } from 'd3-scale-chromatic';
 import type { DataPoint, ModelParameters, ProblemConfig } from '../types/types';
 // Type-only import (erased at build time, so no runtime cycle with stores).
-import type { Colormap } from '../stores/stores';
+import type { Colormap, FieldDensity } from '../stores/stores';
 
 // All sequential maps with monotonically increasing luminance (dark = high
 // loss → bright = low loss). Rainbow maps like turbo are deliberately excluded:
@@ -119,6 +119,24 @@ export function computeLossGrid(
   }
 
   return { res, extMin, extMax, range, values, visMin, visMax, logMin, logMax, thresholds };
+}
+
+// Density drives both the field resolution and how many contour rings are
+// drawn, so "High" thickens the field AND the contours together.
+export const CONTOUR_COUNT: Record<FieldDensity, number> = { sparse: 9, normal: 16, dense: 28 };
+
+/**
+ * Log-spaced contour levels between the grid's visible min/max, split into
+ * `count` bands. (computeLossGrid bakes a 16-band default into grid.thresholds;
+ * this lets a consumer re-derive any count from the same log range so the
+ * density control can change ring count without a grid recompute.)
+ */
+export function contourThresholds(grid: LossGrid, count: number): number[] {
+  const out: number[] = [];
+  for (let k = 1; k < count; k++) {
+    out.push(Math.exp(grid.logMin + (k / count) * (grid.logMax - grid.logMin)) - LOG_EPS);
+  }
+  return out;
 }
 
 // ---------- Heatmap rendering (offscreen canvas → data URL) ----------

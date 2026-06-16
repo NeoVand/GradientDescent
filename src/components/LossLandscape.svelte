@@ -37,7 +37,7 @@
     type FieldDensity,
     type Colormap
   } from '../stores/stores';
-  import { gridToImageURL, computeVectorField, colormapStops } from '../utils/lossGrid';
+  import { gridToImageURL, computeVectorField, colormapStops, contourThresholds, CONTOUR_COUNT } from '../utils/lossGrid';
   import { basinStore, ensureBasins, BASIN_COLORS } from '../utils/basins';
   import { optimizers } from '../utils/optimizers';
   import { runStartStep } from '../utils/trainer';
@@ -619,8 +619,11 @@
     yScale: d3.ScaleLinear<number, number>
   ) {
     if (!scene || !layers.contours) return;
-    const { res, extMin, extMax, values, thresholds } = scene.grid;
+    const { res, extMin, extMax, values } = scene.grid;
     const extSpan = extMax - extMin;
+    // Density also sets how many rings to draw (re-derived from the grid's log
+    // range, so no recompute is needed).
+    const thresholds = contourThresholds(scene.grid, CONTOUR_COUNT[layers.density] ?? 16);
 
     const contourGenerator = contours()
       .size([res, res])
@@ -1365,16 +1368,6 @@
                   <button class:on={layers.field === 'off'} on:click={() => vizLayersStore.patch({ field: 'off' })}>Off</button>
                 </div>
               </div>
-              {#if layers.field !== 'off'}
-                <div class="lp-row">
-                  <span class="lp-label">Density</span>
-                  <div class="lp-seg">
-                    <button class:on={layers.density === 'sparse'} on:click={() => vizLayersStore.patch({ density: 'sparse' })}>Low</button>
-                    <button class:on={layers.density === 'normal'} on:click={() => vizLayersStore.patch({ density: 'normal' })}>Med</button>
-                    <button class:on={layers.density === 'dense'} on:click={() => vizLayersStore.patch({ density: 'dense' })}>High</button>
-                  </div>
-                </div>
-              {/if}
               <div class="lp-row">
                 <span class="lp-label">Contours</span>
                 <button
@@ -1386,6 +1379,16 @@
                   on:click={() => vizLayersStore.patch({ contours: !layers.contours })}
                 ><span class="lp-knob"></span></button>
               </div>
+              {#if layers.field !== 'off' || layers.contours}
+                <div class="lp-row">
+                  <span class="lp-label">Density</span>
+                  <div class="lp-seg">
+                    <button class:on={layers.density === 'sparse'} on:click={() => vizLayersStore.patch({ density: 'sparse' })}>Low</button>
+                    <button class:on={layers.density === 'normal'} on:click={() => vizLayersStore.patch({ density: 'normal' })}>Med</button>
+                    <button class:on={layers.density === 'dense'} on:click={() => vizLayersStore.patch({ density: 'dense' })}>High</button>
+                  </div>
+                </div>
+              {/if}
               <div class="lp-divider"></div>
               <div class="lp-row lp-col">
                 <span class="lp-label">Colormap</span>
