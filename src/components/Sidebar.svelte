@@ -10,8 +10,9 @@
    * intents.
    */
 
-  import { selectedProblem, datasetStore, trainingStore, historyStore, optimizerStore, resetOptimizerState, raceStore } from '../stores/stores';
-  import type { ProblemType, ScheduleId } from '../types/types';
+  import { selectedProblem, datasetStore, trainingStore, historyStore, optimizerStore, resetOptimizerState, raceStore, customModelStore } from '../stores/stores';
+  import type { ProblemType, ScheduleId, DataPoint } from '../types/types';
+  import { REGRESSION_LABELS, formulaIsValid, type RegressionModel } from '../utils/customModel';
   import { problemConfigs } from '../utils/problems';
   import { optimizers, optimizerOrder, type OptimizerId } from '../utils/optimizers';
   import { schedules, scheduleOrder } from '../utils/schedules';
@@ -53,7 +54,9 @@
     Layers,
     Flag,
     Brain,
-    Timer
+    Timer,
+    Shapes,
+    ClipboardPaste
   } from 'lucide-svelte';
 
   // Compact labels for the schedule segmented control
@@ -147,6 +150,12 @@
         { type: 'saddle-point', name: 'Saddle Point', icon: null, customIcon: '±' },
         { type: 'himmelblau', name: 'Himmelblau', icon: null, customIcon: '∷' }
       ]
+    },
+    {
+      label: 'Your data',
+      items: [
+        { type: 'custom-regression', name: 'Custom Regression', icon: null, customIcon: 'ƒ' }
+      ]
     }
   ];
 
@@ -170,6 +179,51 @@
   $: currentOptimizer = optimizers[optimizerSel.id];
   $: isAnalytic = problemConfigs[currentProblem]?.noData ?? false;
   $: raceRunning = $raceStore?.running ?? false;
+
+  // ---------- Custom datasets ----------
+  $: isCustomReg = currentProblem === 'custom-regression';
+  $: isCustom = isCustomReg; // classification arrives next
+  $: cmodel = $customModelStore;
+  $: isCustomFormula = isCustomReg && cmodel.regression === 'custom';
+  $: formulaOk = !isCustomFormula || formulaIsValid(cmodel.formula);
+  const REG_OPTS: RegressionModel[] = ['line', 'quadratic', 'exponential', 'power', 'custom'];
+
+  function onModelChange(e: Event) {
+    const v = (e.currentTarget as HTMLSelectElement).value as RegressionModel;
+    customModelStore.patch({ regression: v });
+    resetOptimizerState();
+  }
+  function onFormulaInput(e: Event) {
+    customModelStore.patch({ formula: (e.currentTarget as HTMLInputElement).value });
+  }
+
+  let showPaste = false;
+  let pasteText = '';
+  let pasteMsg = '';
+  function applyPaste() {
+    const pts = parsePastedData(pasteText);
+    if (pts.length < 3) {
+      pasteMsg = 'Need ≥ 3 valid rows of  x, y';
+      return;
+    }
+    datasetStore.setData(pts);
+    pasteMsg = `Loaded ${pts.length} points.`;
+    showPaste = false;
+    pasteText = '';
+  }
+  /** Parse pasted text into points: rows of "x, y" with an optional 1/0 train flag. */
+  function parsePastedData(text: string): DataPoint[] {
+    const out: DataPoint[] = [];
+    for (const line of text.split(/\r?\n/)) {
+      const parts = line.trim().split(/[\s,;]+/);
+      const a = parseFloat(parts[0]);
+      const b = parseFloat(parts[1]);
+      if (!Number.isFinite(a) || !Number.isFinite(b)) continue; // skips headers/blanks
+      const flag = parseFloat(parts[2]);
+      out.push({ x: a, y: b, isTraining: Number.isFinite(flag) ? flag > 0.5 : true });
+    }
+    return out;
+  }
 
   // Training progress for the Train button fill. A continuous (∞) run has
   // no end, so the bar reads full while it loops.
@@ -368,6 +422,57 @@
         <Dices size={14} strokeWidth={2} />
       </button>
     </div>
+
+    {#if isCustom}
+      <!-- Custom dataset: pick the model, optionally type a formula, paste data -->
+      <div class="ctl">
+        <div class="row">
+          <span class="icon"><Shapes size={16} strokeWidth={2} /></span>
+          <span class="row-label">Model</span>
+          <button class="info-btn" aria-label="About the model" use:tooltip={'The 2-parameter model fit to your data. "Custom formula" lets you type ŷ as an expression in x, a (α) and b (β); its gradient is taken by finite differences.'}>
+            <Info size={13} strokeWidth={2} />
+          </button>
+          <div class="row-spring"></div>
+        </div>
+        <select class="model-select" value={cmodel.regression} on:change={onModelChange}>
+          {#each REG_OPTS as m}
+            <option value={m}>{REGRESSION_LABELS[m]}</option>
+          {/each}
+        </select>
+      </div>
+      {#if isCustomFormula}
+        <div class="ctl">
+          <input
+            class="formula-input"
+            class:invalid={!formulaOk}
+            value={cmodel.formula}
+            on:input={onFormulaInput}
+            placeholder="e.g. a*sin(b*x)"
+            spellcheck="false"
+            autocomplete="off"
+          />
+        </div>
+      {/if}
+      <div class="ctl">
+        <button class="paste-toggle" on:click={() => { showPaste = !showPaste; pasteMsg = ''; }}>
+          <ClipboardPaste size={13} strokeWidth={2} />
+          <span>Paste your own data{showPaste ? '' : '…'}</span>
+        </button>
+        {#if showPaste}
+          <textarea
+            class="paste-area"
+            bind:value={pasteText}
+            rows="4"
+            spellcheck="false"
+            placeholder={'One point per line:\nx, y\n0.4, 1.2\n…  (add a 3rd 1/0 for train/test)'}
+          ></textarea>
+          <div class="paste-actions">
+            <button class="paste-apply" on:click={applyPaste}>Apply</button>
+            {#if pasteMsg}<span class="paste-msg">{pasteMsg}</span>{/if}
+          </div>
+        {/if}
+      </div>
+    {/if}
 
     <!-- Points -->
     <div class="ctl">
@@ -872,6 +977,77 @@
     flex-direction: column;
     gap: calc(2px + 0.3 * var(--air));
   }
+
+  /* ---------- Custom dataset controls ---------- */
+  .model-select {
+    width: 100%;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  .model-select:focus { outline: none; border-color: #10b981; }
+  .formula-input {
+    width: 100%;
+    padding: 0.4rem 0.55rem;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 0.78rem;
+  }
+  .formula-input:focus { outline: none; border-color: #10b981; }
+  .formula-input.invalid { border-color: var(--color-danger); }
+  .paste-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    align-self: flex-start;
+    padding: 0.3rem 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 7px;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .paste-toggle:hover { color: #10b981; border-color: rgba(16, 185, 129, 0.5); }
+  .paste-area {
+    width: 100%;
+    margin-top: 0.3rem;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 0.72rem;
+    line-height: 1.4;
+    resize: vertical;
+  }
+  .paste-area:focus { outline: none; border-color: #10b981; }
+  .paste-actions { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.35rem; }
+  .paste-apply {
+    padding: 0.3rem 0.7rem;
+    border: 1px solid rgba(16, 185, 129, 0.5);
+    border-radius: 7px;
+    background: rgba(16, 185, 129, 0.12);
+    color: #10b981;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .paste-apply:hover { background: rgba(16, 185, 129, 0.22); }
+  .paste-msg { font-size: 0.7rem; color: var(--color-text-tertiary); }
 
   .greek-label {
     font-family: 'Georgia', serif;

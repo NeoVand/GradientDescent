@@ -11,6 +11,10 @@
 
 import type { ProblemConfig, DataPoint, ModelParameters } from '../types/types';
 import { rand, shuffle } from './rng';
+import {
+  regressionPredict, regressionLoss, regressionGrad,
+  classificationLoss, classificationGrad
+} from './customModel';
 
 /**
  * ---------- One-parameter problems (oneParam) ----------
@@ -1628,6 +1632,69 @@ const himmelblau: ProblemConfig = {
   parameterRange: { min: -5, max: 5 }
 };
 
+/**
+ * Custom Regression — bring your own (x, y) points and pick the model (line,
+ * quadratic, exponential, power, or a typed formula). predict/loss/gradient
+ * delegate to utils/customModel, which reads the live model selection.
+ */
+const customRegression: ProblemConfig = {
+  type: 'custom-regression',
+  name: 'Custom Regression',
+  description: 'Bring your own data and choose the model that fits it',
+  tagline: 'Your data, your model — place points or paste a dataset.',
+  trueParameters: { a: 1, b: 0 }, // no ground truth; the true-line overlay is hidden
+  generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
+    // A small, sensible starter cloud (~a noisy line) the learner edits or replaces.
+    const n = Math.max(6, Math.min(numPoints, 14));
+    const numTrain = Math.floor(n * trainRatio);
+    const data: DataPoint[] = [];
+    for (let i = 0; i < n; i++) {
+      const x = (i / (n - 1)) * 4 - 2 + (rand() - 0.5) * 0.15;
+      const y = 0.8 * x + 0.3 + (rand() - 0.5) * noiseLevel * 2;
+      data.push({ x, y, isTraining: i < numTrain });
+    }
+    return shuffle(data);
+  },
+  predict: (x, params) => regressionPredict(x, params),
+  computeLoss: (data, params) => regressionLoss(data, params),
+  computeGradient: (data, params) => regressionGrad(data, params),
+  defaultLearningRate: 0.02
+};
+
+/**
+ * Custom Classification — place two classes of 2D points and pick a
+ * 2-parameter boundary (linear through the origin, or a fixed-radius circle).
+ * Features live in (x, y); the class is in label, like the built-in classifiers.
+ */
+const customClassification: ProblemConfig = {
+  type: 'custom-classification',
+  name: 'Custom Classification',
+  description: 'Place two classes and choose a 2-parameter boundary',
+  tagline: 'Two classes, one boundary you control.',
+  trueParameters: { a: 1, b: 1 },
+  generateData: (numPoints: number, trainRatio: number): DataPoint[] => {
+    // A tiny starter set with both classes present so the BCE loss is defined.
+    const pts: DataPoint[] = [];
+    const add = (x: number, y: number, label: number) => pts.push({ x, y, label, isTraining: true });
+    add(-1.4, -1.0, 0); add(-1.0, -1.5, 0); add(-1.7, -0.6, 0); add(-0.8, -0.9, 0);
+    add(1.3, 1.1, 1); add(1.0, 1.6, 1); add(1.7, 0.7, 1); add(0.9, 1.0, 1);
+    const numTrain = Math.floor(pts.length * trainRatio);
+    shuffle(pts);
+    pts.forEach((p, i) => { p.isTraining = i < numTrain; });
+    return pts;
+  },
+  predict: () => 0, // the data plot draws the decision boundary itself
+  computeLoss: (data, params) => classificationLoss(data, params),
+  computeGradient: (data, params) => classificationGrad(data, params),
+  getInitialParameters: () => {
+    const ang = rand() * Math.PI * 2;
+    const r = 1.5 + rand();
+    return { a: Math.cos(ang) * r, b: Math.sin(ang) * r };
+  },
+  defaultLearningRate: 0.1,
+  parameterRange: { min: -4, max: 4 }
+};
+
 // Export all problem configurations
 export const problemConfigs: Record<string, ProblemConfig> = {
   'slope-1d': slopeFit,
@@ -1651,6 +1718,8 @@ export const problemConfigs: Record<string, ProblemConfig> = {
   'tiny-net': tinyNet,
   'rosenbrock': rosenbrock,
   'saddle-point': saddlePoint,
-  'himmelblau': himmelblau
+  'himmelblau': himmelblau,
+  'custom-regression': customRegression,
+  'custom-classification': customClassification
 };
 

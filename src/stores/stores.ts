@@ -17,6 +17,7 @@ import type {
 import { problemConfigs } from '../utils/problems';
 import { setSeed, newSeed, shuffle } from '../utils/rng';
 import { optimizers, defaultHyper, type OptimizerId, type OptimizerState } from '../utils/optimizers';
+import { customModel, type RegressionModel, type ClassificationModel } from '../utils/customModel';
 import {
   computeLossGrid,
   gridToImageURL,
@@ -98,6 +99,8 @@ function createDatasetStore() {
           ? { ...state, data: state.data.filter((_, i) => i !== index) }
           : state
       ),
+    /** Replace the entire dataset — the single ingestion path for CSV/paste import. */
+    setData: (points: DataPoint[]) => update(state => ({ ...state, data: points })),
     /** Restore settings from a shared URL (data rebuilt separately). */
     hydrate: (partial: Partial<Omit<DatasetState, 'data'>>) =>
       update(state => ({ ...state, ...partial }))
@@ -236,13 +239,48 @@ function createHistoryStore() {
 
 export const historyStore = createHistoryStore();
 
+// ========== Custom-model Store ==========
+// For the two "Custom" problems, the Model dropdown changes predict/loss/grad
+// WITHOUT changing which ProblemConfig is selected. The pure config methods
+// read the live selection from the customModel module object; patch() updates
+// that object synchronously (before notifying). currentProblemConfig depends on
+// this store and re-emits on change, so EVERY downstream consumer (loss scene,
+// marker gradient, readout, data plot) recomputes the moment the model changes.
+export interface CustomModelState {
+  regression: RegressionModel;
+  classification: ClassificationModel;
+  formula: string;
+}
+
+function createCustomModelStore() {
+  const store = writable<CustomModelState>({
+    regression: customModel.regression,
+    classification: customModel.classification,
+    formula: customModel.formula
+  });
+  return {
+    subscribe: store.subscribe,
+    patch: (p: Partial<CustomModelState>) =>
+      store.update(v => {
+        const next = { ...v, ...p };
+        customModel.regression = next.regression;
+        customModel.classification = next.classification;
+        customModel.formula = next.formula;
+        return next;
+      })
+  };
+}
+
+export const customModelStore = createCustomModelStore();
+
 // ========== Derived Stores ==========
 // These automatically update when their dependencies change
 
-// Current problem configuration
+// Current problem configuration. Depends on customModelStore so that changing
+// the Custom model re-emits the config and refreshes everything downstream.
 export const currentProblemConfig = derived(
-  selectedProblem,
-  $selectedProblem => problemConfigs[$selectedProblem]
+  [selectedProblem, customModelStore],
+  ([$selectedProblem]) => problemConfigs[$selectedProblem]
 );
 
 // Split data into training and test sets

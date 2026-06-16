@@ -27,7 +27,9 @@ export type ProblemType =
   | 'tiny-net'
   | 'rosenbrock'
   | 'saddle-point'
-  | 'himmelblau';
+  | 'himmelblau'
+  | 'custom-regression'
+  | 'custom-classification';
 
 // A single data point in our dataset
 export interface DataPoint {

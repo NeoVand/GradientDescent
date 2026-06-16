@@ -728,15 +728,18 @@
       .y(d => yScale(d.y))
       .curve(d3.curveMonotoneX);
     
-    // Draw the true model line (dashed)
-    g.append('path')
-      .datum(trueModelData)
-      .attr('fill', 'none')
-      .attr('stroke', '#10b981')
-      .attr('stroke-width', 2)
-      .attr('stroke-dasharray', '8,4')
-      .attr('d', line)
-      .style('opacity', 0.6);
+    // Draw the true model line (dashed) — skipped for custom data, which has
+    // no ground-truth model to compare against.
+    if (problemType !== 'custom-regression') {
+      g.append('path')
+        .datum(trueModelData)
+        .attr('fill', 'none')
+        .attr('stroke', '#10b981')
+        .attr('stroke-width', 2)
+        .attr('stroke-dasharray', '8,4')
+        .attr('d', line)
+        .style('opacity', 0.6);
+    }
     
     // Draw the current model prediction line
     g.append('path')
