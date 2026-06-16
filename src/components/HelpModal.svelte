@@ -453,7 +453,7 @@
                 <div class="toc-part">{t.part}</div>
               {:else}
                 <button class="toc-item" class:active={activeId === t.id} on:click={() => goTo(t.id!)}>
-                  <span class="toc-n">{t.n}</span>
+                  <span class="toc-ic"><svelte:component this={chIcon[t.id!]} size={16} strokeWidth={2} /></span>
                   <span class="toc-title">{t.title}</span>
                 </button>
               {/if}
@@ -511,7 +511,7 @@
             <!-- ============== 1 · THE BOWL ============== -->
             <section data-ch="ch-bowl" id="ch-bowl">
               <div class="part-label">Part I · The landscape</div>
-              <h3><span class="chap">1</span><svelte:component this={chIcon['ch-bowl']} size={18} strokeWidth={2} /> The bottom of a bowl</h3>
+              <h3><svelte:component this={chIcon['ch-bowl']} size={18} strokeWidth={2} /> The bottom of a bowl</h3>
 
               <p>
                 Everything in this lab is one idea wearing many costumes: a machine has a few
@@ -567,7 +567,7 @@
 
             <!-- ============== 2 · LOSS IS A LANDSCAPE ============== -->
             <section data-ch="ch-landscape" id="ch-landscape">
-              <h3><span class="chap">2</span><svelte:component this={chIcon['ch-landscape']} size={18} strokeWidth={2} /> Loss is a landscape</h3>
+              <h3><svelte:component this={chIcon['ch-landscape']} size={18} strokeWidth={2} /> Loss is a landscape</h3>
 
               <p>
                 Here is the move that makes everything visual. The loss is not one fixed number —
@@ -598,7 +598,7 @@
             <!-- ============== 3 · WHICH WAY IS DOWNHILL ============== -->
             <section data-ch="ch-downhill" id="ch-downhill">
               <div class="part-label">Part II · One step</div>
-              <h3><span class="chap">3</span><svelte:component this={chIcon['ch-downhill']} size={18} strokeWidth={2} /> Which way is downhill?</h3>
+              <h3><svelte:component this={chIcon['ch-downhill']} size={18} strokeWidth={2} /> Which way is downhill?</h3>
 
               <p>
                 Standing on a hillside in fog, you can still feel which way is down — the ground
@@ -670,7 +670,7 @@
 
             <!-- ============== 4 · ONE STEP ============== -->
             <section data-ch="ch-step" id="ch-step">
-              <h3><span class="chap">4</span><svelte:component this={chIcon['ch-step']} size={18} strokeWidth={2} /> One step of descent</h3>
+              <h3><svelte:component this={chIcon['ch-step']} size={18} strokeWidth={2} /> One step of descent</h3>
 
               <p>Now we can actually walk. One step of <strong>gradient descent</strong> is almost insultingly simple:</p>
               <blockquote class="recipe">
@@ -697,7 +697,7 @@
 
             <!-- ============== 5 · LEARNING RATE ============== -->
             <section data-ch="ch-gamma" id="ch-gamma">
-              <h3><span class="chap">5</span><svelte:component this={chIcon['ch-gamma']} size={18} strokeWidth={2} /> The learning rate γ</h3>
+              <h3><svelte:component this={chIcon['ch-gamma']} size={18} strokeWidth={2} /> The learning rate γ</h3>
 
               <p>
                 There is one number you’ll reach for more than any other: <em class="g">γ</em>
@@ -734,7 +734,7 @@
             <!-- ============== 6 · THE OPTIMIZER STORY ============== -->
             <section data-ch="ch-optimizers" id="ch-optimizers">
               <div class="part-label">Part III · When one step isn’t enough</div>
-              <h3><span class="chap">6</span><svelte:component this={chIcon['ch-optimizers']} size={18} strokeWidth={2} /> Six optimizers, one story</h3>
+              <h3><svelte:component this={chIcon['ch-optimizers']} size={18} strokeWidth={2} /> Six optimizers, one story</h3>
               <p>
                 Plain gradient descent has one recurring nemesis: the <strong>ravine</strong> — a
                 valley far steeper across than along. The γ that’s safe on the steep walls is
@@ -834,7 +834,7 @@
 
             <!-- ============== 7 · NOISE / SGD ============== -->
             <section data-ch="ch-noise" id="ch-noise">
-              <h3><span class="chap">7</span><svelte:component this={chIcon['ch-noise']} size={18} strokeWidth={2} /> Mini-batches &amp; the S in SGD</h3>
+              <h3><svelte:component this={chIcon['ch-noise']} size={18} strokeWidth={2} /> Mini-batches &amp; the S in SGD</h3>
               <p>
                 Every gradient so far has been the <strong>true</strong> one — measured on all your
                 data at once. That is <strong>full-batch</strong> descent: the <strong>Batch
@@ -883,7 +883,7 @@
 
             <!-- ============== 8 · SCHEDULING THE LEARNING RATE ============== -->
             <section data-ch="ch-schedule" id="ch-schedule">
-              <h3><span class="chap">8</span><svelte:component this={chIcon['ch-schedule']} size={18} strokeWidth={2} /> Scheduling the learning rate</h3>
+              <h3><svelte:component this={chIcon['ch-schedule']} size={18} strokeWidth={2} /> Scheduling the learning rate</h3>
               <p>
                 Chapter 5 left us with a dilemma, and Chapter 7 sharpened it. A <strong>large</strong>
                 γ covers ground quickly but overshoots, and under noise it orbits the minimum in a wide
@@ -954,7 +954,7 @@
             <!-- ============== 9 · THE PROBLEMS ============== -->
             <section data-ch="ch-problems" id="ch-problems">
               <div class="part-label">Part IV · The zoo</div>
-              <h3><span class="chap">9</span><svelte:component this={chIcon['ch-problems']} size={18} strokeWidth={2} /> The 22 landscapes</h3>
+              <h3><svelte:component this={chIcon['ch-problems']} size={18} strokeWidth={2} /> The 22 landscapes</h3>
               <p>
                 Every problem has the same two parameters (α, β) and a loss surface you can see live —
                 but each surface tells a different story, from a single clean bowl to four-way ties
@@ -984,7 +984,7 @@
 
             <!-- ============== 9 · EXPERIMENTS ============== -->
             <section data-ch="ch-experiments" id="ch-experiments">
-              <h3><span class="chap">10</span><svelte:component this={chIcon['ch-experiments']} size={18} strokeWidth={2} /> Things to try</h3>
+              <h3><svelte:component this={chIcon['ch-experiments']} size={18} strokeWidth={2} /> Things to try</h3>
               <p>Each card is a ready-made scenario — one click sets everything up, starts training, and tells you what to watch for.</p>
               {#each experiments as exp (exp.id)}
                 <div class="experiment">
@@ -1002,7 +1002,7 @@
             <!-- ============== 10 · READING THE PANELS ============== -->
             <section data-ch="ch-panels" id="ch-panels">
               <div class="part-label">Reference</div>
-              <h3><span class="chap">11</span><svelte:component this={chIcon['ch-panels']} size={18} strokeWidth={2} /> Reading the panels</h3>
+              <h3><svelte:component this={chIcon['ch-panels']} size={18} strokeWidth={2} /> Reading the panels</h3>
               <ul class="viz-list">
                 <li><strong>Data plot</strong> — the data points and the current model. For curve fits, blue solid is the current fit and green dashed is the truth. For 2D problems, the orange marker shows your parameters directly on the plot.</li>
                 <li><strong>Loss &amp; Gradient</strong> — the landscape from Chapter 2: bright = low loss, white contours join equal-loss points, and the field arrows are −∇ℒ. On the marker, the <span class="ink-blue">blue arrow</span> is steepest descent and the <span class="ink-red">red arrow</span> is the step actually taken (Chapters 3–4). Drag the marker to teleport.</li>
@@ -1012,7 +1012,7 @@
 
             <!-- ============== 11 · KEYBOARD ============== -->
             <section data-ch="ch-keys" id="ch-keys">
-              <h3><span class="chap">12</span><svelte:component this={chIcon['ch-keys']} size={18} strokeWidth={2} /> Keyboard</h3>
+              <h3><svelte:component this={chIcon['ch-keys']} size={18} strokeWidth={2} /> Keyboard</h3>
               <div class="kbd-row">
                 <span class="kbd-item"><kbd>Space</kbd> Train / Pause</span>
                 <span class="kbd-item"><kbd>S</kbd> Step</span>
@@ -1180,18 +1180,13 @@
   }
   .toc-item:hover { background: var(--color-bg-tertiary); color: var(--color-text-primary); }
   .toc-item.active { background: rgba(16, 185, 129, 0.12); color: var(--color-text-primary); }
-  .toc-n {
+  .toc-ic {
     flex-shrink: 0;
     width: 1.35rem; height: 1.35rem;
     display: inline-flex; align-items: center; justify-content: center;
-    font-family: 'SF Mono', Monaco, monospace;
-    font-size: 0.7rem;
-    font-weight: 700;
-    border-radius: 6px;
-    color: var(--color-text-tertiary);
-    background: var(--color-bg-tertiary);
+    color: #10b981; /* same green the chapter icons use in the text */
   }
-  .toc-item.active .toc-n { color: #10b981; background: rgba(16, 185, 129, 0.18); }
+  .toc-ic :global(svg) { width: 16px; height: 16px; flex-shrink: 0; }
   .toc-title { font-size: 0.82rem; font-weight: 500; line-height: 1.25; }
 
   /* ---------- Reading column ---------- */
@@ -1304,17 +1299,6 @@
   em.g { font-family: Georgia, serif; font-style: italic; color: #10b981; font-weight: 500; }
   .ink-blue { color: #3b82f6; font-weight: 600; }
   .ink-red { color: #ef4444; font-weight: 600; }
-
-  .chap {
-    font-family: 'SF Mono', Monaco, monospace;
-    font-size: 0.8rem;
-    font-weight: 800;
-    color: #10b981;
-    background: rgba(16, 185, 129, 0.1);
-    border-radius: 6px;
-    padding: 0.12rem 0.5rem;
-    flex-shrink: 0;
-  }
 
   /* ---------- Recipe blockquote ---------- */
   .recipe {
