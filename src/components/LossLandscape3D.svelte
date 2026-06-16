@@ -162,9 +162,15 @@
     const extSpan = grid.extMax - grid.extMin;
     const { min, max } = currentScene.range;
 
+    // Each ring is drawn as TWO copies: one just above the surface and one just
+    // below it (±D in height). With the surface opaque (depthTest on), the top
+    // copy shows when you look from above and the bottom copy shows from below,
+    // while the surface still hides the far-side rings — so the contours read
+    // from any angle without the surface going transparent.
+    const D = 0.011;
     const verts: number[] = [];
     for (const poly of polys) {
-      const y = normalizedLogLoss(grid, poly.value) * HEIGHT + 0.004;
+      const yBase = normalizedLogLoss(grid, poly.value) * HEIGHT;
       for (const polygon of poly.coordinates) {
         for (const ring of polygon) {
           for (let k = 0; k < ring.length - 1; k++) {
@@ -177,7 +183,9 @@
               aA < min || aA > max || bA < min || bA > max ||
               aB < min || aB > max || bB < min || bB > max
             ) continue;
-            verts.push(toX(aA), y, toZ(bA), toX(aB), y, toZ(bB));
+            const xA = toX(aA), zA = toZ(bA), xB = toX(aB), zB = toZ(bB);
+            verts.push(xA, yBase + D, zA, xB, yBase + D, zB); // top copy
+            verts.push(xA, yBase - D, zA, xB, yBase - D, zB); // bottom copy
           }
         }
       }
@@ -185,14 +193,15 @@
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
-    // depthTest off + a render order above the surface: the iso-loss rings read
-    // from any orbit angle, including from below, instead of being occluded by
-    // the terrain in front of them (the marker and trail already do this).
+    // depthTest ON so the opaque surface occludes rings on its far side —
+    // without it, contours from behind every hill showed through and the
+    // surface read as transparent. Lifted slightly above the surface so the
+    // visible (near-face) rings still draw cleanly instead of z-fighting.
     const mat = new THREE.LineBasicMaterial({
       color: 0xffffff,
       transparent: true,
-      opacity: 0.32,
-      depthTest: false,
+      opacity: 0.78,
+      depthTest: true,
       depthWrite: false
     });
     contourLines = new THREE.LineSegments(geo, mat);
@@ -223,7 +232,7 @@
     const range = currentScene.range;
 
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    const c: [number, number, number] = isDark ? [0.62, 0.69, 0.8] : [0.27, 0.32, 0.41];
+    const c: [number, number, number] = isDark ? [0.86, 0.91, 1.0] : [0.12, 0.16, 0.26];
     const LIFT = 0.012;
 
     const verts: number[] = [];
@@ -236,8 +245,8 @@
         const last = line.length - 1;
         for (let i = 0; i < last; i++) {
           const p = line[i], q = line[i + 1];
-          const f0 = 0.25 + 0.75 * (i / last);
-          const f1 = 0.25 + 0.75 * ((i + 1) / last);
+          const f0 = 0.45 + 0.55 * (i / last);
+          const f1 = 0.45 + 0.55 * ((i + 1) / last);
           verts.push(toX(p.a), heightAt(p.a, p.b) + LIFT, toZ(p.b),
                      toX(q.a), heightAt(q.a, q.b) + LIFT, toZ(q.b));
           cols.push(c[0] * f0, c[1] * f0, c[2] * f0, c[0] * f1, c[1] * f1, c[2] * f1);
@@ -248,16 +257,19 @@
       const { arrows, maxMag } = computeVectorField(
         trainData, config, range, FIELD_RES_3D[layers3d.density] ?? 16
       );
-      const LEN = 0.085;
+      const LEN = 0.09;
       for (const ar of arrows) {
         const d = dirVec(-ar.ga, -ar.gb);
         if (!d) continue;
         const norm = maxMag > 0 ? ar.mag / maxMag : 0;
-        const len = LEN * (0.3 + 0.7 * norm);
+        // Low floor (matching the 2D field): flat regions get tiny marks, steep
+        // regions get bold ones. The old 0.3 floor squashed every arrow to
+        // nearly the same length, so the magnitude was invisible.
+        const len = LEN * (0.12 + 0.88 * norm);
         const y = heightAt(ar.a, ar.b) + LIFT;
         const x0 = toX(ar.a), z0 = toZ(ar.b);
         verts.push(x0, y, z0, x0 + d.x * len, y, z0 + d.z * len);
-        cols.push(c[0] * 0.25, c[1] * 0.25, c[2] * 0.25, c[0], c[1], c[2]); // base dim → tip bright (downhill)
+        cols.push(c[0] * 0.5, c[1] * 0.5, c[2] * 0.5, c[0], c[1], c[2]); // base dim → tip bright (downhill)
       }
     }
 
@@ -268,8 +280,8 @@
     const mat = new THREE.LineBasicMaterial({
       vertexColors: true,
       transparent: true,
-      opacity: isDark ? 0.55 : 0.6,
-      depthTest: false,
+      opacity: 0.95,
+      depthTest: true, // occluded by the surface — no more x-ray through hills
       depthWrite: false
     });
     vectorField3d = new THREE.LineSegments(geo, mat);
@@ -856,11 +868,14 @@
     controls.minDistance = 0.6;
     controls.maxDistance = 6;
 
-    scene3.add(new THREE.AmbientLight(0xffffff, 0.6));
-    const sun = new THREE.DirectionalLight(0xffffff, 1.1);
+    // Calmer lights: the old set (0.6 + 1.1 + 0.35) blew the bright basins out
+    // to white, washing the surface and swallowing the overlays. Pulled down so
+    // the colormap stays rich and the contours/arrows read against it.
+    scene3.add(new THREE.AmbientLight(0xffffff, 0.5));
+    const sun = new THREE.DirectionalLight(0xffffff, 0.8);
     sun.position.set(1.5, 2.5, 1);
     scene3.add(sun);
-    const fill = new THREE.DirectionalLight(0xffffff, 0.35);
+    const fill = new THREE.DirectionalLight(0xffffff, 0.28);
     fill.position.set(-1.5, 1.2, -1.5);
     scene3.add(fill);
 
