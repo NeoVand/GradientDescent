@@ -892,9 +892,10 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-    /* Open dropdowns paint above the run card below */
-    position: relative;
-    z-index: 2;
+    /* No stacking context here on purpose: the fixed dropdowns and their
+       backdrop both live at the component root, and trapping the dropdown in
+       a local context (z-index) would let the root-level backdrop paint over
+       it — swallowing every click and wheel. */
   }
 
   .run-panel {
@@ -978,15 +979,13 @@
   }
 
   /* The top rail stitches its sections into one continuous panel surface (no
-     inset cards), separated by a hairline — cleaner and more compact, and the
-     list scrolls as a whole. The run deck below keeps its inset-card look. */
+     inset cards, no dividers) — the uppercase section labels do the
+     separating. Cleaner and more compact, and the list scrolls as a whole.
+     The run deck below keeps its inset-card look. */
   .sidebar-content .section {
     background: none;
     border-radius: 0;
-    padding: calc(7px + 0.35 * var(--air)) 0;
-  }
-  .sidebar-content .section + .section {
-    border-top: 1px solid var(--color-border);
+    padding: calc(6px + 0.3 * var(--air)) 0 calc(8px + 0.3 * var(--air));
   }
 
   .section-label {
