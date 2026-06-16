@@ -24,9 +24,26 @@
   import { contours } from 'd3-contour';
   import { interpolateViridis } from 'd3-scale-chromatic';
   import { experiments } from '../utils/experiments';
+  import { schedules, scheduleOrder } from '../utils/schedules';
 
   export let isOpen = false;
   export let onClose: () => void;
+
+  // Tiny γ-vs-step previews for the scheduling chapter, sampled from the SAME
+  // schedule factors the trainer uses, so the curves are honest.
+  const SCH_W = 150, SCH_H = 78, SCH_PAD = 7;
+  const scheduleCurves = scheduleOrder.map((id) => {
+    const f = schedules[id].factor;
+    const N = 72, T = 100;
+    const pts: string[] = [];
+    for (let k = 0; k <= N; k++) {
+      const v = Math.max(0, Math.min(1, f((k / N) * T, T)));
+      const x = SCH_PAD + (k / N) * (SCH_W - 2 * SCH_PAD);
+      const y = SCH_PAD + (1 - v) * (SCH_H - 2 * SCH_PAD);
+      pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+    }
+    return { id, name: schedules[id].name, desc: schedules[id].description, d: 'M ' + pts.join(' L ') };
+  });
 
   function runExperiment(exp: (typeof experiments)[number]) {
     onClose();
@@ -49,13 +66,14 @@
     { id: 'ch-gamma', n: '5', title: 'The learning rate γ' },
     { part: "Part III · When one step isn't enough" },
     { id: 'ch-optimizers', n: '6', title: 'Six optimizers, one story' },
-    { id: 'ch-noise', n: '7', title: 'Noise — the S in SGD' },
+    { id: 'ch-noise', n: '7', title: 'Mini-batches & the S in SGD' },
+    { id: 'ch-schedule', n: '8', title: 'Scheduling the learning rate' },
     { part: 'Part IV · The zoo' },
-    { id: 'ch-problems', n: '8', title: 'The 22 landscapes' },
-    { id: 'ch-experiments', n: '9', title: 'Things to try' },
+    { id: 'ch-problems', n: '9', title: 'The 22 landscapes' },
+    { id: 'ch-experiments', n: '10', title: 'Things to try' },
     { part: 'Reference' },
-    { id: 'ch-panels', n: '10', title: 'Reading the panels' },
-    { id: 'ch-keys', n: '11', title: 'Keyboard' }
+    { id: 'ch-panels', n: '11', title: 'Reading the panels' },
+    { id: 'ch-keys', n: '12', title: 'Keyboard' }
   ];
   const chapters = toc.filter(t => t.id) as Required<Pick<TocEntry, 'id' | 'n' | 'title'>>[];
 
@@ -401,6 +419,7 @@
   const chIcon: Record<string, any> = {
     'ch-bowl': BookOpen, 'ch-landscape': Mountain, 'ch-downhill': TrendingDown,
     'ch-step': Compass, 'ch-gamma': Zap, 'ch-optimizers': Rocket, 'ch-noise': Waves,
+    'ch-schedule': Activity,
     'ch-problems': Layers, 'ch-experiments': FlaskConical, 'ch-panels': Map, 'ch-keys': Keyboard
   };
 </script>
@@ -532,16 +551,18 @@
                 </svg>
               </div>
 
-              <details class="deeper">
-                <summary>Go deeper — the loss formula</summary>
-                <p>
-                  For most fits here the loss is the <em>mean squared error</em>: take each
-                  prediction <em>ŷ</em>, subtract the true value <em>y</em>, square the gap (so over-
-                  and under-shooting both count as “wrong”), and average over all <em>n</em> data
-                  points.
-                </p>
-                <div class="formula-display">{@html texD(formulas.lossDefinition)}</div>
-              </details>
+              <p>
+                We can write that “how wrong” down exactly. For most fits here the loss is the
+                <strong>mean squared error</strong>: take each prediction <em>ŷ</em>, subtract the
+                true value <em>y</em>, square the gap so that overshooting and undershooting both
+                count as wrong, and average over all <em>n</em> data points.
+              </p>
+              <div class="formula-display">{@html texD(formulas.lossDefinition)}</div>
+              <p>
+                The squaring is the quiet hero here: it punishes a big miss far more than a small one,
+                and it makes the loss a smooth, rounded <em>bowl</em> rather than a creased tent — and
+                a smooth bowl is exactly what lets us roll downhill in the chapters ahead.
+              </p>
             </section>
 
             <!-- ============== 2 · LOSS IS A LANDSCAPE ============== -->
@@ -631,15 +652,20 @@
                 </div>
               </div>
 
-              <details class="deeper">
-                <summary>Go deeper — what ∇ℒ actually is</summary>
-                <p>
-                  Formally the gradient is the column of <em>partial derivatives</em> — one slope per
-                  parameter. Each entry answers “if I wiggle only this knob, how fast does the loss
-                  change?”
-                </p>
-                <div class="formula-display">{@html texD(formulas.gradientDefinition)}</div>
-              </details>
+              <p>
+                Formally, the gradient is a column of <strong>partial derivatives</strong> — one
+                slope per parameter. Each entry answers a single, narrow question: <em>if I wiggle
+                only this knob and hold the other still, how fast does the loss change?</em>
+              </p>
+              <div class="formula-display">{@html texD(formulas.gradientDefinition)}</div>
+              <p>
+                Stack those two answers into a little arrow and you have ∇ℒ. Its
+                <strong>direction</strong> is the steepest way uphill; its <strong>length</strong> is
+                how steep. That is why the field arrows stretch long on the steep walls and shrink to
+                almost nothing at the basin floor — at the very bottom there is no downhill left, so
+                the gradient, and the step it drives, fades to zero. The marker arriving and going
+                still <em>is</em> the gradient vanishing.
+              </p>
             </section>
 
             <!-- ============== 4 · ONE STEP ============== -->
@@ -690,15 +716,19 @@
                 whole subject of Part III.
               </p>
 
-              <details class="deeper">
-                <summary>Go deeper — the stability edge</summary>
-                <p>
-                  For a smooth bowl, gradient descent only settles when γ stays below 2 divided by
-                  the largest curvature (λ<sub>max</sub>, the steepest second derivative). Cross it
-                  and each step lands farther out than the last.
-                </p>
-                <div class="formula-display">{@html texD(formulas.stability)}</div>
-              </details>
+              <p>
+                That edge is not vague — it has an exact location. For a smooth bowl, gradient descent
+                only settles when γ stays below <strong>two divided by the largest curvature</strong>,
+                written λ<sub>max</sub> (the steepest second derivative of the surface — how sharply
+                the slope itself is bending).
+              </p>
+              <div class="formula-display">{@html texD(formulas.stability)}</div>
+              <p>
+                Stay under that line and each step lands closer to the bottom than the last, so the run
+                converges. Cross it and the opposite happens: every step overshoots a little more than
+                the one before, the bounce compounds, and the loss runs off to infinity. That single
+                number — the curvature — is the villain the whole next part is built to outwit.
+              </p>
             </section>
 
             <!-- ============== 6 · THE OPTIMIZER STORY ============== -->
@@ -804,28 +834,127 @@
 
             <!-- ============== 7 · NOISE / SGD ============== -->
             <section data-ch="ch-noise" id="ch-noise">
-              <h3><span class="chap">7</span><svelte:component this={chIcon['ch-noise']} size={18} strokeWidth={2} /> Noise — the S in SGD</h3>
+              <h3><span class="chap">7</span><svelte:component this={chIcon['ch-noise']} size={18} strokeWidth={2} /> Mini-batches &amp; the S in SGD</h3>
               <p>
-                Real datasets are huge, so instead of measuring the gradient on <em>all</em> the data
-                every step, you can measure it on a small random <strong>batch</strong>. The
-                direction you get back is <strong>noisy</strong> — it jitters around the true
-                downhill — but it’s far cheaper, and on average it still points the right way. That
-                is the <strong>S</strong> (stochastic) in <strong>SGD</strong>, stochastic gradient
-                descent.
+                Every gradient so far has been the <strong>true</strong> one — measured on all your
+                data at once. That is <strong>full-batch</strong> descent: the <strong>Batch
+                size</strong> dial set to <em>All</em>. It gives the cleanest possible arrow, and it
+                is the most expensive thing you can do, because every single step has to read every
+                single data point.
               </p>
               <p>
-                Drop the <strong>Batch size</strong> in the optimizer panel and a faint
-                <strong>fan</strong> of arrows appears at the marker: each ray is the gradient a
-                different batch would have given, and the spread of the fan <em>is</em> the noise. A
-                little of it is even useful — a noisy step can rattle the marker out of a shallow
-                trap that a perfectly smooth step would have settled into.
+                Real datasets are far too large for that, so instead you <em>estimate</em> the
+                gradient from a small random <strong>batch</strong> — a handful of points, freshly
+                resampled each step. The arrow you get back is <strong>noisy</strong>: it jitters
+                around the true downhill, because a different handful would have pulled in a slightly
+                different direction. But it is cheap, and — this is the quiet miracle that makes modern
+                training possible — it still points the right way <em>on average</em>. Averaging your
+                way downhill through that noise is the <strong>S</strong> (stochastic) in
+                <strong>SGD</strong>, stochastic gradient descent.
+              </p>
+              <p>
+                Slide the <strong>Batch size</strong> down from <em>All</em> toward <em>1</em> and a
+                faint <strong>fan</strong> of arrows opens at the marker: each ray is the gradient a
+                different random batch would have handed you, so the <em>width of the fan is the noise
+                itself.</em> The fewer points in the batch, the wider it spreads — and it spreads in a
+                very specific way. The error of an average shrinks only with the <em>square root</em>
+                of how many samples go into it, so a batch of 4 is roughly twice as steady as a batch
+                of 1, and you need 16 to halve the noise again. That is the law of diminishing returns
+                behind every batch-size choice: a batch of 32 already looks almost as calm as the full
+                dataset, for a fraction of the cost.
+              </p>
+              <p>
+                And the noise is not pure cost. A little jitter is genuinely <strong>useful</strong>: a
+                noisy step can rattle the marker out of a shallow dip or a flat saddle that a perfectly
+                smooth step would have settled into and never left, and the constant restlessness tends
+                to steer a run toward <em>wide, gentle</em> basins — the forgiving kind that generalize
+                to new data — rather than narrow, brittle cracks. This is why a touch of stochasticity
+                is often kept on purpose, even when the full gradient is affordable.
+              </p>
+              <p>
+                The bill comes due at the <em>end</em>. Because the gradient never goes quiet, SGD never
+                fully stops: near the bottom it stops descending and starts <strong>orbiting</strong>,
+                buzzing around the minimum inside a small <strong>noise ball</strong> whose radius grows
+                with both the step size γ and the width of the fan. On the loss curve it shows up as a
+                fuzzy <em>band</em> rather than a clean line that flatlines — the run has arrived, but it
+                can’t hold still. Pulling that band shut is exactly what the next chapter is for.
               </p>
             </section>
 
-            <!-- ============== 8 · THE PROBLEMS ============== -->
+            <!-- ============== 8 · SCHEDULING THE LEARNING RATE ============== -->
+            <section data-ch="ch-schedule" id="ch-schedule">
+              <h3><span class="chap">8</span><svelte:component this={chIcon['ch-schedule']} size={18} strokeWidth={2} /> Scheduling the learning rate</h3>
+              <p>
+                Chapter 5 left us with a dilemma, and Chapter 7 sharpened it. A <strong>large</strong>
+                γ covers ground quickly but overshoots, and under noise it orbits the minimum in a wide
+                ball. A <strong>small</strong> γ lands precisely but crawls to get there. The trick is
+                that you don’t have to choose: stop treating γ as one frozen number and start
+                <strong>scheduling</strong> it — large early to make fast progress, small late to settle
+                cleanly. The <strong>Schedule</strong> control beneath the learning rate does exactly
+                that, multiplying your base γ by a factor that changes on every step of the run.
+              </p>
+              <p>
+                The four schedules trace four different shapes for that factor over a run — flat, then
+                three ways of bleeding γ away as the steps tick by:
+              </p>
+              <div class="schedule-grid">
+                {#each scheduleCurves as s (s.id)}
+                  <div class="schedule-card">
+                    <svg viewBox="0 0 {SCH_W} {SCH_H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                      <line x1={SCH_PAD} y1={SCH_H - SCH_PAD} x2={SCH_W - SCH_PAD} y2={SCH_H - SCH_PAD} class="sch-axis" />
+                      <line x1={SCH_PAD} y1={SCH_PAD} x2={SCH_PAD} y2={SCH_H - SCH_PAD} class="sch-axis" />
+                      <path d={s.d} fill="none" class="sch-curve" />
+                    </svg>
+                    <div class="schedule-name">{s.name}</div>
+                    <div class="schedule-desc">{s.desc}</div>
+                  </div>
+                {/each}
+              </div>
+              <p>
+                <strong>Constant</strong> is the baseline every earlier chapter quietly assumed — γ holds
+                its value start to finish. It is the honest choice when you want to watch raw behaviour,
+                but it forces you to pick a single γ that is always a compromise between fast and precise.
+              </p>
+              <p>
+                <strong>Step decay</strong> holds γ flat, then cuts it by a fixed factor at set milestones
+                — here ×0.3 a third of the way in, and ×0.3 again at two-thirds. On the loss curve it
+                leaves the field’s most recognizable fingerprint: a long plateau, then a sudden
+                <em>cliff</em> downward the instant γ drops, as the smaller step finally resolves detail
+                the larger one kept skating over. For most of deep learning’s history, this staircase was
+                how nearly every network was trained.
+              </p>
+              <p>
+                <strong>Cosine</strong> does the same work without the jolts. γ glides along the first
+                half of a cosine, easing from full strength down to a small floor (about 5%) — quick at
+                first, feather-light by the end. With no single brutal transition the run simply
+                <em>eases</em> into its minimum, which is why cosine annealing has become the modern
+                default.
+              </p>
+              <p>
+                <strong>Warmup + cosine</strong> bolts a short on-ramp onto the front: γ starts near zero
+                and climbs over the first tenth of the run before the cosine takes over. It looks fussy
+                until you remember where a run <em>begins</em> — at a random, often dreadful point, where
+                the gradient can be enormous and the adaptive optimizers from Chapter 6 have no history
+                yet to calibrate against. A full-size first step there can fling the marker clean off the
+                map. Warmup lets the optimizer find its footing on small, safe steps before it opens the
+                throttle, and it is now standard practice for training large models from scratch.
+              </p>
+              <p>
+                There is a deeper reason the late shrink matters, and it is the noise ball from Chapter 7.
+                That ball’s radius scales with γ — so a γ annealing toward zero draws the orbit in tight
+                around the true minimum, turning SGD’s restless buzzing into a soft landing. Decay isn’t
+                only about speed: under noise, it is <em>how a stochastic run converges at all.</em>
+              </p>
+              <p class="look">
+                Try it: set a small batch so the loss settles into a fuzzy band on <strong>Const</strong>,
+                then switch to <strong>Cosine</strong> and watch the band pinch shut over the final steps.
+              </p>
+            </section>
+
+            <!-- ============== 9 · THE PROBLEMS ============== -->
             <section data-ch="ch-problems" id="ch-problems">
               <div class="part-label">Part IV · The zoo</div>
-              <h3><span class="chap">8</span><svelte:component this={chIcon['ch-problems']} size={18} strokeWidth={2} /> The 22 landscapes</h3>
+              <h3><span class="chap">9</span><svelte:component this={chIcon['ch-problems']} size={18} strokeWidth={2} /> The 22 landscapes</h3>
               <p>
                 Every problem has the same two parameters (α, β) and a loss surface you can see live —
                 but each surface tells a different story, from a single clean bowl to four-way ties
@@ -855,7 +984,7 @@
 
             <!-- ============== 9 · EXPERIMENTS ============== -->
             <section data-ch="ch-experiments" id="ch-experiments">
-              <h3><span class="chap">9</span><svelte:component this={chIcon['ch-experiments']} size={18} strokeWidth={2} /> Things to try</h3>
+              <h3><span class="chap">10</span><svelte:component this={chIcon['ch-experiments']} size={18} strokeWidth={2} /> Things to try</h3>
               <p>Each card is a ready-made scenario — one click sets everything up, starts training, and tells you what to watch for.</p>
               {#each experiments as exp (exp.id)}
                 <div class="experiment">
@@ -873,7 +1002,7 @@
             <!-- ============== 10 · READING THE PANELS ============== -->
             <section data-ch="ch-panels" id="ch-panels">
               <div class="part-label">Reference</div>
-              <h3><span class="chap">10</span><svelte:component this={chIcon['ch-panels']} size={18} strokeWidth={2} /> Reading the panels</h3>
+              <h3><span class="chap">11</span><svelte:component this={chIcon['ch-panels']} size={18} strokeWidth={2} /> Reading the panels</h3>
               <ul class="viz-list">
                 <li><strong>Data plot</strong> — the data points and the current model. For curve fits, blue solid is the current fit and green dashed is the truth. For 2D problems, the orange marker shows your parameters directly on the plot.</li>
                 <li><strong>Loss &amp; Gradient</strong> — the landscape from Chapter 2: bright = low loss, white contours join equal-loss points, and the field arrows are −∇ℒ. On the marker, the <span class="ink-blue">blue arrow</span> is steepest descent and the <span class="ink-red">red arrow</span> is the step actually taken (Chapters 3–4). Drag the marker to teleport.</li>
@@ -883,7 +1012,7 @@
 
             <!-- ============== 11 · KEYBOARD ============== -->
             <section data-ch="ch-keys" id="ch-keys">
-              <h3><span class="chap">11</span><svelte:component this={chIcon['ch-keys']} size={18} strokeWidth={2} /> Keyboard</h3>
+              <h3><span class="chap">12</span><svelte:component this={chIcon['ch-keys']} size={18} strokeWidth={2} /> Keyboard</h3>
               <div class="kbd-row">
                 <span class="kbd-item"><kbd>Space</kbd> Train / Pause</span>
                 <span class="kbd-item"><kbd>S</kbd> Step</span>
@@ -944,7 +1073,7 @@
 
   /* ---------- Header ---------- */
   .modal-header {
-    padding: 1rem 1.5rem;
+    padding: 0.62rem 1.5rem;
     border-bottom: 1px solid var(--color-border);
     display: flex;
     align-items: center;
@@ -954,14 +1083,14 @@
   .modal-title { display: flex; align-items: center; gap: 0.65rem; }
   .modal-icon {
     font-family: 'Times New Roman', 'Georgia', serif;
-    font-size: 1.9rem;
+    font-size: 1.6rem;
     font-style: italic;
     color: #10b981;
     line-height: 1;
   }
   .modal-header h2 {
     margin: 0;
-    font-size: 1.3rem;
+    font-size: 1.18rem;
     font-weight: 700;
     color: var(--color-text-primary);
     letter-spacing: -0.01em;
@@ -979,16 +1108,22 @@
     margin-left: 0.1rem;
   }
   .close-btn {
-    width: 36px; height: 36px;
+    width: 38px; height: 38px;
     flex-shrink: 0;
-    border: none; border-radius: 8px;
-    background: transparent;
-    color: var(--color-text-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: 9px;
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-secondary);
     cursor: pointer;
     display: inline-flex; align-items: center; justify-content: center;
-    transition: all 0.2s;
+    transition: background 0.18s, color 0.18s, border-color 0.18s, transform 0.1s;
   }
-  .close-btn:hover { background: var(--color-bg-tertiary); color: var(--color-text-primary); }
+  .close-btn :global(svg) { width: 22px; height: 22px; }
+  .close-btn:hover {
+    background: rgba(16, 185, 129, 0.14);
+    color: #10b981;
+    border-color: rgba(16, 185, 129, 0.45);
+  }
   .close-btn:active { transform: scale(0.94); }
 
   /* ---------- Reading-progress bar ---------- */
@@ -1018,7 +1153,7 @@
     border-right: 1px solid var(--color-border);
     overflow-y: auto;
     padding: 1.1rem 0.65rem 1.5rem;
-    background: transparent;
+    background: rgba(0, 0, 0, 0.14);
   }
   .toc nav { display: flex; flex-direction: column; gap: 1px; }
   .toc-part {
@@ -1033,6 +1168,7 @@
   .toc-item {
     display: flex;
     align-items: center;
+    justify-content: flex-start; /* not the global button's centering — keep every row left-aligned */
     gap: 0.6rem;
     width: 100%;
     text-align: left;
@@ -1196,35 +1332,34 @@
   .recipe strong { color: var(--color-text-primary); }
 
   /* ---------- Go deeper ---------- */
-  .deeper {
-    margin: 1rem 0 0;
+  /* ---------- Schedule preview cards ---------- */
+  .schedule-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.7rem;
+    margin: 1.15rem 0 1.5rem;
+  }
+  .schedule-card {
     border: 1px solid var(--color-border);
     border-radius: 10px;
     background: var(--color-bg-tertiary);
-    overflow: hidden;
+    padding: 0.6rem 0.75rem 0.75rem;
   }
-  .deeper > summary {
-    cursor: pointer;
-    list-style: none;
-    padding: 0.6rem 0.9rem;
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: #10b981;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    user-select: none;
+  .schedule-card svg { display: block; width: 100%; height: auto; }
+  .sch-axis { stroke: var(--color-border); stroke-width: 1; }
+  .sch-curve { stroke: #10b981; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .schedule-name {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    margin-top: 0.45rem;
   }
-  .deeper > summary::-webkit-details-marker { display: none; }
-  .deeper > summary::before {
-    content: '▸';
-    font-size: 0.7rem;
-    transition: transform 0.15s;
+  .schedule-desc {
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: var(--color-text-tertiary);
+    margin-top: 0.12rem;
   }
-  .deeper[open] > summary::before { transform: rotate(90deg); }
-  .deeper[open] > summary { border-bottom: 1px solid var(--color-border); }
-  .deeper > p { padding: 0 0.9rem; font-size: 0.9rem; }
-  .deeper > p:first-of-type { padding-top: 0.8rem; }
 
   /* ---------- Concept blocks ---------- */
   .concept {
@@ -1273,7 +1408,6 @@
   }
   .formula-display.center { text-align: center; }
   .formula-display :global(.katex) { color: var(--color-text-primary); }
-  .deeper .formula-display { margin: 0.5rem 0.9rem 0.9rem; }
 
   /* Wide formulas may scroll sideways; keep the scrollbar thin and themed,
      and never let overflow-x:auto spawn a stray vertical scrollbar. */
@@ -1466,7 +1600,7 @@
   /* ---------- Footer ---------- */
   .modal-footer {
     border-top: 1px solid var(--color-border);
-    padding: 0.8rem 1.5rem;
+    padding: 0.5rem 1.5rem;
     flex-shrink: 0;
     display: flex; align-items: center; justify-content: space-between; gap: 1rem;
   }
@@ -1474,7 +1608,7 @@
   .modal-footer strong { color: #10b981; font-weight: 600; }
   .github-link {
     display: inline-flex; align-items: center; gap: 0.4rem;
-    padding: 0.4rem 0.75rem;
+    padding: 0.3rem 0.7rem;
     border-radius: 8px; border: 1px solid var(--color-border);
     background: transparent; color: var(--color-text-secondary);
     text-decoration: none; font-size: 0.8125rem; font-weight: 500;
