@@ -472,7 +472,7 @@ export interface VizLayers {
 const DEFAULT_VIZ_LAYERS: VizLayers = {
   field: 'arrows',
   contours: true,
-  colormap: 'viridis',
+  colormap: 'cubehelix',
   density: 'normal'
 };
 
