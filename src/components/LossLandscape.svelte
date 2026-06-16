@@ -782,7 +782,15 @@
     const dTest = dSep * 0.5;
     const stepLen = dSep * 0.4;
     const MAX_STEPS = 800;
-    const color = isDark ? '#9fb0c9' : '#475569';
+    // A single flat color can't contrast with the whole viridis range — a line
+    // dark enough to read over the bright peaks vanishes into the dark basins
+    // where the streamlines actually pool (which is why light mode looked
+    // almost blank). So each line gets a contrasting halo under a core stroke:
+    // the halo carries it over same-tone regions, the core over the rest.
+    const coreColor = isDark ? '#e8eefa' : '#1e293b';
+    const haloColor = isDark ? '#070b14' : '#ffffff';
+    const coreOpacity = isDark ? 0.62 : 0.82;
+    const haloOpacity = isDark ? 0.42 : 0.6;
 
     // Spatial hash (cell = d_sep) for O(1) "any line point within d?" queries.
     const cell = dSep;
@@ -844,6 +852,7 @@
       for (let j = 0; j < seed0; j++)
         queue.push({ a: range.min + ((i + 0.5) / seed0) * span, b: range.min + ((j + 0.5) / seed0) * span });
 
+    const lines: ModelParameters[][] = [];
     let guard = 0;
     let totalPts = 0;
     while (queue.length && guard++ < 8000 && totalPts < 26000) {
@@ -856,14 +865,7 @@
       if (line.length < 3) continue;
       for (const p of line) addPt(p);
       totalPts += line.length;
-      g.append('path')
-        .attr('class', 'streamline')
-        .attr('d', lineGen(line))
-        .attr('fill', 'none')
-        .attr('stroke', color)
-        .attr('stroke-width', 1)
-        .attr('stroke-linecap', 'round')
-        .style('opacity', isDark ? 0.34 : 0.42);
+      lines.push(line);
       for (let i = 0; i < line.length - 1; i += 2) {
         const p = line[i], q = line[i + 1];
         const tx = q.a - p.a, ty = q.b - p.b, tm = Math.hypot(tx, ty);
@@ -873,6 +875,24 @@
         queue.push({ a: p.a - nx * dSep, b: p.b - ny * dSep });
       }
     }
+
+    // Two passes so every halo sits under every core (no line's halo smears
+    // over another's core): all halos first, then all cores on top.
+    const pass = (stroke: string, w: number, op: number) => {
+      for (const line of lines) {
+        g.append('path')
+          .attr('class', 'streamline')
+          .attr('d', lineGen(line))
+          .attr('fill', 'none')
+          .attr('stroke', stroke)
+          .attr('stroke-width', w)
+          .attr('stroke-linecap', 'round')
+          .attr('stroke-linejoin', 'round')
+          .style('opacity', op);
+      }
+    };
+    pass(haloColor, 2.8, haloOpacity);
+    pass(coreColor, 1.1, coreOpacity);
   }
 
   /**
