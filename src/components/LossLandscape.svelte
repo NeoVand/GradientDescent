@@ -716,8 +716,8 @@
     // Muted in dark mode so the field reads as quiet texture, not a bright
     // lattice that takes over the surface; near-black in light mode.
     const arrowColor = isDark ? '#7c8aa3' : '#1f2937';
-    const baseOpacity = isDark ? 0.10 : 0.16;
-    const spanOpacity = isDark ? 0.40 : 0.46;
+    const baseOpacity = isDark ? 0.16 : 0.20;
+    const spanOpacity = isDark ? 0.46 : 0.50;
 
     const defs = g.append('defs');
     defs.append('marker')
