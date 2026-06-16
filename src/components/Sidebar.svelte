@@ -74,12 +74,35 @@
   let showOptimizerDropdown = false;
   let problemBtn: HTMLButtonElement;
   let optimizerBtn: HTMLButtonElement;
-  let problemDropPos = { top: 0, left: 0, width: 0 };
-  let optimizerDropPos = { top: 0, left: 0, width: 0 };
+  type DropPos = { top: number | null; bottom: number | null; left: number; width: number; maxH: number };
+  let problemDropPos: DropPos = { top: 0, bottom: null, left: 0, width: 0, maxH: 400 };
+  let optimizerDropPos: DropPos = { top: 0, bottom: null, left: 0, width: 0, maxH: 400 };
 
-  function placeFrom(btn: HTMLButtonElement) {
+  // Place the popover from the trigger's on-screen rect, clamping its height to
+  // the viewport (and flipping above the trigger when there's more room there),
+  // so the list — and its scrollbar — always stays fully on screen.
+  function placeFrom(btn: HTMLButtonElement): DropPos {
     const r = btn.getBoundingClientRect();
-    return { top: Math.round(r.bottom + 4), left: Math.round(r.left), width: Math.round(r.width) };
+    const M = 12; // keep this much clear of the viewport edge
+    const CHROME = 8; // border + edge-fade allowance around the scroll area
+    const DESIRED = 400;
+    const below = window.innerHeight - r.bottom - M;
+    const above = r.top - M;
+    const openUp = below < 200 && above > below;
+    const space = openUp ? above : below;
+    const maxH = Math.round(Math.max(120, Math.min(DESIRED, space - CHROME)));
+    return {
+      left: Math.round(r.left),
+      width: Math.round(r.width),
+      maxH,
+      top: openUp ? null : Math.round(r.bottom + 4),
+      bottom: openUp ? Math.round(window.innerHeight - r.top + 4) : null
+    };
+  }
+  // Inline placement string — exactly one of top/bottom is set.
+  function dropStyle(p: DropPos): string {
+    const v = p.top != null ? `top: ${p.top}px` : `bottom: ${p.bottom}px`;
+    return `${v}; left: ${p.left}px; width: ${p.width}px;`;
   }
   function toggleProblemDropdown() {
     showOptimizerDropdown = false;
@@ -406,8 +429,8 @@
       </button>
 
       {#if showProblemDropdown}
-        <div class="problem-dropdown" style="top: {problemDropPos.top}px; left: {problemDropPos.left}px; width: {problemDropPos.width}px;">
-          <div class="dropdown-scroll" bind:this={problemScrollEl} on:scroll={updateDropdownFades}>
+        <div class="problem-dropdown" style={dropStyle(problemDropPos)}>
+          <div class="dropdown-scroll" style="max-height: {problemDropPos.maxH}px" bind:this={problemScrollEl} on:scroll={updateDropdownFades}>
             {#each problemGroups as group}
               <div class="dropdown-group-label">{group.label}</div>
               {#each group.items as problem}
@@ -607,19 +630,21 @@
       </button>
 
       {#if showOptimizerDropdown}
-        <div class="problem-dropdown" style="top: {optimizerDropPos.top}px; left: {optimizerDropPos.left}px; width: {optimizerDropPos.width}px;">
-          {#each optimizerOrder as id}
-            <button
-              class="problem-option optimizer-option"
-              class:selected={id === optimizerSel.id}
-              on:click={() => selectOptimizer(id)}
-            >
-              <span class="optimizer-text">
-                <span class="optimizer-name">{optimizers[id].name}</span>
-                <span class="optimizer-desc">{optimizers[id].description}</span>
-              </span>
-            </button>
-          {/each}
+        <div class="problem-dropdown" style={dropStyle(optimizerDropPos)}>
+          <div class="dropdown-scroll" style="max-height: {optimizerDropPos.maxH}px">
+            {#each optimizerOrder as id}
+              <button
+                class="problem-option optimizer-option"
+                class:selected={id === optimizerSel.id}
+                on:click={() => selectOptimizer(id)}
+              >
+                <span class="optimizer-text">
+                  <span class="optimizer-name">{optimizers[id].name}</span>
+                  <span class="optimizer-desc">{optimizers[id].description}</span>
+                </span>
+              </button>
+            {/each}
+          </div>
         </div>
       {/if}
     </div>
@@ -1199,8 +1224,11 @@
      mid-item), with a hairline scrollbar + strong edge fades so "there's
      more" is unmistakable. */
   .dropdown-scroll {
-    max-height: min(46vh, 400px);
+    max-height: min(46vh, 400px); /* fallback; the live cap is set inline from the viewport */
     overflow-y: auto;
+    /* Keep wheel scrolling inside the list — without this it chains into the
+       sidebar, whose scroll handler would snap the dropdown shut mid-scroll. */
+    overscroll-behavior: contain;
     scrollbar-width: thin;
     scrollbar-color: rgba(16, 185, 129, 0.35) transparent;
   }
