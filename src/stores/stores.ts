@@ -375,7 +375,7 @@ export const landscapeViewStore = createLandscapeViewStore();
 // ========== Visualization Layers Store ==========
 // What the loss landscape draws on top of the heatmap, shared by the 2D, 1D,
 // and 3D views so a toggle flipped in one holds in the others. Persisted.
-export type Colormap = 'viridis' | 'magma' | 'inferno' | 'plasma' | 'cividis' | 'turbo';
+export type Colormap = 'viridis' | 'magma' | 'inferno' | 'plasma' | 'cividis' | 'cubehelix';
 export type FieldMode = 'arrows' | 'streamlines' | 'off';
 export type FieldDensity = 'sparse' | 'normal' | 'dense';
 

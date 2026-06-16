@@ -21,19 +21,23 @@ import {
   interpolateInferno,
   interpolatePlasma,
   interpolateCividis,
-  interpolateTurbo
+  interpolateCubehelixDefault
 } from 'd3-scale-chromatic';
 import type { DataPoint, ModelParameters, ProblemConfig } from '../types/types';
 // Type-only import (erased at build time, so no runtime cycle with stores).
 import type { Colormap } from '../stores/stores';
 
+// All sequential maps with monotonically increasing luminance (dark = high
+// loss → bright = low loss). Rainbow maps like turbo are deliberately excluded:
+// they are bright in the middle and dark at both ends, so on a loss surface the
+// end color reappears near the basin and the scale reads as "circular".
 const INTERPOLATORS: Record<Colormap, (t: number) => string> = {
   viridis: interpolateViridis,
   magma: interpolateMagma,
   inferno: interpolateInferno,
   plasma: interpolatePlasma,
   cividis: interpolateCividis,
-  turbo: interpolateTurbo
+  cubehelix: interpolateCubehelixDefault
 };
 
 export interface ParameterRange {
@@ -67,7 +71,7 @@ export interface LossGrid {
 
 /** Matches the historical log(loss + 0.001) color mapping. */
 const LOG_EPS = 0.001;
-const NUM_CONTOURS = 12;
+const NUM_CONTOURS = 16;
 
 export function computeLossGrid(
   data: DataPoint[],

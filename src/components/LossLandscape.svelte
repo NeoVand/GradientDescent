@@ -96,7 +96,7 @@
   $: heatURL = scene ? gridToImageURL(scene.grid, layers.colormap) : '';
   $: legendStops = colormapStops(layers.colormap);
   const DENSITY_RES: Record<FieldDensity, number> = { sparse: 15, normal: 23, dense: 33 };
-  const COLORMAPS: Colormap[] = ['viridis', 'magma', 'inferno', 'plasma', 'cividis', 'turbo'];
+  const COLORMAPS: Colormap[] = ['viridis', 'magma', 'inferno', 'plasma', 'cividis', 'cubehelix'];
   let showLayers = false;
   let layersBtn: HTMLButtonElement;
   // The panel header clips its overflow, so the popover is fixed-positioned
@@ -770,48 +770,104 @@
     if (!scene || layers.field !== 'streamlines' || !problemConfig) return;
     const range = parameterRange;
     const span = range.max - range.min;
-    const seedN = ({ sparse: 7, normal: 10, dense: 14 } as Record<FieldDensity, number>)[layers.density] ?? 10;
-    const h = span / 90; // integration step in parameter space
-    const MAX_STEPS = 120;
+    // Evenly-spaced streamlines (Jobard & Lefebvre): a new line is only seeded
+    // where no existing line is within d_sep, and integration stops when it
+    // gets within d_test of another line. That makes the SPACING uniform —
+    // unlike grid-seeding, where every line funnels into the basins and bunches.
+    const sepDiv = ({ sparse: 16, normal: 28, dense: 55 } as Record<FieldDensity, number>)[layers.density] ?? 28;
+    const dSep = span / sepDiv;
+    const dTest = dSep * 0.5;
+    const stepLen = dSep * 0.4;
+    const MAX_STEPS = 800;
     const color = isDark ? '#9fb0c9' : '#475569';
+
+    // Spatial hash (cell = d_sep) for O(1) "any line point within d?" queries.
+    const cell = dSep;
+    const hash = new Map<string, ModelParameters[]>();
+    const cidx = (v: number) => Math.floor((v - range.min) / cell);
+    const addPt = (p: ModelParameters) => {
+      const k = `${cidx(p.a)},${cidx(p.b)}`;
+      const arr = hash.get(k);
+      if (arr) arr.push(p); else hash.set(k, [p]);
+    };
+    const nearAny = (a: number, b: number, d: number): boolean => {
+      const ci = cidx(a), cj = cidx(b), d2 = d * d;
+      for (let di = -1; di <= 1; di++)
+        for (let dj = -1; dj <= 1; dj++) {
+          const arr = hash.get(`${ci + di},${cj + dj}`);
+          if (!arr) continue;
+          for (const p of arr) {
+            const dx = p.a - a, dy = p.b - b;
+            if (dx * dx + dy * dy < d2) return true;
+          }
+        }
+      return false;
+    };
+
+    const stepDir = (a: number, b: number, sign: 1 | -1): ModelParameters | null => {
+      const gr = problemConfig!.computeGradient(trainData, { a, b });
+      const m = Math.hypot(gr.a, gr.b);
+      if (!Number.isFinite(m) || m < 1e-5) return null; // flat / at a minimum
+      return { a: sign * (-gr.a / m), b: sign * (-gr.b / m) };
+    };
+
+    // March from a seed one way, stopping at the edge, a minimum, or near another line.
+    const march = (a0: number, b0: number, sign: 1 | -1): ModelParameters[] => {
+      const pts: ModelParameters[] = [];
+      let a = a0, b = b0;
+      for (let s = 0; s < MAX_STEPS; s++) {
+        const d1 = stepDir(a, b, sign);
+        if (!d1) break;
+        const d2 = stepDir(a + d1.a * stepLen * 0.5, b + d1.b * stepLen * 0.5, sign) ?? d1; // RK2
+        a += d2.a * stepLen;
+        b += d2.b * stepLen;
+        if (a < range.min || a > range.max || b < range.min || b > range.max) break;
+        if (nearAny(a, b, dTest)) break;
+        pts.push({ a, b });
+      }
+      return pts;
+    };
 
     const lineGen = d3.line<ModelParameters>()
       .x(p => xScale(p.a))
       .y(p => yScale(p.b))
       .curve(d3.curveCatmullRom.alpha(0.5));
 
-    const integrate = (a0: number, b0: number, dir: 1 | -1): ModelParameters[] => {
-      const pts: ModelParameters[] = [{ a: a0, b: b0 }];
-      let a = a0, b = b0;
-      for (let s = 0; s < MAX_STEPS; s++) {
-        const gr = problemConfig!.computeGradient(trainData, { a, b });
-        const m = Math.hypot(gr.a, gr.b);
-        if (!Number.isFinite(m) || m < 1e-4) break; // reached a flat spot / minimum
-        a += dir * (-gr.a / m) * h;
-        b += dir * (-gr.b / m) * h;
-        if (a < range.min || a > range.max || b < range.min || b > range.max) break;
-        const last = pts[pts.length - 1];
-        if (Math.hypot(a - last.a, b - last.b) > 1e-6) pts.push({ a, b });
-      }
-      return pts;
-    };
+    // Seed queue primed with a coarse grid; each accepted line spawns fresh
+    // candidates offset perpendicular to it by d_sep on both sides.
+    const queue: ModelParameters[] = [];
+    const seed0 = 5;
+    for (let i = 0; i < seed0; i++)
+      for (let j = 0; j < seed0; j++)
+        queue.push({ a: range.min + ((i + 0.5) / seed0) * span, b: range.min + ((j + 0.5) / seed0) * span });
 
-    for (let i = 0; i < seedN; i++) {
-      for (let j = 0; j < seedN; j++) {
-        const a0 = range.min + ((i + 0.5) / seedN) * span;
-        const b0 = range.min + ((j + 0.5) / seedN) * span;
-        const back = integrate(a0, b0, -1).reverse();
-        const fwd = integrate(a0, b0, 1);
-        const pts = back.concat(fwd.slice(1));
-        if (pts.length < 3) continue;
-        g.append('path')
-          .attr('class', 'streamline')
-          .attr('d', lineGen(pts))
-          .attr('fill', 'none')
-          .attr('stroke', color)
-          .attr('stroke-width', 1)
-          .attr('stroke-linecap', 'round')
-          .style('opacity', isDark ? 0.3 : 0.4);
+    let guard = 0;
+    let totalPts = 0;
+    while (queue.length && guard++ < 8000 && totalPts < 26000) {
+      const seed = queue.shift()!;
+      if (seed.a < range.min || seed.a > range.max || seed.b < range.min || seed.b > range.max) continue;
+      if (nearAny(seed.a, seed.b, dSep)) continue;
+      const back = march(seed.a, seed.b, -1).reverse();
+      const fwd = march(seed.a, seed.b, 1);
+      const line = back.concat([{ a: seed.a, b: seed.b }], fwd);
+      if (line.length < 3) continue;
+      for (const p of line) addPt(p);
+      totalPts += line.length;
+      g.append('path')
+        .attr('class', 'streamline')
+        .attr('d', lineGen(line))
+        .attr('fill', 'none')
+        .attr('stroke', color)
+        .attr('stroke-width', 1)
+        .attr('stroke-linecap', 'round')
+        .style('opacity', isDark ? 0.34 : 0.42);
+      for (let i = 0; i < line.length - 1; i += 2) {
+        const p = line[i], q = line[i + 1];
+        const tx = q.a - p.a, ty = q.b - p.b, tm = Math.hypot(tx, ty);
+        if (tm < 1e-9) continue;
+        const nx = -ty / tm, ny = tx / tm;
+        queue.push({ a: p.a + nx * dSep, b: p.b + ny * dSep });
+        queue.push({ a: p.a - nx * dSep, b: p.b - ny * dSep });
       }
     }
   }
