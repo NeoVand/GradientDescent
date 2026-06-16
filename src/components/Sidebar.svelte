@@ -67,9 +67,34 @@
     'warmup-cosine': 'Warmup'
   };
 
-  // Dropdown state
+  // Dropdown state. The pickers are fixed-positioned popovers (computed from
+  // the trigger's rect) so the stitched control list can scroll without
+  // clipping the long problem list.
   let showProblemDropdown = false;
   let showOptimizerDropdown = false;
+  let problemBtn: HTMLButtonElement;
+  let optimizerBtn: HTMLButtonElement;
+  let problemDropPos = { top: 0, left: 0, width: 0 };
+  let optimizerDropPos = { top: 0, left: 0, width: 0 };
+
+  function placeFrom(btn: HTMLButtonElement) {
+    const r = btn.getBoundingClientRect();
+    return { top: Math.round(r.bottom + 4), left: Math.round(r.left), width: Math.round(r.width) };
+  }
+  function toggleProblemDropdown() {
+    showOptimizerDropdown = false;
+    showProblemDropdown = !showProblemDropdown;
+    if (showProblemDropdown && problemBtn) problemDropPos = placeFrom(problemBtn);
+  }
+  function toggleOptimizerDropdown() {
+    showProblemDropdown = false;
+    showOptimizerDropdown = !showOptimizerDropdown;
+    if (showOptimizerDropdown && optimizerBtn) optimizerDropPos = placeFrom(optimizerBtn);
+  }
+  function closeDropdowns() {
+    showProblemDropdown = false;
+    showOptimizerDropdown = false;
+  }
 
   // The problem list is taller than the dropdown: instead of a scrollbar,
   // soft fades at the edges signal "there's more" in that direction.
@@ -354,7 +379,7 @@
       <span class="app-icon">∂</span>
       <span>Gradient Lab</span>
     </h1>
-    <div class="sidebar-content">
+    <div class="sidebar-content" on:scroll={closeDropdowns}>
 
   <!-- ===================== PROBLEM ===================== -->
   <div class="section">
@@ -364,7 +389,8 @@
     <div class="problem-selector" class:open={showProblemDropdown}>
       <button
         class="problem-button"
-        on:click={() => showProblemDropdown = !showProblemDropdown}
+        bind:this={problemBtn}
+        on:click={toggleProblemDropdown}
       >
         <span class="problem-preview">
           {#if problems.find(p => p.type === currentProblem)?.customIcon}
@@ -380,7 +406,7 @@
       </button>
 
       {#if showProblemDropdown}
-        <div class="problem-dropdown">
+        <div class="problem-dropdown" style="top: {problemDropPos.top}px; left: {problemDropPos.left}px; width: {problemDropPos.width}px;">
           <div class="dropdown-scroll" bind:this={problemScrollEl} on:scroll={updateDropdownFades}>
             {#each problemGroups as group}
               <div class="dropdown-group-label">{group.label}</div>
@@ -570,7 +596,8 @@
     <div class="problem-selector" class:open={showOptimizerDropdown}>
       <button
         class="problem-button"
-        on:click={() => showOptimizerDropdown = !showOptimizerDropdown}
+        bind:this={optimizerBtn}
+        on:click={toggleOptimizerDropdown}
       >
         <span class="problem-preview">
           <span class="custom-icon optimizer-glyph">∇</span>
@@ -580,7 +607,7 @@
       </button>
 
       {#if showOptimizerDropdown}
-        <div class="problem-dropdown">
+        <div class="problem-dropdown" style="top: {optimizerDropPos.top}px; left: {optimizerDropPos.left}px; width: {optimizerDropPos.width}px;">
           {#each optimizerOrder as id}
             <button
               class="problem-option optimizer-option"
@@ -808,6 +835,11 @@
   </div>
 </div>
 
+<!-- Closes the fixed-positioned pickers on an outside click -->
+{#if showProblemDropdown || showOptimizerDropdown}
+  <button class="dropdown-backdrop" aria-label="Close menu" on:click={closeDropdowns}></button>
+{/if}
+
 <style>
   /* Two sibling cards fill the left column: the controls panel grows,
      the run deck is its own piece pinned at the bottom, sized to match
@@ -858,19 +890,14 @@
   .sidebar-content {
     display: flex;
     flex-direction: column;
-    gap: var(--gap);
-    flex: 0 1 auto;
+    gap: 0;
+    flex: 1 1 auto;
     min-height: 0;
-    /* Dropdowns float freely; only short screens trade that for scroll */
-    overflow: visible;
+    /* Always scroll on overflow — the pickers are fixed popovers, so they
+       don't need a visible-overflow escape hatch any more. */
+    overflow-y: auto;
+    overflow-x: hidden;
     margin-top: calc(2px + 0.6 * var(--air));
-  }
-
-  @media (max-height: 860px) {
-    .sidebar-content {
-      overflow-y: auto;
-      overflow-x: hidden;
-    }
   }
 
   /* Custom scrollbar for sidebar */
@@ -923,6 +950,18 @@
     flex-direction: column;
     gap: calc(5px + 0.5 * var(--air));
     flex-shrink: 0;
+  }
+
+  /* The top rail stitches its sections into one continuous panel surface (no
+     inset cards), separated by a hairline — cleaner and more compact, and the
+     list scrolls as a whole. The run deck below keeps its inset-card look. */
+  .sidebar-content .section {
+    background: none;
+    border-radius: 0;
+    padding: calc(7px + 0.35 * var(--air)) 0;
+  }
+  .sidebar-content .section + .section {
+    border-top: 1px solid var(--color-border);
   }
 
   .section-label {
@@ -1134,18 +1173,26 @@
     transform: rotate(180deg);
   }
 
+  /* Fixed-positioned (top/left/width set inline from the trigger's rect) so it
+     escapes the scrolling control list instead of being clipped by it. */
   .problem-dropdown {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    margin-top: 0.25rem;
+    position: fixed;
     background: var(--color-bg-secondary);
     border: 2px solid var(--color-border);
     border-radius: 9px;
     overflow: hidden;
-    box-shadow: 0 8px 24px var(--color-shadow);
-    z-index: 30;
+    box-shadow: 0 10px 28px var(--color-shadow);
+    z-index: 200;
+  }
+  .dropdown-backdrop {
+    position: fixed;
+    inset: 0;
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    z-index: 199;
+    cursor: default;
   }
 
   /* Scroll container: deliberately shorter than the list (the cut lands
