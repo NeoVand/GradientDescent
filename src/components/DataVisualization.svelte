@@ -12,7 +12,7 @@
   
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
-  import { datasetStore, parametersStore, currentProblemConfig, selectedProblem, themeStore } from '../stores/stores';
+  import { datasetStore, parametersStore, currentProblemConfig, selectedProblem, themeStore, customModelStore } from '../stores/stores';
   import type { DataPoint, ModelParameters } from '../types/types';
   import { ScatterChart, Eraser } from 'lucide-svelte';
   import { tooltip } from '../utils/tooltip';
@@ -35,27 +35,45 @@
   $: problemType = $selectedProblem;
   $: theme = $themeStore;
 
+  // Custom Classification renders two ways depending on the chosen boundary
+  // model: a linear boundary (exactly the logistic-regression render path) or
+  // a fixed-radius circle (exactly the circle-classifier path). These flags
+  // fold the custom problem into those existing paths so nothing is duplicated.
+  $: cmodelClass = $customModelStore.classification;
+  $: isClassEditor = problemType === 'custom-classification';
+  $: renderCircle =
+    problemType === 'circle-classifier' || (isClassEditor && cmodelClass === 'circle');
+  $: renderLogistic =
+    problemType === 'logistic-regression' || (isClassEditor && cmodelClass === 'linear');
+
   // 2D-point problems: parameters (α, β) live in the *same* coordinate system
   // as the data points (a 2D position). The marker is drawn directly on the
   // data plot, and the plot's range is forced to match parameterRange so the
   // marker's screen position matches the loss landscape's marker exactly.
+  // (Custom Classification in circle mode is one of these — its (α, β) is the
+  // circle centre — but linear mode is not, since (α, β) is a boundary normal.)
   $: is2DPointProblem =
     problemType === 'circle-classifier' ||
     problemType === 'source-localization' ||
-    problemType === 'mean-shift';
+    problemType === 'mean-shift' ||
+    (isClassEditor && cmodelClass === 'circle');
 
   // 1D curve-fitting plots are hand-editable via the toolbar: add train
   // points, add test points, or erase. The loss landscape morphs live —
   // the landscape IS the data. (The AR problems are time series — hand-
   // placed points would break their lag structure, so they stay read-only.)
+  // Custom Classification is always editable, with a class toggle instead.
   $: isEditable =
-    !is2DPointProblem &&
-    problemType !== 'logistic-regression' &&
-    problemType !== 'ar2' &&
-    problemType !== 'ar2-rollout';
+    isClassEditor ||
+    (!is2DPointProblem &&
+      problemType !== 'logistic-regression' &&
+      problemType !== 'ar2' &&
+      problemType !== 'ar2-rollout');
 
   // Active editor tool (the toolbar's pressed button)
   let editTool: 'train' | 'test' | 'erase' = 'train';
+  // Which class a placed point gets, in Custom Classification's class editor.
+  let editClass: 0 | 1 = 1;
 
   // Last-drawn scales, kept for click → data-space inversion
   let lastXScale: d3.ScaleLinear<number, number> | null = null;
@@ -142,11 +160,13 @@
       const best = nearestPoint(px, py, 14);
       if (best >= 0) datasetStore.removePoint(best);
     } else {
-      datasetStore.addPoint({
+      const point: DataPoint = {
         x: lastXScale.invert(px),
         y: lastYScale.invert(py),
         isTraining: editTool === 'train'
-      });
+      };
+      if (isClassEditor) point.label = editClass; // a class, not a train/test split
+      datasetStore.addPoint(point);
     }
     // Re-render the hover preview against the updated dataset
     handlePlotHover(event as PointerEvent);
@@ -154,6 +174,7 @@
   
   // Redraw when data or theme changes
   $: if (svgElement && data && parameters && problemConfig) {
+    void cmodelClass; // also re-render when the custom classifier's model switches
     drawVisualization();
   }
   
@@ -321,8 +342,9 @@
       .attr('transform', `translate(${margin.left},${margin.top})`);
     
     // Add grid lines to clipped group (isDark already declared above)
-    // Skip grid for logistic regression and 2D-point problems (heatmap fills it)
-    if (problemType !== 'logistic-regression' && !is2DPointProblem) {
+    // Skip grid where a probability heatmap fills the frame (classifiers and
+    // 2D-point problems)
+    if (!renderLogistic && !is2DPointProblem) {
       const gridColor = isDark ? '#64748b' : '#9ca3af';
       
       // Regular grid lines
@@ -524,7 +546,7 @@
       return;
     }
 
-    if (problemType === 'circle-classifier') {
+    if (renderCircle) {
       // Probability heatmap: blue (outside) → mid → green (inside) of model circle
       const R = 1.0, tau = 0.4;
       const probAt = (x: number, y: number) => {
@@ -584,7 +606,7 @@
     }
 
     // For classification, draw probability heatmap with decision boundary
-    if (problemType === 'logistic-regression') {
+    if (renderLogistic) {
       const xDomain = xScale.domain();
       const yDomain = yScale.domain();
       
@@ -769,7 +791,7 @@
 
     // -------- 2D-point problems --------
 
-    if (problemType === 'circle-classifier') {
+    if (renderCircle) {
       const all = [...trainData, ...testData];
       // Class 0 (outside, blue circles), Class 1 (inside, green squares)
       for (const p of all) {
@@ -847,13 +869,13 @@
 
     // Helper function to check if a classification point is correctly classified
     const isCorrectlyClassified = (point: DataPoint): boolean => {
-      if (problemType !== 'logistic-regression' || point.label === undefined) return true;
+      if (!renderLogistic || point.label === undefined) return true;
       const z = parameters.a * point.x + parameters.b * point.y;
       const predicted = z > 0 ? 1 : 0;
       return predicted === point.label;
     };
 
-    if (problemType === 'logistic-regression') {
+    if (renderLogistic) {
       // For classification: circles for class 0 (blue), squares for class 1 (green)
       
       // Class 0 training points (circles - solid, blue)
@@ -992,7 +1014,46 @@
       <ScatterChart size={20} strokeWidth={2} />
       <span>Data</span>
     </h2>
-    {#if isEditable}
+    {#if isClassEditor}
+      <div class="header-tools" role="toolbar" aria-label="Class editor">
+        <button
+          class="tool-btn"
+          class:active={editTool === 'train' && editClass === 0}
+          use:tooltip={'Place Class 0 points (blue) — click anywhere on the plot. The loss landscape reshapes live.'}
+          aria-label="Place Class 0 points"
+          aria-pressed={editTool === 'train' && editClass === 0}
+          on:click={() => { editTool = 'train'; editClass = 0; }}
+        >
+          <svg width="15" height="15" viewBox="0 0 15 15" aria-hidden="true">
+            <circle cx="6" cy="9" r="4" fill="#3b82f6" />
+            <path d="M10.5 4.5 H14.5 M12.5 2.5 V6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          </svg>
+        </button>
+        <button
+          class="tool-btn"
+          class:active={editTool === 'train' && editClass === 1}
+          use:tooltip={'Place Class 1 points (green) — click anywhere on the plot'}
+          aria-label="Place Class 1 points"
+          aria-pressed={editTool === 'train' && editClass === 1}
+          on:click={() => { editTool = 'train'; editClass = 1; }}
+        >
+          <svg width="15" height="15" viewBox="0 0 15 15" aria-hidden="true">
+            <rect x="2" y="5" width="8" height="8" fill="#10b981" />
+            <path d="M10.5 4.5 H14.5 M12.5 2.5 V6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          </svg>
+        </button>
+        <button
+          class="tool-btn erase-btn"
+          class:active={editTool === 'erase'}
+          use:tooltip={'Erase points — click a point to remove it (a dataset keeps at least 3)'}
+          aria-label="Erase points"
+          aria-pressed={editTool === 'erase'}
+          on:click={() => (editTool = 'erase')}
+        >
+          <Eraser size={15} strokeWidth={2.2} />
+        </button>
+      </div>
+    {:else if isEditable}
       <div class="header-tools" role="toolbar" aria-label="Data editor">
         <button
           class="tool-btn"
@@ -1044,18 +1105,18 @@
     ></svg>
     <!-- Point legend, tucked into the plot like the landscape's keys -->
     <div class="data-key" style="right: {margin.right + 8}px; bottom: {margin.bottom + 8}px;">
-      {#if problemType === 'logistic-regression' || problemType === 'circle-classifier'}
+      {#if renderLogistic || renderCircle}
         <span class="key-item">
           <svg width="12" height="12" viewBox="0 0 18 18" aria-hidden="true">
             <circle cx="9" cy="9" r="6" fill="#3b82f6" stroke="currentColor" stroke-width="1.5" />
           </svg>
-          <span>{problemType === 'circle-classifier' ? 'Outside' : 'Class 0'}</span>
+          <span>{renderCircle ? 'Outside' : 'Class 0'}</span>
         </span>
         <span class="key-item">
           <svg width="12" height="12" viewBox="0 0 18 18" aria-hidden="true">
             <rect x="3" y="3" width="12" height="12" fill="#10b981" stroke="currentColor" stroke-width="1.5" />
           </svg>
-          <span>{problemType === 'circle-classifier' ? 'Inside' : 'Class 1'}</span>
+          <span>{renderCircle ? 'Inside' : 'Class 1'}</span>
         </span>
         <span class="key-item">
           <svg width="12" height="12" viewBox="0 0 18 18" aria-hidden="true">

@@ -12,7 +12,7 @@
 
   import { selectedProblem, datasetStore, trainingStore, historyStore, optimizerStore, resetOptimizerState, raceStore, customModelStore } from '../stores/stores';
   import type { ProblemType, ScheduleId, DataPoint } from '../types/types';
-  import { REGRESSION_LABELS, formulaIsValid, type RegressionModel } from '../utils/customModel';
+  import { REGRESSION_LABELS, CLASSIFICATION_LABELS, formulaIsValid, type RegressionModel, type ClassificationModel } from '../utils/customModel';
   import { problemConfigs } from '../utils/problems';
   import { optimizers, optimizerOrder, type OptimizerId } from '../utils/optimizers';
   import { schedules, scheduleOrder } from '../utils/schedules';
@@ -202,7 +202,8 @@
     {
       label: 'Your data',
       items: [
-        { type: 'custom-regression', name: 'Custom Regression', icon: null, customIcon: 'ƒ' }
+        { type: 'custom-regression', name: 'Custom Regression', icon: null, customIcon: 'ƒ' },
+        { type: 'custom-classification', name: 'Custom Classification', icon: null, customIcon: '◐' }
       ]
     }
   ];
@@ -230,15 +231,27 @@
 
   // ---------- Custom datasets ----------
   $: isCustomReg = currentProblem === 'custom-regression';
-  $: isCustom = isCustomReg; // classification arrives next
+  $: isCustomClass = currentProblem === 'custom-classification';
+  $: isCustom = isCustomReg || isCustomClass;
   $: cmodel = $customModelStore;
   $: isCustomFormula = isCustomReg && cmodel.regression === 'custom';
   $: formulaOk = !isCustomFormula || formulaIsValid(cmodel.formula);
   const REG_OPTS: RegressionModel[] = ['line', 'quadratic', 'exponential', 'power', 'custom'];
+  const CLASS_OPTS: ClassificationModel[] = ['linear', 'circle'];
+
+  // The Model picker explains itself differently for the two custom problems.
+  $: modelHint = isCustomClass
+    ? 'The 2-parameter boundary separating your two classes. "Linear boundary" is a line through the origin (z = αx₁ + βx₂); "Circle" places a unit-radius circle at centre (α, β).'
+    : 'The 2-parameter model fit to your data. "Custom formula" lets you type ŷ as an expression in x, a (α) and b (β); its gradient is taken by finite differences.';
 
   function onModelChange(e: Event) {
     const v = (e.currentTarget as HTMLSelectElement).value as RegressionModel;
     customModelStore.patch({ regression: v });
+    resetOptimizerState();
+  }
+  function onClassModelChange(e: Event) {
+    const v = (e.currentTarget as HTMLSelectElement).value as ClassificationModel;
+    customModelStore.patch({ classification: v });
     resetOptimizerState();
   }
   function onFormulaInput(e: Event) {
@@ -248,10 +261,19 @@
   let showPaste = false;
   let pasteText = '';
   let pasteMsg = '';
+  // Classification needs a third class column; regression's third column is the
+  // optional train/test flag.
+  $: pastePlaceholder = isCustomClass
+    ? 'One point per line:\nx₁, x₂, class\n-1.2, -0.8, 0\n1.1, 0.9, 1\n…  (class is 0 or 1)'
+    : 'One point per line:\nx, y\n0.4, 1.2\n…  (add a 3rd 1/0 for train/test)';
   function applyPaste() {
     const pts = parsePastedData(pasteText);
     if (pts.length < 3) {
-      pasteMsg = 'Need ≥ 3 valid rows of  x, y';
+      pasteMsg = isCustomClass ? 'Need ≥ 3 rows of  x₁, x₂, class' : 'Need ≥ 3 valid rows of  x, y';
+      return;
+    }
+    if (isCustomClass && !(pts.some(p => p.label === 0) && pts.some(p => p.label === 1))) {
+      pasteMsg = 'Need both class 0 and class 1 points';
       return;
     }
     datasetStore.setData(pts);
@@ -259,7 +281,10 @@
     showPaste = false;
     pasteText = '';
   }
-  /** Parse pasted text into points: rows of "x, y" with an optional 1/0 train flag. */
+  /**
+   * Parse pasted text into points. Regression rows are "x, y[, 1/0 train]";
+   * classification rows are "x₁, x₂, class[, 1/0 train]".
+   */
   function parsePastedData(text: string): DataPoint[] {
     const out: DataPoint[] = [];
     for (const line of text.split(/\r?\n/)) {
@@ -267,8 +292,14 @@
       const a = parseFloat(parts[0]);
       const b = parseFloat(parts[1]);
       if (!Number.isFinite(a) || !Number.isFinite(b)) continue; // skips headers/blanks
-      const flag = parseFloat(parts[2]);
-      out.push({ x: a, y: b, isTraining: Number.isFinite(flag) ? flag > 0.5 : true });
+      if (isCustomClass) {
+        const label = parseFloat(parts[2]) > 0.5 ? 1 : 0;
+        const flag = parseFloat(parts[3]);
+        out.push({ x: a, y: b, label, isTraining: Number.isFinite(flag) ? flag > 0.5 : true });
+      } else {
+        const flag = parseFloat(parts[2]);
+        out.push({ x: a, y: b, isTraining: Number.isFinite(flag) ? flag > 0.5 : true });
+      }
     }
     return out;
   }
@@ -478,16 +509,24 @@
         <div class="row">
           <span class="icon"><Shapes size={16} strokeWidth={2} /></span>
           <span class="row-label">Model</span>
-          <button class="info-btn" aria-label="About the model" use:tooltip={'The 2-parameter model fit to your data. "Custom formula" lets you type ŷ as an expression in x, a (α) and b (β); its gradient is taken by finite differences.'}>
+          <button class="info-btn" aria-label="About the model" use:tooltip={modelHint}>
             <Info size={13} strokeWidth={2} />
           </button>
           <div class="row-spring"></div>
         </div>
-        <select class="model-select" value={cmodel.regression} on:change={onModelChange}>
-          {#each REG_OPTS as m}
-            <option value={m}>{REGRESSION_LABELS[m]}</option>
-          {/each}
-        </select>
+        {#if isCustomClass}
+          <select class="model-select" value={cmodel.classification} on:change={onClassModelChange}>
+            {#each CLASS_OPTS as m}
+              <option value={m}>{CLASSIFICATION_LABELS[m]}</option>
+            {/each}
+          </select>
+        {:else}
+          <select class="model-select" value={cmodel.regression} on:change={onModelChange}>
+            {#each REG_OPTS as m}
+              <option value={m}>{REGRESSION_LABELS[m]}</option>
+            {/each}
+          </select>
+        {/if}
       </div>
       {#if isCustomFormula}
         <div class="ctl">
@@ -513,7 +552,7 @@
             bind:value={pasteText}
             rows="4"
             spellcheck="false"
-            placeholder={'One point per line:\nx, y\n0.4, 1.2\n…  (add a 3rd 1/0 for train/test)'}
+            placeholder={pastePlaceholder}
           ></textarea>
           <div class="paste-actions">
             <button class="paste-apply" on:click={applyPaste}>Apply</button>

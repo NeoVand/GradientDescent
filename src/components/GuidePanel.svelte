@@ -6,7 +6,7 @@
    */
   
   import { onMount, afterUpdate, onDestroy } from 'svelte';
-  import { selectedProblem, optimizerStore } from '../stores/stores';
+  import { selectedProblem, optimizerStore, customModelStore } from '../stores/stores';
   import { optimizers } from '../utils/optimizers';
   import { problemConfigs } from '../utils/problems';
   import { BookOpen } from 'lucide-svelte';
@@ -103,9 +103,42 @@
     'himmelblau': String.raw`\nabla \mathcal{L} = \begin{bmatrix} 4\alpha u + 2v & 2u + 4\beta v \end{bmatrix}^\top, \;\; u = \alpha^2{+}\beta{-}11,\; v = \alpha{+}\beta^2{-}7`
   };
   
-  $: currentModelLatex = modelFormulas[problemType];
-  $: currentLossLatex = lossFormulas[problemType];
-  $: currentGradientLatex = gradientFormulas[problemType];
+  // The two Custom problems have no fixed formula — it follows the model the
+  // learner picks, so resolve it from the live customModelStore selection.
+  $: cm = $customModelStore;
+  const customRegModel: Record<string, string> = {
+    line: String.raw`\hat{Y} = \alpha X + \beta`,
+    quadratic: String.raw`\hat{Y} = \alpha X^2 + \beta X`,
+    exponential: String.raw`\hat{Y} = \alpha\, e^{\beta X}`,
+    power: String.raw`\hat{Y} = \alpha\, |X|^{\beta}`,
+    custom: String.raw`\hat{Y} = f(X;\, \alpha, \beta)`
+  };
+  const customClassModel: Record<string, string> = {
+    linear: String.raw`P(C\!=\!1) = \sigma(\alpha X_1 + \beta X_2)`,
+    circle: String.raw`P(\text{inside}) = \sigma\!\left(\frac{R^2 - (X_1-\alpha)^2 - (X_2-\beta)^2}{\tau}\right)`
+  };
+  const customClassGrad: Record<string, string> = {
+    linear: String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (p_i - C_i) \begin{bmatrix} X_{1i} & X_{2i} \end{bmatrix}^\top`,
+    circle: String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n\tau} \sum_{i=1}^{n} (p_i - C_i) \begin{bmatrix} X_{1i} - \alpha & X_{2i} - \beta \end{bmatrix}^\top`
+  };
+  const MSE_LATEX = String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)^2`;
+  const BCE_LATEX = String.raw`\mathcal{L} = -\frac{1}{n} \sum_{i=1}^{n} \left[ C_i \log p_i + (1-C_i) \log(1-p_i) \right]`;
+  // Generic chain-rule form — correct for every regression model (the typed
+  // formula's ∇ is taken by finite differences, but the form still holds).
+  const REG_GRAD_LATEX = String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n} \sum_{i=1}^{n} (\hat{Y}_i - Y_i)\, \nabla_{\boldsymbol{\theta}} \hat{Y}_i`;
+
+  $: currentModelLatex =
+    problemType === 'custom-regression' ? customRegModel[cm.regression]
+    : problemType === 'custom-classification' ? customClassModel[cm.classification]
+    : modelFormulas[problemType];
+  $: currentLossLatex =
+    problemType === 'custom-regression' ? MSE_LATEX
+    : problemType === 'custom-classification' ? BCE_LATEX
+    : lossFormulas[problemType];
+  $: currentGradientLatex =
+    problemType === 'custom-regression' ? REG_GRAD_LATEX
+    : problemType === 'custom-classification' ? customClassGrad[cm.classification]
+    : gradientFormulas[problemType];
   // The update rule tracks the selected optimizer
   $: updateFormula = optimizers[$optimizerStore.id].updateRuleLatex;
   
