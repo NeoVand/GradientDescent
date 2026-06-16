@@ -477,13 +477,14 @@
     // Heatmap: single pre-rendered image, stretched over the extended range
     drawHeatmapImage(plotGroup, xScale, yScale);
 
-    // Gradient field — arrows or flowing streamlines (above heatmap, below contours)
+    // Contour lines (above the heatmap)
+    drawContours(plotGroup, xScale, yScale);
+
+    // Gradient field — arrows or flowing streamlines, drawn LAST of the field
+    // layers so they sit on top of both the heatmap and the contours.
     // Always dark-styled: these ride on the dark plot interior, not the margins.
     drawGradients(plotGroup, xScale, yScale, true);
     drawStreamlines(plotGroup, xScale, yScale, true);
-
-    // Contour lines (above gradient field, below trail)
-    drawContours(plotGroup, xScale, yScale);
 
     // Basin destination dots (above contours so each region's target pops)
     drawBasinMinima(plotGroup, xScale, yScale);
