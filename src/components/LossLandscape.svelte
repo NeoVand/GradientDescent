@@ -370,13 +370,6 @@
     d3.select(svgElement).selectAll('*').remove();
 
     const svg = d3.select(svgElement);
-    // The whole 2D landscape sits on a dark canvas in both themes (day mode
-    // too): the viridis heatmap, field and contours read richest on black,
-    // where a light canvas washed them out. The surrounding app stays light.
-    svg.append('rect')
-      .attr('x', 0).attr('y', 0)
-      .attr('width', width).attr('height', height)
-      .attr('fill', '#060913');
     const g = svg.append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
@@ -400,10 +393,10 @@
     const xAxis = d3.axisBottom(xScale).tickSizeOuter(0);
     const yAxis = d3.axisLeft(yScale).tickSizeOuter(0);
 
-    // The landscape canvas is always dark (see the dark rect above), so every
-    // in-plot element — axes, field, contours — uses the dark-mode palette
-    // regardless of the app theme.
-    const isDark = true;
+    // Tick labels and the frame live in the margins, which stay the app's
+    // theme — so they keep the readable day/night colors. Only the plot
+    // *interior* (background, field, contours) is forced dark below.
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     const axisColor = isDark ? '#527a75' : '#064e3b';
 
     // Bottom axis
@@ -461,13 +454,15 @@
       .style('text-anchor', 'middle')
       .text('β');
 
-    // Add background
+    // Dark plot interior in both themes (the heatmap/field read richest on
+    // black; a light canvas washed them out). Only this rect is dark — the
+    // surrounding margins keep the app theme.
     g.insert('rect', ':first-child')
       .attr('x', 0)
       .attr('y', 0)
       .attr('width', innerWidth)
       .attr('height', innerHeight)
-      .attr('fill', isDark ? '#060913' : '#ffffff')
+      .attr('fill', '#060913')
       .attr('rx', 4);
 
     // Create clipped group for landscape content
@@ -483,8 +478,9 @@
     drawHeatmapImage(plotGroup, xScale, yScale);
 
     // Gradient field — arrows or flowing streamlines (above heatmap, below contours)
-    drawGradients(plotGroup, xScale, yScale, isDark);
-    drawStreamlines(plotGroup, xScale, yScale, isDark);
+    // Always dark-styled: these ride on the dark plot interior, not the margins.
+    drawGradients(plotGroup, xScale, yScale, true);
+    drawStreamlines(plotGroup, xScale, yScale, true);
 
     // Contour lines (above gradient field, below trail)
     drawContours(plotGroup, xScale, yScale);
@@ -504,14 +500,14 @@
       plotGroup.append('path')
         .attr('d', `M ${tri.map(([a, b]) => `${xScale(a)},${yScale(b)}`).join(' L ')} Z`)
         .attr('fill', 'none')
-        .attr('stroke', isDark ? '#e2e8f0' : '#334155')
+        .attr('stroke', '#e2e8f0')
         .attr('stroke-width', 1.5)
         .attr('stroke-dasharray', '7,5')
         .style('opacity', 0.75);
       plotGroup.append('text')
         .attr('x', xScale(0))
         .attr('y', yScale(-0.55))
-        .attr('fill', isDark ? '#e2e8f0' : '#334155')
+        .attr('fill', '#e2e8f0')
         .attr('font-size', '11px')
         .attr('font-weight', '600')
         .attr('letter-spacing', '0.08em')
