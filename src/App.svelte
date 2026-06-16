@@ -246,7 +246,13 @@ import CoursePanel from './components/CoursePanel.svelte';
   <button class="topbar-btn menu-btn" on:click={openDrawer} aria-label="Open controls">
     <Menu size={22} strokeWidth={2.5} />
   </button>
-  <h1 class="topbar-title"><span class="topbar-mark">∂</span> Gradient Lab</h1>
+  <h1 class="topbar-title"><span class="topbar-mark">∂</span> <span class="topbar-name">Gradient Lab</span></h1>
+  <button class="topbar-btn" class:active={$courseStore.active} on:click={() => ($courseStore.active ? closeCourse() : startCourse())} aria-label="Course">
+    <GraduationCap size={20} strokeWidth={2.5} />
+  </button>
+  <button class="topbar-btn" class:active={showSharePopover} on:click={toggleSharePopover} aria-label="Share">
+    <Share2 size={19} strokeWidth={2.5} />
+  </button>
   <button class="topbar-btn" on:click={() => showHelpModal = true} aria-label="Help">
     <HelpCircle size={20} strokeWidth={2.5} />
   </button>
@@ -514,6 +520,73 @@ import CoursePanel from './components/CoursePanel.svelte';
     background: rgba(16, 185, 129, 0.14) !important;
   }
 
+  /* ---------- Share popover (anchored above the tool corner) ---------- */
+  .popover-backdrop {
+    position: fixed;
+    inset: 0;
+    background: transparent;
+    border: none;
+    z-index: 599;
+  }
+  .share-popover {
+    position: fixed;
+    bottom: 3.9rem;
+    right: 1.5rem;
+    width: 268px;
+    max-width: calc(100vw - 2rem);
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    box-shadow: 0 14px 36px var(--color-shadow);
+    padding: 0.4rem;
+    z-index: 600;
+    animation: popIn 0.16s ease;
+  }
+  @keyframes popIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .share-row {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    width: 100%;
+    padding: 0.5rem 0.6rem;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    color: var(--color-text-secondary);
+    font-size: 0.82rem;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .share-row:hover { background: var(--color-bg-tertiary); color: var(--color-text-primary); }
+  .share-row :global(svg) { color: #10b981; flex-shrink: 0; }
+  .share-divider { height: 1px; background: var(--color-border); margin: 0.3rem 0.45rem; }
+  .target-label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    padding: 0.1rem 0.6rem 0.5rem;
+    font-size: 0.76rem;
+    color: var(--color-text-tertiary);
+  }
+  .target-label input {
+    width: 4.5rem;
+    padding: 0.2rem 0.45rem;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 0.78rem;
+  }
+  .target-label input:focus { outline: none; border-color: #10b981; }
+  .target-emoji { font-size: 0.95rem; line-height: 1; }
+
   /* Main app container using CSS Grid for layout */
   .app-container {
     display: grid;
@@ -642,14 +715,22 @@ import CoursePanel from './components/CoursePanel.svelte';
     .mobile-topbar {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.15rem;
       position: sticky;
       top: 0;
       z-index: 50;
-      padding: 0.4rem 0.625rem;
+      padding: 0.4rem 0.5rem;
       background-color: var(--color-bg-primary);
       border-bottom: 1px solid var(--color-border);
     }
+    .topbar-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+    }
+    /* Menu sits left; the four tools hug the right edge. */
+    .topbar-title { margin-right: auto; }
 
     .topbar-title {
       flex: 1;
@@ -672,7 +753,7 @@ import CoursePanel from './components/CoursePanel.svelte';
     }
 
     .topbar-btn {
-      width: 40px;
+      width: 38px;
       height: 40px;
       border: none;
       background: none;
@@ -688,6 +769,13 @@ import CoursePanel from './components/CoursePanel.svelte';
     .topbar-btn:active {
       transform: scale(0.92);
       color: #10b981;
+    }
+    .topbar-btn.active { color: #10b981; }
+    /* The share popover drops from under the sticky bar on phones. */
+    .share-popover {
+      top: 3.1rem;
+      bottom: auto;
+      right: 0.5rem;
     }
 
     /* Mobile is a flex column that fills the available viewport. Each plot

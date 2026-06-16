@@ -1473,6 +1473,9 @@
     justify-content: center;
     gap: 0.45rem;
     width: 100%;
+    /* Breathing room from the transport row above — keeps it from crowding
+       Reset/Train when the deck is short (mobile, or a tight viewport). */
+    margin-top: calc(4px + 0.4 * var(--air));
     padding: calc(5.5px + 0.35 * var(--air));
     border: 1.5px solid var(--color-success);
     border-radius: 8px;
