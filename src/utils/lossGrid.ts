@@ -15,8 +15,26 @@
  */
 
 import { rgb } from 'd3';
-import { interpolateViridis } from 'd3-scale-chromatic';
+import {
+  interpolateViridis,
+  interpolateMagma,
+  interpolateInferno,
+  interpolatePlasma,
+  interpolateCividis,
+  interpolateTurbo
+} from 'd3-scale-chromatic';
 import type { DataPoint, ModelParameters, ProblemConfig } from '../types/types';
+// Type-only import (erased at build time, so no runtime cycle with stores).
+import type { Colormap } from '../stores/stores';
+
+const INTERPOLATORS: Record<Colormap, (t: number) => string> = {
+  viridis: interpolateViridis,
+  magma: interpolateMagma,
+  inferno: interpolateInferno,
+  plasma: interpolatePlasma,
+  cividis: interpolateCividis,
+  turbo: interpolateTurbo
+};
 
 export interface ParameterRange {
   min: number;
@@ -102,19 +120,32 @@ export function computeLossGrid(
 // ---------- Heatmap rendering (offscreen canvas → data URL) ----------
 
 const LUT_SIZE = 256;
-let viridisLUT: Uint8ClampedArray | null = null;
+// One 256-entry byte LUT per colormap, built on first use. Keyed by name so a
+// colormap switch can't return stale bytes (the old single-cache bug).
+const lutCache: Partial<Record<Colormap, Uint8ClampedArray>> = {};
 
-function getViridisLUT(): Uint8ClampedArray {
-  if (!viridisLUT) {
-    viridisLUT = new Uint8ClampedArray(LUT_SIZE * 3);
+function getLUT(cmap: Colormap = 'viridis'): Uint8ClampedArray {
+  let lut = lutCache[cmap];
+  if (!lut) {
+    lut = new Uint8ClampedArray(LUT_SIZE * 3);
+    const interp = INTERPOLATORS[cmap] ?? interpolateViridis;
     for (let k = 0; k < LUT_SIZE; k++) {
-      const c = rgb(interpolateViridis(k / (LUT_SIZE - 1)));
-      viridisLUT[k * 3] = c.r;
-      viridisLUT[k * 3 + 1] = c.g;
-      viridisLUT[k * 3 + 2] = c.b;
+      const c = rgb(interp(k / (LUT_SIZE - 1)));
+      lut[k * 3] = c.r;
+      lut[k * 3 + 1] = c.g;
+      lut[k * 3 + 2] = c.b;
     }
+    lutCache[cmap] = lut;
   }
-  return viridisLUT;
+  return lut;
+}
+
+/** CSS color stops for a colormap, low→high — for the legend bar. */
+export function colormapStops(cmap: Colormap = 'viridis', steps = 8): string {
+  const interp = INTERPOLATORS[cmap] ?? interpolateViridis;
+  const parts: string[] = [];
+  for (let k = 0; k <= steps; k++) parts.push(interp(k / steps));
+  return parts.join(', ');
 }
 
 /**
@@ -124,14 +155,14 @@ function getViridisLUT(): Uint8ClampedArray {
  * with slight transparency so the theme background tints the surface like
  * the old per-rect opacity did.
  */
-export function gridToImageURL(grid: LossGrid): string {
+export function gridToImageURL(grid: LossGrid, cmap: Colormap = 'viridis'): string {
   const { res, values, logMin, logMax } = grid;
   const canvas = document.createElement('canvas');
   canvas.width = res;
   canvas.height = res;
   const ctx = canvas.getContext('2d')!;
   const img = ctx.createImageData(res, res);
-  const lut = getViridisLUT();
+  const lut = getLUT(cmap);
   const logSpan = logMax - logMin || 1;
 
   for (let j = 0; j < res; j++) {
@@ -189,9 +220,9 @@ export function normalizedLogLoss(grid: LossGrid, loss: number): number {
   return t < 0 ? 0 : t > 1 ? 1 : t;
 }
 
-/** Viridis color for normalized t ∈ [0, 1] as 0–1 RGB (bright = t high). */
-export function viridisRGB(t: number): [number, number, number] {
-  const lut = getViridisLUT();
+/** Colormap RGB for normalized t ∈ [0, 1] as 0–1 floats (bright = t high). */
+export function viridisRGB(t: number, cmap: Colormap = 'viridis'): [number, number, number] {
+  const lut = getLUT(cmap);
   const k = Math.max(0, Math.min(LUT_SIZE - 1, Math.round(t * (LUT_SIZE - 1))));
   return [lut[k * 3] / 255, lut[k * 3 + 1] / 255, lut[k * 3 + 2] / 255];
 }

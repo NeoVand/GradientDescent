@@ -32,11 +32,16 @@
     optimizerStore,
     optimizerStateStore,
     trainingStore,
+    vizLayersStore,
     type LossScene,
-    type RaceState
+    type RaceState,
+    type Colormap
   } from '../stores/stores';
   import { sampleLoss, normalizedLogLoss, viridisRGB } from '../utils/lossGrid';
   import { runStartStep } from '../utils/trainer';
+
+  // Active colormap, kept in sync with the 2D view via vizLayersStore.
+  let cmap: Colormap = get(vizLayersStore).colormap;
   import { previewNextStep } from '../utils/preview';
   import type { TrainingHistoryPoint } from '../types/types';
 
@@ -113,7 +118,7 @@
       const { a, b } = fromXZ(x, z);
       const t = normalizedLogLoss(currentScene.grid, sampleLoss(currentScene.grid, a, b));
       pos.setY(i, t * HEIGHT);
-      const [r, g, bb] = viridisRGB(1 - t); // bright = low loss, same as 2D
+      const [r, g, bb] = viridisRGB(1 - t, cmap); // bright = low loss, same as 2D
       colors[i * 3] = r;
       colors[i * 3 + 1] = g;
       colors[i * 3 + 2] = bb;
@@ -722,6 +727,13 @@
         applyTheme(t);
         buildLabels(t);
         buildGizmo(t);
+      }),
+      // Re-tint the surface when the colormap changes (kept in sync with 2D).
+      vizLayersStore.subscribe(v => {
+        if (v.colormap !== cmap) {
+          cmap = v.colormap;
+          if (currentScene) buildSurface();
+        }
       })
     );
 

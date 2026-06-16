@@ -372,6 +372,65 @@ function createLandscapeViewStore() {
 
 export const landscapeViewStore = createLandscapeViewStore();
 
+// ========== Visualization Layers Store ==========
+// What the loss landscape draws on top of the heatmap, shared by the 2D, 1D,
+// and 3D views so a toggle flipped in one holds in the others. Persisted.
+export type Colormap = 'viridis' | 'magma' | 'inferno' | 'plasma' | 'cividis' | 'turbo';
+export type FieldMode = 'arrows' | 'streamlines' | 'off';
+export type FieldDensity = 'sparse' | 'normal' | 'dense';
+
+export interface VizLayers {
+  /** The gradient field glyph: directional arrows, flowing streamlines, or hidden. */
+  field: FieldMode;
+  /** Iso-loss contour lines. */
+  contours: boolean;
+  /** Color scheme for the loss surface (kept in sync across 2D/1D/3D). */
+  colormap: Colormap;
+  /** How many arrows/streamlines to draw. */
+  density: FieldDensity;
+}
+
+const DEFAULT_VIZ_LAYERS: VizLayers = {
+  field: 'arrows',
+  contours: true,
+  colormap: 'viridis',
+  density: 'normal'
+};
+
+function createVizLayersStore() {
+  const KEY = 'gd-viz-layers';
+  const initial = (): VizLayers => {
+    if (typeof window === 'undefined') return { ...DEFAULT_VIZ_LAYERS };
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) return { ...DEFAULT_VIZ_LAYERS, ...JSON.parse(raw) };
+    } catch {
+      // ignore malformed storage
+    }
+    return { ...DEFAULT_VIZ_LAYERS };
+  };
+
+  const store = writable<VizLayers>(initial());
+  const persist = (v: VizLayers) => {
+    if (typeof window !== 'undefined') {
+      try { localStorage.setItem(KEY, JSON.stringify(v)); } catch { /* quota */ }
+    }
+  };
+
+  return {
+    subscribe: store.subscribe,
+    /** Merge a partial update (the only mutator the UI needs). */
+    patch: (p: Partial<VizLayers>) =>
+      store.update(v => {
+        const next = { ...v, ...p };
+        persist(next);
+        return next;
+      })
+  };
+}
+
+export const vizLayersStore = createVizLayersStore();
+
 // ========== Challenge Store ==========
 // A shared link can carry a goal: "reach the basin in ≤ N steps". The
 // landscape shows the target pill; the trainer judges each finished run.

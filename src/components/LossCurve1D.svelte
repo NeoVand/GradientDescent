@@ -29,7 +29,8 @@
     divergenceStore,
     clearCoach,
     raceStore,
-    markerDragging
+    markerDragging,
+    vizLayersStore
   } from '../stores/stores';
   import { viridisRGB } from '../utils/lossGrid';
   import { basinStore, BASIN_COLORS } from '../utils/basins';
@@ -83,9 +84,10 @@
 
   $: basin = $basinStore;
   $: basinActive = basinsOn && basin.status === 'ready' && basin.scene?.oneParam === true;
+  $: cmap = $vizLayersStore.colormap;
 
-  // Full rebuild when the curve shape itself can change.
-  $: if (svgElement && problemConfig && data && theme && width && height && basinActive !== undefined) {
+  // Full rebuild when the curve shape itself can change (or the colormap does).
+  $: if (svgElement && problemConfig && data && theme && width && height && basinActive !== undefined && cmap) {
     redraw();
   }
 
@@ -234,7 +236,7 @@
       for (let i = 0; i < CURVE_SAMPLES; i++) {
         let t = (Math.log(curve[i].loss + LOG_EPS) - logMin) / logSpan;
         t = t < 0 ? 0 : t > 1 ? 1 : t;
-        const [r, gg, b] = viridisRGB(1 - t); // bright = low loss
+        const [r, gg, b] = viridisRGB(1 - t, cmap); // bright = low loss
         img.data[i * 4] = Math.round(r * 255);
         img.data[i * 4 + 1] = Math.round(gg * 255);
         img.data[i * 4 + 2] = Math.round(b * 255);

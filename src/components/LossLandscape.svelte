@@ -32,8 +32,12 @@
     challengeStore,
     optimizerStore,
     optimizerStateStore,
-    markerDragging
+    markerDragging,
+    vizLayersStore,
+    type FieldDensity,
+    type Colormap
   } from '../stores/stores';
+  import { gridToImageURL, computeVectorField, colormapStops } from '../utils/lossGrid';
   import { basinStore, ensureBasins, BASIN_COLORS } from '../utils/basins';
   import { optimizers } from '../utils/optimizers';
   import { runStartStep } from '../utils/trainer';
@@ -49,7 +53,7 @@
   } from '../utils/hessian';
   import { canExportVideo, exportRunWebM } from '../utils/replay';
   import type { ModelParameters } from '../types/types';
-  import { Mountain, Orbit, Map as MapIcon, Video } from 'lucide-svelte';
+  import { Mountain, Orbit, Map as MapIcon, Video, Layers } from 'lucide-svelte';
   import { tooltip } from '../utils/tooltip';
   import LossCurve1D from './LossCurve1D.svelte';
 
@@ -84,6 +88,27 @@
   // One-parameter problems render as a loss-vs-α curve; the 2D/3D toggle
   // doesn't apply (there is no β axis).
   $: oneParam = problemConfig?.oneParam ?? false;
+
+  // ---------- Visualization layers (field glyph, contours, colormap) ----------
+  $: layers = $vizLayersStore;
+  // The heatmap is re-tinted from the cached grid whenever the colormap
+  // changes — cheap (one 110² canvas), no grid/field recompute.
+  $: heatURL = scene ? gridToImageURL(scene.grid, layers.colormap) : '';
+  $: legendStops = colormapStops(layers.colormap);
+  const DENSITY_RES: Record<FieldDensity, number> = { sparse: 15, normal: 23, dense: 33 };
+  const COLORMAPS: Colormap[] = ['viridis', 'magma', 'inferno', 'plasma', 'cividis', 'turbo'];
+  let showLayers = false;
+  let layersBtn: HTMLButtonElement;
+  // The panel header clips its overflow, so the popover is fixed-positioned
+  // from the button's on-screen rect instead of absolutely inside the header.
+  let layersPos = { top: 0, right: 0 };
+  function toggleLayers() {
+    showLayers = !showLayers;
+    if (showLayers && layersBtn) {
+      const r = layersBtn.getBoundingClientRect();
+      layersPos = { top: r.bottom + 8, right: window.innerWidth - r.right };
+    }
+  }
 
   $: if (scene) {
     minLossValue = scene.grid.visMin;
@@ -283,9 +308,10 @@
     return (v < 0 ? '−' : '') + s;
   }
 
-  // Full redraw whenever the cached scene, the theme, or the basin overlay
-  // changes (all cheap: the heavy work already happened off-thread).
-  $: if (svgElement && scene && theme && basinActive !== undefined) {
+  // Full redraw whenever the cached scene, the theme, the basin overlay, or
+  // the visualization layers change (all cheap: the heavy work already
+  // happened off-thread).
+  $: if (svgElement && scene && theme && basinActive !== undefined && layers) {
     redraw();
   }
 
@@ -446,8 +472,9 @@
     // Heatmap: single pre-rendered image, stretched over the extended range
     drawHeatmapImage(plotGroup, xScale, yScale);
 
-    // Gradient field (above heatmap, below contours)
+    // Gradient field — arrows or flowing streamlines (above heatmap, below contours)
     drawGradients(plotGroup, xScale, yScale, isDark);
+    drawStreamlines(plotGroup, xScale, yScale, isDark);
 
     // Contour lines (above gradient field, below trail)
     drawContours(plotGroup, xScale, yScale);
@@ -559,7 +586,7 @@
 
     const { extMin, extMax } = scene.grid;
     g.append('image')
-      .attr('href', scene.imageURL)
+      .attr('href', heatURL || scene.imageURL)
       .attr('x', xScale(extMin))
       .attr('y', yScale(extMax))
       .attr('width', xScale(extMax) - xScale(extMin))
@@ -591,7 +618,7 @@
     xScale: d3.ScaleLinear<number, number>,
     yScale: d3.ScaleLinear<number, number>
   ) {
-    if (!scene) return;
+    if (!scene || !layers.contours) return;
     const { res, extMin, extMax, values, thresholds } = scene.grid;
     const extSpan = extMax - extMin;
 
@@ -670,49 +697,50 @@
     yScale: d3.ScaleLinear<number, number>,
     isDark: boolean
   ) {
-    if (!scene || scene.field.arrows.length === 0) return;
-    const { arrows, maxMag } = scene.field;
+    if (!scene || layers.field !== 'arrows' || !problemConfig) return;
+    // Field at the chosen density — cheap (a grid of analytic gradients), and
+    // decoupled from the cached scene so density can change without a recompute.
+    const field = computeVectorField(trainData, problemConfig, parameterRange, DENSITY_RES[layers.density] ?? 23);
+    if (field.arrows.length === 0) return;
+    const { arrows, maxMag } = field;
 
-    // Light slate in dark mode (black vanishes on the dark purples);
-    // black in light mode as before.
-    const arrowColor = isDark ? '#e2e8f0' : '#000000';
+    // Muted in dark mode so the field reads as quiet texture, not a bright
+    // lattice that takes over the surface; near-black in light mode.
+    const arrowColor = isDark ? '#7c8aa3' : '#1f2937';
+    const baseOpacity = isDark ? 0.10 : 0.16;
+    const spanOpacity = isDark ? 0.40 : 0.46;
 
-    // Define arrowhead marker
     const defs = g.append('defs');
     defs.append('marker')
       .attr('id', 'arrowhead')
       .attr('viewBox', '0 -5 10 10')
       .attr('refX', 8)
       .attr('refY', 0)
-      .attr('markerWidth', 5)
-      .attr('markerHeight', 5)
+      .attr('markerWidth', 4.5)
+      .attr('markerHeight', 4.5)
       .attr('orient', 'auto')
       .append('path')
       .attr('d', 'M0,-5L10,0L0,5')
       .attr('fill', arrowColor);
 
-    // Draw arrows - balanced size for density
-    const baseArrowLength = 12;
-    const maxArrowLength = 20;
+    // Length ∝ magnitude with no floor: flat regions get tiny faint marks and
+    // steep regions get bold ones, so the field declutters itself instead of
+    // showing a uniform 12px lattice everywhere.
+    const MAX_LEN = 18;
 
     for (const item of arrows) {
       const { a, b, ga, gb, mag } = item;
-      const normalizedMagnitude = maxMag > 0 ? mag / maxMag : 0;
+      const norm = maxMag > 0 ? mag / maxMag : 0;
 
-      // Position
       const x = xScale(a);
       const y = yScale(b);
 
-      // Normalized steepest-descent direction (negative gradient)
       const normGradA = -ga / mag;
       const normGradB = -gb / mag;
 
-      // Arrow length based on magnitude
-      const arrowLength = baseArrowLength + (maxArrowLength - baseArrowLength) * normalizedMagnitude;
-
-      // End position
+      const arrowLength = 2 + (MAX_LEN - 2) * norm;
       const x2 = x + normGradA * arrowLength;
-      const y2 = y - normGradB * arrowLength; // Negative because SVG y is inverted
+      const y2 = y - normGradB * arrowLength; // SVG y is inverted
 
       g.append('line')
         .attr('class', 'gradient-arrow')
@@ -721,9 +749,70 @@
         .attr('x2', x2)
         .attr('y2', y2)
         .attr('stroke', arrowColor)
-        .attr('stroke-width', 0.8 + normalizedMagnitude * 1.2)
+        .attr('stroke-width', 0.7 + norm * 1.1)
         .attr('marker-end', 'url(#arrowhead)')
-        .style('opacity', 0.35 + normalizedMagnitude * 0.25);
+        .style('opacity', baseOpacity + norm * spanOpacity);
+    }
+  }
+
+  /**
+   * Static streamlines: trace the −∇ℒ field from a grid of seeds (integrated
+   * both ways through each seed) and draw them as smooth, faint paths. They
+   * read as the flow of "downhill everywhere" without any animation — plateaus
+   * thin out, walls bunch up, and basins are where the lines converge.
+   */
+  function drawStreamlines(
+    g: d3.Selection<SVGGElement, unknown, null, undefined>,
+    xScale: d3.ScaleLinear<number, number>,
+    yScale: d3.ScaleLinear<number, number>,
+    isDark: boolean
+  ) {
+    if (!scene || layers.field !== 'streamlines' || !problemConfig) return;
+    const range = parameterRange;
+    const span = range.max - range.min;
+    const seedN = ({ sparse: 7, normal: 10, dense: 14 } as Record<FieldDensity, number>)[layers.density] ?? 10;
+    const h = span / 90; // integration step in parameter space
+    const MAX_STEPS = 120;
+    const color = isDark ? '#9fb0c9' : '#475569';
+
+    const lineGen = d3.line<ModelParameters>()
+      .x(p => xScale(p.a))
+      .y(p => yScale(p.b))
+      .curve(d3.curveCatmullRom.alpha(0.5));
+
+    const integrate = (a0: number, b0: number, dir: 1 | -1): ModelParameters[] => {
+      const pts: ModelParameters[] = [{ a: a0, b: b0 }];
+      let a = a0, b = b0;
+      for (let s = 0; s < MAX_STEPS; s++) {
+        const gr = problemConfig!.computeGradient(trainData, { a, b });
+        const m = Math.hypot(gr.a, gr.b);
+        if (!Number.isFinite(m) || m < 1e-4) break; // reached a flat spot / minimum
+        a += dir * (-gr.a / m) * h;
+        b += dir * (-gr.b / m) * h;
+        if (a < range.min || a > range.max || b < range.min || b > range.max) break;
+        const last = pts[pts.length - 1];
+        if (Math.hypot(a - last.a, b - last.b) > 1e-6) pts.push({ a, b });
+      }
+      return pts;
+    };
+
+    for (let i = 0; i < seedN; i++) {
+      for (let j = 0; j < seedN; j++) {
+        const a0 = range.min + ((i + 0.5) / seedN) * span;
+        const b0 = range.min + ((j + 0.5) / seedN) * span;
+        const back = integrate(a0, b0, -1).reverse();
+        const fwd = integrate(a0, b0, 1);
+        const pts = back.concat(fwd.slice(1));
+        if (pts.length < 3) continue;
+        g.append('path')
+          .attr('class', 'streamline')
+          .attr('d', lineGen(pts))
+          .attr('fill', 'none')
+          .attr('stroke', color)
+          .attr('stroke-width', 1)
+          .attr('stroke-linecap', 'round')
+          .style('opacity', isDark ? 0.3 : 0.4);
+      }
     }
   }
 
@@ -774,6 +863,13 @@
     const kx = xScale(1) - xScale(0);
     const ky = yScale(0) - yScale(1);
 
+    // Arrows are sized by magnitude (not pinned to a fixed length), so they
+    // shrink toward a dot as the run converges — only the angle carries
+    // meaning when both are short. Below ARROW_HIDE px they vanish.
+    const ARROW_HIDE = 2.5;
+    const GRAD_MAX_LEN = 42; // −∇ℒ length at the steepest point on the field
+    const STEP_MAX_LEN = 46; // cap Δθ so a bold first step still fits the frame
+
     const setVec = (
       sel: d3.Selection<d3.BaseType, unknown, null, undefined>,
       sx: number,
@@ -781,7 +877,7 @@
       len: number
     ) => {
       const m = Math.hypot(sx, sy);
-      if (!Number.isFinite(m) || m < 1e-12) {
+      if (!Number.isFinite(m) || m < 1e-9 || len < ARROW_HIDE) {
         sel.style('display', 'none');
         return;
       }
@@ -792,21 +888,28 @@
         .attr('y2', (sy / m) * len);
     };
 
-    // Steepest descent: param direction (−ga, −gb) → screen (−ga·kx, +gb·ky)
+    // Steepest descent −∇ℒ: length ∝ how steep it is here relative to the
+    // steepest point on the visible field (the same normalization the field
+    // arrows use), so it's a bold field arrow at the marker — and it fades
+    // out at a minimum where the gradient goes to zero.
     const g = currentGradient;
+    const fieldMaxMag = scene?.field?.maxMag ?? 0;
+    const gradFrac = fieldMaxMag > 0 && gradMag > 0 ? Math.min(1.3, gradMag / fieldMaxMag) : 0;
     setVec(
       marker.select('.vec-grad'),
       g ? -g.a * kx : 0,
       g ? g.b * ky : 0,
-      32
+      gradFrac * GRAD_MAX_LEN
     );
 
-    // Last actual update Δθ
+    // Last actual update Δθ: the literal screen distance the marker moved last
+    // step (clamped), so it grows with a bold step and disappears at convergence.
     const n = history.length;
     if (n >= 2) {
       const da = history[n - 1].parameters.a - history[n - 2].parameters.a;
       const db = history[n - 1].parameters.b - history[n - 2].parameters.b;
-      setVec(marker.select('.vec-upd'), da * kx, -db * ky, 24);
+      const stepPx = Math.hypot(da * kx, db * ky);
+      setVec(marker.select('.vec-upd'), da * kx, -db * ky, Math.min(STEP_MAX_LEN, stepPx));
     } else {
       marker.select('.vec-upd').style('display', 'none');
     }
@@ -1184,6 +1287,69 @@
     </div>
     {#if view === '2d' || oneParam}
       <div class="header-tools" role="toolbar" aria-label="Landscape tools">
+        <span class="layers-control">
+          <button
+            class="tool-btn"
+            class:active={showLayers}
+            bind:this={layersBtn}
+            use:tooltip={'Layers — show or hide the gradient field and contours, change density, and pick a colormap'}
+            aria-label="Layers"
+            aria-expanded={showLayers}
+            on:click={toggleLayers}
+          >
+            <Layers size={15} strokeWidth={2.2} />
+          </button>
+          {#if showLayers}
+            <button class="layers-backdrop" aria-label="Close layers" on:click={() => (showLayers = false)}></button>
+            <div class="layers-pop" role="menu" aria-label="Layer options" style="top: {layersPos.top}px; right: {layersPos.right}px;">
+              <div class="lp-row">
+                <span class="lp-label">Field</span>
+                <div class="lp-seg">
+                  <button class:on={layers.field === 'arrows'} on:click={() => vizLayersStore.patch({ field: 'arrows' })}>Arrows</button>
+                  <button class:on={layers.field === 'streamlines'} on:click={() => vizLayersStore.patch({ field: 'streamlines' })}>Flow</button>
+                  <button class:on={layers.field === 'off'} on:click={() => vizLayersStore.patch({ field: 'off' })}>Off</button>
+                </div>
+              </div>
+              {#if layers.field !== 'off'}
+                <div class="lp-row">
+                  <span class="lp-label">Density</span>
+                  <div class="lp-seg">
+                    <button class:on={layers.density === 'sparse'} on:click={() => vizLayersStore.patch({ density: 'sparse' })}>Low</button>
+                    <button class:on={layers.density === 'normal'} on:click={() => vizLayersStore.patch({ density: 'normal' })}>Med</button>
+                    <button class:on={layers.density === 'dense'} on:click={() => vizLayersStore.patch({ density: 'dense' })}>High</button>
+                  </div>
+                </div>
+              {/if}
+              <div class="lp-row">
+                <span class="lp-label">Contours</span>
+                <button
+                  class="lp-switch"
+                  class:on={layers.contours}
+                  role="switch"
+                  aria-checked={layers.contours}
+                  aria-label="Contour lines"
+                  on:click={() => vizLayersStore.patch({ contours: !layers.contours })}
+                ><span class="lp-knob"></span></button>
+              </div>
+              <div class="lp-divider"></div>
+              <div class="lp-row lp-col">
+                <span class="lp-label">Colormap</span>
+                <div class="lp-cmaps">
+                  {#each COLORMAPS as cm}
+                    <button
+                      class="lp-cmap"
+                      class:on={layers.colormap === cm}
+                      style="background: linear-gradient(to right, {colormapStops(cm)});"
+                      aria-label={cm}
+                      title={cm}
+                      on:click={() => vizLayersStore.patch({ colormap: cm })}
+                    ></button>
+                  {/each}
+                </div>
+              </div>
+            </div>
+          {/if}
+        </span>
         {#if !oneParam}
           <button
             class="tool-btn"
@@ -1271,7 +1437,7 @@
       <div class="loss-key" style="right: {margin.right + 8}px; bottom: {margin.bottom + 8}px;">
         <span class="key-title">Loss</span>
         <span class="key-val">{maxLossValue.toFixed(2)}</span>
-        <div class="vbar"></div>
+        <div class="vbar" style="background: linear-gradient(to bottom, {legendStops});"></div>
         <span class="key-val">{minLossValue.toFixed(2)}</span>
       </div>
     {/if}
@@ -1500,6 +1666,99 @@
   @keyframes toolSpin {
     to { transform: rotate(360deg); }
   }
+
+  /* ---------- Layers popover ---------- */
+  .layers-control { position: relative; display: inline-flex; }
+  .layers-backdrop {
+    position: fixed;
+    inset: 0;
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: default;
+    z-index: 40;
+  }
+  .layers-pop {
+    position: fixed;
+    z-index: 60;
+    width: 214px;
+    padding: 0.6rem 0.7rem;
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    box-shadow: 0 12px 30px var(--color-shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    animation: lpIn 0.14s ease;
+  }
+  @keyframes lpIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .lp-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+  .lp-row.lp-col { flex-direction: column; align-items: stretch; gap: 0.4rem; }
+  .lp-label {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .lp-seg {
+    display: inline-flex;
+    border: 1px solid var(--color-border);
+    border-radius: 7px;
+    overflow: hidden;
+  }
+  .lp-seg button {
+    border: none;
+    background: transparent;
+    color: var(--color-text-tertiary);
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 0.2rem 0.45rem;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+  }
+  .lp-seg button:hover { color: var(--color-text-primary); }
+  .lp-seg button.on { background: rgba(16, 185, 129, 0.16); color: #10b981; }
+  .lp-switch {
+    width: 34px;
+    height: 19px;
+    border-radius: 19px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-tertiary);
+    position: relative;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .lp-switch.on { background: rgba(16, 185, 129, 0.22); border-color: rgba(16, 185, 129, 0.5); }
+  .lp-knob {
+    position: absolute;
+    top: 1.5px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--color-text-tertiary);
+    transition: transform 0.15s, background 0.15s;
+  }
+  .lp-switch.on .lp-knob { transform: translateX(15px); background: #10b981; }
+  .lp-divider { height: 1px; background: var(--color-border); margin: 0.05rem 0; }
+  .lp-cmaps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+  .lp-cmap {
+    height: 18px;
+    border-radius: 5px;
+    border: 1.5px solid transparent;
+    cursor: pointer;
+    padding: 0;
+    transition: border-color 0.12s, transform 0.12s;
+  }
+  .lp-cmap:hover { transform: translateY(-1px); }
+  .lp-cmap.on { border-color: #10b981; box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.4); }
 
   /* ---------- In-plot corner keys ---------- */
 
