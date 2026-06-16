@@ -944,8 +944,8 @@
     flex-direction: column;
   }
 
-  /* The deck keeps the same inset-card look as every other section and
-     spreads its rows to fill the fixed-height card. */
+  /* Spreads its rows over the fixed deck height. (The inset card is stripped
+     by the .run-panel .section rule below, alongside the top-section stitch.) */
   .run-inner {
     flex: 1;
     min-height: 0;
@@ -1020,8 +1020,11 @@
   /* The top rail stitches its sections into one continuous panel surface (no
      inset cards, no dividers) — the uppercase section labels do the
      separating. Cleaner and more compact, and the list scrolls as a whole.
-     The run deck below keeps its inset-card look. */
-  .sidebar-content .section {
+     The run deck gets the same treatment for consistency: no inset card, its
+     content aligned to the panel edge like the sections above. (Both need a
+     two-class selector to outrank the later .section base rule.) */
+  .sidebar-content .section,
+  .run-panel .section {
     background: none;
     border-radius: 0;
     padding: calc(6px + 0.3 * var(--air)) 0 calc(8px + 0.3 * var(--air));
