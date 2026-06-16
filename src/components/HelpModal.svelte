@@ -1110,20 +1110,18 @@
   .close-btn {
     width: 38px; height: 38px;
     flex-shrink: 0;
-    border: 1px solid var(--color-border);
-    border-radius: 9px;
-    background: var(--color-bg-tertiary);
+    border: none;
+    border-radius: 8px;
+    background: transparent;
     color: var(--color-text-secondary);
     cursor: pointer;
     display: inline-flex; align-items: center; justify-content: center;
-    transition: background 0.18s, color 0.18s, border-color 0.18s, transform 0.1s;
+    transition: background 0.18s, color 0.18s, transform 0.1s;
   }
-  .close-btn :global(svg) { width: 22px; height: 22px; }
-  .close-btn:hover {
-    background: rgba(16, 185, 129, 0.14);
-    color: #10b981;
-    border-color: rgba(16, 185, 129, 0.45);
-  }
+  /* flex-shrink:0 is the fix — without it the icon collapsed to a 4px sliver
+     (the "tiny cross"). 24px stroke, plain neutral colour, no box. */
+  .close-btn :global(svg) { width: 24px; height: 24px; flex-shrink: 0; }
+  .close-btn:hover { background: var(--color-bg-tertiary); color: var(--color-text-primary); }
   .close-btn:active { transform: scale(0.94); }
 
   /* ---------- Reading-progress bar ---------- */
