@@ -1341,8 +1341,7 @@
         </div>
       {/if}
     </div>
-    {#if view === '2d' || oneParam}
-      <div class="header-tools" role="toolbar" aria-label="Landscape tools">
+    <div class="header-tools" role="toolbar" aria-label="Landscape tools">
         <span class="layers-control">
           <button
             class="tool-btn"
@@ -1406,6 +1405,7 @@
             </div>
           {/if}
         </span>
+        {#if view === '2d' || oneParam}
         {#if !oneParam}
           <button
             class="tool-btn"
@@ -1451,8 +1451,8 @@
             {/if}
           </button>
         {/if}
-      </div>
-    {/if}
+      {/if}
+    </div>
   </div>
   <div class="svg-container" bind:this={containerEl}>
     {#if oneParam}

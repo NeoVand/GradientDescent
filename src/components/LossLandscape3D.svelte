@@ -40,8 +40,10 @@
   import { sampleLoss, normalizedLogLoss, viridisRGB } from '../utils/lossGrid';
   import { runStartStep } from '../utils/trainer';
 
-  // Active colormap, kept in sync with the 2D view via vizLayersStore.
+  // Visualization layers, kept in sync with the 2D view via vizLayersStore.
   let cmap: Colormap = get(vizLayersStore).colormap;
+  let layers3d = get(vizLayersStore);
+  let vectorField3d: THREE.LineSegments | null = null;
   import { previewNextStep } from '../utils/preview';
   import type { TrainingHistoryPoint } from '../types/types';
 
@@ -143,7 +145,9 @@
       scene3.remove(contourLines);
       contourLines.geometry.dispose();
       (contourLines.material as THREE.Material).dispose();
+      contourLines = null;
     }
+    if (!layers3d.contours) return;
 
     const { grid } = currentScene;
     const gen = contours().size([grid.res, grid.res]).smooth(true).thresholds(grid.thresholds);
@@ -174,9 +178,68 @@
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
-    const mat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3 });
+    // depthTest off + a render order above the surface: the iso-loss rings read
+    // from any orbit angle, including from below, instead of being occluded by
+    // the terrain in front of them (the marker and trail already do this).
+    const mat = new THREE.LineBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.32,
+      depthTest: false,
+      depthWrite: false
+    });
     contourLines = new THREE.LineSegments(geo, mat);
+    contourLines.renderOrder = 8;
     scene3.add(contourLines);
+  }
+
+  /**
+   * Gradient field draped on the surface: a short downhill segment at each
+   * field sample, lifted to the surface height, with a per-vertex color fade
+   * (dim base → bright tip) showing direction without batching arrowheads.
+   * depthTest off so it reads from any orbit angle, like the contours/marker.
+   */
+  function buildVectorField3d() {
+    if (vectorField3d) {
+      scene3.remove(vectorField3d);
+      vectorField3d.geometry.dispose();
+      (vectorField3d.material as THREE.Material).dispose();
+      vectorField3d = null;
+    }
+    if (!currentScene || layers3d.field === 'off') return;
+    const { arrows, maxMag } = currentScene.field;
+    if (!arrows.length) return;
+
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const c: [number, number, number] = isDark ? [0.62, 0.69, 0.8] : [0.27, 0.32, 0.41];
+    const LEN = 0.085;
+
+    const verts: number[] = [];
+    const cols: number[] = [];
+    for (const ar of arrows) {
+      const d = dirVec(-ar.ga, -ar.gb);
+      if (!d) continue;
+      const norm = maxMag > 0 ? ar.mag / maxMag : 0;
+      const len = LEN * (0.3 + 0.7 * norm);
+      const y = heightAt(ar.a, ar.b) + 0.012;
+      const x0 = toX(ar.a), z0 = toZ(ar.b);
+      verts.push(x0, y, z0, x0 + d.x * len, y, z0 + d.z * len);
+      cols.push(c[0] * 0.25, c[1] * 0.25, c[2] * 0.25, c[0], c[1], c[2]); // base dim → tip bright (downhill)
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(cols), 3));
+    const mat = new THREE.LineBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      opacity: isDark ? 0.55 : 0.6,
+      depthTest: false,
+      depthWrite: false
+    });
+    vectorField3d = new THREE.LineSegments(geo, mat);
+    vectorField3d.renderOrder = 7;
+    scene3.add(vectorField3d);
   }
 
   /**
@@ -697,6 +760,7 @@
         if (!s) return;
         buildSurface();
         buildContours();
+        buildVectorField3d();
         buildPath(get(historyStore));
         updateMarker();
       }),
@@ -727,13 +791,21 @@
         applyTheme(t);
         buildLabels(t);
         buildGizmo(t);
+        buildVectorField3d(); // re-tint the field for the new theme
       }),
-      // Re-tint the surface when the colormap changes (kept in sync with 2D).
+      // Mirror the 2D Layers controls: colormap re-tints the surface, the
+      // contour toggle adds/removes the rings, and field/density rebuild the
+      // draped gradient field.
       vizLayersStore.subscribe(v => {
-        if (v.colormap !== cmap) {
-          cmap = v.colormap;
-          if (currentScene) buildSurface();
-        }
+        const colorChanged = v.colormap !== cmap;
+        const contoursChanged = v.contours !== layers3d.contours;
+        const fieldChanged = v.field !== layers3d.field || v.density !== layers3d.density;
+        cmap = v.colormap;
+        layers3d = v;
+        if (!currentScene) return;
+        if (colorChanged) buildSurface();
+        if (contoursChanged) buildContours();
+        if (fieldChanged) buildVectorField3d();
       })
     );
 
