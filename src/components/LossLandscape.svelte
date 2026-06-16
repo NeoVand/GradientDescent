@@ -1806,15 +1806,23 @@
   .lp-divider { height: 1px; background: var(--color-border); margin: 0.05rem 0; }
   .lp-cmaps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
   .lp-cmap {
-    height: 18px;
+    height: 19px;
     border-radius: 5px;
-    border: 1.5px solid transparent;
+    border: none;
+    appearance: none;
+    -webkit-appearance: none;
     cursor: pointer;
     padding: 0;
-    transition: border-color 0.12s, transform 0.12s;
+    /* Fill edge-to-edge with the gradient. A transparent border + the default
+       padding-box origin makes Chromium paint a stray END-color pixel at the
+       left edge (the gradient reads as "circular"); border-box origin + no
+       border avoids it. The selected ring uses box-shadow, not a border. */
+    background-origin: border-box;
+    background-clip: border-box;
+    transition: box-shadow 0.12s, transform 0.12s;
   }
   .lp-cmap:hover { transform: translateY(-1px); }
-  .lp-cmap.on { border-color: #10b981; box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.4); }
+  .lp-cmap.on { box-shadow: 0 0 0 2px var(--color-bg-secondary), 0 0 0 3.5px #10b981; }
 
   /* ---------- In-plot corner keys ---------- */
 
