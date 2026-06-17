@@ -294,15 +294,16 @@
         if (!d) continue;
         const norm = maxMag > 0 ? ar.mag / maxMag : 0;
         const len = LEN * (0.12 + 0.88 * norm); // flat = tiny, steep = bold
-        const y = heightAt(ar.a, ar.b) + LIFT;
         const x0 = toX(ar.a), z0 = toZ(ar.b);
         const xt = x0 + d.x * len, zt = z0 + d.z * len;
         // Head dimensions (shrunk together if the shaft is shorter than a head).
         const hl = Math.min(HEAD_LEN, len * 0.7);
         const hw = HEAD_W * (hl / HEAD_LEN);
         const bx = xt - d.x * hl, bz = zt - d.z * hl; // base centre of the head
-        // Shaft: origin → head base, so the line doesn't poke through the head.
-        verts.push(x0, y, z0, bx, y, bz);
+        // Shaft: origin → head base. Every vertex (shaft AND head) is draped to
+        // the surface with the same surfY, so the shaft meets the head instead
+        // of floating at the origin's height on a slope.
+        verts.push(x0, surfY(x0, z0), z0, bx, surfY(bx, bz), bz);
         cols.push(dim[0], dim[1], dim[2], c[0], c[1], c[2]); // base dim → tip bright
         // Solid triangle head: tip + two base corners, each draped to the surface.
         const px = -d.z, pz = d.x; // perpendicular to d in the (x,z) plane
