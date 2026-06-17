@@ -39,6 +39,7 @@
     type FieldDensity
   } from '../stores/stores';
   import { sampleLoss, normalizedLogLoss, viridisRGB, computeVectorField, contourThresholds, CONTOUR_COUNT } from '../utils/lossGrid';
+  import { placeStreamlines } from '../utils/streamlines';
 
   // Field sampling resolution per density (the draped field is recomputed at
   // this resolution, decoupled from the cached scene — same idea as the 2D view).
@@ -290,9 +291,8 @@
   }
 
   /**
-   * Evenly-spaced streamlines (Jobard & Lefebvre) in (α, β) space — a new line
-   * is seeded only where none is within d_sep, and integration stops near
-   * another line — so the spacing stays uniform instead of bunching in basins.
+   * Evenly-spaced streamlines in (α, β) space via farthest-point seeding
+   * (utils/streamlines) — uniform coverage, lines running into the basins.
    * Returns polylines in parameter space; the caller drapes them on the surface.
    */
   function buildStreamlines3d(
@@ -302,83 +302,10 @@
   ): { a: number; b: number }[][] {
     const span = range.max - range.min;
     const sepDiv = ({ sparse: 14, normal: 24, dense: 42 } as Record<FieldDensity, number>)[layers3d.density] ?? 24;
-    const dSep = span / sepDiv;
-    const dTest = dSep * 0.5;
-    const stepLen = dSep * 0.4;
-    const MAX_STEPS = 600;
-
-    const hash = new Map<string, { a: number; b: number }[]>();
-    const cidx = (v: number) => Math.floor((v - range.min) / dSep);
-    const addPt = (p: { a: number; b: number }) => {
-      const k = `${cidx(p.a)},${cidx(p.b)}`;
-      const arr = hash.get(k);
-      if (arr) arr.push(p); else hash.set(k, [p]);
-    };
-    const nearAny = (a: number, b: number, d: number): boolean => {
-      const ci = cidx(a), cj = cidx(b), d2 = d * d;
-      for (let di = -1; di <= 1; di++)
-        for (let dj = -1; dj <= 1; dj++) {
-          const arr = hash.get(`${ci + di},${cj + dj}`);
-          if (!arr) continue;
-          for (const p of arr) {
-            const dx = p.a - a, dy = p.b - b;
-            if (dx * dx + dy * dy < d2) return true;
-          }
-        }
-      return false;
-    };
-    const stepDir = (a: number, b: number, sign: 1 | -1) => {
-      const gr = config.computeGradient(trainData, { a, b });
-      const m = Math.hypot(gr.a, gr.b);
-      if (!Number.isFinite(m) || m < 1e-5) return null; // flat / at a minimum
-      return { a: sign * (-gr.a / m), b: sign * (-gr.b / m) };
-    };
-    const march = (a0: number, b0: number, sign: 1 | -1) => {
-      const pts: { a: number; b: number }[] = [];
-      let a = a0, b = b0;
-      for (let s = 0; s < MAX_STEPS; s++) {
-        const d1 = stepDir(a, b, sign);
-        if (!d1) break;
-        const d2 = stepDir(a + d1.a * stepLen * 0.5, b + d1.b * stepLen * 0.5, sign) ?? d1; // RK2
-        a += d2.a * stepLen;
-        b += d2.b * stepLen;
-        if (a < range.min || a > range.max || b < range.min || b > range.max) break;
-        if (nearAny(a, b, dTest)) break;
-        pts.push({ a, b });
-      }
-      return pts;
-    };
-
-    const out: { a: number; b: number }[][] = [];
-    const queue: { a: number; b: number }[] = [];
-    const seed0 = 5;
-    for (let i = 0; i < seed0; i++)
-      for (let j = 0; j < seed0; j++)
-        queue.push({ a: range.min + ((i + 0.5) / seed0) * span, b: range.min + ((j + 0.5) / seed0) * span });
-
-    let guard = 0;
-    let totalPts = 0;
-    while (queue.length && guard++ < 6000 && totalPts < 18000) {
-      const seed = queue.shift()!;
-      if (seed.a < range.min || seed.a > range.max || seed.b < range.min || seed.b > range.max) continue;
-      if (nearAny(seed.a, seed.b, dSep)) continue;
-      const back = march(seed.a, seed.b, -1).reverse();
-      const fwd = march(seed.a, seed.b, 1);
-      const line = back.concat([{ a: seed.a, b: seed.b }], fwd);
-      if (line.length < 3) continue;
-      for (const p of line) addPt(p);
-      totalPts += line.length;
-      out.push(line);
-      for (let i = 0; i < line.length - 1; i += 2) {
-        const p = line[i], q = line[i + 1];
-        const tx = q.a - p.a, ty = q.b - p.b, tm = Math.hypot(tx, ty);
-        if (tm < 1e-9) continue;
-        const nx = -ty / tm, ny = tx / tm;
-        queue.push({ a: p.a + nx * dSep, b: p.b + ny * dSep });
-        queue.push({ a: p.a - nx * dSep, b: p.b - ny * dSep });
-      }
-    }
-    return out;
+    return placeStreamlines(
+      { min: range.min, max: range.max, gradient: (a, b) => config.computeGradient(trainData, { a, b }) },
+      { dSep: span / sepDiv }
+    );
   }
 
   /**

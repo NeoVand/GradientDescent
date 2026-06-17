@@ -38,6 +38,7 @@
     type Colormap
   } from '../stores/stores';
   import { gridToImageURL, computeVectorField, colormapStops, contourThresholds, CONTOUR_COUNT } from '../utils/lossGrid';
+  import { placeStreamlines } from '../utils/streamlines';
   import { basinStore, ensureBasins, BASIN_COLORS } from '../utils/basins';
   import { optimizers } from '../utils/optimizers';
   import { runStartStep } from '../utils/trainer';
@@ -484,7 +485,7 @@
     // layers so they sit on top of both the heatmap and the contours.
     // Always dark-styled: these ride on the dark plot interior, not the margins.
     drawGradients(plotGroup, xScale, yScale, true);
-    drawStreamlines(plotGroup, xScale, yScale, true);
+    drawStreamlines(plotGroup, xScale, yScale);
 
     // Basin destination dots (above contours so each region's target pops)
     drawBasinMinima(plotGroup, xScale, yScale);
@@ -766,125 +767,38 @@
   }
 
   /**
-   * Static streamlines: trace the −∇ℒ field from a grid of seeds (integrated
-   * both ways through each seed) and draw them as smooth, faint paths. They
-   * read as the flow of "downhill everywhere" without any animation — plateaus
-   * thin out, walls bunch up, and basins are where the lines converge.
+   * Streamlines of the −∇ℒ flow, placed evenly by farthest-point seeding
+   * (utils/streamlines): each new line fills the biggest remaining void, so
+   * coverage is uniform and lines run all the way into the basins instead of
+   * stopping short. No animation — plateaus thin out, walls bunch up, basins
+   * are where the lines converge.
    */
   function drawStreamlines(
     g: d3.Selection<SVGGElement, unknown, null, undefined>,
     xScale: d3.ScaleLinear<number, number>,
-    yScale: d3.ScaleLinear<number, number>,
-    isDark: boolean
+    yScale: d3.ScaleLinear<number, number>
   ) {
     if (!scene || layers.field !== 'streamlines' || !problemConfig) return;
     const range = parameterRange;
     const span = range.max - range.min;
-    // Evenly-spaced streamlines (Jobard & Lefebvre): a new line is only seeded
-    // where no existing line is within d_sep, and integration stops when it
-    // gets within d_test of another line. That makes the SPACING uniform —
-    // unlike grid-seeding, where every line funnels into the basins and bunches.
     const sepDiv = ({ sparse: 16, normal: 28, dense: 55 } as Record<FieldDensity, number>)[layers.density] ?? 28;
-    const dSep = span / sepDiv;
-    const dTest = dSep * 0.5;
-    const stepLen = dSep * 0.4;
-    const MAX_STEPS = 800;
-    // A single flat color can't contrast with the whole viridis range — a line
-    // dark enough to read over the bright peaks vanishes into the dark basins
-    // where the streamlines actually pool (which is why light mode looked
-    // almost blank). So each line gets a contrasting halo under a core stroke:
-    // the halo carries it over same-tone regions, the core over the rest.
-    // One toned-down treatment (the landscape canvas is always dark): a soft,
-    // muted core over a dark halo — bright enough to read over the dark basins
-    // and the bright peaks, without the glaring near-white lines from before.
+
+    const cfg = problemConfig;
+    const data = trainData;
+    const lines = placeStreamlines(
+      { min: range.min, max: range.max, gradient: (a, b) => cfg.computeGradient(data, { a, b }) },
+      { dSep: span / sepDiv }
+    );
+
+    // The landscape canvas is always dark: a soft muted core over a dark halo,
+    // bright enough over both the basins and the peaks without glaring.
     const coreColor = '#9fb0c9';
     const haloColor = '#070b14';
-    const coreOpacity = 0.5;
-    const haloOpacity = 0.4;
-
-    // Spatial hash (cell = d_sep) for O(1) "any line point within d?" queries.
-    const cell = dSep;
-    const hash = new Map<string, ModelParameters[]>();
-    const cidx = (v: number) => Math.floor((v - range.min) / cell);
-    const addPt = (p: ModelParameters) => {
-      const k = `${cidx(p.a)},${cidx(p.b)}`;
-      const arr = hash.get(k);
-      if (arr) arr.push(p); else hash.set(k, [p]);
-    };
-    const nearAny = (a: number, b: number, d: number): boolean => {
-      const ci = cidx(a), cj = cidx(b), d2 = d * d;
-      for (let di = -1; di <= 1; di++)
-        for (let dj = -1; dj <= 1; dj++) {
-          const arr = hash.get(`${ci + di},${cj + dj}`);
-          if (!arr) continue;
-          for (const p of arr) {
-            const dx = p.a - a, dy = p.b - b;
-            if (dx * dx + dy * dy < d2) return true;
-          }
-        }
-      return false;
-    };
-
-    const stepDir = (a: number, b: number, sign: 1 | -1): ModelParameters | null => {
-      const gr = problemConfig!.computeGradient(trainData, { a, b });
-      const m = Math.hypot(gr.a, gr.b);
-      if (!Number.isFinite(m) || m < 1e-5) return null; // flat / at a minimum
-      return { a: sign * (-gr.a / m), b: sign * (-gr.b / m) };
-    };
-
-    // March from a seed one way, stopping at the edge, a minimum, or near another line.
-    const march = (a0: number, b0: number, sign: 1 | -1): ModelParameters[] => {
-      const pts: ModelParameters[] = [];
-      let a = a0, b = b0;
-      for (let s = 0; s < MAX_STEPS; s++) {
-        const d1 = stepDir(a, b, sign);
-        if (!d1) break;
-        const d2 = stepDir(a + d1.a * stepLen * 0.5, b + d1.b * stepLen * 0.5, sign) ?? d1; // RK2
-        a += d2.a * stepLen;
-        b += d2.b * stepLen;
-        if (a < range.min || a > range.max || b < range.min || b > range.max) break;
-        if (nearAny(a, b, dTest)) break;
-        pts.push({ a, b });
-      }
-      return pts;
-    };
 
     const lineGen = d3.line<ModelParameters>()
       .x(p => xScale(p.a))
       .y(p => yScale(p.b))
       .curve(d3.curveCatmullRom.alpha(0.5));
-
-    // Seed queue primed with a coarse grid; each accepted line spawns fresh
-    // candidates offset perpendicular to it by d_sep on both sides.
-    const queue: ModelParameters[] = [];
-    const seed0 = 5;
-    for (let i = 0; i < seed0; i++)
-      for (let j = 0; j < seed0; j++)
-        queue.push({ a: range.min + ((i + 0.5) / seed0) * span, b: range.min + ((j + 0.5) / seed0) * span });
-
-    const lines: ModelParameters[][] = [];
-    let guard = 0;
-    let totalPts = 0;
-    while (queue.length && guard++ < 8000 && totalPts < 26000) {
-      const seed = queue.shift()!;
-      if (seed.a < range.min || seed.a > range.max || seed.b < range.min || seed.b > range.max) continue;
-      if (nearAny(seed.a, seed.b, dSep)) continue;
-      const back = march(seed.a, seed.b, -1).reverse();
-      const fwd = march(seed.a, seed.b, 1);
-      const line = back.concat([{ a: seed.a, b: seed.b }], fwd);
-      if (line.length < 3) continue;
-      for (const p of line) addPt(p);
-      totalPts += line.length;
-      lines.push(line);
-      for (let i = 0; i < line.length - 1; i += 2) {
-        const p = line[i], q = line[i + 1];
-        const tx = q.a - p.a, ty = q.b - p.b, tm = Math.hypot(tx, ty);
-        if (tm < 1e-9) continue;
-        const nx = -ty / tm, ny = tx / tm;
-        queue.push({ a: p.a + nx * dSep, b: p.b + ny * dSep });
-        queue.push({ a: p.a - nx * dSep, b: p.b - ny * dSep });
-      }
-    }
 
     // Two passes so every halo sits under every core (no line's halo smears
     // over another's core): all halos first, then all cores on top.
@@ -901,8 +815,8 @@
           .style('opacity', op);
       }
     };
-    pass(haloColor, 2.8, haloOpacity);
-    pass(coreColor, 1.1, coreOpacity);
+    pass(haloColor, 2.8, 0.4); // halo
+    pass(coreColor, 1.1, 0.5); // core
   }
 
   /**
