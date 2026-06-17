@@ -232,8 +232,10 @@
     const trainData = get(datasetStore).data.filter(d => d.isTraining);
     const range = currentScene.range;
 
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    const c: [number, number, number] = isDark ? [0.86, 0.91, 1.0] : [0.12, 0.16, 0.26];
+    // The 3D surface shows the colormap in both themes (dark basins, bright
+    // peaks), so the field is always bright white — the dark day-mode colour
+    // vanished against it. Matches the clean white lines in the 2D view.
+    const c: [number, number, number] = [0.86, 0.91, 1.0];
     const LIFT = 0.012;
 
     const verts: number[] = [];
