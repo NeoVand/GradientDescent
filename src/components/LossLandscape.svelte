@@ -781,7 +781,7 @@
     if (!scene || layers.field !== 'streamlines' || !problemConfig) return;
     const range = parameterRange;
     const span = range.max - range.min;
-    const sepDiv = ({ sparse: 16, normal: 28, dense: 55 } as Record<FieldDensity, number>)[layers.density] ?? 28;
+    const sepDiv = ({ sparse: 20, normal: 30, dense: 55 } as Record<FieldDensity, number>)[layers.density] ?? 30;
 
     const cfg = problemConfig;
     const data = trainData;
@@ -790,33 +790,25 @@
       { dSep: span / sepDiv }
     );
 
-    // The landscape canvas is always dark: a soft muted core over a dark halo,
-    // bright enough over both the basins and the peaks without glaring.
-    const coreColor = '#9fb0c9';
-    const haloColor = '#070b14';
-
     const lineGen = d3.line<ModelParameters>()
       .x(p => xScale(p.a))
       .y(p => yScale(p.b))
       .curve(d3.curveCatmullRom.alpha(0.5));
 
-    // Two passes so every halo sits under every core (no line's halo smears
-    // over another's core): all halos first, then all cores on top.
-    const pass = (stroke: string, w: number, op: number) => {
-      for (const line of lines) {
-        g.append('path')
-          .attr('class', 'streamline')
-          .attr('d', lineGen(line))
-          .attr('fill', 'none')
-          .attr('stroke', stroke)
-          .attr('stroke-width', w)
-          .attr('stroke-linecap', 'round')
-          .attr('stroke-linejoin', 'round')
-          .style('opacity', op);
-      }
-    };
-    pass(haloColor, 2.8, 0.4); // halo
-    pass(coreColor, 1.1, 0.5); // core
+    // Clean white lines on the dark canvas — no gray core, no dark halo (the
+    // 3D view does the same). The black SVG backdrop gives them all the
+    // contrast they need over both the basins and the peaks.
+    for (const line of lines) {
+      g.append('path')
+        .attr('class', 'streamline')
+        .attr('d', lineGen(line))
+        .attr('fill', 'none')
+        .attr('stroke', '#dbe7fb')
+        .attr('stroke-width', 1.05)
+        .attr('stroke-linecap', 'round')
+        .attr('stroke-linejoin', 'round')
+        .style('opacity', 0.62);
+    }
   }
 
   /**

@@ -301,7 +301,7 @@
     range: { min: number; max: number }
   ): { a: number; b: number }[][] {
     const span = range.max - range.min;
-    const sepDiv = ({ sparse: 14, normal: 24, dense: 42 } as Record<FieldDensity, number>)[layers3d.density] ?? 24;
+    const sepDiv = ({ sparse: 18, normal: 26, dense: 42 } as Record<FieldDensity, number>)[layers3d.density] ?? 26;
     return placeStreamlines(
       { min: range.min, max: range.max, gradient: (a, b) => config.computeGradient(trainData, { a, b }) },
       { dSep: span / sepDiv }

@@ -50,9 +50,13 @@ export function placeStreamlines(
   if (span <= 0) return [];
 
   const dSep = opts.dSep;
-  const dTest = opts.dTest ?? dSep * 0.5;
-  const step = opts.step ?? dSep * 0.4;
-  const maxSteps = opts.maxSteps ?? 800;
+  // dTest a little under half d_sep lets lines integrate closer to their
+  // neighbours before stopping — longer lines, tighter packing, fewer gaps
+  // (which is what hurt most at low density). A smaller step lands closer to
+  // the sinks before the last overshoot, so lines converge cleanly.
+  const dTest = opts.dTest ?? dSep * 0.45;
+  const step = opts.step ?? dSep * 0.33;
+  const maxSteps = opts.maxSteps ?? 1500;
 
   // ---------- distance grid ----------
   // dist[k] = distance from cell centre k to the nearest streamline so far
@@ -111,7 +115,9 @@ export function placeStreamlines(
 
   // ---------- the downhill unit-direction field ----------
   const CRIT_EPS = 1e-4 * maxMag; // below this |∇| we've reached a critical point
-  const CRIT_NEAR = 0.05 * maxMag; // below this we're converging in: ignore dTest
+  const CRIT_NEAR = 0.13 * maxMag; // below this we're converging in: ignore dTest
+  //   (bigger than before, so lines push into the basins and "come together"
+  //    at the sink even at low density, instead of stopping in a ring around it)
   const flow = (a: number, b: number): { dx: number; dy: number; mag: number } | null => {
     const g = gradient(a, b);
     const m = Math.hypot(g.a, g.b);
