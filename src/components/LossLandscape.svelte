@@ -37,8 +37,9 @@
     type FieldDensity,
     type Colormap
   } from '../stores/stores';
-  import { gridToImageURL, computeVectorField, colormapStops, contourThresholds, CONTOUR_COUNT } from '../utils/lossGrid';
+  import { gridToImageURL, colormapStops, contourThresholds, CONTOUR_COUNT } from '../utils/lossGrid';
   import { placeStreamlines } from '../utils/streamlines';
+  import { poissonDiskSample } from '../utils/poisson';
   import { basinStore, ensureBasins, BASIN_COLORS } from '../utils/basins';
   import { optimizers } from '../utils/optimizers';
   import { runStartStep } from '../utils/trainer';
@@ -484,7 +485,7 @@
     // Gradient field — arrows or flowing streamlines, drawn LAST of the field
     // layers so they sit on top of both the heatmap and the contours.
     // Always dark-styled: these ride on the dark plot interior, not the margins.
-    drawGradients(plotGroup, xScale, yScale, true);
+    drawGradients(plotGroup, xScale, yScale);
     drawStreamlines(plotGroup, xScale, yScale);
 
     // Basin destination dots (above contours so each region's target pops)
@@ -705,21 +706,31 @@
   function drawGradients(
     g: d3.Selection<SVGGElement, unknown, null, undefined>,
     xScale: d3.ScaleLinear<number, number>,
-    yScale: d3.ScaleLinear<number, number>,
-    isDark: boolean
+    yScale: d3.ScaleLinear<number, number>
   ) {
     if (!scene || layers.field !== 'arrows' || !problemConfig) return;
-    // Field at the chosen density — cheap (a grid of analytic gradients), and
-    // decoupled from the cached scene so density can change without a recompute.
-    const field = computeVectorField(trainData, problemConfig, parameterRange, DENSITY_RES[layers.density] ?? 23);
-    if (field.arrows.length === 0) return;
-    const { arrows, maxMag } = field;
 
-    // Muted in dark mode so the field reads as quiet texture, not a bright
-    // lattice that takes over the surface; near-black in light mode.
-    const arrowColor = isDark ? '#7c8aa3' : '#1f2937';
-    const baseOpacity = isDark ? 0.16 : 0.20;
-    const spanOpacity = isDark ? 0.46 : 0.50;
+    // Blue-noise (Poisson-disk) arrow placement — even spread with no grid
+    // rows, like the streamlines. The layout is stable for a given domain +
+    // density, so arrows don't reshuffle when the marker moves or data changes.
+    const span = parameterRange.max - parameterRange.min;
+    const res = DENSITY_RES[layers.density] ?? 23;
+    const cfg = problemConfig;
+    const data = trainData;
+    let maxMag = 0;
+    const arrows = poissonDiskSample(parameterRange.min, parameterRange.max, span / res).map(p => {
+      const gr = cfg.computeGradient(data, { a: p.x, b: p.y });
+      const mag = Math.hypot(gr.a, gr.b);
+      if (Number.isFinite(mag) && mag > maxMag) maxMag = mag;
+      return { a: p.x, b: p.y, ga: gr.a, gb: gr.b, mag };
+    });
+    if (!arrows.length || !(maxMag > 0)) return;
+
+    // Clean, clearly-visible cool-white lines on the dark canvas (the old muted
+    // slate was nearly invisible). Magnitude still fades the faint ones down.
+    const arrowColor = '#cdd9f2';
+    const baseOpacity = 0.42;
+    const spanOpacity = 0.5;
 
     const defs = g.append('defs');
     defs.append('marker')

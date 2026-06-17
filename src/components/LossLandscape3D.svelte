@@ -38,8 +38,9 @@
     type Colormap,
     type FieldDensity
   } from '../stores/stores';
-  import { sampleLoss, normalizedLogLoss, viridisRGB, computeVectorField, contourThresholds, CONTOUR_COUNT } from '../utils/lossGrid';
+  import { sampleLoss, normalizedLogLoss, viridisRGB, contourThresholds, CONTOUR_COUNT } from '../utils/lossGrid';
   import { placeStreamlines } from '../utils/streamlines';
+  import { poissonDiskSample } from '../utils/poisson';
 
   // Field sampling resolution per density (the draped field is recomputed at
   // this resolution, decoupled from the cached scene — same idea as the 2D view).
@@ -50,6 +51,7 @@
   let cmap: Colormap = get(vizLayersStore).colormap;
   let layers3d = get(vizLayersStore);
   let vectorField3d: THREE.LineSegments | null = null;
+  let vectorField3dHeads: THREE.Mesh | null = null;
   import { previewNextStep } from '../utils/preview';
   import type { TrainingHistoryPoint, DataPoint, ProblemConfig } from '../types/types';
 
@@ -223,6 +225,12 @@
       (vectorField3d.material as THREE.Material).dispose();
       vectorField3d = null;
     }
+    if (vectorField3dHeads) {
+      scene3.remove(vectorField3dHeads);
+      vectorField3dHeads.geometry.dispose();
+      (vectorField3dHeads.material as THREE.Material).dispose();
+      vectorField3dHeads = null;
+    }
     if (!currentScene || layers3d.field === 'off') return;
 
     // Recompute from the live config/data (not the cached scene field) so the
@@ -240,6 +248,7 @@
 
     const verts: number[] = [];
     const cols: number[] = [];
+    const headVerts: number[] = []; // arrowhead triangles (arrows only)
 
     if (layers3d.field === 'streamlines') {
       // Flowing draped lines (evenly-spaced, Jobard–Lefebvre), colored
@@ -257,22 +266,53 @@
       }
     } else {
       // Arrows: a short downhill segment at each field sample, length ∝ |∇|.
-      const { arrows, maxMag } = computeVectorField(
-        trainData, config, range, FIELD_RES_3D[layers3d.density] ?? 16
-      );
+      // Blue-noise placement (utils/poisson) — even spread, no grid rows.
+      const span = range.max - range.min;
+      const res = FIELD_RES_3D[layers3d.density] ?? 16;
+      let maxMag = 0;
+      const arrows = poissonDiskSample(range.min, range.max, span / res).map(p => {
+        const gr = config.computeGradient(trainData, { a: p.x, b: p.y });
+        const mag = Math.hypot(gr.a, gr.b);
+        if (Number.isFinite(mag) && mag > maxMag) maxMag = mag;
+        return { a: p.x, b: p.y, ga: gr.a, gb: gr.b, mag };
+      });
       const LEN = 0.09;
+      // A proper arrow: a shaft line plus a FIXED-SIZE solid triangle head
+      // draped on the surface. Fixed size (not scaled by magnitude) keeps every
+      // head identical and clean, like the 2D marker; only the shaft length
+      // carries the magnitude. The head is clamped on tiny arrows so it never
+      // outruns its shaft.
+      const HEAD_LEN = 0.026; // arrowhead length, world units
+      const HEAD_W = 0.017; // arrowhead half-width, world units
+      const dim: [number, number, number] = [c[0] * 0.5, c[1] * 0.5, c[2] * 0.5];
+      const surfY = (x: number, z: number) => {
+        const q = fromXZ(x, z);
+        return heightAt(q.a, q.b) + LIFT + 0.003;
+      };
       for (const ar of arrows) {
         const d = dirVec(-ar.ga, -ar.gb);
         if (!d) continue;
         const norm = maxMag > 0 ? ar.mag / maxMag : 0;
-        // Low floor (matching the 2D field): flat regions get tiny marks, steep
-        // regions get bold ones. The old 0.3 floor squashed every arrow to
-        // nearly the same length, so the magnitude was invisible.
-        const len = LEN * (0.12 + 0.88 * norm);
+        const len = LEN * (0.12 + 0.88 * norm); // flat = tiny, steep = bold
         const y = heightAt(ar.a, ar.b) + LIFT;
         const x0 = toX(ar.a), z0 = toZ(ar.b);
-        verts.push(x0, y, z0, x0 + d.x * len, y, z0 + d.z * len);
-        cols.push(c[0] * 0.5, c[1] * 0.5, c[2] * 0.5, c[0], c[1], c[2]); // base dim → tip bright (downhill)
+        const xt = x0 + d.x * len, zt = z0 + d.z * len;
+        // Head dimensions (shrunk together if the shaft is shorter than a head).
+        const hl = Math.min(HEAD_LEN, len * 0.7);
+        const hw = HEAD_W * (hl / HEAD_LEN);
+        const bx = xt - d.x * hl, bz = zt - d.z * hl; // base centre of the head
+        // Shaft: origin → head base, so the line doesn't poke through the head.
+        verts.push(x0, y, z0, bx, y, bz);
+        cols.push(dim[0], dim[1], dim[2], c[0], c[1], c[2]); // base dim → tip bright
+        // Solid triangle head: tip + two base corners, each draped to the surface.
+        const px = -d.z, pz = d.x; // perpendicular to d in the (x,z) plane
+        const lx = bx + px * hw, lz = bz + pz * hw;
+        const rx = bx - px * hw, rz = bz - pz * hw;
+        headVerts.push(
+          xt, surfY(xt, zt), zt,
+          lx, surfY(lx, lz), lz,
+          rx, surfY(rx, rz), rz
+        );
       }
     }
 
@@ -290,6 +330,22 @@
     vectorField3d = new THREE.LineSegments(geo, mat);
     vectorField3d.renderOrder = 7;
     scene3.add(vectorField3d);
+
+    if (headVerts.length) {
+      const hgeo = new THREE.BufferGeometry();
+      hgeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(headVerts), 3));
+      const hmat = new THREE.MeshBasicMaterial({
+        color: new THREE.Color(c[0], c[1], c[2]),
+        transparent: true,
+        opacity: 0.95,
+        depthTest: true,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      });
+      vectorField3dHeads = new THREE.Mesh(hgeo, hmat);
+      vectorField3dHeads.renderOrder = 7;
+      scene3.add(vectorField3dHeads);
+    }
   }
 
   /**
