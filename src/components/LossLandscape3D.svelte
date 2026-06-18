@@ -33,12 +33,20 @@
     optimizerStateStore,
     trainingStore,
     vizLayersStore,
+    basinsEnabledStore,
     type LossScene,
     type RaceState,
     type Colormap,
     type FieldDensity
   } from '../stores/stores';
   import { sampleLoss, normalizedLogLoss, viridisRGB, contourThresholds, CONTOUR_COUNT } from '../utils/lossGrid';
+  import {
+    basinStore,
+    basinIdAt,
+    BASIN_COLORS_RGB,
+    BASIN_UNSETTLED_RGB,
+    type BasinState
+  } from '../utils/basins';
   import { placeStreamlines } from '../utils/streamlines';
   import { poissonDiskSample } from '../utils/poisson';
 
@@ -52,6 +60,14 @@
   let layers3d = get(vizLayersStore);
   let vectorField3d: THREE.LineSegments | null = null;
   let vectorField3dHeads: THREE.Mesh | null = null;
+
+  // Basins of attraction: when on, the surface is colored by WHICH minimum
+  // plain GD reaches from each point (categorical palette) instead of the
+  // loss colormap — height still comes from loss, and lighting still shades
+  // the terrain, so the shape reads while the color tells the destination.
+  let basinsEnabled = get(basinsEnabledStore);
+  let basinState: BasinState = get(basinStore);
+  let basinMarkers: THREE.Group | null = null;
   import { previewNextStep } from '../utils/preview';
   import type { TrainingHistoryPoint, DataPoint, ProblemConfig } from '../types/types';
 
@@ -109,6 +125,16 @@
 
   // ---------- scene construction ----------
 
+  /** True when the basin overlay is on and a matching 2-parameter map is ready. */
+  function basinActive(): boolean {
+    return (
+      basinsEnabled &&
+      basinState.status === 'ready' &&
+      basinState.scene !== null &&
+      !basinState.scene.oneParam
+    );
+  }
+
   function buildSurface() {
     if (!currentScene) return;
     if (surfaceMesh) {
@@ -121,6 +147,7 @@
     geo.rotateX(-Math.PI / 2); // lie flat: x stays x, plane v-axis becomes z
     const pos = geo.attributes.position as THREE.BufferAttribute;
     const colors = new Float32Array(pos.count * 3);
+    const basins = basinActive() ? basinState.scene : null;
 
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
@@ -128,7 +155,15 @@
       const { a, b } = fromXZ(x, z);
       const t = normalizedLogLoss(currentScene.grid, sampleLoss(currentScene.grid, a, b));
       pos.setY(i, t * HEIGHT);
-      const [r, g, bb] = viridisRGB(1 - t, cmap); // bright = low loss, same as 2D
+      // Basin mode: flat categorical color per destination (lighting still
+      // shades the terrain). Otherwise the loss colormap, bright = low loss.
+      let r: number, g: number, bb: number;
+      if (basins) {
+        const id = basinIdAt(basins, a, b);
+        [r, g, bb] = id < 0 ? BASIN_UNSETTLED_RGB : BASIN_COLORS_RGB[id % BASIN_COLORS_RGB.length];
+      } else {
+        [r, g, bb] = viridisRGB(1 - t, cmap);
+      }
       colors[i * 3] = r;
       colors[i * 3 + 1] = g;
       colors[i * 3 + 2] = bb;
@@ -145,6 +180,50 @@
     });
     surfaceMesh = new THREE.Mesh(geo, mat);
     scene3.add(surfaceMesh);
+  }
+
+  /**
+   * One small emissive sphere per basin destination, draped onto the surface
+   * at the minimum and colored like its region — the 3D echo of the 2D
+   * "destination dots", so each color visibly resolves to one minimum.
+   */
+  function buildBasinMarkers() {
+    if (basinMarkers) {
+      scene3.remove(basinMarkers);
+      basinMarkers.traverse(obj => {
+        const m = obj as THREE.Mesh;
+        if (m.geometry) m.geometry.dispose();
+        const mat = m.material as THREE.Material | undefined;
+        mat?.dispose();
+      });
+      basinMarkers = null;
+    }
+    if (!currentScene || !basinActive() || !basinState.scene) return;
+
+    const { min, max } = currentScene.range;
+    basinMarkers = new THREE.Group();
+    basinState.scene.minima.forEach((m, i) => {
+      if (m.a < min || m.a > max || m.b < min || m.b > max) return;
+      const [r, g, b] = BASIN_COLORS_RGB[i % BASIN_COLORS_RGB.length];
+      const color = new THREE.Color(r, g, b);
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.02, 16, 12),
+        new THREE.MeshStandardMaterial({
+          color,
+          emissive: color,
+          emissiveIntensity: 0.5,
+          roughness: 0.4,
+          // A converged minimum sits in a depression the near rim would hide;
+          // draw it through, like the marker and contours.
+          depthTest: false,
+          depthWrite: false
+        })
+      );
+      dot.position.set(toX(m.a), heightAt(m.a, m.b) + 0.012, toZ(m.b));
+      dot.renderOrder = 9;
+      basinMarkers!.add(dot);
+    });
+    scene3.add(basinMarkers);
   }
 
   function buildContours() {
@@ -889,8 +968,25 @@
         buildSurface();
         buildContours();
         buildVectorField3d();
+        buildBasinMarkers();
         buildPath(get(historyStore));
         updateMarker();
+      }),
+      // Basin overlay: toggling it, or a freshly computed map arriving,
+      // recolors the surface and refreshes the destination markers.
+      basinsEnabledStore.subscribe(on => {
+        basinsEnabled = on;
+        if (currentScene) {
+          buildSurface();
+          buildBasinMarkers();
+        }
+      }),
+      basinStore.subscribe(s => {
+        basinState = s;
+        if (currentScene && basinsEnabled) {
+          buildSurface();
+          buildBasinMarkers();
+        }
       }),
       parametersStore.subscribe(() => updateMarker()),
       historyStore.subscribe(h => {

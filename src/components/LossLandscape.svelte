@@ -34,6 +34,7 @@
     optimizerStateStore,
     markerDragging,
     vizLayersStore,
+    basinsEnabledStore,
     type FieldDensity,
     type Colormap
   } from '../stores/stores';
@@ -179,11 +180,11 @@
   // ---------- Basins of attraction ----------
   // Color every cell by which minimum plain GD (at the current γ) reaches
   // from there. Computed in a Web Worker, cached per scenario.
-  let basinsOn = typeof window !== 'undefined' && localStorage.getItem('gd-basins') === '1';
+  // Toggle lives in a global store so the 3D surface can color by basin too.
+  $: basinsOn = $basinsEnabledStore;
 
   function toggleBasins() {
-    basinsOn = !basinsOn;
-    if (typeof window !== 'undefined') localStorage.setItem('gd-basins', basinsOn ? '1' : '0');
+    basinsEnabledStore.toggle();
   }
 
   $: basin = $basinStore;
@@ -201,7 +202,7 @@
       parameterRange,
       learningRate,
       oneParam,
-      oneParam ? 280 : problemConfig.noData ? 180 : 128
+      oneParam ? 360 : problemConfig.noData ? 220 : 160
     );
   }
 
@@ -1355,8 +1356,9 @@
             </div>
           {/if}
         </span>
-        {#if view === '2d' || oneParam}
-        {#if !oneParam}
+        <!-- Curvature lens: a 2D-only overlay (the Hessian ellipse is drawn on
+             the SVG plot), so it stays gated to the 2D view. -->
+        {#if view === '2d' && !oneParam}
           <button
             class="tool-btn"
             class:active={lensOn}
@@ -1368,6 +1370,8 @@
             <Orbit size={15} strokeWidth={2.2} />
           </button>
         {/if}
+        <!-- Basins of attraction work in every view (2D heatmap, 1D curve, and
+             now the colorized 3D surface), so the toggle is always available. -->
         <button
           class="tool-btn"
           class:active={basinsOn}
@@ -1382,7 +1386,8 @@
             <MapIcon size={15} strokeWidth={2.2} />
           {/if}
         </button>
-        {#if videoSupported && !oneParam}
+        <!-- Video export records the 2D canvas — 2D, multi-parameter only. -->
+        {#if view === '2d' && videoSupported && !oneParam}
           <button
             class="tool-btn"
             disabled={!canExport}
@@ -1401,7 +1406,6 @@
             {/if}
           </button>
         {/if}
-      {/if}
     </div>
   </div>
   <div class="svg-container" bind:this={containerEl}>

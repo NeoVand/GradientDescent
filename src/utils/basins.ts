@@ -15,6 +15,11 @@ export interface BasinScene {
   minima: { a: number; b: number }[];
   res: number;
   oneParam: boolean;
+  /** Per-cell basin index (row-major, j*res+i; −1 = diverged/unsettled). Kept
+   *  so the 3D surface can color each vertex by basin via basinIdAt(). */
+  cells: Int16Array;
+  /** Parameter range the cells span — needed to map (a,b) → cell. */
+  range: { min: number; max: number };
 }
 
 export interface BasinState {
@@ -48,6 +53,7 @@ const CACHE_MAX = 12;
 let worker: Worker | null = null;
 let requestCounter = 0;
 let pendingKey: string | null = null;
+let pendingRange: { min: number; max: number } | null = null;
 let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
 function fingerprint(data: DataPoint[]): string {
@@ -82,6 +88,33 @@ export function basinKey(
 function hexToRgb(hex: string): [number, number, number] {
   const v = parseInt(hex.slice(1), 16);
   return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+}
+
+/** Basin palette as 0–1 float RGB triples — for three.js vertex colors. */
+export const BASIN_COLORS_RGB: [number, number, number][] = BASIN_COLORS.map(h => {
+  const [r, g, b] = hexToRgb(h);
+  return [r / 255, g / 255, b / 255];
+});
+
+/** Muted slate for diverged/unsettled cells, matching the 2D map's gray. */
+export const BASIN_UNSETTLED_RGB: [number, number, number] = [100 / 255, 116 / 255, 139 / 255];
+
+/**
+ * Basin id at parameter point (a, b) for a computed scene, or −1 when the
+ * point is outside the grid or its cell never settled. Mirrors the cell
+ * indexing in computeBasinMap (cell center i ↔ a = min + (i+0.5)/res·span).
+ */
+export function basinIdAt(scene: BasinScene, a: number, b: number): number {
+  const { min, max } = scene.range;
+  const span = max - min;
+  if (span <= 0) return -1;
+  const res = scene.res;
+  const i = Math.floor(((a - min) / span) * res);
+  if (i < 0 || i >= res) return -1;
+  const rows = scene.oneParam ? 1 : res;
+  const j = scene.oneParam ? 0 : Math.floor(((b - min) / span) * res);
+  if (j < 0 || j >= rows) return -1;
+  return scene.cells[j * res + i];
 }
 
 function renderToURL(result: BasinResult): string {
@@ -133,7 +166,9 @@ function getWorker(): Worker {
           imageURL: renderToURL(msg.result),
           minima: msg.result.minima,
           res: msg.result.res,
-          oneParam: msg.result.oneParam
+          oneParam: msg.result.oneParam,
+          cells: msg.result.cells,
+          range: pendingRange!
         };
         cache.set(scene.key, scene);
         if (cache.size > CACHE_MAX) {
@@ -184,6 +219,7 @@ export function ensureBasins(
   debounceTimer = setTimeout(() => {
     if (pendingKey !== key) return; // superseded while debouncing
     requestCounter++;
+    pendingRange = range;
     getWorker().postMessage({
       requestId: requestCounter,
       problemType,

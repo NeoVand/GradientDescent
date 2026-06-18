@@ -510,6 +510,32 @@ function createVizLayersStore() {
 
 export const vizLayersStore = createVizLayersStore();
 
+// ========== Basins of attraction toggle ==========
+// Whether the basin-of-attraction overlay is on. Global (not local to the 2D
+// view) so the 3D surface can color itself by basin too — both views read the
+// same flag. Persisted under the same 'gd-basins' key the 2D view always used.
+function createBasinsEnabledStore() {
+  const KEY = 'gd-basins';
+  const initial = () =>
+    typeof window !== 'undefined' && localStorage.getItem(KEY) === '1';
+
+  const { subscribe, update } = writable<boolean>(initial());
+
+  return {
+    subscribe,
+    toggle: () =>
+      update(v => {
+        const next = !v;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(KEY, next ? '1' : '0');
+        }
+        return next;
+      })
+  };
+}
+
+export const basinsEnabledStore = createBasinsEnabledStore();
+
 // ========== Challenge Store ==========
 // A shared link can carry a goal: "reach the basin in ≤ N steps". The
 // landscape shows the target pill; the trainer judges each finished run.
