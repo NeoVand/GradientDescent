@@ -30,7 +30,7 @@ import CoursePanel from './components/CoursePanel.svelte';
   import { startTraining, stopTraining, stepOnce, resetRun, runEndStore, applyProblem } from './utils/trainer';
   import { startCourse, closeCourse } from './utils/lessons';
   import { applyUrlState, encodeStateUrl } from './utils/urlState';
-  import { Sun, Moon, HelpCircle, Menu, X, Share2, GraduationCap, Maximize, Minimize } from 'lucide-svelte';
+  import { Sun, Moon, Compass, Menu, X, Share2, GraduationCap, Maximize, Minimize } from 'lucide-svelte';
 
   // The main app orchestrates all our components and manages the overall layout.
   // We use CSS Grid for a responsive, flexible layout that adapts to different screen sizes.
@@ -248,13 +248,13 @@ import CoursePanel from './components/CoursePanel.svelte';
   </button>
   <h1 class="topbar-title"><span class="topbar-mark">∂</span> <span class="topbar-name">Gradient Lab</span></h1>
   <button class="topbar-btn" class:active={$courseStore.active} on:click={() => ($courseStore.active ? closeCourse() : startCourse())} aria-label="Course">
-    <GraduationCap size={20} strokeWidth={2.5} />
+    <Compass size={20} strokeWidth={2.5} />
   </button>
   <button class="topbar-btn" class:active={showSharePopover} on:click={toggleSharePopover} aria-label="Share">
     <Share2 size={19} strokeWidth={2.5} />
   </button>
   <button class="topbar-btn" on:click={() => showHelpModal = true} aria-label="Help">
-    <HelpCircle size={20} strokeWidth={2.5} />
+    <GraduationCap size={20} strokeWidth={2.5} />
   </button>
   <button class="topbar-btn" on:click={() => themeStore.toggle()} aria-label="Toggle theme">
     {#if theme === 'light'}
@@ -320,13 +320,13 @@ import CoursePanel from './components/CoursePanel.svelte';
     on:click={() => ($courseStore.active ? closeCourse() : startCourse())}
     title="Course — ten predict-then-run lessons, from slopes to a tiny neural net"
   >
-    <GraduationCap size={19} strokeWidth={2.5} />
+    <Compass size={19} strokeWidth={2.5} />
   </button>
   <button class="help-btn" class:tool-on={showSharePopover} on:click={toggleSharePopover} title="Share this exact scenario — or turn it into a challenge">
     <Share2 size={18} strokeWidth={2.5} />
   </button>
   <button class="help-btn" on:click={() => showHelpModal = true} title="Help & Guide">
-    <HelpCircle size={20} strokeWidth={2.5} />
+    <GraduationCap size={20} strokeWidth={2.5} />
   </button>
   <button
     class="help-btn"
