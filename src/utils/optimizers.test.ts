@@ -99,6 +99,19 @@ describe('optimizers', () => {
     expect(state.s.a).toBeLessThan(sAfterBurst / 100);
   });
 
+  it('lion steps have fixed magnitude γ per axis, independent of gradient scale', () => {
+    const opt = optimizers.lion;
+    for (const scale of [0.001, 1, 1000]) {
+      const params = { a: 5, b: -5 };
+      // From a fresh state, m=0 so the sign follows the gradient's sign.
+      const out = opt.step(params, { a: scale, b: -scale }, opt.init(), 0.05, defaultHyper('lion'));
+      expect(Math.abs(out.params.a - params.a)).toBeCloseTo(0.05, 12);
+      expect(Math.abs(out.params.b - params.b)).toBeCloseTo(0.05, 12);
+      expect(Math.sign(out.params.a - params.a)).toBe(-1); // downhill on +g
+      expect(Math.sign(out.params.b - params.b)).toBe(1);
+    }
+  });
+
   it('state is not mutated in place', () => {
     for (const id of Object.keys(optimizers) as OptimizerId[]) {
       const opt = optimizers[id];

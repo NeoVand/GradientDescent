@@ -14,7 +14,7 @@
 
 import type { ModelParameters } from '../types/types';
 
-export type OptimizerId = 'gd' | 'momentum' | 'nesterov' | 'adagrad' | 'rmsprop' | 'adam';
+export type OptimizerId = 'gd' | 'momentum' | 'nesterov' | 'adagrad' | 'rmsprop' | 'adam' | 'lion';
 
 export interface OptimizerState {
   v: ModelParameters;
@@ -246,13 +246,75 @@ export const adam: Optimizer = {
   }
 };
 
+// Lion (Chen et al., 2023) — "EvoLved Sign Momentum". The update direction is
+// the SIGN of a momentum/gradient blend, so every step has the SAME magnitude γ
+// on each axis no matter how steep the slope. That makes it strikingly distinct
+// on the landscape — a constant-stride staircase rather than the smooth, slope-
+// scaled curves of the other methods — and very light (one momentum buffer, no
+// squared-gradient term). Two decays: β₁ sets the step DIRECTION (mostly
+// momentum, a little fresh gradient), β₂ is the slower memory of the momentum
+// buffer itself. We drop the paper's decoupled weight decay — this app's loss
+// has no regularizer for it to act on.
+const LION_BETA1: HyperparamSpec = {
+  key: 'beta1',
+  label: 'Direction blend',
+  symbol: 'β₁',
+  min: 0,
+  max: 0.999,
+  step: 0.001,
+  default: 0.9,
+  hint: 'Momentum vs. fresh gradient that sets the step direction (only its sign is used).'
+};
+
+const LION_BETA2: HyperparamSpec = {
+  key: 'beta2',
+  label: 'Momentum decay',
+  symbol: 'β₂',
+  min: 0.9,
+  max: 0.9999,
+  step: 0.0001,
+  default: 0.99,
+  hint: 'How slowly the momentum buffer forgets past gradients.'
+};
+
+export const lion: Optimizer = {
+  id: 'lion',
+  name: 'Lion',
+  description: 'Sign of momentum: fixed-size steps, very light',
+  updateRuleLatex: String.raw`\mathbf{c} \leftarrow \beta_1 \mathbf{m} + (1{-}\beta_1)\nabla\mathcal{L}, \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\,\operatorname{sign}(\mathbf{c}), \;\; \mathbf{m} \leftarrow \beta_2 \mathbf{m} + (1{-}\beta_2)\nabla\mathcal{L}`,
+  hyperparams: [LION_BETA1, LION_BETA2],
+  fixedLearningRate: 0.05,
+  init: initState,
+  step(params, g, state, lr, hyper) {
+    const b1 = hyper.beta1 ?? LION_BETA1.default;
+    const b2 = hyper.beta2 ?? LION_BETA2.default;
+    const m = state.v;
+    // Step direction: sign of the (mostly-momentum) blend — magnitude is always γ.
+    const ca = b1 * m.a + (1 - b1) * g.a;
+    const cb = b1 * m.b + (1 - b1) * g.b;
+    // Momentum buffer updates with its own, slower decay and the fresh gradient.
+    const v = {
+      a: b2 * m.a + (1 - b2) * g.a,
+      b: b2 * m.b + (1 - b2) * g.b
+    };
+    return {
+      params: {
+        a: params.a - lr * Math.sign(ca),
+        b: params.b - lr * Math.sign(cb)
+      },
+      state: { ...state, v, t: state.t + 1 }
+    };
+  }
+};
+
 export const optimizers: Record<OptimizerId, Optimizer> = {
   gd: gradientDescent,
   momentum,
   nesterov,
   adagrad,
   rmsprop,
-  adam
+  adam,
+  lion
 };
 
 export const optimizerOrder: OptimizerId[] = [
@@ -261,7 +323,8 @@ export const optimizerOrder: OptimizerId[] = [
   'nesterov',
   'adagrad',
   'rmsprop',
-  'adam'
+  'adam',
+  'lion'
 ];
 
 /** Default hyperparameter values for an optimizer, keyed by spec key. */
