@@ -65,7 +65,7 @@
     { id: 'ch-step', n: '4', title: 'One step of descent' },
     { id: 'ch-gamma', n: '5', title: 'The learning rate γ' },
     { part: "Part III · When one step isn't enough" },
-    { id: 'ch-optimizers', n: '6', title: 'Six optimizers, one story' },
+    { id: 'ch-optimizers', n: '6', title: 'Seven optimizers, one story' },
     { id: 'ch-noise', n: '7', title: 'Mini-batches & the S in SGD' },
     { id: 'ch-schedule', n: '8', title: 'Scheduling the learning rate' },
     { part: 'Part IV · The zoo' },
@@ -210,10 +210,22 @@
       formula: String.raw`\hat{\mathbf{m}} = \frac{\mathbf{m}}{1-\beta_1^t}, \quad \hat{s} = \frac{s}{1-\beta_2^t}, \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \frac{\hat{\mathbf{m}}}{\sqrt{\hat{s}} + \varepsilon}`,
       fix: 'robust out of the box almost everywhere',
       brk: 'sometimes generalizes worse than carefully tuned SGD — the story isn’t over'
+    },
+    {
+      act: { no: 'Coda', title: 'A different shape' },
+      year: '2023',
+      name: 'Lion',
+      by: 'Chen et al. (Google) — found by program search, not designed',
+      idea:
+        'Adam was the finale of one idea — scale the step by gradient history. Lion takes a different shape entirely, and it wasn’t invented by a person: a program searched the space of optimizers and this fell out. Keep one momentum buffer, blend it with the fresh gradient, and step by the SIGN of the result — so every step is the same size γ on each axis, no matter how steep or flat. That makes it light (one buffer, no squared-gradient term) and competitive with Adam on big vision and language models. The catch is the very thing that makes it clean: a step that never shrinks can’t settle by itself.',
+      formula: String.raw`\mathbf{c} \leftarrow \beta_1 \mathbf{m} + (1{-}\beta_1)\nabla\mathcal{L}, \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \operatorname{sign}(\mathbf{c}), \;\; \mathbf{m} \leftarrow \beta_2 \mathbf{m} + (1{-}\beta_2)\nabla\mathcal{L}`,
+      fix: 'fixed-size steps from one tiny buffer — light and fast',
+      brk: 'the step never shrinks, so it orbits the minimum until γ is decayed (Chapter 8)'
     }
   ];
 
   const raceExperiment = experiments.find(e => e.id === 'banana-race');
+  const scheduleExperiment = experiments.find(e => e.id === 'lion-schedule');
 
   // ---------- The opening picture: a real race on a real landscape ----------
   // A curved ravine, ℒ = 9(y − c(x))² + 0.22(x − x*)² with a sine valley
@@ -734,7 +746,7 @@
             <!-- ============== 6 · THE OPTIMIZER STORY ============== -->
             <section data-ch="ch-optimizers" id="ch-optimizers">
               <div class="part-label">Part III · When one step isn’t enough</div>
-              <h3><svelte:component this={chIcon['ch-optimizers']} size={18} strokeWidth={2} /> Six optimizers, one story</h3>
+              <h3><svelte:component this={chIcon['ch-optimizers']} size={18} strokeWidth={2} /> Seven optimizers, one story</h3>
               <p>
                 Plain gradient descent has one recurring nemesis: the <strong>ravine</strong> — a
                 valley far steeper across than along. The γ that’s safe on the steep walls is
@@ -818,6 +830,15 @@
                     the peak the gradient is so faint the marker stalls. Crank μ to 0.9 and watch it
                     power through. Remember the marker arrows from Part II: blue is raw steepest
                     descent, red is the step actually taken — here the gap is momentum at work.
+                  </p>
+                {/if}
+                {#if c.name === 'Lion'}
+                  <p class="aside">
+                    Pick <strong>Lion</strong> and watch the marker move in equal-size hops, the
+                    same stride on a cliff or a flat — every other method takes smaller steps as it
+                    nears the bottom; Lion can’t. So it circles the minimum in a fixed ring instead
+                    of homing in. Chapter 8 turns that into a one-click lesson on why learning-rate
+                    schedules exist.
                   </p>
                 {/if}
               {/each}
@@ -945,9 +966,27 @@
                 around the true minimum, turning SGD’s restless buzzing into a soft landing. Decay isn’t
                 only about speed: under noise, it is <em>how a stochastic run converges at all.</em>
               </p>
+              <p>
+                One optimizer makes this visible with no noise at all. <strong>Lion</strong> (Chapter 6)
+                steps by the <em>sign</em> of its momentum, so every step is the same size ±γ — even on
+                the exact full-batch gradient it cannot take a smaller step as it nears the bottom. On
+                <strong>Constant</strong> it simply orbits the minimum in a ring of radius γ and never
+                lands. That makes it the purest illustration of why a schedule has to exist: bleed γ to
+                zero with <strong>Cosine</strong> and the ring closes to a point — the optimizer has no
+                other way to stop.
+              </p>
+              {#if scheduleExperiment}
+                <div class="opt-cta">
+                  <span>See it happen:</span>
+                  <button class="try-btn" on:click={() => runExperiment(scheduleExperiment)}>
+                    <Play size={13} strokeWidth={2.5} /><span>Watch Lion orbit, then land</span>
+                  </button>
+                </div>
+              {/if}
               <p class="look">
-                Try it: set a small batch so the loss settles into a fuzzy band on <strong>Const</strong>,
-                then switch to <strong>Cosine</strong> and watch the band pinch shut over the final steps.
+                Or with noise: set a small batch so the loss settles into a fuzzy band on
+                <strong>Const</strong>, then switch to <strong>Cosine</strong> and watch the band pinch
+                shut over the final steps.
               </p>
             </section>
 

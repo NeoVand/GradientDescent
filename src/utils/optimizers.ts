@@ -6,7 +6,7 @@
  * are generated from it) and a LaTeX update rule (the Formulas panel shows
  * the math for whichever optimizer is selected).
  *
- * State convention — one record fits all six methods:
+ * State convention — one record fits all seven methods:
  *   v: velocity (momentum family) or first-moment estimate (Adam)
  *   s: squared-gradient accumulator (AdaGrad) / EMA (RMSProp, Adam)
  *   t: step count (Adam bias correction)

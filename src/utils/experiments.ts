@@ -139,6 +139,35 @@ export const experiments: Experiment[] = [
     }
   },
   {
+    id: 'lion-schedule',
+    title: 'Why a schedule matters — Lion that won’t settle',
+    blurb:
+      'Lion steps by the sign of its momentum, so every step is the same size and it never shrinks — on a Constant schedule it orbits the minimum forever. Switch to Cosine and watch the ring close to a point.',
+    apply() {
+      applyProblem('gaussian-mixture');
+      applyOptimizer('lion');
+      // A larger-than-default γ makes the fixed-step orbit clearly visible.
+      // A FINITE run on Constant lets it ring around the minimum (the band never
+      // flatlines); the learner then switches to Cosine, where the schedule —
+      // which only applies to finite runs, not ∞ — bleeds γ away and lands it.
+      // (applyOptimizer set Lion's γ; override it after.)
+      trainingStore.update(s => ({
+        ...s,
+        learningRate: 0.15,
+        schedule: 'constant',
+        continuous: false,
+        totalSteps: 300,
+        stepsPerSecond: 60
+      }));
+      startTraining();
+      showCoach(
+        'info',
+        'Lion’s step is always ±γ — it can’t get smaller near the bottom, so it buzzes around the minimum in a fixed ring. Open Schedule → Cosine and Train again: as γ bleeds to zero the ring closes to a point. That’s what a schedule is for.',
+        16000
+      );
+    }
+  },
+  {
     id: 'marker-is-model',
     title: 'The marker IS the parameters',
     blurb:
