@@ -30,12 +30,13 @@ import CoursePanel from './components/CoursePanel.svelte';
   import { startTraining, stopTraining, stepOnce, resetRun, runEndStore, applyProblem } from './utils/trainer';
   import { startCourse, closeCourse } from './utils/lessons';
   import { applyUrlState, encodeStateUrl } from './utils/urlState';
-  import { Sun, Moon, Compass, Menu, X, Share2, GraduationCap, Maximize, Minimize } from 'lucide-svelte';
+  import { Sun, Moon, Compass, Menu, Share2, GraduationCap, Maximize, Minimize, Play, Pause } from 'lucide-svelte';
 
   // The main app orchestrates all our components and manages the overall layout.
   // We use CSS Grid for a responsive, flexible layout that adapts to different screen sizes.
 
   $: theme = $themeStore;
+  $: isTraining = $trainingStore.isTraining;
 
   let showHelpModal = false;
   let drawerOpen = false;
@@ -247,6 +248,21 @@ import CoursePanel from './components/CoursePanel.svelte';
     <Menu size={22} strokeWidth={2.5} />
   </button>
   <h1 class="topbar-title"><span class="topbar-mark">∂</span> <span class="topbar-name">Gradient Lab</span></h1>
+  <!-- Train straight from the main view: no need to open the controls drawer
+       (and miss the action happening behind it). Toggles start/pause. -->
+  <button
+    class="topbar-train"
+    class:training={isTraining}
+    on:click={() => (isTraining ? stopTraining() : startTraining())}
+    aria-label={isTraining ? 'Pause training' : 'Start training'}
+  >
+    {#if isTraining}
+      <Pause size={16} strokeWidth={2.5} />
+    {:else}
+      <Play size={16} strokeWidth={2.5} />
+    {/if}
+    <span>{isTraining ? 'Pause' : 'Train'}</span>
+  </button>
   <button class="topbar-btn" class:active={$courseStore.active} on:click={() => ($courseStore.active ? closeCourse() : startCourse())} aria-label="Course">
     <Compass size={20} strokeWidth={2.5} />
   </button>
@@ -269,10 +285,7 @@ import CoursePanel from './components/CoursePanel.svelte';
   <div class="app-container">
     <!-- Sidebar: in-grid on desktop, slide-in drawer on mobile -->
     <aside class="sidebar" class:drawer-open={drawerOpen}>
-      <button class="drawer-close" on:click={closeDrawer} aria-label="Close controls">
-        <X size={20} strokeWidth={2.5} />
-      </button>
-      <Sidebar />
+      <Sidebar onClose={closeDrawer} />
     </aside>
 
     {#if drawerOpen}
@@ -676,7 +689,6 @@ import CoursePanel from './components/CoursePanel.svelte';
   
   /* Mobile top bar: hidden on desktop */
   .mobile-topbar { display: none; }
-  .drawer-close { display: none; }
   .drawer-backdrop { display: none; }
 
   /* Responsive design for smaller screens */
@@ -773,6 +785,33 @@ import CoursePanel from './components/CoursePanel.svelte';
       color: #10b981;
     }
     .topbar-btn.active { color: #10b981; }
+
+    /* Green Train pill: the one primary action promoted out of the drawer so a
+       run can be started (and watched) from the main view. */
+    .topbar-train {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      height: 34px;
+      padding: 0 0.7rem;
+      margin-right: 0.15rem;
+      border: none;
+      border-radius: 9px;
+      background: #10b981;
+      color: #04130d;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.15s ease, transform 0.1s ease;
+    }
+    .topbar-train:active { transform: scale(0.95); }
+    .topbar-train.training {
+      background: var(--color-bg-tertiary, #1e293b);
+      color: #10b981;
+      box-shadow: inset 0 0 0 1.5px #10b981;
+    }
+
     /* The share popover drops from under the sticky bar on phones. */
     .share-popover {
       top: 3.1rem;
@@ -858,30 +897,12 @@ import CoursePanel from './components/CoursePanel.svelte';
       z-index: 100;
       border-radius: 0 16px 16px 0;
       box-shadow: 8px 0 24px rgba(0, 0, 0, 0.25);
-      padding: 3rem 0.75rem 0.75rem;
+      padding: 0.75rem;
       background-color: var(--color-bg-primary);
       overflow-y: auto;
     }
     .sidebar.drawer-open {
       transform: translateX(0);
-    }
-
-    .drawer-close {
-      display: flex;
-      position: absolute;
-      top: 0.625rem;
-      right: 0.625rem;
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-      border: 1px solid var(--color-border);
-      background: var(--color-bg-secondary);
-      color: var(--color-text-secondary);
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      padding: 0;
-      z-index: 1;
     }
 
     .drawer-backdrop {

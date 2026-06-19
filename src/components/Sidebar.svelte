@@ -56,8 +56,12 @@
     Brain,
     Timer,
     Shapes,
-    ClipboardPaste
+    ClipboardPaste,
+    PanelLeftClose
   } from 'lucide-svelte';
+
+  /** On mobile the sidebar is a drawer; this collapses it. Unset on desktop. */
+  export let onClose: (() => void) | null = null;
 
   // Compact labels for the schedule segmented control
   const SCHEDULE_LABELS: Record<ScheduleId, string> = {
@@ -432,6 +436,11 @@
     <h1>
       <span class="app-icon">∂</span>
       <span>Gradient Lab</span>
+      {#if onClose}
+        <button class="drawer-collapse" on:click={onClose} aria-label="Close controls">
+          <PanelLeftClose size={20} strokeWidth={2.25} />
+        </button>
+      {/if}
     </h1>
     <div class="sidebar-content" on:scroll={closeDropdowns}>
 
@@ -992,6 +1001,28 @@
     align-items: center;
     gap: 0.625rem;
     flex-shrink: 0;
+  }
+
+  /* Collapse-drawer control, pinned to the top-right of the header. Hidden on
+     desktop (the rail is always open); revealed only in the mobile drawer. */
+  .drawer-collapse {
+    display: none;
+    margin-left: auto;
+    width: 34px;
+    height: 34px;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 9px;
+    background: none;
+    color: var(--color-text-tertiary);
+    cursor: pointer;
+    padding: 0;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+  .drawer-collapse:active {
+    transform: scale(0.92);
+    color: #10b981;
   }
 
   .app-icon {
@@ -1797,5 +1828,6 @@
     .sidebar-stack { gap: 0.625rem; }
     .run-panel { height: auto; }
     .panel { padding: 0.75rem; }
+    .drawer-collapse { display: flex; }
   }
 </style>
