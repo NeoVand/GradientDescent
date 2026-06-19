@@ -688,18 +688,19 @@ import CoursePanel from './components/CoursePanel.svelte';
 
   /* ---------- Mobile (≤768px) ---------- */
   @media (max-width: 768px) {
+    /* Lock the page to the viewport and scroll INSIDE <main>, so the top bar
+       (menu + tools) stays pinned above the scroll area and is always reachable
+       — a sticky bar inside a body-scroll slid away on these layouts. */
     :global(html), :global(body) {
-      overflow: auto;
-      height: auto;
+      overflow: hidden;
+      height: 100dvh;
       overscroll-behavior-y: none;
     }
-    /* Svelte mounts everything inside <div id="app">, so the flex column
-       lives there — that lets <main> grow into the remaining viewport
-       after the sticky top bar. */
     :global(#app) {
       display: flex;
       flex-direction: column;
-      min-height: 100dvh;
+      height: 100dvh;
+      min-height: 0;
     }
 
     main {
@@ -707,8 +708,9 @@ import CoursePanel from './components/CoursePanel.svelte';
       display: flex;
       flex-direction: column;
       min-height: 0;
-      height: auto;
-      overflow: visible;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
     }
 
     /* Sticky top bar */
@@ -778,62 +780,64 @@ import CoursePanel from './components/CoursePanel.svelte';
       right: 0.5rem;
     }
 
-    /* Mobile is a flex column that fills the available viewport. Each plot
-       gets a flex-grow weight so they distribute the leftover space
-       proportionally — no empty room on tall phones, min-heights on short
-       ones. */
+    /* Mobile stacks the plots in a normally-scrolling column. Cramming all
+       three into one viewport (the old flex-grow approach) squeezed the data
+       plot until its axes clipped on shorter screens; instead each plot gets a
+       comfortable height sized to the phone's WIDTH (so the landscape stays
+       roughly square and the data scatter keeps a readable aspect) and the page
+       scrolls. Drags inside the plots don't scroll — those SVGs set
+       touch-action:none. */
     .app-container {
-      flex: 1 1 auto;
+      flex: 0 0 auto;
       display: flex;
       flex-direction: column;
-      min-height: 0;
       height: auto;
-      padding: 0.25rem 0.5rem 0.4rem;
-      gap: 0;
+      padding: 0.5rem 0.5rem calc(0.5rem + env(safe-area-inset-bottom));
+      gap: 0.5rem;
     }
 
     .main-content {
-      flex: 1 1 auto;
-      min-height: 0;
+      flex: 0 0 auto;
+      height: auto;
       display: flex;
       flex-direction: column;
-      gap: 0.25rem;
+      gap: 0.5rem;
     }
 
     .top-row {
-      flex: 1 1 auto;
-      min-height: 0;
+      flex: 0 0 auto;
+      height: auto;
       display: flex;
       flex-direction: column;
-      gap: 0.25rem;
+      gap: 0.5rem;
     }
 
     .bottom-row {
       flex: 0 0 auto;
       display: flex;
       flex-direction: column;
-      gap: 0;
+      gap: 0.5rem;
       height: auto;
     }
 
-    /* Plots flex-grow proportionally; landscape gets the most weight since
-       it's the most interactive viz. Min-heights keep them readable on
-       short phones. */
+    /* Data scatter: a touch shorter than wide reads well for the curve fit. */
     .data-viz-container {
-      flex: 4 1 0;
-      min-height: 180px;
+      flex: 0 0 auto;
+      height: min(72vw, 320px);
       padding: 0;
     }
 
+    /* Landscape is an α×β plane — keep it near-square so the heatmap and basin
+       map aren't distorted. */
     .loss-landscape-container {
-      flex: 6 1 0;
-      min-height: 240px;
+      flex: 0 0 auto;
+      height: min(94vw, 440px);
       padding: 0;
     }
 
     .loss-history-container {
       flex: 0 0 auto;
-      height: clamp(160px, 24vh, 220px);
+      height: min(52vw, 220px);
       padding: 0;
     }
 
