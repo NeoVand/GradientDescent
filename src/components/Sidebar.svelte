@@ -972,6 +972,9 @@
     overflow-y: auto;
     overflow-x: hidden;
     margin-top: calc(2px + 0.6 * var(--air));
+    /* Breathing room so the scrollbar floats clear of the controls instead of
+       touching the slider tracks and value labels. */
+    padding-right: 8px;
   }
 
   /* Custom scrollbar for sidebar */

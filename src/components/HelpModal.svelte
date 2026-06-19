@@ -98,6 +98,16 @@
     bodyEl?.querySelector(`section[data-ch="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  // Auto-hiding scrollbar for the TOC rail: flag it as scrolling, then clear
+  // the flag a beat after the last scroll event so the bar fades back out.
+  let tocScrolling = false;
+  let tocScrollTimer: ReturnType<typeof setTimeout> | undefined;
+  function onTocScroll() {
+    tocScrolling = true;
+    clearTimeout(tocScrollTimer);
+    tocScrollTimer = setTimeout(() => { tocScrolling = false; }, 700);
+  }
+
   // Reset to the top whenever the book is opened.
   let prevOpen = false;
   $: if (isOpen !== prevOpen) {
@@ -458,7 +468,7 @@
 
       <div class="reading-shell">
         <!-- ---------------- Table of contents rail ---------------- -->
-        <aside class="toc" aria-label="Table of contents">
+        <aside class="toc" class:scrolling={tocScrolling} on:scroll={onTocScroll} aria-label="Table of contents">
           <nav>
             {#each toc as t}
               {#if t.part}
@@ -1191,6 +1201,31 @@
     overflow-y: auto;
     padding: 1.1rem 0.65rem 1.5rem;
     background: rgba(0, 0, 0, 0.14);
+  }
+  /* WebKit (Chrome/Safari): a slim, themed bar that only paints its thumb
+     while the rail is being scrolled (or hovered, so it can still be grabbed).
+     NB: setting the standard scrollbar-width/-color here would make Chrome
+     ignore these pseudo rules, so Firefox is handled separately below. */
+  .toc::-webkit-scrollbar { width: 6px; }
+  .toc::-webkit-scrollbar-track { background: transparent; }
+  .toc::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 3px;
+    transition: background 0.25s ease;
+  }
+  .toc.scrolling::-webkit-scrollbar-thumb,
+  .toc:hover::-webkit-scrollbar-thumb {
+    background: rgba(16, 185, 129, 0.32);
+  }
+  .toc.scrolling::-webkit-scrollbar-thumb:hover,
+  .toc:hover::-webkit-scrollbar-thumb:hover {
+    background: rgba(16, 185, 129, 0.5);
+  }
+  /* Firefox has no ::-webkit-scrollbar; give it the same hidden-until-scrolling
+     treatment via the standard properties (scoped so Chrome keeps the rules above). */
+  @supports not selector(::-webkit-scrollbar) {
+    .toc { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+    .toc.scrolling, .toc:hover { scrollbar-color: rgba(16, 185, 129, 0.4) transparent; }
   }
   .toc nav { display: flex; flex-direction: column; gap: 1px; }
   .toc-part {
