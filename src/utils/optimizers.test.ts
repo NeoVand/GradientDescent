@@ -212,6 +212,20 @@ describe('optimizers', () => {
     expect(p.a - out.params.a).toBeLessThan(g.a); // gentle, not a raw γ·∇ leap
   });
 
+  it('sophia clips each coordinate step to γ·ρ when curvature is small', () => {
+    // With a large gradient over modest curvature, m/h blows past ρ, so the clip
+    // caps the per-axis move at γ·ρ no matter how big the gradient is.
+    const opt = optimizers.sophia;
+    const hyper = defaultHyper('sophia');
+    for (const scale of [10, 100, 1000]) {
+      const out = opt.step({ a: 5, b: -5 }, { a: scale, b: -scale }, opt.init(), 0.1, hyper, {
+        hessian: { h11: 2, h12: 0, h22: 2 }
+      });
+      expect(Math.abs(out.params.a - 5)).toBeCloseTo(0.1 * hyper.rho, 9);
+      expect(Math.sign(out.params.a - 5)).toBe(-1); // still downhill
+    }
+  });
+
   it('state is not mutated in place', () => {
     for (const id of Object.keys(optimizers) as OptimizerId[]) {
       const opt = optimizers[id];

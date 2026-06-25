@@ -15,7 +15,7 @@
 import type { ModelParameters } from '../types/types';
 import { newtonStep, isPositiveDefinite, type Hessian2 } from './hessian';
 
-export type OptimizerId = 'gd' | 'momentum' | 'nesterov' | 'adagrad' | 'rmsprop' | 'adadelta' | 'adam' | 'nadam' | 'adamw' | 'radam' | 'newton' | 'lion';
+export type OptimizerId = 'gd' | 'momentum' | 'nesterov' | 'adagrad' | 'rmsprop' | 'adadelta' | 'adam' | 'nadam' | 'adamw' | 'radam' | 'newton' | 'sophia' | 'lion';
 
 export interface OptimizerState {
   v: ModelParameters;
@@ -520,6 +520,76 @@ export const newton: Optimizer = {
   }
 };
 
+// Sophia (Liu et al., 2023) — Newton's curvature idea, cut down until it fits a
+// real training loop. The full N×N Hessian is hopeless at scale, so Sophia
+// keeps only its DIAGONAL — one curvature number per parameter, no matrix to
+// invert — and preconditions the momentum by it. The trick that makes that
+// safe is the CLIP: every coordinate's update is capped at ±ρ, so where the
+// diagonal curvature is tiny or noisy (and m/h would explode) the step is
+// bounded, while trustworthy directions stay curvature-scaled. It trained
+// GPT-class models ~2× faster than Adam by step count. State: v = momentum,
+// s = EMA of the diagonal Hessian.
+const SOPHIA_EPS = 1e-2;
+const SOPHIA_BETA2 = 0.99; // Hessian-EMA decay — kept internal, rarely tuned
+
+const SOPHIA_BETA1: HyperparamSpec = {
+  key: 'beta1',
+  label: 'Momentum decay',
+  symbol: 'β₁',
+  min: 0,
+  max: 0.999,
+  step: 0.001,
+  default: 0.9,
+  hint: 'EMA rate of the gradient (first moment).'
+};
+
+const SOPHIA_RHO: HyperparamSpec = {
+  key: 'rho',
+  label: 'Clip',
+  symbol: 'ρ',
+  min: 0.02,
+  max: 2,
+  step: 0.01,
+  default: 0.5,
+  hint: 'Per-coordinate step cap. Small ρ = very cautious — Sophia’s guard against bad curvature estimates.'
+};
+
+export const sophia: Optimizer = {
+  id: 'sophia',
+  name: 'Sophia',
+  description: 'Diagonal curvature, with clipped steps',
+  updateRuleLatex: String.raw`\mathbf{m} \leftarrow \beta_1\mathbf{m} + (1{-}\beta_1)\nabla \mathcal{L}, \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\,\operatorname{clip}\!\left(\frac{\mathbf{m}}{\max(\mathbf{h},\varepsilon)},\,\rho\right)`,
+  hyperparams: [SOPHIA_BETA1, SOPHIA_RHO],
+  fixedLearningRate: 0.1,
+  usesHessian: true,
+  init: initState,
+  step(params, g, state, lr, hyper, ctx) {
+    const b1 = hyper.beta1 ?? SOPHIA_BETA1.default;
+    const rho = hyper.rho ?? SOPHIA_RHO.default;
+    const hess = ctx?.hessian;
+    // Diagonal Hessian, clamped non-negative (negative curvature is no bowl to
+    // descend). With no Hessian supplied, fall back to gradient² ≈ a crude
+    // diagonal estimate so the method still moves.
+    const hDiagA = hess ? Math.max(hess.h11, 0) : g.a * g.a;
+    const hDiagB = hess ? Math.max(hess.h22, 0) : g.b * g.b;
+    const m = {
+      a: b1 * state.v.a + (1 - b1) * g.a,
+      b: b1 * state.v.b + (1 - b1) * g.b
+    };
+    const h = {
+      a: SOPHIA_BETA2 * state.s.a + (1 - SOPHIA_BETA2) * hDiagA,
+      b: SOPHIA_BETA2 * state.s.b + (1 - SOPHIA_BETA2) * hDiagB
+    };
+    const clip = (z: number) => Math.max(-rho, Math.min(rho, z));
+    const ua = clip(m.a / Math.max(h.a, SOPHIA_EPS));
+    const ub = clip(m.b / Math.max(h.b, SOPHIA_EPS));
+    return {
+      params: { a: params.a - lr * ua, b: params.b - lr * ub },
+      state: { v: m, s: h, t: state.t + 1 }
+    };
+  }
+};
+
 // Lion (Chen et al., 2023) — "EvoLved Sign Momentum". The update direction is
 // the SIGN of a momentum/gradient blend, so every step has the SAME magnitude γ
 // on each axis no matter how steep the slope. That makes it strikingly distinct
@@ -593,6 +663,7 @@ export const optimizers: Record<OptimizerId, Optimizer> = {
   adamw,
   radam,
   newton,
+  sophia,
   lion
 };
 
@@ -608,7 +679,7 @@ export const optimizerGroups: { label: string; ids: OptimizerId[] }[] = [
   { label: 'Adaptive rates', ids: ['adagrad', 'rmsprop', 'adadelta'] },
   { label: 'Adam family', ids: ['adam', 'nadam', 'adamw', 'radam'] },
   { label: 'Sign-based', ids: ['lion'] },
-  { label: 'Second-order', ids: ['newton'] }
+  { label: 'Second-order', ids: ['newton', 'sophia'] }
 ];
 
 export const optimizerOrder: OptimizerId[] = optimizerGroups.flatMap(g => g.ids);

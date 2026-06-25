@@ -283,6 +283,16 @@
       formula: String.raw`\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \mathbf{H}^{-1}\nabla \mathcal{L}`,
       fix: 'curvature-aware: one step to the bottom of any true bowl',
       brk: 'the N×N Hessian is hopeless at scale — and it stumbles on saddles'
+    },
+    {
+      year: '2023',
+      name: 'Sophia',
+      by: 'Liu et al. — Newton, cut down to fit an LLM',
+      idea:
+        'Newton’s curvature is unbeatable and unaffordable; Sophia keeps the affordable part. Drop the full Hessian for just its DIAGONAL — one curvature number per parameter, no matrix to invert — and precondition the momentum by it. Then the safety move: CLIP every coordinate’s step to ±ρ. Where the diagonal estimate is tiny or noisy (and m/h would blow up) the clip bounds the move; where it’s solid, the step stays curvature-scaled. Light enough that it trained GPT-class models roughly twice as fast as Adam by step count — second-order thinking that actually ships.',
+      formula: String.raw`\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\,\operatorname{clip}\!\left(\frac{\mathbf{m}}{\max(\mathbf{h},\varepsilon)},\,\rho\right)`,
+      fix: 'diagonal curvature + a clip — second-order on a budget',
+      brk: 'only the diagonal: blind to the off-axis stretch Newton corrects'
     }
   ];
 
