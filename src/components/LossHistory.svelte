@@ -35,8 +35,15 @@
   $: history = $historyStore;
   $: currentStep = $trainingStore.currentStep;
   $: schedule = $trainingStore.schedule;
+  $: scheduleSpeed = $trainingStore.scheduleSpeed;
+  $: continuous = $trainingStore.continuous;
+  $: totalSteps = $trainingStore.totalSteps;
   $: theme = $themeStore;
-  $: if (svgElement && schedule) drawChart();
+  // Reshape the γ(t) curve whenever ANY schedule control changes — its id, the
+  // decay speed, the run length, or the continuous toggle — not only when a new
+  // history point lands. (drawChart reads these live; this just triggers it.)
+  $: scheduleKey = `${schedule}:${scheduleSpeed}:${continuous}:${totalSteps}`;
+  $: if (svgElement && scheduleKey) drawChart();
   
   // Redraw when history updates
   $: if (svgElement && history) {
@@ -95,6 +102,15 @@
     const windowSize = 500; // Show last 500 steps
     const maxStep = Math.max(...history.map(d => d.step));
     const minStep = Math.max(0, maxStep - windowSize);
+
+    // With a decaying schedule, widen the view to the full run horizon so its
+    // γ(t) curve is fully visible and reshapes live with the Decay-speed slider,
+    // instead of hugging only the steps trained so far. The loss curve then
+    // grows into the frame as the run proceeds.
+    const runStart = $runStartStep;
+    const runT = $trainingStore.totalSteps;
+    const scheduleActive = schedule !== 'constant' && !$trainingStore.continuous;
+    const horizonMax = scheduleActive ? Math.max(maxStep, runStart + runT) : maxStep;
     
     // Filter data to window
     const windowedHistory = history.filter(d => d.step >= minStep);
@@ -106,11 +122,11 @@
     // Add padding to prevent edge bleeding (especially important for stroke width)
     const lossRange = maxLoss - minLoss;
     const lossPadding = lossRange * 0.08;  // 8% padding
-    const stepPadding = Math.max((maxStep - minStep) * 0.02, 1);  // 2% padding or at least 1 step
+    const stepPadding = Math.max((horizonMax - minStep) * 0.02, 1);  // 2% padding or at least 1 step
 
     // Create scales with sliding window and padding
     const xScale = d3.scaleLinear()
-      .domain([minStep - stepPadding, Math.max(maxStep, minStep + 10) + stepPadding])
+      .domain([minStep - stepPadding, Math.max(horizonMax, minStep + 10) + stepPadding])
       .range([0, innerWidth]);
 
     // Log scale clamps to the smallest positive loss in view (zero can't be
@@ -282,16 +298,18 @@
     // γ(t) hairline: the schedule's shape over this run, drawn in a thin
     // band along the top of the plot (shape is what matters, not scale).
     // A continuous (∞) run holds γ constant, so no decay curve is drawn.
-    if (schedule !== 'constant' && !$trainingStore.continuous) {
+    if (scheduleActive) {
       const sched = schedules[schedule];
-      const T = $trainingStore.totalSteps;
+      const T = runT;
       const speed = $trainingStore.scheduleSpeed;
-      const start = $runStartStep;
+      const start = runStart;
       const bandTop = 6;
       const bandH = innerHeight * 0.18;
       const pts: { step: number; f: number }[] = [];
-      const lo = Math.max(minStep, 0);
-      const hi = Math.max(maxStep, lo + 1);
+      // Draw the whole run [start, start+T] so the decay shape is always fully
+      // visible (clamped to the left edge of the window for very long runs).
+      const lo = Math.max(start, minStep);
+      const hi = Math.max(start + T, lo + 1);
       const n = 80;
       for (let k = 0; k <= n; k++) {
         const s = lo + (k / n) * (hi - lo);
