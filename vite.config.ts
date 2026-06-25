@@ -21,7 +21,7 @@ export default defineConfig({
         name: 'Gradient Lab',
         short_name: 'Gradient Lab',
         description:
-          'Interactive playground for learning gradient-based optimization: loss landscapes in 1D/2D/3D, six optimizers, races, basins of attraction, and a built-in course.',
+          'Interactive playground for learning gradient-based optimization: loss landscapes in 1D/2D/3D, fourteen optimizers, races, basins of attraction, and a built-in course.',
         theme_color: '#0a1218',
         background_color: '#0a1218',
         display: 'standalone',

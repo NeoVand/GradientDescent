@@ -16,7 +16,8 @@
     Activity, Mountain, TrendingUp, TrendingDown, Percent, Waves,
     Target, Radio, ScatterChart, Brain,
     Compass, Rocket, Zap,
-    BookOpen, FlaskConical, Layers, Map, Play, Pause, RotateCcw, Keyboard
+    BookOpen, FlaskConical, Layers, Map, Play, Pause, RotateCcw, Keyboard,
+    FileText
   } from 'lucide-svelte';
   import katex from 'katex';
   import 'katex/dist/katex.min.css';
@@ -307,6 +308,107 @@
       brk: 'the estimate only climbs, so a bad early ramp can overshoot'
     }
   ];
+
+  // Citations + inventor portraits, keyed by optimizer name so the optTree
+  // cards stay readable. Portraits are placeholders (initials) until real
+  // images are dropped into /public/inventors/ at the paths below.
+  type Cite = { wiki?: string; paper?: string; cite?: string; person?: string; img?: string };
+  const OPT_CITE: Record<string, Cite> = {
+    'Gradient Descent': {
+      wiki: 'https://en.wikipedia.org/wiki/Gradient_descent',
+      person: 'Augustin-Louis Cauchy',
+      img: '/inventors/cauchy.jpg'
+    },
+    'The moving average': {
+      wiki: 'https://en.wikipedia.org/wiki/Exponential_smoothing'
+    },
+    Momentum: {
+      wiki: 'https://en.wikipedia.org/wiki/Stochastic_gradient_descent#Momentum',
+      paper: 'https://doi.org/10.1016/0041-5553(64)90137-5',
+      cite: 'Polyak, 1964',
+      person: 'Boris Polyak',
+      img: '/inventors/polyak.jpg'
+    },
+    Nesterov: {
+      wiki: 'https://en.wikipedia.org/wiki/Stochastic_gradient_descent#Momentum',
+      person: 'Yurii Nesterov',
+      img: '/inventors/nesterov.jpg'
+    },
+    AdaGrad: {
+      wiki: 'https://en.wikipedia.org/wiki/Stochastic_gradient_descent#AdaGrad',
+      paper: 'https://jmlr.org/papers/v12/duchi11a.html',
+      cite: 'Duchi et al., 2011',
+      person: 'John Duchi',
+      img: '/inventors/duchi.jpg'
+    },
+    RMSProp: {
+      wiki: 'https://en.wikipedia.org/wiki/Stochastic_gradient_descent#RMSProp',
+      paper: 'https://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf',
+      cite: 'Hinton, 2012',
+      person: 'Geoffrey Hinton',
+      img: '/inventors/hinton.jpg'
+    },
+    AdaDelta: {
+      paper: 'https://arxiv.org/abs/1212.5701',
+      cite: 'arXiv:1212.5701',
+      person: 'Matthew Zeiler',
+      img: '/inventors/zeiler.jpg'
+    },
+    Adam: {
+      wiki: 'https://en.wikipedia.org/wiki/Stochastic_gradient_descent#Adam',
+      paper: 'https://arxiv.org/abs/1412.6980',
+      cite: 'arXiv:1412.6980',
+      person: 'Diederik Kingma',
+      img: '/inventors/kingma.jpg'
+    },
+    Nadam: {
+      paper: 'https://www.semanticscholar.org/paper/d44efdc542f2cc5e196f04bc76bc783bfd7084af',
+      cite: 'Dozat, 2016',
+      person: 'Timothy Dozat',
+      img: '/inventors/dozat.jpg'
+    },
+    AdamW: {
+      paper: 'https://arxiv.org/abs/1711.05101',
+      cite: 'arXiv:1711.05101',
+      person: 'Ilya Loshchilov',
+      img: '/inventors/loshchilov.jpg'
+    },
+    RAdam: {
+      paper: 'https://arxiv.org/abs/1908.03265',
+      cite: 'arXiv:1908.03265',
+      person: 'Liyuan Liu',
+      img: '/inventors/liu-radam.jpg'
+    },
+    Lion: {
+      paper: 'https://arxiv.org/abs/2302.06675',
+      cite: 'arXiv:2302.06675',
+      person: 'Xiangning Chen',
+      img: '/inventors/chen-lion.jpg'
+    },
+    Newton: {
+      wiki: 'https://en.wikipedia.org/wiki/Newton%27s_method_in_optimization',
+      person: 'Isaac Newton',
+      img: '/inventors/newton.jpg'
+    },
+    Sophia: {
+      paper: 'https://arxiv.org/abs/2305.14342',
+      cite: 'arXiv:2305.14342',
+      person: 'Hong Liu',
+      img: '/inventors/liu-sophia.jpg'
+    },
+    Prodigy: {
+      paper: 'https://arxiv.org/abs/2306.06101',
+      cite: 'arXiv:2306.06101',
+      person: 'Konstantin Mishchenko',
+      img: '/inventors/mishchenko.jpg'
+    }
+  };
+  // Two-letter monogram for the portrait placeholder (first + last initial).
+  function initials(name: string): string {
+    const parts = name.replace(/[^A-Za-z\s]/g, ' ').trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
 
   const raceExperiment = experiments.find(e => e.id === 'banana-race');
   const scheduleExperiment = experiments.find(e => e.id === 'lion-schedule');
@@ -999,11 +1101,22 @@
                 {#if c.act}
                   <div class="opt-act"><span class="act-no">{c.act.no}</span><span class="act-title">{c.act.title}</span></div>
                 {/if}
+                {@const cite = OPT_CITE[c.name]}
                 <div class="opt-card" class:prereq-card={c.prereq}>
-                  <div class="opt-head">
-                    <span class="opt-year">{c.year}</span>
-                    <span class="opt-name">{c.name}</span>
-                    <span class="opt-by">{c.by}</span>
+                  <div class="opt-top">
+                    <div class="opt-head">
+                      <span class="opt-year">{c.year}</span>
+                      <span class="opt-name">{c.name}</span>
+                      <span class="opt-by">{c.by}</span>
+                    </div>
+                    {#if cite?.person}
+                      <div class="opt-portrait" title={cite.person}>
+                        <span class="opt-portrait-ph" aria-hidden="true">{initials(cite.person)}</span>
+                        {#if cite.img}
+                          <img class="opt-portrait-img" src={cite.img} alt={cite.person} loading="lazy" on:error={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')} />
+                        {/if}
+                      </div>
+                    {/if}
                   </div>
                   <p class="opt-idea">{c.idea}</p>
                   <div class="opt-formula">{@html tex(c.formula)}</div>
@@ -1011,6 +1124,21 @@
                     <div class="opt-foot">
                       {#if c.fix}<span class="opt-fix">✓ {c.fix}</span>{/if}
                       {#if c.brk}<span class="opt-break">✗ {c.brk}</span>{/if}
+                    </div>
+                  {/if}
+                  {#if cite?.wiki || cite?.paper}
+                    <div class="opt-cite">
+                      {#if cite.person}<span class="opt-cite-who">{cite.person}</span>{/if}
+                      {#if cite.wiki}
+                        <a class="opt-cite-link" href={cite.wiki} target="_blank" rel="noopener noreferrer">
+                          <BookOpen size={11} strokeWidth={2.2} /> Wikipedia
+                        </a>
+                      {/if}
+                      {#if cite.paper}
+                        <a class="opt-cite-link" href={cite.paper} target="_blank" rel="noopener noreferrer">
+                          <FileText size={11} strokeWidth={2.2} /> {cite.cite ?? 'Paper'}
+                        </a>
+                      {/if}
                     </div>
                   {/if}
                 </div>
@@ -1802,7 +1930,48 @@
     margin-bottom: 0.65rem;
   }
   .opt-card.prereq-card { border-style: dashed; }
-  .opt-head { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.3rem; }
+  /* Head row + inventor portrait sit side by side; the portrait holds the top
+     right corner of each card. */
+  .opt-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.85rem; }
+  .opt-head { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.3rem; }
+  .opt-portrait {
+    flex-shrink: 0;
+    position: relative;
+    width: 50px; height: 50px;
+  }
+  .opt-portrait-ph {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    background: rgba(16, 185, 129, 0.12);
+    color: #10b981;
+    font-family: 'SF Mono', Monaco, monospace;
+    font-weight: 700; font-size: 0.95rem;
+    border: 1px solid var(--color-border);
+  }
+  .opt-portrait-img {
+    position: absolute; inset: 0; z-index: 1;
+    width: 100%; height: 100%;
+    object-fit: cover; border-radius: 50%;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-secondary);
+  }
+  /* Citation footer: who + Wikipedia + paper, on a hairline rule. */
+  .opt-cite {
+    display: flex; align-items: center; gap: 0.4rem 0.9rem; flex-wrap: wrap;
+    margin-top: 0.6rem; padding-top: 0.5rem;
+    border-top: 1px solid var(--color-border);
+  }
+  .opt-cite-who { font-size: 0.72rem; color: var(--color-text-tertiary); font-style: italic; margin-right: auto; }
+  .opt-cite-link {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    font-size: 0.72rem; font-weight: 600;
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+  .opt-cite-link:hover { color: #10b981; }
+  .opt-cite-link :global(svg) { opacity: 0.75; }
   .opt-year {
     font-family: 'SF Mono', Monaco, monospace;
     font-size: 0.625rem; font-weight: 800;
