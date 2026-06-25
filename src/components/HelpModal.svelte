@@ -293,6 +293,17 @@
       formula: String.raw`\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\,\operatorname{clip}\!\left(\frac{\mathbf{m}}{\max(\mathbf{h},\varepsilon)},\,\rho\right)`,
       fix: 'diagonal curvature + a clip — second-order on a budget',
       brk: 'only the diagonal: blind to the off-axis stretch Newton corrects'
+    },
+    {
+      act: { no: 'Branch', title: 'Tune itself' },
+      year: '2024',
+      name: 'Prodigy',
+      by: 'Mishchenko & Defazio — the learning rate, removed',
+      idea:
+        'Every method so far still made you pick γ. This branch deletes that last knob. The insight: the ideal step size is set by how far the start is from the solution — a distance d. You don’t know d, so Prodigy estimates it live, ramping a tiny seed upward from how the gradients line up with how far you’ve already travelled (⟨g, x₀−x⟩), and scales an Adam step by it. Set nothing and watch the marker creep, then accelerate as d finds its level — the learning rate, discovered rather than tuned. Parameter-free methods like this won the 2024 self-tuning optimization challenge.',
+      formula: String.raw`d_{t+1} = \max\!\left(d_t,\, \frac{r_{t+1}}{\lVert \mathbf{s}_{t+1}\rVert_1}\right), \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, d_t\,\frac{\mathbf{m}}{\sqrt{\mathbf{v}} + d_t\varepsilon}`,
+      fix: 'no learning rate to choose — it finds its own',
+      brk: 'the estimate only climbs, so a bad early ramp can overshoot'
     }
   ];
 

@@ -15,12 +15,17 @@
 import type { ModelParameters } from '../types/types';
 import { newtonStep, isPositiveDefinite, type Hessian2 } from './hessian';
 
-export type OptimizerId = 'gd' | 'momentum' | 'nesterov' | 'adagrad' | 'rmsprop' | 'adadelta' | 'adam' | 'nadam' | 'adamw' | 'radam' | 'newton' | 'sophia' | 'lion';
+export type OptimizerId = 'gd' | 'momentum' | 'nesterov' | 'adagrad' | 'rmsprop' | 'adadelta' | 'adam' | 'nadam' | 'adamw' | 'radam' | 'newton' | 'sophia' | 'lion' | 'prodigy';
 
 export interface OptimizerState {
   v: ModelParameters;
   s: ModelParameters;
   t: number;
+  // --- Prodigy (parameter-free) bookkeeping; untouched by every other method ---
+  d?: number; // running distance-to-solution estimate (its self-tuned rate)
+  rNum?: number; // scalar numerator accumulator for d̂
+  sDen?: ModelParameters; // vector denominator accumulator for d̂
+  x0?: ModelParameters; // reference starting point, anchored on the first step
 }
 
 /**
@@ -651,6 +656,86 @@ export const lion: Optimizer = {
   }
 };
 
+// Prodigy (Mishchenko & Defazio, 2024) — the parameter-FREE branch: an Adam
+// that estimates its OWN learning rate, so there is nothing to tune. The idea
+// (from D-Adaptation) is to track d, a running lower bound on the distance from
+// where you started to the solution; the right step size is about that
+// distance, so once you know d you know your rate. Prodigy ramps d up from a
+// tiny seed using how the gradients correlate with how far you've already
+// travelled (⟨g, x₀−x⟩), and scales an Adam step by it. Watch the marker creep,
+// then accelerate as d finds its level — the learning rate, discovered live.
+// State: v = momentum m, s = second moment, plus d / r / s-accumulator / x₀.
+const PRODIGY_D0 = 1e-6;
+
+const PRODIGY_BETA1: HyperparamSpec = {
+  key: 'beta1',
+  label: 'Momentum decay',
+  symbol: 'β₁',
+  min: 0,
+  max: 0.999,
+  step: 0.001,
+  default: 0.9,
+  hint: 'EMA rate of the gradient (first moment).'
+};
+
+const PRODIGY_BETA2: HyperparamSpec = {
+  key: 'beta2',
+  label: 'Scale decay',
+  symbol: 'β₂',
+  min: 0.8,
+  max: 0.9999,
+  step: 0.0001,
+  default: 0.999,
+  hint: 'EMA rate of the squared gradient, and of the distance accumulators.'
+};
+
+export const prodigy: Optimizer = {
+  id: 'prodigy',
+  name: 'Prodigy',
+  description: 'Parameter-free: estimates its own learning rate',
+  updateRuleLatex: String.raw`d_{t+1} = \max\!\left(d_t,\, \frac{r_{t+1}}{\lVert \mathbf{s}_{t+1}\rVert_1}\right), \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, d_t\,\frac{\mathbf{m}}{\sqrt{\mathbf{v}} + d_t\varepsilon}`,
+  hyperparams: [PRODIGY_BETA1, PRODIGY_BETA2],
+  // Prodigy supplies its own rate via d; γ is just a base multiplier (leave 1).
+  fixedLearningRate: 1.0,
+  init: initState,
+  step(params, g, state, lr, hyper) {
+    const b1 = hyper.beta1 ?? PRODIGY_BETA1.default;
+    const b2 = hyper.beta2 ?? PRODIGY_BETA2.default;
+    const sb2 = Math.sqrt(b2);
+    const d = state.d ?? PRODIGY_D0;
+    const x0 = state.x0 ?? params; // first step after a reset anchors the start
+    const rPrev = state.rNum ?? 0;
+    const sPrev = state.sDen ?? zero();
+    // Adam-style moments, but each gradient is weighted by the distance d.
+    const m = {
+      a: b1 * state.v.a + (1 - b1) * d * g.a,
+      b: b1 * state.v.b + (1 - b1) * d * g.b
+    };
+    const vv = {
+      a: b2 * state.s.a + (1 - b2) * d * d * g.a * g.a,
+      b: b2 * state.s.b + (1 - b2) * d * d * g.b * g.b
+    };
+    // Distance estimate: numerator from ⟨g, x₀−x⟩ (how far we've travelled),
+    // denominator from the accumulated gradient. d only ever grows.
+    const dot = g.a * (x0.a - params.a) + g.b * (x0.b - params.b);
+    const rNum = sb2 * rPrev + (1 - sb2) * lr * d * d * dot;
+    const sDen = {
+      a: sb2 * sPrev.a + (1 - sb2) * lr * d * d * g.a,
+      b: sb2 * sPrev.b + (1 - sb2) * lr * d * d * g.b
+    };
+    const sL1 = Math.abs(sDen.a) + Math.abs(sDen.b);
+    const dNext = Math.max(d, sL1 > 0 ? rNum / sL1 : d);
+    // The step uses the CURRENT d (per the algorithm), and the d's in m/√v cancel.
+    return {
+      params: {
+        a: params.a - (lr * d * m.a) / (Math.sqrt(vv.a) + d * EPS),
+        b: params.b - (lr * d * m.b) / (Math.sqrt(vv.b) + d * EPS)
+      },
+      state: { v: m, s: vv, t: state.t + 1, d: dNext, rNum, sDen, x0 }
+    };
+  }
+};
+
 export const optimizers: Record<OptimizerId, Optimizer> = {
   gd: gradientDescent,
   momentum,
@@ -664,7 +749,8 @@ export const optimizers: Record<OptimizerId, Optimizer> = {
   radam,
   newton,
   sophia,
-  lion
+  lion,
+  prodigy
 };
 
 /**
@@ -679,7 +765,8 @@ export const optimizerGroups: { label: string; ids: OptimizerId[] }[] = [
   { label: 'Adaptive rates', ids: ['adagrad', 'rmsprop', 'adadelta'] },
   { label: 'Adam family', ids: ['adam', 'nadam', 'adamw', 'radam'] },
   { label: 'Sign-based', ids: ['lion'] },
-  { label: 'Second-order', ids: ['newton', 'sophia'] }
+  { label: 'Second-order', ids: ['newton', 'sophia'] },
+  { label: 'Parameter-free', ids: ['prodigy'] }
 ];
 
 export const optimizerOrder: OptimizerId[] = optimizerGroups.flatMap(g => g.ids);

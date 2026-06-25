@@ -50,7 +50,7 @@ describe('optimizers', () => {
       const lr =
         id === 'gd' || id === 'momentum' || id === 'nesterov'
           ? 0.05
-          : id === 'adadelta'
+          : id === 'adadelta' || id === 'prodigy'
             ? 1.0
             : 0.1;
       const end = f(run(id, 50, lr));
@@ -224,6 +224,26 @@ describe('optimizers', () => {
       expect(Math.abs(out.params.a - 5)).toBeCloseTo(0.1 * hyper.rho, 9);
       expect(Math.sign(out.params.a - 5)).toBe(-1); // still downhill
     }
+  });
+
+  it('prodigy tunes its own rate: tiny first steps that grow as d ramps up', () => {
+    // From d ≈ 1e-6 the first step is microscopic; as Prodigy estimates the
+    // distance to the solution, d climbs and the steps grow — a learning rate
+    // discovered at run time, with no γ to set.
+    const opt = optimizers.prodigy;
+    let p: ModelParameters = { a: 1.5, b: -2.0 };
+    let state = opt.init();
+    const mags: number[] = [];
+    for (let i = 0; i < 20; i++) {
+      const prev = p;
+      const out = opt.step(p, grad(p), state, 1.0, defaultHyper('prodigy'));
+      p = out.params;
+      state = out.state;
+      mags.push(Math.hypot(p.a - prev.a, p.b - prev.b));
+    }
+    expect(mags[0]).toBeLessThan(1e-3); // d0 ≈ 1e-6 → microscopic opening step
+    expect(mags[19]).toBeGreaterThan(mags[0]); // steps grew as d ramped
+    expect(state.d).toBeGreaterThan(1e-3); // d climbed off its seed
   });
 
   it('state is not mutated in place', () => {
