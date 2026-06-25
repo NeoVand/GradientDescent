@@ -229,6 +229,7 @@
   $: currentStep = $trainingStore.currentStep;
   $: batchSize = $trainingStore.batchSize;
   $: schedule = $trainingStore.schedule;
+  $: scheduleSpeed = $trainingStore.scheduleSpeed;
   $: stepsPerSecond = $trainingStore.stepsPerSecond;
   $: isTraining = $trainingStore.isTraining;
   $: optimizerSel = $optimizerStore;
@@ -402,7 +403,8 @@
     points: '#3b82f6',
     batch: '#22d3ee',
     steps: '#10b981',
-    speed: '#94a3b8'
+    speed: '#94a3b8',
+    decay: '#f59e0b' // schedule decay speed: amber, the "annealing" warmth
   };
 
   function handleLrSlider(e: Event) {
@@ -772,6 +774,33 @@
         {/each}
       </div>
     </div>
+
+    <!-- Decay speed: how fast the schedule anneals γ. Only meaningful for a
+         decaying schedule on a finite run, so it appears with one. -->
+    {#if schedule !== 'constant' && !continuous}
+      <div class="ctl">
+        <div class="row">
+          <span class="icon"><Gauge size={16} strokeWidth={2} /></span>
+          <span class="row-label">Decay speed</span>
+          <button class="info-btn" aria-label="About decay speed" use:tooltip={'How fast the schedule anneals γ<br/><span style="opacity:0.8;font-size:0.7rem">1× spreads the decay across the whole run; turn it up to make the schedule bite within a short run.</span>'}>
+            <Info size={13} strokeWidth={2} />
+          </button>
+          <div class="row-spring"></div>
+          <span class="row-value" style="color: {SLIDER_COLORS.decay}">{scheduleSpeed.toFixed(1)}×</span>
+        </div>
+        <input
+          id="schedule-speed"
+          class="hyper-slider"
+          type="range"
+          min="0.5"
+          max="10"
+          step="0.5"
+          value={scheduleSpeed}
+          style="--fill: {((scheduleSpeed - 0.5) / 9.5) * 100}%; --slider-color: {SLIDER_COLORS.decay}"
+          on:input={(e) => trainingStore.update(s => ({ ...s, scheduleSpeed: parseFloat(e.currentTarget.value) }))}
+        />
+      </div>
+    {/if}
 
     <!-- Batch Size -->
     <div class="ctl">

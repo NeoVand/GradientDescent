@@ -1078,6 +1078,14 @@
                 throttle, and it is now standard practice for training large models from scratch.
               </p>
               <p>
+                One practical wrinkle: these shapes were drawn for runs of thousands of steps, so across a
+                short run here the decay can be too gentle to even see. The <strong>Decay speed</strong>
+                slider — it appears whenever a non-constant schedule is active — fixes that: it compresses
+                the whole schedule into a fraction of the run, so at <em>4×</em> the curve finishes
+                annealing a quarter of the way in. Turn it up to watch a schedule actually bite within the
+                steps you have, and read the result off the dotted γ(t) line in the loss chart.
+              </p>
+              <p>
                 There is a deeper reason the late shrink matters, and it is the noise ball from Chapter 7.
                 That ball’s radius scales with γ — so a γ annealing toward zero draws the orbit in tight
                 around the true minimum, turning SGD’s restless buzzing into a soft landing. Decay isn’t

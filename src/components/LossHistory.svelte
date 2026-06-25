@@ -285,6 +285,7 @@
     if (schedule !== 'constant' && !$trainingStore.continuous) {
       const sched = schedules[schedule];
       const T = $trainingStore.totalSteps;
+      const speed = $trainingStore.scheduleSpeed;
       const start = $runStartStep;
       const bandTop = 6;
       const bandH = innerHeight * 0.18;
@@ -294,7 +295,7 @@
       const n = 80;
       for (let k = 0; k <= n; k++) {
         const s = lo + (k / n) * (hi - lo);
-        pts.push({ step: s, f: sched.factor(Math.max(0, s - start), T) });
+        pts.push({ step: s, f: sched.factor(Math.max(0, s - start) * speed, T) });
       }
       const schedLine = d3.line<{ step: number; f: number }>()
         .x(d => xScale(d.step))

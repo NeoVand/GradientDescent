@@ -26,7 +26,7 @@ export function previewNextStep(
 ): ModelParameters | null {
   if (!grad || !Number.isFinite(grad.a) || !Number.isFinite(grad.b)) return null;
   const tInRun = Math.max(0, t.currentStep - runStart);
-  const effLr = t.learningRate * schedules[t.schedule].factor(tInRun, t.totalSteps);
+  const effLr = t.learningRate * schedules[t.schedule].factor(tInRun * t.scheduleSpeed, t.totalSteps);
   const opt = optimizers[sel.id];
   const range = config?.parameterRange ?? { min: -7, max: 7 };
   const ctx =

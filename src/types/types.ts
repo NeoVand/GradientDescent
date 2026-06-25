@@ -101,6 +101,10 @@ export interface TrainingConfig {
   stepsPerSecond: number;
   // How γ evolves over the run (constant, step decay, cosine, warmup).
   schedule: ScheduleId;
+  // Compresses the schedule's time axis: the decay completes in T / speed
+  // steps instead of the full run T. 1 = anneal over the whole run; higher =
+  // decay faster, so a schedule's effect is visible within a short run.
+  scheduleSpeed: number;
   // When true the run never ends on its own — it loops until paused (the
   // Steps slider pulled past its max). γ stays constant (no schedule decay)
   // so dragging the marker always springs it back toward a minimum.

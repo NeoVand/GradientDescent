@@ -35,7 +35,10 @@ export function encodeStateUrl(goalSteps?: number): string {
   q.set('lr', t.learningRate.toPrecision(3));
   q.set('bs', String(t.batchSize));
   q.set('st', String(t.totalSteps));
-  if (t.schedule !== 'constant') q.set('sch', t.schedule);
+  if (t.schedule !== 'constant') {
+    q.set('sch', t.schedule);
+    if (t.scheduleSpeed !== 1) q.set('scs', t.scheduleSpeed.toFixed(1));
+  }
   q.set('n', String(d.numPoints));
   q.set('no', d.noiseLevel.toFixed(2));
   q.set('tr', d.trainRatio.toFixed(1));
@@ -96,7 +99,8 @@ export function applyUrlState(): { params: ModelParameters; goal: number | null 
     learningRate: num('lr', 1e-4, 1, 0.01),
     totalSteps: Math.round(num('st', 10, 1000, 200)),
     batchSize,
-    schedule
+    schedule,
+    scheduleSpeed: num('scs', 0.5, 10, 1)
   }));
 
   if (q.get('v') === '3d') landscapeViewStore.set('3d');

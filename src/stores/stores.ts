@@ -162,6 +162,7 @@ export const trainingStore = writable<TrainingConfig>({
   batchSize: 'all',
   stepsPerSecond: 20,
   schedule: 'constant',
+  scheduleSpeed: 1,
   continuous: false
 });
 

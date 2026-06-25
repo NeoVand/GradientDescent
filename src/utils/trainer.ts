@@ -119,7 +119,7 @@ function doOneStep(): boolean {
   const tInRun = Math.max(0, t.currentStep - get(runStartStep));
   const effLr = t.continuous
     ? t.learningRate
-    : t.learningRate * schedules[t.schedule].factor(tInRun, t.totalSteps);
+    : t.learningRate * schedules[t.schedule].factor(tInRun * t.scheduleSpeed, t.totalSteps);
 
   // Every optimizer gets the domain range (Newton/Prodigy size their trust
   // regions from it); second-order methods also get the local curvature,
