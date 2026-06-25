@@ -243,6 +243,16 @@
       fix: 'Nesterov foresight on Adam’s momentum'
     },
     {
+      year: '2017',
+      name: 'AdamW',
+      by: 'Loshchilov & Hutter — the actual default today',
+      idea:
+        'The refinement that matters most: nearly every large model — GPT, BERT, the lot — trains with AdamW, not plain Adam. Weight decay gently pulls every parameter toward zero to curb overfitting; Adam folded that pull into the gradient, where its adaptive √ŝ scaling then distorted it. AdamW decouples them — the λθ decay lands straight on θ, outside the scaling. One honest caveat here: these toy losses carry no overfitting to regularize, so λ shows up as a literal, visible pull of the marker toward the origin. Crank it and watch the fit drift inward; set it to 0 and you are back to exact Adam.',
+      formula: String.raw`\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\left(\frac{\hat{\mathbf{m}}}{\sqrt{\hat{\mathbf{s}}} + \varepsilon} + \lambda\,\boldsymbol{\theta}\right)`,
+      fix: 'decoupled decay — why it’s the real-world default',
+      brk: 'with no overfitting to fight here, λ is a pull toward 0 more than a regularizer'
+    },
+    {
       act: { no: 'Branch', title: 'Sign steps' },
       year: '2023',
       name: 'Lion',

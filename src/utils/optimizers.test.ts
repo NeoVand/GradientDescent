@@ -96,6 +96,24 @@ describe('optimizers', () => {
     expect(Math.sign(na.params.b - p.b)).toBe(1);
   });
 
+  it('adamw with λ=0 is exactly adam', () => {
+    const a = run('adam', 12, 0.1);
+    const w = run('adamw', 12, 0.1, { ...defaultHyper('adamw'), wd: 0 });
+    expect(w.a).toBeCloseTo(a.a, 12);
+    expect(w.b).toBeCloseTo(a.b, 12);
+  });
+
+  it('adamw decay pulls toward the origin even with zero gradient', () => {
+    // No gradient means the adaptive term vanishes; the only motion is the
+    // decoupled decay γλθ, shrinking |θ| without overshooting past 0.
+    const opt = optimizers.adamw;
+    const out = opt.step({ a: 5, b: -5 }, { a: 0, b: 0 }, opt.init(), 0.1, defaultHyper('adamw'));
+    expect(Math.abs(out.params.a)).toBeLessThan(5);
+    expect(Math.abs(out.params.b)).toBeLessThan(5);
+    expect(Math.sign(out.params.a)).toBe(1);
+    expect(Math.sign(out.params.b)).toBe(-1);
+  });
+
   it('adagrad steps shrink as gradient history accumulates', () => {
     const opt = optimizers.adagrad;
     let params = { a: 10, b: 10 };

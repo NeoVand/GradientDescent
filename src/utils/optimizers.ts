@@ -14,7 +14,7 @@
 
 import type { ModelParameters } from '../types/types';
 
-export type OptimizerId = 'gd' | 'momentum' | 'nesterov' | 'adagrad' | 'rmsprop' | 'adadelta' | 'adam' | 'nadam' | 'lion';
+export type OptimizerId = 'gd' | 'momentum' | 'nesterov' | 'adagrad' | 'rmsprop' | 'adadelta' | 'adam' | 'nadam' | 'adamw' | 'lion';
 
 export interface OptimizerState {
   v: ModelParameters;
@@ -344,6 +344,64 @@ export const nadam: Optimizer = {
   }
 };
 
+// AdamW (Loshchilov & Hutter, 2017) — the optimizer almost every large model
+// actually trains with. "Weight decay" pulls parameters toward zero to curb
+// overfitting. Plain Adam added that pull to the gradient, where the adaptive
+// √ŝ scaling then warped it; AdamW DECOUPLES it — the λθ term hits θ directly,
+// outside the scaling. Honest caveat for this playground: the toy losses have
+// no overfitting to regularize, so λ shows up as a literal, visible pull of
+// the marker toward the origin rather than a generalization aid. At λ=0 it is
+// bit-for-bit Adam.
+const ADAMW_WD: HyperparamSpec = {
+  key: 'wd',
+  label: 'Weight decay',
+  symbol: 'λ',
+  min: 0,
+  max: 0.3,
+  step: 0.005,
+  default: 0.1,
+  hint: 'Decoupled pull toward the origin each step, applied outside the adaptive scaling. 0 = plain Adam.'
+};
+
+export const adamw: Optimizer = {
+  id: 'adamw',
+  name: 'AdamW',
+  description: 'Adam with decoupled weight decay — the real default',
+  updateRuleLatex: String.raw`\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\left(\frac{\hat{\mathbf{m}}}{\sqrt{\hat{\mathbf{s}}} + \varepsilon} + \lambda\,\boldsymbol{\theta}\right)`,
+  hyperparams: [BETA1_SPEC, BETA2_SPEC, ADAMW_WD],
+  fixedLearningRate: 0.1,
+  init: initState,
+  step(params, g, state, lr, hyper) {
+    const b1 = hyper.beta1 ?? BETA1_SPEC.default;
+    const b2 = hyper.beta2 ?? BETA2_SPEC.default;
+    const wd = hyper.wd ?? ADAMW_WD.default;
+    const t = state.t + 1;
+    const v = {
+      a: b1 * state.v.a + (1 - b1) * g.a,
+      b: b1 * state.v.b + (1 - b1) * g.b
+    };
+    const s = {
+      a: b2 * state.s.a + (1 - b2) * g.a * g.a,
+      b: b2 * state.s.b + (1 - b2) * g.b * g.b
+    };
+    const mc1 = 1 - Math.pow(b1, t);
+    const mc2 = 1 - Math.pow(b2, t);
+    const mHatA = v.a / mc1;
+    const mHatB = v.b / mc1;
+    const sHatA = s.a / mc2;
+    const sHatB = s.b / mc2;
+    return {
+      params: {
+        // Adam's adaptive step PLUS a decoupled decay γλθ toward the origin,
+        // independent of the gradient — the whole point of the "W".
+        a: params.a - lr * (mHatA / (Math.sqrt(sHatA) + EPS) + wd * params.a),
+        b: params.b - lr * (mHatB / (Math.sqrt(sHatB) + EPS) + wd * params.b)
+      },
+      state: { v, s, t }
+    };
+  }
+};
+
 // Lion (Chen et al., 2023) — "EvoLved Sign Momentum". The update direction is
 // the SIGN of a momentum/gradient blend, so every step has the SAME magnitude γ
 // on each axis no matter how steep the slope. That makes it strikingly distinct
@@ -414,6 +472,7 @@ export const optimizers: Record<OptimizerId, Optimizer> = {
   adadelta,
   adam,
   nadam,
+  adamw,
   lion
 };
 
@@ -427,7 +486,7 @@ export const optimizerGroups: { label: string; ids: OptimizerId[] }[] = [
   { label: 'Baseline', ids: ['gd'] },
   { label: 'Momentum', ids: ['momentum', 'nesterov'] },
   { label: 'Adaptive rates', ids: ['adagrad', 'rmsprop', 'adadelta'] },
-  { label: 'Adam family', ids: ['adam', 'nadam'] },
+  { label: 'Adam family', ids: ['adam', 'nadam', 'adamw'] },
   { label: 'Sign-based', ids: ['lion'] }
 ];
 
