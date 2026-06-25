@@ -121,11 +121,13 @@ function doOneStep(): boolean {
     ? t.learningRate
     : t.learningRate * schedules[t.schedule].factor(tInRun, t.totalSteps);
 
-  // Second-order methods need the local curvature, computed on the SAME batch
-  // as the gradient so H and ∇ are consistent. First-order methods skip it.
+  // Every optimizer gets the domain range (Newton/Prodigy size their trust
+  // regions from it); second-order methods also get the local curvature,
+  // computed on the SAME batch as the gradient so H and ∇ are consistent.
+  const range = config.parameterRange ?? { min: -7, max: 7 };
   const ctx = opt.usesHessian
-    ? { hessian: computeHessian(config, batch, params), range: config.parameterRange ?? { min: -7, max: 7 } }
-    : undefined;
+    ? { hessian: computeHessian(config, batch, params), range }
+    : { range };
   const result = opt.step(params, gradient, get(optimizerStateStore), effLr, sel.hyper, ctx);
 
   // The chart always shows the loss over the full training set, so curve
@@ -476,9 +478,10 @@ function stepRace(cap: number) {
     if (r.finished || r.diverged || r.steps >= cap) continue;
 
     const gradient = config.computeGradient(trainData, r.params);
+    const raceRange = config.parameterRange ?? { min: -7, max: 7 };
     const ctx = optimizers[r.id].usesHessian
-      ? { hessian: computeHessian(config, trainData, r.params), range: config.parameterRange ?? { min: -7, max: 7 } }
-      : undefined;
+      ? { hessian: computeHessian(config, trainData, r.params), range: raceRange }
+      : { range: raceRange };
     const out = optimizers[r.id].step(
       r.params,
       gradient,

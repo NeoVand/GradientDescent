@@ -28,10 +28,11 @@ export function previewNextStep(
   const tInRun = Math.max(0, t.currentStep - runStart);
   const effLr = t.learningRate * schedules[t.schedule].factor(tInRun, t.totalSteps);
   const opt = optimizers[sel.id];
+  const range = config?.parameterRange ?? { min: -7, max: 7 };
   const ctx =
     opt.usesHessian && config
-      ? { hessian: computeHessian(config, data ?? [], params), range: config.parameterRange ?? { min: -7, max: 7 } }
-      : undefined;
+      ? { hessian: computeHessian(config, data ?? [], params), range }
+      : { range };
   const out = opt.step(params, grad, state, effLr, sel.hyper, ctx);
   if (!Number.isFinite(out.params.a) || !Number.isFinite(out.params.b)) return null;
   return out.params;

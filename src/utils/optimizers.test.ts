@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { optimizers, defaultHyper, type OptimizerId } from './optimizers';
+import { optimizers, defaultHyper, type OptimizerId, type OptimizerState } from './optimizers';
 import type { ModelParameters } from '../types/types';
 
 const grad = (p: ModelParameters): ModelParameters => ({ a: 2 * p.a, b: 2 * p.b });
@@ -247,10 +247,10 @@ describe('optimizers', () => {
     }
   });
 
-  it('prodigy tunes its own rate: tiny first steps that grow as d ramps up', () => {
-    // From d ≈ 1e-6 the first step is microscopic; as Prodigy estimates the
-    // distance to the solution, d climbs and the steps grow — a learning rate
-    // discovered at run time, with no γ to set.
+  it('prodigy tunes its own rate: small first steps that grow as d ramps up', () => {
+    // From a tiny seed d (a fraction of the domain) the first step is small; as
+    // Prodigy estimates the distance to the solution, d climbs and the steps
+    // grow — a learning rate discovered at run time, with no γ to set.
     const opt = optimizers.prodigy;
     let p: ModelParameters = { a: 1.5, b: -2.0 };
     let state = opt.init();
@@ -262,9 +262,26 @@ describe('optimizers', () => {
       state = out.state;
       mags.push(Math.hypot(p.a - prev.a, p.b - prev.b));
     }
-    expect(mags[0]).toBeLessThan(1e-3); // d0 ≈ 1e-6 → microscopic opening step
+    expect(mags[0]).toBeLessThan(0.05); // gentle opening step from the small seed
     expect(mags[19]).toBeGreaterThan(mags[0]); // steps grew as d ramped
-    expect(state.d).toBeGreaterThan(1e-3); // d climbed off its seed
+    expect(state.d).toBeGreaterThan(mags[0]); // d climbed off its seed
+  });
+
+  it('prodigy never steps outside its trust region', () => {
+    // Even with a large gradient and a ramped-up d, the per-step move is capped
+    // at PRODIGY_TRUST_FRAC · span so a non-convex overshoot can't fly off-map.
+    const opt = optimizers.prodigy;
+    const range = { min: -7, max: 7 };
+    let p: ModelParameters = { a: 6, b: -6 };
+    let state: OptimizerState = { ...opt.init(), d: 5 }; // pretend d has already ramped high
+    for (let i = 0; i < 30; i++) {
+      const prev = p;
+      const out = opt.step(p, { a: 40, b: -40 }, state, 1.0, defaultHyper('prodigy'), { range });
+      p = out.params;
+      state = out.state;
+      const mag = Math.hypot(p.a - prev.a, p.b - prev.b);
+      expect(mag).toBeLessThanOrEqual(0.18 * (range.max - range.min) + 1e-9);
+    }
   });
 
   it('state is not mutated in place', () => {

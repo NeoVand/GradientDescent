@@ -689,7 +689,16 @@ export const lion: Optimizer = {
 // travelled (⟨g, x₀−x⟩), and scales an Adam step by it. Watch the marker creep,
 // then accelerate as d finds its level — the learning rate, discovered live.
 // State: v = momentum m, s = second moment, plus d / r / s-accumulator / x₀.
-const PRODIGY_D0 = 1e-6;
+//
+// Two toy-scale safeguards, because d only ever GROWS: on these small non-convex
+// surfaces its estimate can overshoot, and with nothing to pull it back the run
+// would explode and never recover. We seed and cap d relative to the domain so
+// the warmup isn't glacial (the paper's 1e-6 is tuned for billion-parameter
+// nets, not two), and clip each step to a trust region so a bad ramp can't fling
+// the marker off the map.
+const PRODIGY_D0_FRAC = 1e-4; // seed distance as a fraction of the domain span
+const PRODIGY_D_MAX_FRAC = 1.5; // cap the distance estimate at 1.5× the span
+const PRODIGY_TRUST_FRAC = 0.18; // per-step cap as a fraction of the domain span
 
 const PRODIGY_BETA1: HyperparamSpec = {
   key: 'beta1',
@@ -722,11 +731,12 @@ export const prodigy: Optimizer = {
   // Prodigy supplies its own rate via d; γ is just a base multiplier (leave 1).
   fixedLearningRate: 1.0,
   init: initState,
-  step(params, g, state, lr, hyper) {
+  step(params, g, state, lr, hyper, ctx) {
     const b1 = hyper.beta1 ?? PRODIGY_BETA1.default;
     const b2 = hyper.beta2 ?? PRODIGY_BETA2.default;
     const sb2 = Math.sqrt(b2);
-    const d = state.d ?? PRODIGY_D0;
+    const span = ctx?.range ? ctx.range.max - ctx.range.min : 14;
+    const d = state.d ?? PRODIGY_D0_FRAC * span;
     const x0 = state.x0 ?? params; // first step after a reset anchors the start
     const rPrev = state.rNum ?? 0;
     const sPrev = state.sDen ?? zero();
@@ -740,7 +750,8 @@ export const prodigy: Optimizer = {
       b: b2 * state.s.b + (1 - b2) * d * d * g.b * g.b
     };
     // Distance estimate: numerator from ⟨g, x₀−x⟩ (how far we've travelled),
-    // denominator from the accumulated gradient. d only ever grows.
+    // denominator from the accumulated gradient. d only ever grows — capped here
+    // at a multiple of the domain so a non-convex overshoot can't run away.
     const dot = g.a * (x0.a - params.a) + g.b * (x0.b - params.b);
     const rNum = sb2 * rPrev + (1 - sb2) * lr * d * d * dot;
     const sDen = {
@@ -748,13 +759,20 @@ export const prodigy: Optimizer = {
       b: sb2 * sPrev.b + (1 - sb2) * lr * d * d * g.b
     };
     const sL1 = Math.abs(sDen.a) + Math.abs(sDen.b);
-    const dNext = Math.max(d, sL1 > 0 ? rNum / sL1 : d);
-    // The step uses the CURRENT d (per the algorithm), and the d's in m/√v cancel.
+    const dNext = Math.min(PRODIGY_D_MAX_FRAC * span, Math.max(d, sL1 > 0 ? rNum / sL1 : d));
+    // The step uses the CURRENT d (per the algorithm); the d's in m/√v cancel.
+    let stepA = (lr * d * m.a) / (Math.sqrt(vv.a) + d * EPS);
+    let stepB = (lr * d * m.b) / (Math.sqrt(vv.b) + d * EPS);
+    // Trust region: never fling the marker more than a fraction of the domain.
+    const radius = PRODIGY_TRUST_FRAC * span;
+    const mag = Math.hypot(stepA, stepB);
+    if (mag > radius) {
+      const k = radius / mag;
+      stepA *= k;
+      stepB *= k;
+    }
     return {
-      params: {
-        a: params.a - (lr * d * m.a) / (Math.sqrt(vv.a) + d * EPS),
-        b: params.b - (lr * d * m.b) / (Math.sqrt(vv.b) + d * EPS)
-      },
+      params: { a: params.a - stepA, b: params.b - stepB },
       state: { v: m, s: vv, t: state.t + 1, d: dNext, rNum, sDen, x0 }
     };
   }
