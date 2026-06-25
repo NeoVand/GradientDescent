@@ -191,25 +191,46 @@ describe('optimizers', () => {
   });
 
   it('newton lands on the minimum of a quadratic bowl in a single step', () => {
-    // f(θ)=a²+b² has H=2I; −H⁻¹∇ at any point is exactly the vector to the
-    // origin, so one full (γ=1) Newton step reaches the minimum.
+    // f(θ)=a²+b² has H=2I; in a convex bowl the saddle-free step is exactly
+    // −H⁻¹∇, the vector to the origin. A range generous enough that the trust
+    // region doesn't bind lets the full γ=1 step reach the minimum at once.
     const opt = optimizers.newton;
     const p = { a: 1.5, b: -2.0 };
-    const out = opt.step(p, grad(p), opt.init(), 1.0, defaultHyper('newton'), { hessian: fdHessian(p) });
+    const out = opt.step(p, grad(p), opt.init(), 1.0, defaultHyper('newton'), {
+      hessian: fdHessian(p),
+      range: { min: -20, max: 20 }
+    });
     expect(out.params.a).toBeCloseTo(0, 6);
     expect(out.params.b).toBeCloseTo(0, 6);
   });
 
-  it('newton falls back to a gentle gradient step on non-convex curvature', () => {
-    // An indefinite Hessian (a saddle) is not positive-definite, so Newton
-    // refuses the −H⁻¹∇ jump (which could go uphill) and descends the gradient.
+  it('newton descends (not climbs) on a saddle, bounded by the trust region', () => {
+    // Indefinite Hessian: pure −H⁻¹∇ would climb toward the saddle. The
+    // saddle-free form steps by 1/|λ|, so it goes downhill on both axes, and
+    // the trust region caps the move to a fraction of the domain span.
     const opt = optimizers.newton;
     const p = { a: 2, b: 2 };
     const g = { a: 4, b: 4 };
-    const out = opt.step(p, g, opt.init(), 1.0, defaultHyper('newton'), { hessian: { h11: 1, h12: 0, h22: -1 } });
-    expect(out.params.a).toBeLessThan(p.a); // downhill
+    const range = { min: -7, max: 7 };
+    const out = opt.step(p, g, opt.init(), 1.0, defaultHyper('newton'), { hessian: { h11: 1, h12: 0, h22: -1 }, range });
+    expect(out.params.a).toBeLessThan(p.a); // downhill on both axes
     expect(out.params.b).toBeLessThan(p.b);
-    expect(p.a - out.params.a).toBeLessThan(g.a); // gentle, not a raw γ·∇ leap
+    const stepMag = Math.hypot(out.params.a - p.a, out.params.b - p.b);
+    expect(stepMag).toBeLessThanOrEqual(0.28 * (range.max - range.min) + 1e-9); // within trust region
+  });
+
+  it('newton never leaps outside its trust region, even on near-flat curvature', () => {
+    // Tiny curvature would make −H⁻¹∇ explode; the floor + trust region keep
+    // the step bounded to NEWTON_TRUST_FRAC · span regardless.
+    const opt = optimizers.newton;
+    const range = { min: -7, max: 7 };
+    const out = opt.step({ a: 3, b: -3 }, { a: 50, b: -50 }, opt.init(), 1.0, defaultHyper('newton'), {
+      hessian: { h11: 1e-4, h12: 0, h22: 1e-4 },
+      range
+    });
+    const stepMag = Math.hypot(out.params.a - 3, out.params.b - -3);
+    expect(stepMag).toBeLessThanOrEqual(0.28 * (range.max - range.min) + 1e-9);
+    expect(out.params.a).toBeLessThan(3); // still downhill
   });
 
   it('sophia clips each coordinate step to γ·ρ when curvature is small', () => {

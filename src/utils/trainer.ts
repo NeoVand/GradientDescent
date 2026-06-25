@@ -123,7 +123,9 @@ function doOneStep(): boolean {
 
   // Second-order methods need the local curvature, computed on the SAME batch
   // as the gradient so H and ∇ are consistent. First-order methods skip it.
-  const ctx = opt.usesHessian ? { hessian: computeHessian(config, batch, params) } : undefined;
+  const ctx = opt.usesHessian
+    ? { hessian: computeHessian(config, batch, params), range: config.parameterRange ?? { min: -7, max: 7 } }
+    : undefined;
   const result = opt.step(params, gradient, get(optimizerStateStore), effLr, sel.hyper, ctx);
 
   // The chart always shows the loss over the full training set, so curve
@@ -475,7 +477,7 @@ function stepRace(cap: number) {
 
     const gradient = config.computeGradient(trainData, r.params);
     const ctx = optimizers[r.id].usesHessian
-      ? { hessian: computeHessian(config, trainData, r.params) }
+      ? { hessian: computeHessian(config, trainData, r.params), range: config.parameterRange ?? { min: -7, max: 7 } }
       : undefined;
     const out = optimizers[r.id].step(
       r.params,

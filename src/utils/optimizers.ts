@@ -13,7 +13,7 @@
  */
 
 import type { ModelParameters } from '../types/types';
-import { newtonStep, isPositiveDefinite, type Hessian2 } from './hessian';
+import { eigenSym2, type Hessian2 } from './hessian';
 
 export type OptimizerId = 'gd' | 'momentum' | 'nesterov' | 'adagrad' | 'rmsprop' | 'adadelta' | 'adam' | 'nadam' | 'adamw' | 'radam' | 'newton' | 'sophia' | 'lion' | 'prodigy';
 
@@ -36,6 +36,8 @@ export interface OptimizerState {
  */
 export interface OptimizerStepContext {
   hessian?: Hessian2;
+  /** Parameter domain, so Newton can size its trust region to the landscape. */
+  range?: { min: number; max: number };
 }
 
 export interface HyperparamSpec {
@@ -480,20 +482,24 @@ export const radam: Optimizer = {
   }
 };
 
-// When the local curvature is not a clean bowl, Newton descends the gradient
-// instead, gently (γ defaults to 1 for it, so a raw step would be huge).
-const NEWTON_FALLBACK = 0.05;
+// Pure Newton, −H⁻¹∇, is unusable on the non-convex landscapes here: on a flat
+// plateau H≈0 makes the step explode, and on a saddle (indefinite H) it points
+// UPHILL toward the stationary point. We use the textbook robust form instead —
+// a regularized / damped Newton (Levenberg–Marquardt style):
+//   • shift the Hessian by τI so its smallest eigenvalue is at least `floor`.
+//     H+τI is then positive-definite, so −(H+τI)⁻¹∇ is always a descent step,
+//     even on a saddle, and tiny curvature can't blow it up (the step degrades
+//     to gradient descent at rate 1/floor in a flat region);
+//   • cap the whole step to a trust region (a fraction of the domain), so it can
+//     never leap off the map even when γ = 1.
+// Solving the 2×2 system directly (rather than via eigenvectors) also avoids the
+// degenerate-eigenvector case when curvature is isotropic. On a genuine convex
+// bowl τ = 0 and the trust region is slack, so it is exactly −H⁻¹∇ again,
+// reaching the minimum in essentially one step.
+const NEWTON_CURV_FLOOR = 0.5; // floor on the smallest eigenvalue; 1/floor is the flat-region GD rate
+const NEWTON_COND_CAP = 1e-3; // relative floor, scaled by the steepest curvature, to cap anisotropy
+const NEWTON_TRUST_FRAC = 0.28; // trust-region radius as a fraction of the domain span
 
-// Newton's method (1680s) — the original second-order optimizer, and the one
-// every method above is a cheap imitation of. Instead of just the slope ∇, it
-// uses the local CURVATURE: fit a quadratic bowl to the surface here (the
-// Hessian H) and jump straight to that bowl's minimum, −H⁻¹∇. On a true bowl
-// that lands the answer in a single step, no learning rate to tune. The catch
-// is why nobody trains big models with it: H is N×N for N parameters (here just
-// 2×2, so it's free — this is the app already drawing the Newton ghost in the
-// curvature lens), and away from a convex bowl −H⁻¹∇ can point UPHILL. When the
-// curvature isn't a clean bowl (saddle or singular H) we fall back to a plain
-// gradient step. γ acts as a damping factor; leave it at 1 for the full jump.
 export const newton: Optimizer = {
   id: 'newton',
   name: 'Newton',
@@ -505,21 +511,39 @@ export const newton: Optimizer = {
   init: initState,
   step(params, g, state, lr, _hyper, ctx) {
     const hess = ctx?.hessian;
-    const nstep = hess ? newtonStep(hess, g) : null;
-    // Trust the Newton step only inside a genuine local bowl (H positive-
-    // definite and invertible); otherwise it can head uphill, so descend the
-    // gradient instead — damped, since γ defaults to 1 here.
     let dirA: number;
     let dirB: number;
-    if (nstep && hess && isPositiveDefinite(hess)) {
-      dirA = nstep.a;
-      dirB = nstep.b;
+    if (hess) {
+      const eig = eigenSym2(hess);
+      const scale = Math.max(Math.abs(eig.lambda1), Math.abs(eig.lambda2));
+      const floor = Math.max(NEWTON_CURV_FLOOR, scale * NEWTON_COND_CAP);
+      // Regularize: lift the smallest eigenvalue up to `floor` so H+τI is PD.
+      const tau = Math.max(0, floor - Math.min(eig.lambda1, eig.lambda2));
+      const h11 = hess.h11 + tau;
+      const h22 = hess.h22 + tau;
+      const h12 = hess.h12;
+      const det = h11 * h22 - h12 * h12; // > 0: H+τI is positive-definite
+      // δ = −(H+τI)⁻¹ ∇ — a guaranteed descent step.
+      dirA = -(h22 * g.a - h12 * g.b) / det;
+      dirB = -(-h12 * g.a + h11 * g.b) / det;
     } else {
-      dirA = -NEWTON_FALLBACK * g.a;
-      dirB = -NEWTON_FALLBACK * g.b;
+      // No curvature supplied: behave like (damped) gradient descent.
+      dirA = -g.a;
+      dirB = -g.b;
+    }
+    let stepA = lr * dirA;
+    let stepB = lr * dirB;
+    // Trust region: never move more than a fraction of the domain in one step.
+    const span = ctx?.range ? ctx.range.max - ctx.range.min : 14;
+    const radius = NEWTON_TRUST_FRAC * span;
+    const mag = Math.hypot(stepA, stepB);
+    if (mag > radius) {
+      const k = radius / mag;
+      stepA *= k;
+      stepB *= k;
     }
     return {
-      params: { a: params.a + lr * dirA, b: params.b + lr * dirB },
+      params: { a: params.a + stepA, b: params.b + stepB },
       state: { ...state, v: { ...g }, t: state.t + 1 }
     };
   }
