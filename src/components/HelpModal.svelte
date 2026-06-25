@@ -16,7 +16,7 @@
     Activity, Mountain, TrendingUp, TrendingDown, Percent, Waves,
     Target, Radio, ScatterChart, Brain,
     Compass, Rocket, Zap,
-    BookOpen, FlaskConical, Layers, Map, Play, Keyboard
+    BookOpen, FlaskConical, Layers, Map, Play, Pause, RotateCcw, Keyboard
   } from 'lucide-svelte';
   import katex from 'katex';
   import 'katex/dist/katex.min.css';
@@ -25,6 +25,7 @@
   import { interpolateViridis } from 'd3-scale-chromatic';
   import { experiments } from '../utils/experiments';
   import { schedules, scheduleOrder } from '../utils/schedules';
+  import { optimizers, optimizerOrder, defaultHyper, type OptimizerId } from '../utils/optimizers';
 
   export let isOpen = false;
   export let onClose: () => void;
@@ -310,6 +311,70 @@
   const raceExperiment = experiments.find(e => e.id === 'banana-race');
   const scheduleExperiment = experiments.find(e => e.id === 'lion-schedule');
 
+  // ---------- Race palette, tuned rates, and on/off state ----------
+  // One colour per optimizer; cousins share a hue family so the taxonomy reads
+  // at a glance (violet = momentum, cyan/teal = adaptive rates, rose = Adam
+  // family, emerald = second-order).
+  const RACE_COLORS: Record<OptimizerId, string> = {
+    gd: '#94a3b8',
+    momentum: '#a855f7',
+    nesterov: '#c084fc',
+    adagrad: '#f59e0b',
+    rmsprop: '#22d3ee',
+    adadelta: '#2dd4bf',
+    adam: '#f43f5e',
+    nadam: '#fb7185',
+    adamw: '#e11d48',
+    radam: '#fb923c',
+    lion: '#facc15',
+    newton: '#10b981',
+    sophia: '#34d399',
+    prodigy: '#3b82f6'
+  };
+  // Rates tuned for THIS landscape. Adaptive methods keep their own fixed γ;
+  // only the gradient-scaled methods and a few slow ones need a nudge.
+  const RACE_LR: Partial<Record<OptimizerId, number>> = {
+    gd: 0.06,
+    momentum: 0.012,
+    nesterov: 0.012,
+    adagrad: 1.0,
+    rmsprop: 0.06,
+    adadelta: 2.5,
+    radam: 0.15,
+    sophia: 0.25
+  };
+  // A gentler momentum reads better here; AdamW's decay has no regularizer to
+  // act on, so zero it (it would otherwise bias the fit off the true minimum).
+  const RACE_HYPER: Partial<Record<OptimizerId, Record<string, number>>> = {
+    momentum: { mu: 0.86 },
+    nesterov: { mu: 0.86 },
+    adamw: { wd: 0 }
+  };
+  // Start with a legible, diverse handful lit; the rest are one click away.
+  const RACE_DEFAULT_ON: OptimizerId[] = ['gd', 'momentum', 'rmsprop', 'adam', 'lion', 'newton'];
+  let raceOn: Record<OptimizerId, boolean> = Object.fromEntries(
+    optimizerOrder.map(id => [id, RACE_DEFAULT_ON.includes(id)])
+  ) as Record<OptimizerId, boolean>;
+  let raceHover: OptimizerId | null = null;
+  function toggleRacer(id: OptimizerId) {
+    raceOn = { ...raceOn, [id]: !raceOn[id] };
+  }
+
+  // ---------- Race player (drives the SVG's SMIL timeline) ----------
+  let raceSvg: SVGSVGElement;
+  let racePlaying = true;
+  function toggleRacePlay() {
+    if (!raceSvg) return;
+    if (racePlaying) raceSvg.pauseAnimations();
+    else raceSvg.unpauseAnimations();
+    racePlaying = !racePlaying;
+  }
+  function resetRace() {
+    // Jump the whole animation back to the start; keep the current play state.
+    raceSvg?.setCurrentTime(0);
+    if (!racePlaying) raceSvg?.pauseAnimations();
+  }
+
   // ---------- The opening picture: a real race on a real landscape ----------
   // A curved ravine, ℒ = 9(y − c(x))² + 0.22(x − x*)² with a sine valley
   // c(x), rendered exactly the way the app renders every landscape (log loss
@@ -368,61 +433,67 @@
 
     const start: [number, number] = [-1.85, -0.75];
     const minPt: [number, number] = [XSTAR, c(XSTAR)];
-    type Stepper = (g: [number, number], st: Record<string, number>, s: number) => [number, number];
-    const simulate = (step: Stepper): [number, number][] => {
-      let [x, y] = start;
-      const pts: [number, number][] = [[x, y]];
-      const st: Record<string, number> = { vx: 0, vy: 0, sx: 0, sy: 0, mx: 0, my: 0 };
-      for (let s = 0; s < 170; s++) {
-        const [dx, dy] = step(grad(x, y), st, s);
-        x += dx;
-        y += dy;
-        pts.push([x, y]);
-        if (Math.hypot(x - minPt[0], y - minPt[1]) < 0.1) break;
-      }
-      return pts;
+
+    // Run the REAL optimizer engine on this landscape, one trajectory each, so
+    // the race always reflects the actual algorithms (and any new ones). A
+    // finite-difference Hessian feeds the second-order methods; the range sizes
+    // Newton's / Prodigy's trust regions.
+    const fdHess = (x: number, y: number) => {
+      const e = 1e-3;
+      const gpx = grad(x + e, y), gmx = grad(x - e, y);
+      const gpy = grad(x, y + e), gmy = grad(x, y - e);
+      return {
+        h11: (gpx[0] - gmx[0]) / (2 * e),
+        h12: (gpy[0] - gmy[0]) / (2 * e),
+        h22: (gpy[1] - gmy[1]) / (2 * e)
+      };
     };
-    const E = 1e-8;
-    const runners = [
-      { name: 'GD', color: '#94a3b8', pts: simulate(g => [-0.085 * g[0], -0.085 * g[1]]) },
-      {
-        name: 'Momentum', color: '#a855f7',
-        pts: simulate((g, st) => {
-          st.vx = 0.86 * st.vx + g[0];
-          st.vy = 0.86 * st.vy + g[1];
-          return [-0.025 * st.vx, -0.025 * st.vy];
-        })
-      },
-      {
-        name: 'RMSProp', color: '#22d3ee',
-        pts: simulate((g, st) => {
-          st.sx = 0.94 * st.sx + 0.06 * g[0] ** 2;
-          st.sy = 0.94 * st.sy + 0.06 * g[1] ** 2;
-          return [-0.08 * g[0] / (Math.sqrt(st.sx) + E), -0.08 * g[1] / (Math.sqrt(st.sy) + E)];
-        })
-      },
-      {
-        name: 'Adam', color: '#f43f5e',
-        pts: simulate((g, st, s) => {
-          st.mx = 0.9 * st.mx + 0.1 * g[0];
-          st.my = 0.9 * st.my + 0.1 * g[1];
-          st.sx = 0.999 * st.sx + 0.001 * g[0] ** 2;
-          st.sy = 0.999 * st.sy + 0.001 * g[1] ** 2;
-          const b1 = 1 - 0.9 ** (s + 1), b2 = 1 - 0.999 ** (s + 1);
-          return [
-            -0.16 * (st.mx / b1) / (Math.sqrt(st.sx / b2) + E),
-            -0.16 * (st.my / b1) / (Math.sqrt(st.sy / b2) + E)
-          ];
-        })
+    const range = { min: X0, max: X1 };
+    const MAXSTEPS = 250;
+    const simOpt = (id: OptimizerId): { pts: [number, number][]; steps: number; converged: boolean } => {
+      const opt = optimizers[id];
+      // RACE_LR takes precedence over the optimizer's own fixed γ — several
+      // adaptive methods need a landscape-specific rate to actually reach the
+      // basin here (AdaGrad in particular strangles its step at the default).
+      const lr = RACE_LR[id] ?? opt.fixedLearningRate ?? 0.06;
+      const hyper = { ...defaultHyper(id), ...(RACE_HYPER[id] ?? {}) };
+      let p = { a: start[0], b: start[1] };
+      let st = opt.init();
+      const pts: [number, number][] = [[p.a, p.b]];
+      let converged = false;
+      let steps = MAXSTEPS;
+      for (let s = 0; s < MAXSTEPS; s++) {
+        const [gx, gy] = grad(p.a, p.b);
+        const ctx = opt.usesHessian ? { hessian: fdHess(p.a, p.b), range } : { range };
+        const out = opt.step(p, { a: gx, b: gy }, st, lr, hyper, ctx);
+        if (!Number.isFinite(out.params.a) || !Number.isFinite(out.params.b)) {
+          steps = s;
+          break;
+        }
+        p = out.params;
+        st = out.state;
+        pts.push([p.a, p.b]);
+        if (Math.hypot(p.a - minPt[0], p.b - minPt[1]) < 0.15) {
+          converged = true;
+          steps = s + 1;
+          break;
+        }
       }
-    ];
+      return { pts, steps, converged };
+    };
+    const runners = optimizerOrder.map(id => {
+      const r = simOpt(id);
+      return { id, name: optimizers[id].name, color: RACE_COLORS[id], ...r };
+    });
     const slowest = Math.max(...runners.map(r => r.pts.length - 1));
     const racers = runners.map(r => ({
+      id: r.id,
       name: r.name,
       color: r.color,
       d: 'M ' + r.pts.map(([x, y]) => `${px(x).toFixed(1)},${py(y).toFixed(1)}`).join(' L '),
       frac: +(((r.pts.length - 1) / slowest) * 0.72).toFixed(4),
-      steps: r.pts.length - 1
+      steps: r.steps,
+      converged: r.converged
     }));
     return {
       heatURL,
@@ -840,12 +911,21 @@
                 picker is grouped to match.
               </p>
               <p>
-                Here are four of them racing on the same ravine from the same start, each actually
-                simulated — the dots arrive in their true step counts:
+                Here they are racing on the same ravine from the same start — every one running its
+                real update rule, the dots arriving in their true step counts. Click a name to add or
+                remove it; hover one to pick it out of the pack:
               </p>
 
               <figure class="race-demo">
-                <svg viewBox="0 0 {RACE_W} {RACE_H}" preserveAspectRatio="xMidYMid meet">
+                <div class="race-player">
+                  <button type="button" class="race-pbtn" on:click={toggleRacePlay} aria-label={racePlaying ? 'Pause race' : 'Play race'} title={racePlaying ? 'Pause' : 'Play'}>
+                    {#if racePlaying}<Pause size={14} strokeWidth={2.5} />{:else}<Play size={14} strokeWidth={2.5} />{/if}
+                  </button>
+                  <button type="button" class="race-pbtn" on:click={resetRace} aria-label="Restart race" title="Restart">
+                    <RotateCcw size={14} strokeWidth={2.5} />
+                  </button>
+                </div>
+                <svg bind:this={raceSvg} viewBox="0 0 {RACE_W} {RACE_H}" preserveAspectRatio="xMidYMid meet">
                   <defs>
                     <clipPath id="race-clip"><rect x="0" y="0" width={RACE_W} height={RACE_H} /></clipPath>
                     <!-- Contours close along the grid edge; clip them a hair inside
@@ -861,32 +941,50 @@
                         {/each}
                       </g>
                     </g>
-                    {#each raceDemo.racers as r (r.name)}
-                      <path d={r.d} fill="none" stroke={r.color} stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" opacity="0.92">
+                    {#each raceDemo.racers as r (r.id)}
+                      {@const hot = raceHover === r.id}
+                      {@const dim = raceHover !== null && !hot}
+                      <path d={r.d} fill="none" stroke={r.color} stroke-width={hot ? 3 : 1.7} stroke-linecap="round" stroke-linejoin="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" opacity={hot ? 1 : !raceOn[r.id] ? 0 : dim ? 0.13 : 0.9} style="transition: opacity 0.15s ease, stroke-width 0.15s ease;">
                         <animate attributeName="stroke-dashoffset" values="100;0;0" keyTimes="0;{r.frac};1" dur="7s" repeatCount="indefinite" />
                       </path>
                     {/each}
                     <circle cx={raceDemo.min[0]} cy={raceDemo.min[1]} r="7" fill="none" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3,2.5" />
                     <circle cx={raceDemo.start[0]} cy={raceDemo.start[1]} r="8" fill="none" stroke="#f59e0b" stroke-width="1.75" opacity="0.9" />
                     <circle cx={raceDemo.start[0]} cy={raceDemo.start[1]} r="4.5" fill="#f59e0b" stroke="#fff" stroke-width="1.5" />
-                    {#each raceDemo.racers as r (r.name)}
-                      <circle r="3.4" fill={r.color} stroke="#fff" stroke-width="1.25">
+                    {#each raceDemo.racers as r (r.id)}
+                      {@const hot = raceHover === r.id}
+                      {@const dim = raceHover !== null && !hot}
+                      <circle r={hot ? 4.6 : 3.2} fill={r.color} stroke="#fff" stroke-width="1.25" opacity={hot ? 1 : !raceOn[r.id] ? 0 : dim ? 0.13 : 1} style="transition: opacity 0.15s ease;">
                         <animateMotion path={r.d} keyPoints="0;1;1" keyTimes="0;{r.frac};1" calcMode="linear" dur="7s" repeatCount="indefinite" />
                       </circle>
                     {/each}
                   </g>
                 </svg>
                 <div class="race-legend">
-                  {#each raceDemo.racers as r (r.name)}
-                    <span class="race-chip"><span class="race-swatch" style="background:{r.color}"></span>{r.name} · {r.steps}</span>
+                  {#each raceDemo.racers as r (r.id)}
+                    <button
+                      type="button"
+                      class="race-chip"
+                      class:off={!raceOn[r.id]}
+                      class:hot={raceHover === r.id}
+                      on:click={() => toggleRacer(r.id)}
+                      on:mouseenter={() => (raceHover = r.id)}
+                      on:mouseleave={() => (raceHover = null)}
+                      on:focus={() => (raceHover = r.id)}
+                      on:blur={() => (raceHover = null)}
+                    >
+                      <span class="race-swatch" style="--sw:{r.color}"></span>
+                      <span class="race-cname">{r.name}</span>
+                      <span class="race-steps">{r.steps}{r.converged ? '' : '+'}</span>
+                    </button>
                   {/each}
                 </div>
                 <figcaption class="race-caption">
-                  Same start, each with the γ it likes. Plain GD burns its budget bouncing wall to
-                  wall; Momentum cancels the bounce and glides; RMSProp and Adam size every
-                  parameter’s step from gradient history. Numbers are steps to the basin.
-                  (Nesterov and AdaGrad sit this race out — they’re close cousins of Momentum and
-                  RMSProp, and you’ll meet them below.)
+                  All {raceDemo.racers.length} optimizers, same start, same ravine — each running its real
+                  update rule, the dots arriving in their true step counts. Click a name to toggle it,
+                  hover to spotlight one. Watch the contrasts: Newton nearly teleports, GD rattles wall to
+                  wall, Momentum glides past it, and RAdam’s self-warmup keeps it cautious to the end. Use
+                  the play / restart controls to watch it again.
                 </figcaption>
               </figure>
 
@@ -1607,6 +1705,7 @@
 
   /* ---------- The optimizer story ---------- */
   .race-demo {
+    position: relative;
     margin: 1.25rem 0 1.5rem;
     border: 1px solid var(--color-border);
     border-radius: 12px;
@@ -1614,14 +1713,66 @@
     background: var(--color-bg-primary);
   }
   .race-demo svg { width: 100%; display: block; }
-  .race-legend { display: flex; justify-content: center; gap: 0.9rem; flex-wrap: wrap; padding: 0.6rem 0.6rem 0; }
+
+  /* Minimal play / pause / restart player, floated over the race corner. */
+  .race-player {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    display: flex;
+    gap: 0.3rem;
+    z-index: 2;
+  }
+  .race-pbtn {
+    width: 26px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 7px;
+    background: rgba(10, 14, 20, 0.55);
+    color: #e2e8f0;
+    cursor: pointer;
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+  }
+  .race-pbtn:hover { background: rgba(16, 185, 129, 0.28); border-color: rgba(16, 185, 129, 0.6); color: #fff; }
+  .race-pbtn:active { transform: scale(0.92); }
+  .race-legend {
+    display: flex; justify-content: center; gap: 0.3rem 0.4rem; flex-wrap: wrap;
+    padding: 0.7rem 0.6rem 0.1rem;
+  }
+  /* Each legend entry is a toggle: click to turn a racer on/off, hover to
+     spotlight it. Off chips read as muted outlines so the lit set stands out. */
   .race-chip {
-    display: inline-flex; align-items: center; gap: 0.3rem;
+    display: inline-flex; align-items: center; gap: 0.32rem;
+    padding: 0.2rem 0.5rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: transparent;
     font-family: 'SF Mono', Monaco, monospace;
     font-size: 0.6875rem; font-weight: 600;
     color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, opacity 0.15s ease;
   }
-  .race-swatch { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .race-chip:hover, .race-chip.hot { background: rgba(127, 127, 127, 0.14); color: var(--color-text-primary); }
+  .race-chip.off { opacity: 0.42; }
+  .race-chip.off:hover { opacity: 0.7; }
+  .race-chip .race-steps {
+    font-size: 0.625rem; opacity: 0.6; font-variant-numeric: tabular-nums;
+  }
+  .race-swatch {
+    width: 9px; height: 9px; border-radius: 50%; display: inline-block;
+    background: var(--sw); border: 1.5px solid var(--sw);
+    box-sizing: border-box;
+    transition: background 0.15s ease;
+  }
+  /* Off: hollow ring in the racer's colour, so you still know which is which. */
+  .race-chip.off .race-swatch { background: transparent; }
   .race-caption {
     font-size: 0.78rem;
     color: var(--color-text-tertiary);
