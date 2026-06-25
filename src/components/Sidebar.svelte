@@ -691,10 +691,7 @@
                   class:selected={id === optimizerSel.id}
                   on:click={() => selectOptimizer(id)}
                 >
-                  <span class="optimizer-text">
-                    <span class="optimizer-name">{optimizers[id].name}</span>
-                    <span class="optimizer-desc">{optimizers[id].description}</span>
-                  </span>
+                  <span class="optimizer-name">{optimizers[id].name}</span>
                 </button>
               {/each}
             {/each}
@@ -1427,8 +1424,10 @@
     color: #10b981;
   }
 
+  /* One name per row — same single-line compactness as the problem picker
+     (no subtitle), so the 14-item list stays scannable. */
   .optimizer-option {
-    padding: 0.45rem 0.7rem;
+    padding: 0.5rem 0.7rem;
   }
 
   /* Segmented control (schedule picker): same family as the 2D/3D toggle */
@@ -1467,24 +1466,8 @@
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
   }
 
-  .optimizer-text {
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-    min-width: 0;
-  }
-
   .optimizer-name {
-    font-weight: 600;
-    font-size: 0.8438rem;
-  }
-
-  .optimizer-desc {
-    font-size: 0.7188rem;
-    color: var(--color-text-tertiary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-size: 0.875rem;
   }
 
   .optimizer-glyph {
