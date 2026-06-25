@@ -317,15 +317,21 @@ export const optimizers: Record<OptimizerId, Optimizer> = {
   lion
 };
 
-export const optimizerOrder: OptimizerId[] = [
-  'gd',
-  'momentum',
-  'nesterov',
-  'adagrad',
-  'rmsprop',
-  'adam',
-  'lion'
+/**
+ * Presentation taxonomy for the optimizer picker: short section labels that
+ * also drive the dropdown's labelled dividers (mirroring the problem picker).
+ * `optimizerOrder` is derived from this, so the flat order and the grouped
+ * view can never drift apart.
+ */
+export const optimizerGroups: { label: string; ids: OptimizerId[] }[] = [
+  { label: 'Baseline', ids: ['gd'] },
+  { label: 'Momentum', ids: ['momentum', 'nesterov'] },
+  { label: 'Adaptive rates', ids: ['adagrad', 'rmsprop'] },
+  { label: 'Adam family', ids: ['adam'] },
+  { label: 'Sign-based', ids: ['lion'] }
 ];
+
+export const optimizerOrder: OptimizerId[] = optimizerGroups.flatMap(g => g.ids);
 
 /** Default hyperparameter values for an optimizer, keyed by spec key. */
 export function defaultHyper(id: OptimizerId): Record<string, number> {

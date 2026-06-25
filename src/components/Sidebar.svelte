@@ -14,7 +14,7 @@
   import type { ProblemType, ScheduleId, DataPoint } from '../types/types';
   import { REGRESSION_LABELS, CLASSIFICATION_LABELS, formulaIsValid, type RegressionModel, type ClassificationModel } from '../utils/customModel';
   import { problemConfigs } from '../utils/problems';
-  import { optimizers, optimizerOrder, type OptimizerId } from '../utils/optimizers';
+  import { optimizers, optimizerGroups, type OptimizerId } from '../utils/optimizers';
   import { schedules, scheduleOrder } from '../utils/schedules';
   import { tooltip } from '../utils/tooltip';
   import {
@@ -123,20 +123,23 @@
     showOptimizerDropdown = false;
   }
 
-  // The problem list is taller than the dropdown: instead of a scrollbar,
-  // soft fades at the edges signal "there's more" in that direction.
+  // Both the problem and optimizer lists can outgrow their dropdown: a thin
+  // scrollbar plus soft dark fades at the edges signal "there's more" in that
+  // direction. Only one dropdown is open at a time, so they share the fade
+  // state and bind whichever scroll element is currently live.
   let problemScrollEl: HTMLDivElement | null = null;
+  let optimizerScrollEl: HTMLDivElement | null = null;
   let dropdownFadeTop = false;
   let dropdownFadeBottom = false;
 
   function updateDropdownFades() {
-    const el = problemScrollEl;
+    const el = problemScrollEl ?? optimizerScrollEl;
     if (!el) return;
     dropdownFadeTop = el.scrollTop > 2;
     dropdownFadeBottom = el.scrollTop + el.clientHeight < el.scrollHeight - 2;
   }
 
-  $: if (showProblemDropdown) {
+  $: if (showProblemDropdown || showOptimizerDropdown) {
     // Measure once the dropdown has rendered
     requestAnimationFrame(updateDropdownFades);
   }
@@ -679,20 +682,25 @@
 
       {#if showOptimizerDropdown}
         <div class="problem-dropdown" style={dropStyle(optimizerDropPos)}>
-          <div class="dropdown-scroll" style="max-height: {optimizerDropPos.maxH}px">
-            {#each optimizerOrder as id}
-              <button
-                class="problem-option optimizer-option"
-                class:selected={id === optimizerSel.id}
-                on:click={() => selectOptimizer(id)}
-              >
-                <span class="optimizer-text">
-                  <span class="optimizer-name">{optimizers[id].name}</span>
-                  <span class="optimizer-desc">{optimizers[id].description}</span>
-                </span>
-              </button>
+          <div class="dropdown-scroll" style="max-height: {optimizerDropPos.maxH}px" bind:this={optimizerScrollEl} on:scroll={updateDropdownFades}>
+            {#each optimizerGroups as group}
+              <div class="dropdown-group-label">{group.label}</div>
+              {#each group.ids as id}
+                <button
+                  class="problem-option optimizer-option"
+                  class:selected={id === optimizerSel.id}
+                  on:click={() => selectOptimizer(id)}
+                >
+                  <span class="optimizer-text">
+                    <span class="optimizer-name">{optimizers[id].name}</span>
+                    <span class="optimizer-desc">{optimizers[id].description}</span>
+                  </span>
+                </button>
+              {/each}
             {/each}
           </div>
+          <div class="scroll-fade fade-top" class:visible={dropdownFadeTop} aria-hidden="true"></div>
+          <div class="scroll-fade fade-bottom" class:visible={dropdownFadeBottom} aria-hidden="true"></div>
         </div>
       {/if}
     </div>
