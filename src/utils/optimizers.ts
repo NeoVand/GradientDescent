@@ -14,7 +14,7 @@
 
 import type { ModelParameters } from '../types/types';
 
-export type OptimizerId = 'gd' | 'momentum' | 'nesterov' | 'adagrad' | 'rmsprop' | 'adadelta' | 'adam' | 'lion';
+export type OptimizerId = 'gd' | 'momentum' | 'nesterov' | 'adagrad' | 'rmsprop' | 'adadelta' | 'adam' | 'nadam' | 'lion';
 
 export interface OptimizerState {
   v: ModelParameters;
@@ -301,6 +301,49 @@ export const adam: Optimizer = {
   }
 };
 
+// Nadam (Dozat, 2016) — Adam with Nesterov's look-ahead folded into the first
+// moment. Adam steps along the bias-corrected momentum m̂; Nadam steps along a
+// blend nudged toward where the momentum is HEADING — the same "measure ahead
+// of yourself" trick Nesterov played on plain momentum, now inside Adam's
+// adaptive scaling. Same two decays as Adam, same fixed γ.
+export const nadam: Optimizer = {
+  id: 'nadam',
+  name: 'Nadam',
+  description: 'Adam with Nesterov look-ahead on the momentum',
+  updateRuleLatex: String.raw`\bar{\mathbf{m}} = \beta_1 \hat{\mathbf{m}} + \frac{(1{-}\beta_1)\nabla \mathcal{L}}{1-\beta_1^t}, \quad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \frac{\bar{\mathbf{m}}}{\sqrt{\hat{\mathbf{s}}} + \varepsilon}`,
+  hyperparams: [BETA1_SPEC, BETA2_SPEC],
+  fixedLearningRate: 0.1,
+  init: initState,
+  step(params, g, state, lr, hyper) {
+    const b1 = hyper.beta1 ?? BETA1_SPEC.default;
+    const b2 = hyper.beta2 ?? BETA2_SPEC.default;
+    const t = state.t + 1;
+    const v = {
+      a: b1 * state.v.a + (1 - b1) * g.a,
+      b: b1 * state.v.b + (1 - b1) * g.b
+    };
+    const s = {
+      a: b2 * state.s.a + (1 - b2) * g.a * g.a,
+      b: b2 * state.s.b + (1 - b2) * g.b * g.b
+    };
+    const mc1 = 1 - Math.pow(b1, t);
+    const mc2 = 1 - Math.pow(b2, t);
+    // Nesterov-blended first moment: the bias-corrected momentum m̂ = v/mc1,
+    // leaned toward the fresh (bias-corrected) gradient.
+    const mBarA = b1 * (v.a / mc1) + ((1 - b1) * g.a) / mc1;
+    const mBarB = b1 * (v.b / mc1) + ((1 - b1) * g.b) / mc1;
+    const sHatA = s.a / mc2;
+    const sHatB = s.b / mc2;
+    return {
+      params: {
+        a: params.a - (lr * mBarA) / (Math.sqrt(sHatA) + EPS),
+        b: params.b - (lr * mBarB) / (Math.sqrt(sHatB) + EPS)
+      },
+      state: { v, s, t }
+    };
+  }
+};
+
 // Lion (Chen et al., 2023) — "EvoLved Sign Momentum". The update direction is
 // the SIGN of a momentum/gradient blend, so every step has the SAME magnitude γ
 // on each axis no matter how steep the slope. That makes it strikingly distinct
@@ -370,6 +413,7 @@ export const optimizers: Record<OptimizerId, Optimizer> = {
   rmsprop,
   adadelta,
   adam,
+  nadam,
   lion
 };
 
@@ -383,7 +427,7 @@ export const optimizerGroups: { label: string; ids: OptimizerId[] }[] = [
   { label: 'Baseline', ids: ['gd'] },
   { label: 'Momentum', ids: ['momentum', 'nesterov'] },
   { label: 'Adaptive rates', ids: ['adagrad', 'rmsprop', 'adadelta'] },
-  { label: 'Adam family', ids: ['adam'] },
+  { label: 'Adam family', ids: ['adam', 'nadam'] },
   { label: 'Sign-based', ids: ['lion'] }
 ];
 

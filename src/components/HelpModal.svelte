@@ -231,7 +231,16 @@
         'The merger the whole trunk builds to: take Momentum’s moving average of gradients (decay β₁) AND RMSProp’s moving average of squared gradients (decay β₂), and use them together. One honest detail: both averages start at zero and read too low at first, so each is divided by 1−βᵗ to correct that early bias. The result became the workhorse of modern deep learning — and the launch point for every branch that follows.',
       formula: String.raw`\hat{\mathbf{m}} = \frac{\mathbf{m}}{1-\beta_1^t}, \quad \hat{s} = \frac{s}{1-\beta_2^t}, \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \frac{\hat{\mathbf{m}}}{\sqrt{\hat{s}} + \varepsilon}`,
       fix: 'robust out of the box almost everywhere',
-      brk: 'sometimes generalizes worse than carefully tuned SGD — the story isn’t over'
+      brk: 'not perfect — three later papers each sand down one rough edge'
+    },
+    {
+      year: '2016',
+      name: 'Nadam',
+      by: 'Timothy Dozat — Nesterov-accelerated Adam',
+      idea:
+        'The first refinement. Remember Act II, where Nesterov beat plain momentum by measuring the gradient a step ahead? Nadam plays that exact trick inside Adam: swap the bias-corrected momentum m̂ for a blend that leans toward where the momentum is heading, then divide by the same adaptive √ŝ. A small change bought for a little less overshoot and a slightly quicker settle.',
+      formula: String.raw`\bar{\mathbf{m}} = \beta_1 \hat{\mathbf{m}} + \frac{(1{-}\beta_1)\nabla \mathcal{L}}{1-\beta_1^t}, \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\,\frac{\bar{\mathbf{m}}}{\sqrt{\hat{\mathbf{s}}}+\varepsilon}`,
+      fix: 'Nesterov foresight on Adam’s momentum'
     },
     {
       act: { no: 'Branch', title: 'Sign steps' },

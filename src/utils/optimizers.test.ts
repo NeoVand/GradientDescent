@@ -83,6 +83,19 @@ describe('optimizers', () => {
     }
   });
 
+  it('nadam takes a larger first step than adam — the Nesterov look-ahead', () => {
+    // From the same cold start and inputs, Nadam's blended first moment leans
+    // toward the fresh gradient, so its very first step overshoots Adam's.
+    const p = { a: 5, b: -5 };
+    const g = { a: 1, b: -1 };
+    const ad = optimizers.adam.step(p, g, optimizers.adam.init(), 0.1, defaultHyper('adam'));
+    const na = optimizers.nadam.step(p, g, optimizers.nadam.init(), 0.1, defaultHyper('nadam'));
+    expect(Math.abs(na.params.a - p.a)).toBeGreaterThan(Math.abs(ad.params.a - p.a));
+    // Still downhill on both axes.
+    expect(Math.sign(na.params.a - p.a)).toBe(-1);
+    expect(Math.sign(na.params.b - p.b)).toBe(1);
+  });
+
   it('adagrad steps shrink as gradient history accumulates', () => {
     const opt = optimizers.adagrad;
     let params = { a: 10, b: 10 };
