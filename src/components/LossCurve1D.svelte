@@ -486,7 +486,9 @@
         optimizerSel,
         optimizerState,
         trainingCfg,
-        $runStartStep
+        $runStartStep,
+        problemConfig,
+        trainData
       );
       if (!preview) {
         // nothing to preview

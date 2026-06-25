@@ -238,7 +238,9 @@
     $optimizerStore,
     $optimizerStateStore,
     $trainingStore,
-    $runStartStep
+    $runStartStep,
+    problemConfig,
+    trainData
   );
 
   // Repaint the marker layer whenever the preview moves — this is what

@@ -13,13 +13,24 @@
  */
 
 import type { ModelParameters } from '../types/types';
+import { newtonStep, isPositiveDefinite, type Hessian2 } from './hessian';
 
-export type OptimizerId = 'gd' | 'momentum' | 'nesterov' | 'adagrad' | 'rmsprop' | 'adadelta' | 'adam' | 'nadam' | 'adamw' | 'radam' | 'lion';
+export type OptimizerId = 'gd' | 'momentum' | 'nesterov' | 'adagrad' | 'rmsprop' | 'adadelta' | 'adam' | 'nadam' | 'adamw' | 'radam' | 'newton' | 'lion';
 
 export interface OptimizerState {
   v: ModelParameters;
   s: ModelParameters;
   t: number;
+}
+
+/**
+ * Extra per-step context for optimizers that need more than the gradient.
+ * Second-order methods (Newton, Sophia) read the local Hessian from here; the
+ * trainer computes it only for optimizers that flag `usesHessian`, so the
+ * first-order methods pay nothing.
+ */
+export interface OptimizerStepContext {
+  hessian?: Hessian2;
 }
 
 export interface HyperparamSpec {
@@ -52,13 +63,16 @@ export interface Optimizer {
    * this unset and inherit the problem's curated γ.
    */
   fixedLearningRate?: number;
+  /** Second-order methods set this so the trainer computes a Hessian for them. */
+  usesHessian?: boolean;
   init(): OptimizerState;
   step(
     params: ModelParameters,
     gradient: ModelParameters,
     state: OptimizerState,
     learningRate: number,
-    hyper: Record<string, number>
+    hyper: Record<string, number>,
+    ctx?: OptimizerStepContext
   ): { params: ModelParameters; state: OptimizerState };
 }
 
@@ -461,6 +475,51 @@ export const radam: Optimizer = {
   }
 };
 
+// When the local curvature is not a clean bowl, Newton descends the gradient
+// instead, gently (γ defaults to 1 for it, so a raw step would be huge).
+const NEWTON_FALLBACK = 0.05;
+
+// Newton's method (1680s) — the original second-order optimizer, and the one
+// every method above is a cheap imitation of. Instead of just the slope ∇, it
+// uses the local CURVATURE: fit a quadratic bowl to the surface here (the
+// Hessian H) and jump straight to that bowl's minimum, −H⁻¹∇. On a true bowl
+// that lands the answer in a single step, no learning rate to tune. The catch
+// is why nobody trains big models with it: H is N×N for N parameters (here just
+// 2×2, so it's free — this is the app already drawing the Newton ghost in the
+// curvature lens), and away from a convex bowl −H⁻¹∇ can point UPHILL. When the
+// curvature isn't a clean bowl (saddle or singular H) we fall back to a plain
+// gradient step. γ acts as a damping factor; leave it at 1 for the full jump.
+export const newton: Optimizer = {
+  id: 'newton',
+  name: 'Newton',
+  description: 'Second order: jump using local curvature',
+  updateRuleLatex: String.raw`\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \mathbf{H}^{-1} \nabla \mathcal{L}`,
+  hyperparams: [],
+  fixedLearningRate: 1.0,
+  usesHessian: true,
+  init: initState,
+  step(params, g, state, lr, _hyper, ctx) {
+    const hess = ctx?.hessian;
+    const nstep = hess ? newtonStep(hess, g) : null;
+    // Trust the Newton step only inside a genuine local bowl (H positive-
+    // definite and invertible); otherwise it can head uphill, so descend the
+    // gradient instead — damped, since γ defaults to 1 here.
+    let dirA: number;
+    let dirB: number;
+    if (nstep && hess && isPositiveDefinite(hess)) {
+      dirA = nstep.a;
+      dirB = nstep.b;
+    } else {
+      dirA = -NEWTON_FALLBACK * g.a;
+      dirB = -NEWTON_FALLBACK * g.b;
+    }
+    return {
+      params: { a: params.a + lr * dirA, b: params.b + lr * dirB },
+      state: { ...state, v: { ...g }, t: state.t + 1 }
+    };
+  }
+};
+
 // Lion (Chen et al., 2023) — "EvoLved Sign Momentum". The update direction is
 // the SIGN of a momentum/gradient blend, so every step has the SAME magnitude γ
 // on each axis no matter how steep the slope. That makes it strikingly distinct
@@ -533,6 +592,7 @@ export const optimizers: Record<OptimizerId, Optimizer> = {
   nadam,
   adamw,
   radam,
+  newton,
   lion
 };
 
@@ -547,7 +607,8 @@ export const optimizerGroups: { label: string; ids: OptimizerId[] }[] = [
   { label: 'Momentum', ids: ['momentum', 'nesterov'] },
   { label: 'Adaptive rates', ids: ['adagrad', 'rmsprop', 'adadelta'] },
   { label: 'Adam family', ids: ['adam', 'nadam', 'adamw', 'radam'] },
-  { label: 'Sign-based', ids: ['lion'] }
+  { label: 'Sign-based', ids: ['lion'] },
+  { label: 'Second-order', ids: ['newton'] }
 ];
 
 export const optimizerOrder: OptimizerId[] = optimizerGroups.flatMap(g => g.ids);

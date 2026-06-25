@@ -11,13 +11,29 @@ import type { ModelParameters } from '../types/types';
 
 const grad = (p: ModelParameters): ModelParameters => ({ a: 2 * p.a, b: 2 * p.b });
 
+// Finite-difference Hessian of `grad` at p (the trainer supplies the real one
+// at run time; second-order optimizers can't step without it).
+function fdHessian(p: ModelParameters) {
+  const e = 1e-4;
+  const gaP = grad({ a: p.a + e, b: p.b });
+  const gaM = grad({ a: p.a - e, b: p.b });
+  const gbP = grad({ a: p.a, b: p.b + e });
+  const gbM = grad({ a: p.a, b: p.b - e });
+  return {
+    h11: (gaP.a - gaM.a) / (2 * e),
+    h12: (gbP.a - gbM.a) / (2 * e),
+    h22: (gbP.b - gbM.b) / (2 * e)
+  };
+}
+
 function run(id: OptimizerId, steps: number, lr: number, hyper?: Record<string, number>) {
   const opt = optimizers[id];
   let params: ModelParameters = { a: 1.5, b: -2.0 };
   let state = opt.init();
   const h = hyper ?? defaultHyper(id);
   for (let i = 0; i < steps; i++) {
-    const out = opt.step(params, grad(params), state, lr, h);
+    const ctx = opt.usesHessian ? { hessian: fdHessian(params) } : undefined;
+    const out = opt.step(params, grad(params), state, lr, h, ctx);
     params = out.params;
     state = out.state;
   }
@@ -172,6 +188,28 @@ describe('optimizers', () => {
       expect(Math.sign(out.params.a - params.a)).toBe(-1); // downhill on +g
       expect(Math.sign(out.params.b - params.b)).toBe(1);
     }
+  });
+
+  it('newton lands on the minimum of a quadratic bowl in a single step', () => {
+    // f(θ)=a²+b² has H=2I; −H⁻¹∇ at any point is exactly the vector to the
+    // origin, so one full (γ=1) Newton step reaches the minimum.
+    const opt = optimizers.newton;
+    const p = { a: 1.5, b: -2.0 };
+    const out = opt.step(p, grad(p), opt.init(), 1.0, defaultHyper('newton'), { hessian: fdHessian(p) });
+    expect(out.params.a).toBeCloseTo(0, 6);
+    expect(out.params.b).toBeCloseTo(0, 6);
+  });
+
+  it('newton falls back to a gentle gradient step on non-convex curvature', () => {
+    // An indefinite Hessian (a saddle) is not positive-definite, so Newton
+    // refuses the −H⁻¹∇ jump (which could go uphill) and descends the gradient.
+    const opt = optimizers.newton;
+    const p = { a: 2, b: 2 };
+    const g = { a: 4, b: 4 };
+    const out = opt.step(p, g, opt.init(), 1.0, defaultHyper('newton'), { hessian: { h11: 1, h12: 0, h22: -1 } });
+    expect(out.params.a).toBeLessThan(p.a); // downhill
+    expect(out.params.b).toBeLessThan(p.b);
+    expect(p.a - out.params.a).toBeLessThan(g.a); // gentle, not a raw γ·∇ leap
   });
 
   it('state is not mutated in place', () => {

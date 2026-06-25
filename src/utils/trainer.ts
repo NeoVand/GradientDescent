@@ -35,6 +35,7 @@ import {
 } from '../stores/stores';
 import { problemConfigs } from './problems';
 import { optimizers, defaultHyper, type OptimizerId } from './optimizers';
+import { computeHessian } from './hessian';
 import { normalizedLogLoss } from './lossGrid';
 import { schedules } from './schedules';
 import type { DataPoint, ProblemType } from '../types/types';
@@ -107,7 +108,8 @@ function doOneStep(): boolean {
   const opt = optimizers[sel.id];
 
   const params = get(parametersStore);
-  const gradient = config.computeGradient(sampleBatch(trainData), params);
+  const batch = sampleBatch(trainData);
+  const gradient = config.computeGradient(batch, params);
 
   // Effective γ under the schedule, measured by progress through this run.
   // A continuous (∞) run has no horizon, so the schedule doesn't apply —
@@ -119,7 +121,10 @@ function doOneStep(): boolean {
     ? t.learningRate
     : t.learningRate * schedules[t.schedule].factor(tInRun, t.totalSteps);
 
-  const result = opt.step(params, gradient, get(optimizerStateStore), effLr, sel.hyper);
+  // Second-order methods need the local curvature, computed on the SAME batch
+  // as the gradient so H and ∇ are consistent. First-order methods skip it.
+  const ctx = opt.usesHessian ? { hessian: computeHessian(config, batch, params) } : undefined;
+  const result = opt.step(params, gradient, get(optimizerStateStore), effLr, sel.hyper, ctx);
 
   // The chart always shows the loss over the full training set, so curve
   // wobble under small batches reflects parameter noise, not measurement.
@@ -469,12 +474,16 @@ function stepRace(cap: number) {
     if (r.finished || r.diverged || r.steps >= cap) continue;
 
     const gradient = config.computeGradient(trainData, r.params);
+    const ctx = optimizers[r.id].usesHessian
+      ? { hessian: computeHessian(config, trainData, r.params) }
+      : undefined;
     const out = optimizers[r.id].step(
       r.params,
       gradient,
       r.state,
       resolveLearningRate(r.id, problem),
-      hyperForProblem(r.id, problem)
+      hyperForProblem(r.id, problem),
+      ctx
     );
     const loss = config.computeLoss(trainData, out.params);
 

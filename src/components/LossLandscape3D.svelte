@@ -685,7 +685,9 @@
       get(optimizerStore),
       get(optimizerStateStore),
       get(trainingStore),
-      get(runStartStep)
+      get(runStartStep),
+      config,
+      train
     );
     if (preview && !get(raceStore)) {
       const na = Math.max(min, Math.min(max, preview.a));

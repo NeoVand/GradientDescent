@@ -272,6 +272,17 @@
       formula: String.raw`\mathbf{c} \leftarrow \beta_1 \mathbf{m} + (1{-}\beta_1)\nabla\mathcal{L}, \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \operatorname{sign}(\mathbf{c}), \;\; \mathbf{m} \leftarrow \beta_2 \mathbf{m} + (1{-}\beta_2)\nabla\mathcal{L}`,
       fix: 'fixed-size steps from one tiny buffer — light and fast',
       brk: 'the step never shrinks, so it orbits the minimum until γ is decayed (Chapter 8)'
+    },
+    {
+      act: { no: 'Branch', title: 'Use curvature' },
+      year: '1680s',
+      name: 'Newton',
+      by: 'Isaac Newton — the original, three centuries early',
+      idea:
+        'The branch that reaches back furthest — and the method every optimizer above is a cheap stand-in for. They all read only the slope ∇. Newton also reads the CURVATURE: fit a quadratic bowl to the surface right here (the Hessian H) and jump straight to that bowl’s bottom, −H⁻¹∇. On a real bowl that nails the minimum in ONE step, with no learning rate to tune. This app already draws that jump — it is the violet Newton ghost in the curvature lens. So why isn’t it everywhere? H is N×N for N parameters: trivial for our 2, ruinous for a billion. And away from a convex bowl −H⁻¹∇ can aim uphill, so here it falls back to a gradient step on saddles.',
+      formula: String.raw`\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \mathbf{H}^{-1}\nabla \mathcal{L}`,
+      fix: 'curvature-aware: one step to the bottom of any true bowl',
+      brk: 'the N×N Hessian is hopeless at scale — and it stumbles on saddles'
     }
   ];
 
@@ -890,6 +901,15 @@
                     the peak the gradient is so faint the marker stalls. Crank μ to 0.9 and watch it
                     power through. Remember the marker arrows from Part II: blue is raw steepest
                     descent, red is the step actually taken — here the gap is momentum at work.
+                  </p>
+                {/if}
+                {#if c.name === 'Newton'}
+                  <p class="aside">
+                    Turn on the <strong>curvature lens</strong> (the hexagon button on the Loss &amp;
+                    Gradient panel) to see Newton’s violet ghost arrow — that is exactly the step it
+                    takes. Pick a clean bowl like <strong>Linear Regression</strong>, drop the marker
+                    anywhere, and Newton snaps to the bottom almost at once; then try a saddle from
+                    the Classic surfaces and watch it give up the jump and crawl.
                   </p>
                 {/if}
                 {#if c.name === 'Lion'}
