@@ -27,7 +27,7 @@
   $: compact = width < 480;
   $: margin = compact
     ? { top: 6, right: 10, bottom: 36, left: 38 }
-    : { top: 20, right: 20, bottom: 40, left: 50 };
+    : { top: 12, right: 20, bottom: 40, left: 50 };
   $: xLabelOffset = compact ? 30 : 28;
   $: yLabelOffset = compact ? 28 : 35;
   
@@ -391,7 +391,7 @@
     justify-content: space-between;
     align-items: center;
     height: 28px;
-    margin-bottom: 0.375rem;
+    margin-bottom: 0.25rem;
     margin-right: 20px;
     flex-shrink: 0;
   }
