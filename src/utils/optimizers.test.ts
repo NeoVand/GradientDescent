@@ -114,6 +114,16 @@ describe('optimizers', () => {
     expect(Math.sign(out.params.b)).toBe(-1);
   });
 
+  it('radam warms up as momentum SGD: its first step scales with the gradient', () => {
+    // Early on (ρ_t ≤ 4) RAdam skips adaptive scaling and steps along γ·m̂ = γ·g.
+    // So doubling the gradient doubles the first step — the opposite of Adam's
+    // scale-invariant first step, and the signature of the automatic warmup.
+    const opt = optimizers.radam;
+    const s1 = opt.step({ a: 5, b: -5 }, { a: 1, b: -1 }, opt.init(), 0.1, defaultHyper('radam'));
+    const s2 = opt.step({ a: 5, b: -5 }, { a: 2, b: -2 }, opt.init(), 0.1, defaultHyper('radam'));
+    expect(Math.abs(s2.params.a - 5)).toBeCloseTo(2 * Math.abs(s1.params.a - 5), 9);
+  });
+
   it('adagrad steps shrink as gradient history accumulates', () => {
     const opt = optimizers.adagrad;
     let params = { a: 10, b: 10 };

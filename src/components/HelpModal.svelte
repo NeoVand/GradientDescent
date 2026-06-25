@@ -253,6 +253,16 @@
       brk: 'with no overfitting to fight here, λ is a pull toward 0 more than a regularizer'
     },
     {
+      year: '2019',
+      name: 'RAdam',
+      by: 'Liu et al. — Adam’s warmup, automated',
+      idea:
+        'The third refinement closes a quieter Adam wart. In the first handful of steps Adam has barely any squared-gradient history, so its √ŝ scaling is pure noise — the practitioner’s fix was a hand-tuned warmup that crept the rate up by hand. RAdam computes how trustworthy that variance actually is (a number ρ_t) and, until it can be trusted, just skips the scaling and takes a plain momentum step. A rectification factor then eases the adaptive part in. Warmup, but derived rather than guessed — nothing to tune.',
+      formula: String.raw`\rho_t = \rho_\infty - \frac{2t\,\beta_2^{t}}{1-\beta_2^{t}}, \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, r_t\,\frac{\hat{\mathbf{m}}}{\sqrt{\hat{\mathbf{s}}}+\varepsilon}\;\;(\rho_t > 4)`,
+      fix: 'an automatic warmup — no schedule to hand-tune',
+      brk: 'only smooths the opening steps; past warmup it just is Adam'
+    },
+    {
       act: { no: 'Branch', title: 'Sign steps' },
       year: '2023',
       name: 'Lion',

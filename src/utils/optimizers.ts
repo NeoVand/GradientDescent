@@ -14,7 +14,7 @@
 
 import type { ModelParameters } from '../types/types';
 
-export type OptimizerId = 'gd' | 'momentum' | 'nesterov' | 'adagrad' | 'rmsprop' | 'adadelta' | 'adam' | 'nadam' | 'adamw' | 'lion';
+export type OptimizerId = 'gd' | 'momentum' | 'nesterov' | 'adagrad' | 'rmsprop' | 'adadelta' | 'adam' | 'nadam' | 'adamw' | 'radam' | 'lion';
 
 export interface OptimizerState {
   v: ModelParameters;
@@ -402,6 +402,65 @@ export const adamw: Optimizer = {
   }
 };
 
+// RAdam (Liu et al., 2019) — "Rectified Adam". Adam's adaptive step has wild
+// variance in the first handful of updates — too few squared-gradient samples
+// to trust √ŝ — which is exactly why Adam usually needs a hand-tuned warmup.
+// RAdam measures how trustworthy that variance is (ρ_t) and, until it crosses a
+// threshold, skips the adaptive scaling entirely and takes a plain momentum
+// step: an automatic warmup with nothing to tune. Once ρ_t is large enough it
+// switches on a variance-rectified adaptive step (factor r_t) that ramps
+// smoothly up to ordinary Adam. Same two decays, same fixed γ.
+export const radam: Optimizer = {
+  id: 'radam',
+  name: 'RAdam',
+  description: 'Adam with a built-in, automatic warmup',
+  updateRuleLatex: String.raw`\rho_t = \rho_\infty - \frac{2t\,\beta_2^{t}}{1-\beta_2^{t}}, \quad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, r_t\,\frac{\hat{\mathbf{m}}}{\sqrt{\hat{\mathbf{s}}} + \varepsilon}\;\;(\rho_t > 4),\;\; \text{else}\; -\gamma\,\hat{\mathbf{m}}`,
+  hyperparams: [BETA1_SPEC, BETA2_SPEC],
+  fixedLearningRate: 0.1,
+  init: initState,
+  step(params, g, state, lr, hyper) {
+    const b1 = hyper.beta1 ?? BETA1_SPEC.default;
+    const b2 = hyper.beta2 ?? BETA2_SPEC.default;
+    const t = state.t + 1;
+    const v = {
+      a: b1 * state.v.a + (1 - b1) * g.a,
+      b: b1 * state.v.b + (1 - b1) * g.b
+    };
+    const s = {
+      a: b2 * state.s.a + (1 - b2) * g.a * g.a,
+      b: b2 * state.s.b + (1 - b2) * g.b * g.b
+    };
+    const mc1 = 1 - Math.pow(b1, t);
+    const mHatA = v.a / mc1;
+    const mHatB = v.b / mc1;
+    // ρ∞ = max length of the SMA approximated by the second moment; ρ_t is its
+    // value at step t. Below ~4 the variance is untrustworthy → momentum SGD.
+    const rhoInf = 2 / (1 - b2) - 1;
+    const rhoT = rhoInf - (2 * t * Math.pow(b2, t)) / (1 - Math.pow(b2, t));
+    let stepA: number;
+    let stepB: number;
+    if (rhoT > 4) {
+      const mc2 = 1 - Math.pow(b2, t);
+      const sHatA = Math.sqrt(s.a / mc2);
+      const sHatB = Math.sqrt(s.b / mc2);
+      // Variance-rectification factor: ramps from small toward 1 as ρ_t → ρ∞.
+      const rt = Math.sqrt(
+        ((rhoT - 4) * (rhoT - 2) * rhoInf) / ((rhoInf - 4) * (rhoInf - 2) * rhoT)
+      );
+      stepA = (rt * mHatA) / (sHatA + EPS);
+      stepB = (rt * mHatB) / (sHatB + EPS);
+    } else {
+      // Warmup phase: plain momentum step, no adaptive scaling.
+      stepA = mHatA;
+      stepB = mHatB;
+    }
+    return {
+      params: { a: params.a - lr * stepA, b: params.b - lr * stepB },
+      state: { v, s, t }
+    };
+  }
+};
+
 // Lion (Chen et al., 2023) — "EvoLved Sign Momentum". The update direction is
 // the SIGN of a momentum/gradient blend, so every step has the SAME magnitude γ
 // on each axis no matter how steep the slope. That makes it strikingly distinct
@@ -473,6 +532,7 @@ export const optimizers: Record<OptimizerId, Optimizer> = {
   adam,
   nadam,
   adamw,
+  radam,
   lion
 };
 
@@ -486,7 +546,7 @@ export const optimizerGroups: { label: string; ids: OptimizerId[] }[] = [
   { label: 'Baseline', ids: ['gd'] },
   { label: 'Momentum', ids: ['momentum', 'nesterov'] },
   { label: 'Adaptive rates', ids: ['adagrad', 'rmsprop', 'adadelta'] },
-  { label: 'Adam family', ids: ['adam', 'nadam', 'adamw'] },
+  { label: 'Adam family', ids: ['adam', 'nadam', 'adamw', 'radam'] },
   { label: 'Sign-based', ids: ['lion'] }
 ];
 
