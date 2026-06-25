@@ -213,6 +213,16 @@
       fix: 'forgetting keeps the step size alive'
     },
     {
+      year: '2012',
+      name: 'AdaDelta',
+      by: 'Matthew Zeiler — same year, same fix, one step further',
+      idea:
+        'RMSProp’s twin, born the same year against the same AdaGrad flaw — but Zeiler spotted a deeper oddity: a raw gradient step has the wrong units. AdaDelta divides by RMS[∇] like RMSProp, then multiplies by the RMS of its OWN recent steps. The two memories make the ratio dimensionless, and the learning rate falls out of the math entirely — there is nothing left to set but the decay ρ.',
+      formula: String.raw`\Delta\boldsymbol{\theta} = -\frac{\sqrt{\mathbf{u}+\varepsilon}}{\sqrt{\mathbf{s}+\varepsilon}}\,\nabla \mathcal{L}, \qquad \mathbf{u} \leftarrow \rho\,\mathbf{u} + (1-\rho)\,\Delta\boldsymbol{\theta}^2`,
+      fix: 'no learning rate to tune — it sizes its own steps',
+      brk: 'one knob fewer, but no γ to crank when you DO want it faster'
+    },
+    {
       act: { no: 'Act IV', title: 'Put the two together' },
       year: '2014',
       name: 'Adam',

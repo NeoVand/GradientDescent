@@ -14,7 +14,7 @@
 
 import type { ModelParameters } from '../types/types';
 
-export type OptimizerId = 'gd' | 'momentum' | 'nesterov' | 'adagrad' | 'rmsprop' | 'adam' | 'lion';
+export type OptimizerId = 'gd' | 'momentum' | 'nesterov' | 'adagrad' | 'rmsprop' | 'adadelta' | 'adam' | 'lion';
 
 export interface OptimizerState {
   v: ModelParameters;
@@ -188,6 +188,61 @@ export const rmsprop: Optimizer = {
   }
 };
 
+// AdaDelta (Zeiler, 2012) — RMSProp's sibling, born the same year to fix the
+// same AdaGrad flaw, but it goes one step further and removes the learning
+// rate ENTIRELY. The trick is a units argument: a plain gradient step has the
+// wrong units (∝ ∇, not θ). AdaDelta multiplies by RMS[Δθ]/RMS[g] — a running
+// memory of its OWN past step sizes over the RMS gradient — so the ratio is
+// dimensionless and the step inherits θ's units. There is nothing to tune but
+// the decay ρ. We keep the app's γ as a plain global gain (leave it at 1).
+// State reuse: s = E[g²] (running mean square of gradients), v = E[Δθ²]
+// (running mean square of updates — there's no velocity here to collide with).
+// ε also floors the very first step (when E[Δθ²]=0): the canonical 1e-6 is
+// authentic but warms up too slowly for this toy's short runs, so we use 1e-4
+// — still a legitimate AdaDelta ε, but it descends visibly within a run.
+const ADADELTA_EPS = 1e-4;
+
+const ADADELTA_RHO: HyperparamSpec = {
+  key: 'rho',
+  label: 'Decay',
+  symbol: 'ρ',
+  min: 0.5,
+  max: 0.999,
+  step: 0.001,
+  default: 0.95,
+  hint: 'How slowly both running averages — of squared gradients and squared updates — forget.'
+};
+
+export const adadelta: Optimizer = {
+  id: 'adadelta',
+  name: 'AdaDelta',
+  description: 'RMSProp with no learning rate — the units fix themselves',
+  updateRuleLatex: String.raw`\mathbf{s} \leftarrow \rho \mathbf{s} + (1{-}\rho)(\nabla \mathcal{L})^2, \;\; \Delta\boldsymbol{\theta} = -\frac{\sqrt{\mathbf{u} + \varepsilon}}{\sqrt{\mathbf{s} + \varepsilon}}\,\nabla \mathcal{L}, \;\; \mathbf{u} \leftarrow \rho \mathbf{u} + (1{-}\rho)\Delta\boldsymbol{\theta}^2, \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} + \gamma\,\Delta\boldsymbol{\theta}`,
+  hyperparams: [ADADELTA_RHO],
+  // No learning rate of its own; γ is just a global gain. Default it to 1.
+  fixedLearningRate: 1.0,
+  init: initState,
+  step(params, g, state, lr, hyper) {
+    const rho = hyper.rho ?? ADADELTA_RHO.default;
+    const s = {
+      a: rho * state.s.a + (1 - rho) * g.a * g.a,
+      b: rho * state.s.b + (1 - rho) * g.b * g.b
+    };
+    // u carries E[Δθ²] from the PREVIOUS step — the numerator's memory.
+    const u = state.v;
+    const da = -(Math.sqrt(u.a + ADADELTA_EPS) / Math.sqrt(s.a + ADADELTA_EPS)) * g.a;
+    const db = -(Math.sqrt(u.b + ADADELTA_EPS) / Math.sqrt(s.b + ADADELTA_EPS)) * g.b;
+    const v = {
+      a: rho * u.a + (1 - rho) * da * da,
+      b: rho * u.b + (1 - rho) * db * db
+    };
+    return {
+      params: { a: params.a + lr * da, b: params.b + lr * db },
+      state: { v, s, t: state.t + 1 }
+    };
+  }
+};
+
 const BETA1_SPEC: HyperparamSpec = {
   key: 'beta1',
   label: 'Momentum decay',
@@ -313,6 +368,7 @@ export const optimizers: Record<OptimizerId, Optimizer> = {
   nesterov,
   adagrad,
   rmsprop,
+  adadelta,
   adam,
   lion
 };
@@ -326,7 +382,7 @@ export const optimizers: Record<OptimizerId, Optimizer> = {
 export const optimizerGroups: { label: string; ids: OptimizerId[] }[] = [
   { label: 'Baseline', ids: ['gd'] },
   { label: 'Momentum', ids: ['momentum', 'nesterov'] },
-  { label: 'Adaptive rates', ids: ['adagrad', 'rmsprop'] },
+  { label: 'Adaptive rates', ids: ['adagrad', 'rmsprop', 'adadelta'] },
   { label: 'Adam family', ids: ['adam'] },
   { label: 'Sign-based', ids: ['lion'] }
 ];

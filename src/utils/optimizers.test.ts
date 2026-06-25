@@ -29,9 +29,30 @@ describe('optimizers', () => {
     const f = (p: ModelParameters) => p.a * p.a + p.b * p.b;
     const start = f({ a: 1.5, b: -2.0 });
     for (const id of Object.keys(optimizers) as OptimizerId[]) {
-      const end = f(run(id, 50, id === 'gd' || id === 'momentum' || id === 'nesterov' ? 0.05 : 0.1));
+      // Each optimizer is tested at the γ it actually ships with: the momentum
+      // family at 0.05, AdaDelta at its self-scaling gain of 1, the rest at 0.1.
+      const lr =
+        id === 'gd' || id === 'momentum' || id === 'nesterov'
+          ? 0.05
+          : id === 'adadelta'
+            ? 1.0
+            : 0.1;
+      const end = f(run(id, 50, lr));
       expect(end, `${id} should reduce loss`).toBeLessThan(start * 0.2);
     }
+  });
+
+  it('adadelta is learning-rate-free and eases in from a cold start', () => {
+    const opt = optimizers.adadelta;
+    // No learning rate among its knobs — the decay ρ is the only one.
+    expect(opt.fixedLearningRate).toBe(1);
+    expect(opt.hyperparams.map((h) => h.key)).toEqual(['rho']);
+    // E[Δθ²] = 0 at the start floors the first step near √ε, far below a raw
+    // gradient step (|γ·∇| = 5 here) — AdaDelta eases in rather than leaping.
+    const out = opt.step({ a: 1.5, b: -2 }, { a: 3, b: -4 }, opt.init(), 1.0, defaultHyper('adadelta'));
+    const stepMag = Math.hypot(out.params.a - 1.5, out.params.b - -2);
+    expect(stepMag).toBeGreaterThan(0);
+    expect(stepMag).toBeLessThan(0.2);
   });
 
   it('momentum with μ=0 equals plain GD exactly', () => {
