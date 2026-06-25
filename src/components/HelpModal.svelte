@@ -65,7 +65,7 @@
     { id: 'ch-step', n: '4', title: 'One step of descent' },
     { id: 'ch-gamma', n: '5', title: 'The learning rate γ' },
     { part: "Part III · When one step isn't enough" },
-    { id: 'ch-optimizers', n: '6', title: 'Seven optimizers, one story' },
+    { id: 'ch-optimizers', n: '6', title: 'The optimizer family tree' },
     { id: 'ch-noise', n: '7', title: 'Mini-batches & the S in SGD' },
     { id: 'ch-schedule', n: '8', title: 'Scheduling the learning rate' },
     { part: 'Part IV · The zoo' },
@@ -135,8 +135,10 @@
   };
 
   // ---------- The optimizer story ----------
-  // 170 years of "fix what just broke", told as cards in three acts plus a
-  // finale. Each card now leads with the failure it exists to fix.
+  // 170 years of "fix what just broke", told as cards: a main trunk (Acts I–IV,
+  // GD → Adam) that forks into branches after Adam (sign steps, and — as later
+  // chapters land — second-order and self-tuning). Each card leads with the
+  // failure it exists to fix.
   type OptChapter = {
     year: string;
     name: string;
@@ -211,23 +213,23 @@
       fix: 'forgetting keeps the step size alive'
     },
     {
-      act: { no: 'Finale', title: 'Combine everything' },
+      act: { no: 'Act IV', title: 'Put the two together' },
       year: '2014',
       name: 'Adam',
       by: 'Kingma & Ba — "adaptive moments"',
       idea:
-        'The merger that ends the story: take Momentum’s moving average of gradients (decay β₁) AND RMSProp’s moving average of squared gradients (decay β₂), and use them together. One honest detail: both averages start at zero and read too low at first, so each is divided by 1−βᵗ to correct that early bias. The result is the default optimizer of modern deep learning.',
+        'The merger the whole trunk builds to: take Momentum’s moving average of gradients (decay β₁) AND RMSProp’s moving average of squared gradients (decay β₂), and use them together. One honest detail: both averages start at zero and read too low at first, so each is divided by 1−βᵗ to correct that early bias. The result became the workhorse of modern deep learning — and the launch point for every branch that follows.',
       formula: String.raw`\hat{\mathbf{m}} = \frac{\mathbf{m}}{1-\beta_1^t}, \quad \hat{s} = \frac{s}{1-\beta_2^t}, \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \frac{\hat{\mathbf{m}}}{\sqrt{\hat{s}} + \varepsilon}`,
       fix: 'robust out of the box almost everywhere',
       brk: 'sometimes generalizes worse than carefully tuned SGD — the story isn’t over'
     },
     {
-      act: { no: 'Coda', title: 'A different shape' },
+      act: { no: 'Branch', title: 'Sign steps' },
       year: '2023',
       name: 'Lion',
       by: 'Chen et al. (Google) — found by program search, not designed',
       idea:
-        'Adam was the finale of one idea — scale the step by gradient history. Lion takes a different shape entirely, and it wasn’t invented by a person: a program searched the space of optimizers and this fell out. Keep one momentum buffer, blend it with the fresh gradient, and step by the SIGN of the result — so every step is the same size γ on each axis, no matter how steep or flat. That makes it light (one buffer, no squared-gradient term) and competitive with Adam on big vision and language models. The catch is the very thing that makes it clean: a step that never shrinks can’t settle by itself.',
+        'Adam scaled the step by gradient history. Lion throws that out and takes a different shape — and it wasn’t invented by a person: a program searched the space of optimizers and this fell out. Keep one momentum buffer, blend it with the fresh gradient, and step by the SIGN of the result — so every step is the same size γ on each axis, no matter how steep or flat. That makes it light (one buffer, no squared-gradient term) and competitive with Adam on big vision and language models. The catch is the very thing that makes it clean: a step that never shrinks can’t settle by itself.',
       formula: String.raw`\mathbf{c} \leftarrow \beta_1 \mathbf{m} + (1{-}\beta_1)\nabla\mathcal{L}, \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \operatorname{sign}(\mathbf{c}), \;\; \mathbf{m} \leftarrow \beta_2 \mathbf{m} + (1{-}\beta_2)\nabla\mathcal{L}`,
       fix: 'fixed-size steps from one tiny buffer — light and fast',
       brk: 'the step never shrinks, so it orbits the minimum until γ is decayed (Chapter 8)'
@@ -756,13 +758,15 @@
             <!-- ============== 6 · THE OPTIMIZER STORY ============== -->
             <section data-ch="ch-optimizers" id="ch-optimizers">
               <div class="part-label">Part III · When one step isn’t enough</div>
-              <h3><svelte:component this={chIcon['ch-optimizers']} size={18} strokeWidth={2} /> Seven optimizers, one story</h3>
+              <h3><svelte:component this={chIcon['ch-optimizers']} size={18} strokeWidth={2} /> The optimizer family tree</h3>
               <p>
                 Plain gradient descent has one recurring nemesis: the <strong>ravine</strong> — a
                 valley far steeper across than along. The γ that’s safe on the steep walls is
                 hopeless along the gentle floor, so the marker rattles wall to wall. Every optimizer
                 in the picker is a patch for that pain (or the new pain the last patch created) —
-                170 years of <em>fix what just broke.</em>
+                170 years of <em>fix what just broke</em>: a single trunk of fixes that, once it
+                reaches Adam, finally splits into the branches still being explored today. The
+                picker is grouped to match.
               </p>
               <p>
                 Here are four of them racing on the same ravine from the same start, each actually
@@ -816,6 +820,13 @@
               </figure>
 
               {#each optTree as c (c.name)}
+                {#if c.name === 'Lion'}
+                  <p class="opt-lead">
+                    Adam looked like the destination. It wasn’t — past it the trunk
+                    <strong>forks</strong>, and each later method keeps most of Adam (or throws it
+                    out) to rethink one piece. These are the branches the field is still walking.
+                  </p>
+                {/if}
                 {#if c.act}
                   <div class="opt-act"><span class="act-no">{c.act.no}</span><span class="act-title">{c.act.title}</span></div>
                 {/if}
@@ -852,6 +863,22 @@
                   </p>
                 {/if}
               {/each}
+
+              <div class="opt-frontier">
+                <div class="opt-frontier-title">The frontier — and why it isn’t in the picker</div>
+                <p>
+                  The optimizers winning 2025’s biggest training runs — <strong>Muon</strong> (used
+                  to train Kimi K2 and GLM), <strong>Shampoo</strong>, and <strong>SOAP</strong> —
+                  share a trick this playground can’t show. They treat a layer’s weights as a
+                  <em>matrix</em> and precondition <em>across</em> it: Muon orthogonalizes the
+                  momentum matrix, Shampoo and SOAP whiten it. With only two independent numbers,
+                  α and β, there is no matrix to exploit — strip the structure away and they collapse
+                  to methods already in the list. That matrix structure is exactly why they scale to
+                  billions of parameters, and exactly why a two-parameter sandbox is the wrong stage
+                  for them. To meet them you have to leave the playground — which is a fair note to
+                  end the tree on.
+                </p>
+              </div>
 
               {#if raceExperiment}
                 <div class="opt-cta">
@@ -1562,6 +1589,36 @@
     margin: 0.6rem 0;
   }
   .aside strong { color: var(--color-text-secondary); }
+
+  /* The trunk → branches transition that introduces the post-Adam fork. */
+  .opt-lead {
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: var(--color-text-secondary);
+    margin: 1.8rem 0 0.1rem;
+  }
+  .opt-lead strong { color: var(--color-text-primary); }
+
+  /* The 2025 matrix-optimizer note: real, relevant, deliberately not runnable. */
+  .opt-frontier {
+    margin-top: 1.2rem;
+    border: 1px dashed var(--color-border);
+    border-radius: 10px;
+    background: var(--color-bg-primary);
+    padding: 0.8rem 0.95rem;
+  }
+  .opt-frontier-title {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--color-text-primary);
+    margin-bottom: 0.35rem;
+  }
+  .opt-frontier p {
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: var(--color-text-secondary);
+    margin: 0;
+  }
 
   .opt-cta {
     display: flex; align-items: center; justify-content: space-between;
