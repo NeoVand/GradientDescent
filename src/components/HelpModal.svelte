@@ -5,10 +5,11 @@
    * A two-pane reading view: a sticky chapter rail (table of contents with
    * scroll-spy + a reading-progress bar) beside a calm, measured reading
    * column. The book climbs a gentle ladder — Part I the landscape, Part II
-   * one step, Part III when one step isn't enough (the optimizer story, with
-   * its real simulated race), Part IV the zoo of problems, then a short
-   * reference. Heavy math hides inside "Go deeper" so the main line stays
-   * readable; every term is defined where it is first used.
+   * walking downhill (the gradient, one step, the learning rate and its
+   * schedule), Part III descent in the real world (noisy mini-batches, then
+   * the optimizer family tree with its real simulated race), Part IV the zoo
+   * of problems, then a short reference. Each chapter can launch a matching
+   * preset in the live app; every term is defined where it is first used.
    */
 
   import {
@@ -62,14 +63,14 @@
     { part: 'Part I · The landscape' },
     { id: 'ch-bowl', n: '1', title: 'The bottom of a bowl' },
     { id: 'ch-landscape', n: '2', title: 'Loss is a landscape' },
-    { part: 'Part II · One step' },
+    { part: 'Part II · Walking downhill' },
     { id: 'ch-downhill', n: '3', title: 'Which way is downhill?' },
     { id: 'ch-step', n: '4', title: 'One step of descent' },
     { id: 'ch-gamma', n: '5', title: 'The learning rate γ' },
-    { part: "Part III · When one step isn't enough" },
-    { id: 'ch-optimizers', n: '6', title: 'The optimizer family tree' },
+    { id: 'ch-schedule', n: '6', title: 'Scheduling the learning rate' },
+    { part: 'Part III · Descent in the real world' },
     { id: 'ch-noise', n: '7', title: 'Mini-batches & the S in SGD' },
-    { id: 'ch-schedule', n: '8', title: 'Scheduling the learning rate' },
+    { id: 'ch-optimizers', n: '8', title: 'The optimizer family tree' },
     { part: 'Part IV · The zoo' },
     { id: 'ch-problems', n: '9', title: 'The 22 landscapes' },
     { id: 'ch-experiments', n: '10', title: 'Things to try' },
@@ -273,7 +274,7 @@
         'Adam scaled the step by gradient history. Lion throws that out and takes a different shape — and it wasn’t invented by a person: a program searched the space of optimizers and this fell out. Keep one momentum buffer, blend it with the fresh gradient, and step by the SIGN of the result — so every step is the same size γ on each axis, no matter how steep or flat. That makes it light (one buffer, no squared-gradient term) and competitive with Adam on big vision and language models. The catch is the very thing that makes it clean: a step that never shrinks can’t settle by itself.',
       formula: String.raw`\mathbf{c} \leftarrow \beta_1 \mathbf{m} + (1{-}\beta_1)\nabla\mathcal{L}, \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \operatorname{sign}(\mathbf{c}), \;\; \mathbf{m} \leftarrow \beta_2 \mathbf{m} + (1{-}\beta_2)\nabla\mathcal{L}`,
       fix: 'fixed-size steps from one tiny buffer — light and fast',
-      brk: 'the step never shrinks, so it orbits the minimum until γ is decayed (Chapter 8)'
+      brk: 'the step never shrinks, so it orbits the minimum until γ is decayed by a schedule'
     },
     {
       act: { no: 'Branch', title: 'Use curvature' },
@@ -865,7 +866,7 @@
 
             <!-- ============== 3 · WHICH WAY IS DOWNHILL ============== -->
             <section data-ch="ch-downhill" id="ch-downhill">
-              <div class="part-label">Part II · One step</div>
+              <div class="part-label">Part II · Walking downhill</div>
               <h3><svelte:component this={chIcon['ch-downhill']} size={18} strokeWidth={2} /> Which way is downhill?</h3>
 
               <p>
@@ -999,9 +1000,138 @@
               </p>
             </section>
 
-            <!-- ============== 6 · THE OPTIMIZER STORY ============== -->
+            <!-- ============== 6 · SCHEDULING THE LEARNING RATE ============== -->
+            <section data-ch="ch-schedule" id="ch-schedule">
+              <h3><svelte:component this={chIcon['ch-schedule']} size={18} strokeWidth={2} /> Scheduling the learning rate</h3>
+              <p>
+                The learning rate just handed us a single, unavoidable compromise: a <strong>large</strong>
+                γ covers ground fast but overshoots the floor; a <strong>small</strong> γ lands precisely
+                but crawls to get there. You don’t actually have to choose. Stop treating γ as one frozen
+                number and <strong>schedule</strong> it — large early to cover ground, small late to settle
+                cleanly — and you get both halves of the bargain. The <strong>Schedule</strong> control
+                beneath the learning rate does exactly that: it multiplies your base γ by a factor that
+                changes on every step of the run.
+              </p>
+              <p>
+                The four schedules trace four different shapes for that factor over a run — flat, then
+                three ways of bleeding γ away as the steps tick by:
+              </p>
+              <div class="schedule-grid">
+                {#each scheduleCurves as s (s.id)}
+                  <div class="schedule-card">
+                    <svg viewBox="0 0 {SCH_W} {SCH_H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                      <line x1={SCH_PAD} y1={SCH_H - SCH_PAD} x2={SCH_W - SCH_PAD} y2={SCH_H - SCH_PAD} class="sch-axis" />
+                      <line x1={SCH_PAD} y1={SCH_PAD} x2={SCH_PAD} y2={SCH_H - SCH_PAD} class="sch-axis" />
+                      <path d={s.d} fill="none" class="sch-curve" />
+                    </svg>
+                    <div class="schedule-name">{s.name}</div>
+                    <div class="schedule-desc">{s.desc}</div>
+                  </div>
+                {/each}
+              </div>
+              <p>
+                <strong>Constant</strong> holds γ start to finish — the honest baseline, and always the
+                compromise above. <strong>Step decay</strong> keeps γ flat, then cuts it by a fixed factor
+                at set milestones (here ×0.3 a third of the way in, and again at two-thirds). It leaves the
+                loss curve’s most recognizable fingerprint: a long plateau, then a sudden <em>cliff</em>
+                the instant γ drops and the smaller step resolves detail the larger one skated over. For
+                most of deep learning’s history, that staircase trained nearly every network.
+              </p>
+              <p>
+                <strong>Cosine</strong> does the same work without the jolts — γ eases down the first half
+                of a cosine from full strength to a small floor (about 5%), quick at first and
+                feather-light by the end. With no brutal transition the run simply settles, which is why
+                cosine annealing is the modern default. <strong>Warmup + cosine</strong> bolts a short
+                on-ramp onto the front: γ starts near zero and climbs over the first tenth before the
+                cosine takes over. That protects the opening, where a run <em>begins</em> at a random,
+                often dreadful point and one full-size step could fling the marker off the map — so it is
+                now standard for training large models from scratch.
+              </p>
+              <p>
+                One practical wrinkle: these shapes were designed for runs of thousands of steps, so over
+                a short run here the decay can be too gentle to see. The <strong>Decay speed</strong>
+                slider — it appears whenever a non-constant schedule is active — compresses the whole
+                schedule into a fraction of the run, so at <em>4×</em> it finishes annealing a quarter of
+                the way in. Turn it up and read the result off the dotted γ(t) line in the loss chart.
+              </p>
+              <p>
+                Scheduling has a second, deeper payoff that only lands once gradients turn <em>noisy</em>
+                — the subject of the next part. A γ bled toward zero is the one thing that pulls a restless
+                run in to a clean stop. And one optimizer you’ll meet there, <strong>Lion</strong>, takes a
+                fixed-size step and so cannot settle <em>at all</em> on a constant γ: it just orbits the
+                minimum forever. It is the purest illustration of why schedules exist — switch it to cosine
+                and the orbit closes to a point.
+              </p>
+              {#if scheduleExperiment}
+                <div class="opt-cta">
+                  <span>See it now:</span>
+                  <button class="try-btn" on:click={() => runExperiment(scheduleExperiment)}>
+                    <Play size={13} strokeWidth={2.5} /><span>Watch Lion orbit, then land</span>
+                  </button>
+                </div>
+              {/if}
+            </section>
+
+            <!-- ============== 7 · NOISE / SGD ============== -->
+            <section data-ch="ch-noise" id="ch-noise">
+              <div class="part-label">Part III · Descent in the real world</div>
+              <h3><svelte:component this={chIcon['ch-noise']} size={18} strokeWidth={2} /> Mini-batches &amp; the S in SGD</h3>
+              <p>
+                Every gradient so far has been the <strong>true</strong> one — measured on all your
+                data at once. That is <strong>full-batch</strong> descent: the <strong>Batch
+                size</strong> dial set to <em>All</em>. It gives the cleanest possible arrow, and it
+                is the most expensive thing you can do, because every single step has to read every
+                single data point.
+              </p>
+              <p>
+                Real datasets are far too large for that, so instead you <em>estimate</em> the
+                gradient from a small random <strong>batch</strong> — a handful of points, freshly
+                resampled each step. The arrow you get back is <strong>noisy</strong>: it jitters
+                around the true downhill, because a different handful would have pulled in a slightly
+                different direction. But it is cheap, and — this is the quiet miracle that makes modern
+                training possible — it still points the right way <em>on average</em>. Averaging your
+                way downhill through that noise is the <strong>S</strong> (stochastic) in
+                <strong>SGD</strong>, stochastic gradient descent.
+              </p>
+              <p>
+                Slide the <strong>Batch size</strong> down from <em>All</em> toward <em>1</em> and a
+                faint <strong>fan</strong> of arrows opens at the marker: each ray is the gradient a
+                different random batch would have handed you, so the <em>width of the fan is the noise
+                itself.</em> The fewer points in the batch, the wider it spreads — and it spreads in a
+                very specific way. The error of an average shrinks only with the <em>square root</em>
+                of how many samples go into it, so a batch of 4 is roughly twice as steady as a batch
+                of 1, and you need 16 to halve the noise again. That is the law of diminishing returns
+                behind every batch-size choice: a batch of 32 already looks almost as calm as the full
+                dataset, for a fraction of the cost.
+              </p>
+              <p>
+                And the noise is not pure cost. A little jitter is genuinely <strong>useful</strong>: a
+                noisy step can rattle the marker out of a shallow dip or a flat saddle that a perfectly
+                smooth step would have settled into and never left, and the constant restlessness tends
+                to steer a run toward <em>wide, gentle</em> basins — the forgiving kind that generalize
+                to new data — rather than narrow, brittle cracks. This is why a touch of stochasticity
+                is often kept on purpose, even when the full gradient is affordable.
+              </p>
+              <p>
+                The bill comes due at the <em>end</em>. Because the gradient never goes quiet, SGD never
+                fully stops: near the bottom it stops descending and starts <strong>orbiting</strong>,
+                buzzing around the minimum inside a small <strong>noise ball</strong> whose radius grows
+                with both the step size γ and the width of the fan. On the loss curve it shows up as a
+                fuzzy <em>band</em> rather than a clean line that flatlines — the run has arrived, but it
+                can’t hold still. This is where the <strong>schedule</strong> from the last chapter earns
+                its keep: a γ bled toward zero draws that ball in tight, turning the restless buzz into a
+                soft landing. Under noise, decay isn’t a luxury — it is <em>how a stochastic run converges
+                at all.</em>
+              </p>
+              <p class="look">
+                Watch it: set a small <strong>Batch size</strong> so the loss settles into a fuzzy band on
+                <strong>Const</strong>, then switch the schedule to <strong>Cosine</strong> and see the
+                band pinch shut over the final steps.
+              </p>
+            </section>
+
+            <!-- ============== 8 · THE OPTIMIZER STORY ============== -->
             <section data-ch="ch-optimizers" id="ch-optimizers">
-              <div class="part-label">Part III · When one step isn’t enough</div>
               <h3><svelte:component this={chIcon['ch-optimizers']} size={18} strokeWidth={2} /> The optimizer family tree</h3>
               <p>
                 Plain gradient descent has one recurring nemesis: the <strong>ravine</strong> — a
@@ -1164,8 +1294,8 @@
                     Pick <strong>Lion</strong> and watch the marker move in equal-size hops, the
                     same stride on a cliff or a flat — every other method takes smaller steps as it
                     nears the bottom; Lion can’t. So it circles the minimum in a fixed ring instead
-                    of homing in. Chapter 8 turns that into a one-click lesson on why learning-rate
-                    schedules exist.
+                    of homing in — exactly the case the scheduling chapter built on: bleed γ to zero
+                    and the ring closes to a point.
                   </p>
                 {/if}
               {/each}
@@ -1194,151 +1324,6 @@
                   </button>
                 </div>
               {/if}
-            </section>
-
-            <!-- ============== 7 · NOISE / SGD ============== -->
-            <section data-ch="ch-noise" id="ch-noise">
-              <h3><svelte:component this={chIcon['ch-noise']} size={18} strokeWidth={2} /> Mini-batches &amp; the S in SGD</h3>
-              <p>
-                Every gradient so far has been the <strong>true</strong> one — measured on all your
-                data at once. That is <strong>full-batch</strong> descent: the <strong>Batch
-                size</strong> dial set to <em>All</em>. It gives the cleanest possible arrow, and it
-                is the most expensive thing you can do, because every single step has to read every
-                single data point.
-              </p>
-              <p>
-                Real datasets are far too large for that, so instead you <em>estimate</em> the
-                gradient from a small random <strong>batch</strong> — a handful of points, freshly
-                resampled each step. The arrow you get back is <strong>noisy</strong>: it jitters
-                around the true downhill, because a different handful would have pulled in a slightly
-                different direction. But it is cheap, and — this is the quiet miracle that makes modern
-                training possible — it still points the right way <em>on average</em>. Averaging your
-                way downhill through that noise is the <strong>S</strong> (stochastic) in
-                <strong>SGD</strong>, stochastic gradient descent.
-              </p>
-              <p>
-                Slide the <strong>Batch size</strong> down from <em>All</em> toward <em>1</em> and a
-                faint <strong>fan</strong> of arrows opens at the marker: each ray is the gradient a
-                different random batch would have handed you, so the <em>width of the fan is the noise
-                itself.</em> The fewer points in the batch, the wider it spreads — and it spreads in a
-                very specific way. The error of an average shrinks only with the <em>square root</em>
-                of how many samples go into it, so a batch of 4 is roughly twice as steady as a batch
-                of 1, and you need 16 to halve the noise again. That is the law of diminishing returns
-                behind every batch-size choice: a batch of 32 already looks almost as calm as the full
-                dataset, for a fraction of the cost.
-              </p>
-              <p>
-                And the noise is not pure cost. A little jitter is genuinely <strong>useful</strong>: a
-                noisy step can rattle the marker out of a shallow dip or a flat saddle that a perfectly
-                smooth step would have settled into and never left, and the constant restlessness tends
-                to steer a run toward <em>wide, gentle</em> basins — the forgiving kind that generalize
-                to new data — rather than narrow, brittle cracks. This is why a touch of stochasticity
-                is often kept on purpose, even when the full gradient is affordable.
-              </p>
-              <p>
-                The bill comes due at the <em>end</em>. Because the gradient never goes quiet, SGD never
-                fully stops: near the bottom it stops descending and starts <strong>orbiting</strong>,
-                buzzing around the minimum inside a small <strong>noise ball</strong> whose radius grows
-                with both the step size γ and the width of the fan. On the loss curve it shows up as a
-                fuzzy <em>band</em> rather than a clean line that flatlines — the run has arrived, but it
-                can’t hold still. Pulling that band shut is exactly what the next chapter is for.
-              </p>
-            </section>
-
-            <!-- ============== 8 · SCHEDULING THE LEARNING RATE ============== -->
-            <section data-ch="ch-schedule" id="ch-schedule">
-              <h3><svelte:component this={chIcon['ch-schedule']} size={18} strokeWidth={2} /> Scheduling the learning rate</h3>
-              <p>
-                Chapter 5 left us with a dilemma, and Chapter 7 sharpened it. A <strong>large</strong>
-                γ covers ground quickly but overshoots, and under noise it orbits the minimum in a wide
-                ball. A <strong>small</strong> γ lands precisely but crawls to get there. The trick is
-                that you don’t have to choose: stop treating γ as one frozen number and start
-                <strong>scheduling</strong> it — large early to make fast progress, small late to settle
-                cleanly. The <strong>Schedule</strong> control beneath the learning rate does exactly
-                that, multiplying your base γ by a factor that changes on every step of the run.
-              </p>
-              <p>
-                The four schedules trace four different shapes for that factor over a run — flat, then
-                three ways of bleeding γ away as the steps tick by:
-              </p>
-              <div class="schedule-grid">
-                {#each scheduleCurves as s (s.id)}
-                  <div class="schedule-card">
-                    <svg viewBox="0 0 {SCH_W} {SCH_H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                      <line x1={SCH_PAD} y1={SCH_H - SCH_PAD} x2={SCH_W - SCH_PAD} y2={SCH_H - SCH_PAD} class="sch-axis" />
-                      <line x1={SCH_PAD} y1={SCH_PAD} x2={SCH_PAD} y2={SCH_H - SCH_PAD} class="sch-axis" />
-                      <path d={s.d} fill="none" class="sch-curve" />
-                    </svg>
-                    <div class="schedule-name">{s.name}</div>
-                    <div class="schedule-desc">{s.desc}</div>
-                  </div>
-                {/each}
-              </div>
-              <p>
-                <strong>Constant</strong> is the baseline every earlier chapter quietly assumed — γ holds
-                its value start to finish. It is the honest choice when you want to watch raw behaviour,
-                but it forces you to pick a single γ that is always a compromise between fast and precise.
-              </p>
-              <p>
-                <strong>Step decay</strong> holds γ flat, then cuts it by a fixed factor at set milestones
-                — here ×0.3 a third of the way in, and ×0.3 again at two-thirds. On the loss curve it
-                leaves the field’s most recognizable fingerprint: a long plateau, then a sudden
-                <em>cliff</em> downward the instant γ drops, as the smaller step finally resolves detail
-                the larger one kept skating over. For most of deep learning’s history, this staircase was
-                how nearly every network was trained.
-              </p>
-              <p>
-                <strong>Cosine</strong> does the same work without the jolts. γ glides along the first
-                half of a cosine, easing from full strength down to a small floor (about 5%) — quick at
-                first, feather-light by the end. With no single brutal transition the run simply
-                <em>eases</em> into its minimum, which is why cosine annealing has become the modern
-                default.
-              </p>
-              <p>
-                <strong>Warmup + cosine</strong> bolts a short on-ramp onto the front: γ starts near zero
-                and climbs over the first tenth of the run before the cosine takes over. It looks fussy
-                until you remember where a run <em>begins</em> — at a random, often dreadful point, where
-                the gradient can be enormous and the adaptive optimizers from Chapter 6 have no history
-                yet to calibrate against. A full-size first step there can fling the marker clean off the
-                map. Warmup lets the optimizer find its footing on small, safe steps before it opens the
-                throttle, and it is now standard practice for training large models from scratch.
-              </p>
-              <p>
-                One practical wrinkle: these shapes were drawn for runs of thousands of steps, so across a
-                short run here the decay can be too gentle to even see. The <strong>Decay speed</strong>
-                slider — it appears whenever a non-constant schedule is active — fixes that: it compresses
-                the whole schedule into a fraction of the run, so at <em>4×</em> the curve finishes
-                annealing a quarter of the way in. Turn it up to watch a schedule actually bite within the
-                steps you have, and read the result off the dotted γ(t) line in the loss chart.
-              </p>
-              <p>
-                There is a deeper reason the late shrink matters, and it is the noise ball from Chapter 7.
-                That ball’s radius scales with γ — so a γ annealing toward zero draws the orbit in tight
-                around the true minimum, turning SGD’s restless buzzing into a soft landing. Decay isn’t
-                only about speed: under noise, it is <em>how a stochastic run converges at all.</em>
-              </p>
-              <p>
-                One optimizer makes this visible with no noise at all. <strong>Lion</strong> (Chapter 6)
-                steps by the <em>sign</em> of its momentum, so every step is the same size ±γ — even on
-                the exact full-batch gradient it cannot take a smaller step as it nears the bottom. On
-                <strong>Constant</strong> it simply orbits the minimum in a ring of radius γ and never
-                lands. That makes it the purest illustration of why a schedule has to exist: bleed γ to
-                zero with <strong>Cosine</strong> and the ring closes to a point — the optimizer has no
-                other way to stop.
-              </p>
-              {#if scheduleExperiment}
-                <div class="opt-cta">
-                  <span>See it happen:</span>
-                  <button class="try-btn" on:click={() => runExperiment(scheduleExperiment)}>
-                    <Play size={13} strokeWidth={2.5} /><span>Watch Lion orbit, then land</span>
-                  </button>
-                </div>
-              {/if}
-              <p class="look">
-                Or with noise: set a small batch so the loss settles into a fuzzy band on
-                <strong>Const</strong>, then switch to <strong>Cosine</strong> and watch the band pinch
-                shut over the final steps.
-              </p>
             </section>
 
             <!-- ============== 9 · THE PROBLEMS ============== -->
@@ -1372,7 +1357,7 @@
               {/each}
             </section>
 
-            <!-- ============== 9 · EXPERIMENTS ============== -->
+            <!-- ============== 10 · EXPERIMENTS ============== -->
             <section data-ch="ch-experiments" id="ch-experiments">
               <h3><svelte:component this={chIcon['ch-experiments']} size={18} strokeWidth={2} /> Things to try</h3>
               <p>Each card is a ready-made scenario — one click sets everything up, starts training, and tells you what to watch for.</p>
@@ -1389,7 +1374,7 @@
               {/each}
             </section>
 
-            <!-- ============== 10 · READING THE PANELS ============== -->
+            <!-- ============== 11 · READING THE PANELS ============== -->
             <section data-ch="ch-panels" id="ch-panels">
               <div class="part-label">Reference</div>
               <h3><svelte:component this={chIcon['ch-panels']} size={18} strokeWidth={2} /> Reading the panels</h3>
@@ -1400,7 +1385,7 @@
               </ul>
             </section>
 
-            <!-- ============== 11 · KEYBOARD ============== -->
+            <!-- ============== 12 · KEYBOARD ============== -->
             <section data-ch="ch-keys" id="ch-keys">
               <h3><svelte:component this={chIcon['ch-keys']} size={18} strokeWidth={2} /> Keyboard</h3>
               <div class="kbd-row">
