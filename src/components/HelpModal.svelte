@@ -25,7 +25,7 @@
   import { rgb, geoPath } from 'd3';
   import { contours } from 'd3-contour';
   import { interpolateViridis } from 'd3-scale-chromatic';
-  import { experiments } from '../utils/experiments';
+  import { experiments, chapterPresets } from '../utils/experiments';
   import { schedules, scheduleOrder } from '../utils/schedules';
   import { optimizers, optimizerOrder, defaultHyper, type OptimizerId } from '../utils/optimizers';
 
@@ -51,6 +51,15 @@
   function runExperiment(exp: (typeof experiments)[number]) {
     onClose();
     exp.apply();
+  }
+
+  // A chapter's matching preset: close the book and set the live app to what
+  // the chapter just explained. Rendered as a small CTA at the chapter's end.
+  function runPreset(id: string) {
+    const p = chapterPresets[id];
+    if (!p) return;
+    onClose();
+    p.apply();
   }
 
   // Formulas render straight to HTML — no element refs, no afterUpdate.
@@ -191,7 +200,7 @@
       name: 'Nesterov',
       by: 'Yurii Nesterov — accelerated gradient',
       idea:
-        'The failure to fix: momentum overshoots because it looks where it stands. The cure: look ahead. Measure the gradient where the velocity is about to carry you, not where you are — like braking into a corner instead of after it. The same heavy ball, now with foresight; it settles without the orbit.',
+        'The failure to fix: momentum overshoots because it looks where it stands. The cure: look ahead. Measure the gradient where the velocity is about to carry you, not where you are — like braking into a corner instead of after it. The same heavy ball, now with foresight; it settles without the orbit. On a smooth convex bowl this look-ahead provably converges as fast as any method using only gradients ever can — you cannot do better with the slope alone.',
       formula: String.raw`\mathbf{v} \leftarrow \mu \mathbf{v} + \nabla \mathcal{L}(\boldsymbol{\theta}), \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\,(\nabla \mathcal{L} + \mu \mathbf{v})`,
       fix: 'corrects the overshoot before it happens'
     },
@@ -231,7 +240,7 @@
       name: 'Adam',
       by: 'Kingma & Ba — "adaptive moments"',
       idea:
-        'The merger the whole trunk builds to: take Momentum’s moving average of gradients (decay β₁) AND RMSProp’s moving average of squared gradients (decay β₂), and use them together. One honest detail: both averages start at zero and read too low at first, so each is divided by 1−βᵗ to correct that early bias. The result became the workhorse of modern deep learning — and the launch point for every branch that follows.',
+        'The merger the whole trunk builds to: take Momentum’s moving average of gradients (decay β₁) AND RMSProp’s moving average of squared gradients (decay β₂), and use them together. One honest detail: both averages start at zero and read too low at first, so each is divided by 1−βᵗ to correct that early bias. The result became the workhorse of modern deep learning — its paper is now one of the most-cited in all of science — and the launch point for every branch that follows.',
       formula: String.raw`\hat{\mathbf{m}} = \frac{\mathbf{m}}{1-\beta_1^t}, \quad \hat{s} = \frac{s}{1-\beta_2^t}, \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \frac{\hat{\mathbf{m}}}{\sqrt{\hat{s}} + \varepsilon}`,
       fix: 'robust out of the box almost everywhere',
       brk: 'not perfect — three later papers each sand down one rough edge'
@@ -271,7 +280,7 @@
       name: 'Lion',
       by: 'Chen et al. (Google) — found by program search, not designed',
       idea:
-        'Adam scaled the step by gradient history. Lion throws that out and takes a different shape — and it wasn’t invented by a person: a program searched the space of optimizers and this fell out. Keep one momentum buffer, blend it with the fresh gradient, and step by the SIGN of the result — so every step is the same size γ on each axis, no matter how steep or flat. That makes it light (one buffer, no squared-gradient term) and competitive with Adam on big vision and language models. The catch is the very thing that makes it clean: a step that never shrinks can’t settle by itself.',
+        'Adam scaled the step by gradient history. Lion throws that out and takes a different shape — and it wasn’t invented by a person: a program searched the space of optimizers and this fell out. The name is a fitting backronym — EvoLved Sign Momentum. Keep one momentum buffer, blend it with the fresh gradient, and step by the SIGN of the result — so every step is the same size γ on each axis, no matter how steep or flat. That makes it light (one buffer, no squared-gradient term) and competitive with Adam on big vision and language models. The catch is the very thing that makes it clean: a step that never shrinks can’t settle by itself.',
       formula: String.raw`\mathbf{c} \leftarrow \beta_1 \mathbf{m} + (1{-}\beta_1)\nabla\mathcal{L}, \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \operatorname{sign}(\mathbf{c}), \;\; \mathbf{m} \leftarrow \beta_2 \mathbf{m} + (1{-}\beta_2)\nabla\mathcal{L}`,
       fix: 'fixed-size steps from one tiny buffer — light and fast',
       brk: 'the step never shrinks, so it orbits the minimum until γ is decayed by a schedule'
@@ -303,7 +312,7 @@
       name: 'Prodigy',
       by: 'Mishchenko & Defazio — the learning rate, removed',
       idea:
-        'Every method so far still made you pick γ. This branch deletes that last knob. The insight: the ideal step size is set by how far the start is from the solution — a distance d. You don’t know d, so Prodigy estimates it live, ramping a tiny seed upward from how the gradients line up with how far you’ve already travelled (⟨g, x₀−x⟩), and scales an Adam step by it. Set nothing and watch the marker creep, then accelerate as d finds its level — the learning rate, discovered rather than tuned. Parameter-free methods like this won the 2024 self-tuning optimization challenge.',
+        'Every method so far still made you pick γ. This branch deletes that last knob. The insight: the ideal step size is set by how far the start is from the solution — a distance d. You don’t know d, so Prodigy estimates it live, ramping a tiny seed upward from how the gradients line up with how far you’ve already travelled (⟨g, x₀−x⟩), and scales an Adam step by it. Set nothing and watch the marker creep, then accelerate as d finds its level — the learning rate, discovered rather than tuned. Prodigy sharpens the same lab’s earlier D-Adaptation, and the parameter-free idea is taken seriously: a sibling schedule-free method from these authors won the self-tuning track of MLCommons’ 2024 AlgoPerf benchmark.',
       formula: String.raw`d_{t+1} = \max\!\left(d_t,\, \frac{r_{t+1}}{\lVert \mathbf{s}_{t+1}\rVert_1}\right), \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, d_t\,\frac{\mathbf{m}}{\sqrt{\mathbf{v}} + d_t\varepsilon}`,
       fix: 'no learning rate to choose — it finds its own',
       brk: 'the estimate only climbs, so a bad early ramp can overshoot'
@@ -832,6 +841,14 @@
                 and it makes the loss a smooth, rounded <em>bowl</em> rather than a creased tent — and
                 a smooth bowl is exactly what lets us roll downhill in the chapters ahead.
               </p>
+              {#if chapterPresets['ch-bowl']}
+                <div class="opt-cta">
+                  <span>Try it live:</span>
+                  <button class="try-btn" on:click={() => runPreset('ch-bowl')}>
+                    <Play size={13} strokeWidth={2.5} /><span>{chapterPresets['ch-bowl'].title}</span>
+                  </button>
+                </div>
+              {/if}
             </section>
 
             <!-- ============== 2 · LOSS IS A LANDSCAPE ============== -->
@@ -862,6 +879,14 @@
                 Look at the Loss &amp; Gradient panel right now: the bright dimple is where the loss
                 is lowest, and the marker is trying to reach it.
               </p>
+              {#if chapterPresets['ch-landscape']}
+                <div class="opt-cta">
+                  <span>Try it live:</span>
+                  <button class="try-btn" on:click={() => runPreset('ch-landscape')}>
+                    <Play size={13} strokeWidth={2.5} /><span>{chapterPresets['ch-landscape'].title}</span>
+                  </button>
+                </div>
+              {/if}
             </section>
 
             <!-- ============== 3 · WHICH WAY IS DOWNHILL ============== -->
@@ -957,6 +982,14 @@
                 the whole reason a step can be <em>too big</em>, and taming it is what the learning rate
                 exists to do.
               </p>
+              {#if chapterPresets['ch-downhill']}
+                <div class="opt-cta">
+                  <span>Try it live:</span>
+                  <button class="try-btn" on:click={() => runPreset('ch-downhill')}>
+                    <Play size={13} strokeWidth={2.5} /><span>{chapterPresets['ch-downhill'].title}</span>
+                  </button>
+                </div>
+              {/if}
             </section>
 
             <!-- ============== 4 · ONE STEP ============== -->
@@ -984,6 +1017,14 @@
                 almost agree. Once you add the tricks in Part III, they’ll split apart — and
                 <em>that gap is the optimizer’s personality.</em>
               </p>
+              {#if chapterPresets['ch-step']}
+                <div class="opt-cta">
+                  <span>Try it live:</span>
+                  <button class="try-btn" on:click={() => runPreset('ch-step')}>
+                    <Play size={13} strokeWidth={2.5} /><span>{chapterPresets['ch-step'].title}</span>
+                  </button>
+                </div>
+              {/if}
             </section>
 
             <!-- ============== 5 · LEARNING RATE ============== -->
@@ -1020,6 +1061,14 @@
                 the one before, the bounce compounds, and the loss runs off to infinity. That single
                 number — the curvature — is the villain the whole next part is built to outwit.
               </p>
+              {#if chapterPresets['ch-gamma']}
+                <div class="opt-cta">
+                  <span>Try it live:</span>
+                  <button class="try-btn" on:click={() => runPreset('ch-gamma')}>
+                    <Play size={13} strokeWidth={2.5} /><span>{chapterPresets['ch-gamma'].title}</span>
+                  </button>
+                </div>
+              {/if}
             </section>
 
             <!-- ============== 6 · SCHEDULING THE LEARNING RATE ============== -->
@@ -1150,6 +1199,14 @@
                 <strong>Const</strong>, then switch the schedule to <strong>Cosine</strong> and see the
                 band pinch shut over the final steps.
               </p>
+              {#if chapterPresets['ch-noise']}
+                <div class="opt-cta">
+                  <span>Try it live:</span>
+                  <button class="try-btn" on:click={() => runPreset('ch-noise')}>
+                    <Play size={13} strokeWidth={2.5} /><span>{chapterPresets['ch-noise'].title}</span>
+                  </button>
+                </div>
+              {/if}
             </section>
 
             <!-- ============== 8 · THE OPTIMIZER STORY ============== -->
@@ -1329,8 +1386,9 @@
                   The optimizers winning 2025’s biggest training runs — <strong>Muon</strong> (used
                   to train Kimi K2 and GLM), <strong>Shampoo</strong>, and <strong>SOAP</strong> —
                   share a trick this playground can’t show. They treat a layer’s weights as a
-                  <em>matrix</em> and precondition <em>across</em> it: Muon orthogonalizes the
-                  momentum matrix, Shampoo and SOAP whiten it. With only two independent numbers,
+                  <em>matrix</em> and precondition <em>across</em> it: Muon (<em>momentum
+                  orthogonalized by Newton–Schulz</em>) straightens the momentum matrix, Shampoo and
+                  SOAP whiten it. With only two independent numbers,
                   α and β, there is no matrix to exploit — strip the structure away and they collapse
                   to methods already in the list. That matrix structure is exactly why they scale to
                   billions of parameters, and exactly why a two-parameter sandbox is the wrong stage

@@ -14,7 +14,8 @@ import {
   trainingStore,
   recordInitialHistory,
   resetOptimizerState,
-  showCoach
+  showCoach,
+  landscapeViewStore
 } from '../stores/stores';
 import { applyProblem, applyOptimizer, startTraining, startRace } from './trainer';
 
@@ -182,3 +183,111 @@ export const experiments: Experiment[] = [
     }
   }
 ];
+
+/**
+ * Per-chapter presets for the guide. Each one closes the book and sets up
+ * the live app to match what the chapter just explained — the right problem,
+ * optimizer, marker, and a coach note pointing at the thing to watch. Kept
+ * separate from `experiments` so the "Things to try" list stays curated;
+ * the guide looks these up by chapter id.
+ */
+export const chapterPresets: Record<string, Experiment> = {
+  'ch-bowl': {
+    id: 'preset-bowl',
+    title: 'Roll into the bowl',
+    blurb: '',
+    apply() {
+      applyProblem('linear-regression');
+      applyOptimizer('gd');
+      startTraining();
+      showCoach(
+        'info',
+        'One clean bowl. The loss falls as the marker rolls to the single lowest point — that is all of training, in miniature.',
+        13000
+      );
+    }
+  },
+  'ch-landscape': {
+    id: 'preset-landscape',
+    title: 'Lift the map into 3D',
+    blurb: '',
+    apply() {
+      applyProblem('polynomial-regression');
+      landscapeViewStore.set('3d');
+      showCoach(
+        'info',
+        'The flat contour map lifts into real hills and valleys — drag to rotate it. Bright and low is a good model, dark and high is a bad one. Press D to flip back to 2D.',
+        15000
+      );
+    }
+  },
+  'ch-downhill': {
+    id: 'preset-downhill',
+    title: 'Show the downhill arrows',
+    blurb: '',
+    apply() {
+      applyProblem('linear-regression');
+      applyOptimizer('gd');
+      parametersStore.set({ a: -4, b: 3.5 });
+      resetOptimizerState();
+      recordInitialHistory();
+      showCoach(
+        'info',
+        'Don’t train yet — read the Loss & Gradient panel. The faint arrows are −∇ℒ everywhere; the blue arrow on the marker is the steepest way down from where you stand. Notice they all cut straight across the white contours.',
+        16000
+      );
+    }
+  },
+  'ch-step': {
+    id: 'preset-step',
+    title: 'Take one step at a time',
+    blurb: '',
+    apply() {
+      applyProblem('linear-regression');
+      applyOptimizer('gd');
+      parametersStore.set({ a: -3.5, b: 3 });
+      resetOptimizerState();
+      recordInitialHistory();
+      showCoach(
+        'info',
+        'Press Step (or the S key) to take exactly one −γ∇ℒ move, and watch the marker hop. The red arrow is the step actually taken; the blue arrow is pure downhill — early on they nearly agree.',
+        16000
+      );
+    }
+  },
+  'ch-gamma': {
+    id: 'preset-gamma',
+    title: 'Push γ past the edge',
+    blurb: '',
+    apply() {
+      applyProblem('linear-regression');
+      applyOptimizer('gd');
+      parametersStore.set({ a: -3, b: 2.5 });
+      resetOptimizerState();
+      recordInitialHistory();
+      trainingStore.update(s => ({ ...s, learningRate: 1.3, totalSteps: 80 }));
+      startTraining();
+      showCoach(
+        'warn',
+        'γ is cranked past the stable 2/λmax limit — watch the steps grow instead of shrink until the run blows up. Drop γ back down and Train again for a smooth glide.',
+        16000
+      );
+    }
+  },
+  'ch-noise': {
+    id: 'preset-noise',
+    title: 'Watch the noise ball',
+    blurb: '',
+    apply() {
+      applyProblem('linear-regression');
+      applyOptimizer('gd');
+      trainingStore.update(s => ({ ...s, batchSize: 1, totalSteps: 300, stepsPerSecond: 40 }));
+      startTraining();
+      showCoach(
+        'info',
+        'A batch of 1 turns every gradient into a noisy estimate. The loss falls, then can’t hold still — it settles into a fuzzy band, the noise ball. Slide the batch size up and the band calms down.',
+        16000
+      );
+    }
+  }
+};
