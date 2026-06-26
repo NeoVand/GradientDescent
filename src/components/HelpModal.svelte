@@ -770,9 +770,9 @@
                 </g>
               </svg>
               <div class="hero-text">
-                <div class="hero-eyebrow">A short, friendly book about</div>
-                <div class="hero-title">finding the bottom of a bowl.</div>
-                <div class="hero-subtitle">Drag the orange marker. Hit Train. Watch the loss fall — and learn why it works.</div>
+                <div class="hero-eyebrow">An interactive guide to</div>
+                <div class="hero-title">gradient-based optimization.</div>
+                <div class="hero-subtitle">Two knobs, a landscape of error, and the search for its lowest point. Drag the marker, press Train, watch the loss fall — then learn why it does.</div>
               </div>
             </div>
 
@@ -1541,8 +1541,11 @@
     border-right: 1px solid var(--color-border);
     overflow-y: auto;
     padding: 1.1rem 0.65rem 1.5rem;
-    background: rgba(0, 0, 0, 0.14);
+    /* Light mode: a soft mint rail, not a dingy grey overlay. Dark mode keeps
+       a gentle darkening (below) since the rail sits on a near-black panel. */
+    background: rgba(16, 185, 129, 0.06);
   }
+  :global([data-theme='dark']) .toc { background: rgba(0, 0, 0, 0.14); }
   /* WebKit (Chrome/Safari): a slim, themed bar that only paints its thumb
      while the rail is being scrolled (or hovered, so it can still be grabbed).
      NB: setting the standard scrollbar-width/-color here would make Chrome
