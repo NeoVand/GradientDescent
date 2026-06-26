@@ -696,6 +696,73 @@
     ]
   };
 
+  // ---------- Inline teaching figures: honest little simulations ----------
+  type Pt = { x: number; y: number };
+
+  // 1) Three learning-rate regimes — real GD on the same anisotropic bowl
+  // (gentle along x, steeper along y) at three γ. Per-axis factor 1 − γλ:
+  // small γ creeps; good γ glides; γ past 2/λ_y makes y overshoot and grow,
+  // so the iterate zig-zags up the steep walls.
+  const lrRegimes = (() => {
+    const cx = 75, cy = 70, lx = 0.6, ly = 1.0, p0: Pt = { x: -46, y: -30 };
+    const sim = (gamma: number, n: number, color: string, label: string, sub: string) => {
+      let p = { ...p0 };
+      const dots: Pt[] = [{ x: cx + p.x, y: cy + p.y }];
+      for (let k = 0; k < n; k++) {
+        p = { x: p.x * (1 - gamma * lx), y: p.y * (1 - gamma * ly) };
+        dots.push({ x: cx + p.x, y: cy + p.y });
+      }
+      return { cx, cy, color, label, sub, dots,
+        d: 'M ' + dots.map(q => `${q.x.toFixed(1)},${q.y.toFixed(1)}`).join(' L ') };
+    };
+    return [
+      sim(0.12, 12, '#94a3b8', 'γ too small', 'creeps, stalls short'),
+      sim(0.95, 7, '#10b981', 'γ just right', 'glides into the basin'),
+      sim(2.18, 6, '#f59e0b', 'γ too big', 'overshoots, diverges')
+    ];
+  })();
+
+  // 2) The ravine — one γ safe across the steep axis crawls along the gentle
+  // one. GD zig-zags wall to wall; momentum builds speed and glides. Both are
+  // real iterations on the same anisotropic quadratic, then fit to the box.
+  const ravineFig = (() => {
+    const W = 460, H = 150, pad = 18;
+    const ax = 0.05, ay = 1.0;            // gentle along x, steep across y
+    const start: Pt = { x: -1, y: 0.6 };
+    const simGD = () => {
+      const g = 1.72; let p = { ...start }; const out: Pt[] = [{ ...p }];
+      for (let k = 0; k < 30; k++) { p = { x: p.x - g * ax * p.x, y: p.y - g * ay * p.y }; out.push({ ...p }); }
+      return out;
+    };
+    const simMom = () => {
+      const g = 0.6, mu = 0.86; let v = { x: 0, y: 0 }, p = { ...start }; const out: Pt[] = [{ ...p }];
+      for (let k = 0; k < 30; k++) { v = { x: mu * v.x + ax * p.x, y: mu * v.y + ay * p.y }; p = { x: p.x - g * v.x, y: p.y - g * v.y }; out.push({ ...p }); }
+      return out;
+    };
+    const gd = simGD(), mom = simMom();
+    const all = [...gd, ...mom, { x: 0, y: 0 }];
+    const xmin = Math.min(...all.map(p => p.x)), xmax = Math.max(...all.map(p => p.x));
+    const ymax = Math.max(...all.map(p => Math.abs(p.y)), 0.001);
+    const xspan = (xmax - xmin) * 1.18; // leave the minimum a little off the right edge
+    const sx = (x: number) => pad + ((x - xmin) / xspan) * (W - 2 * pad);
+    const sy = (y: number) => H / 2 - (y / (ymax * 1.18)) * (H / 2 - pad);
+    const path = (arr: Pt[]) => 'M ' + arr.map(p => `${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(' L ');
+    return { W, H, gd: path(gd), mom: path(mom),
+      min: { x: sx(0), y: sy(0) }, start: { x: sx(start.x), y: sy(start.y) } };
+  })();
+
+  // 3) The noise ball — SGD orbits the minimum in a cloud whose radius scales
+  // with γ; decay γ and the cloud closes to a point. Deterministic scatter so
+  // the figure never reshuffles between renders.
+  const noiseBall = (() => {
+    let s = 1337 >>> 0;
+    const rnd = () => { s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const gauss = () => Math.sqrt(-2 * Math.log(rnd() || 1e-9)) * Math.cos(2 * Math.PI * rnd());
+    const cloud = (cx: number, cy: number, sigma: number, n: number) =>
+      Array.from({ length: n }, () => ({ x: cx + gauss() * sigma, y: cy + gauss() * sigma * 0.82, r: 1.3 + rnd() * 1.4 }));
+    return { big: cloud(112, 74, 25, 52), small: cloud(348, 74, 6.5, 52) };
+  })();
+
   const chIcon: Record<string, any> = {
     'ch-bowl': BookOpen, 'ch-landscape': Mountain, 'ch-downhill': TrendingDown,
     'ch-step': Compass, 'ch-gamma': Zap, 'ch-optimizers': Rocket, 'ch-noise': Waves,
@@ -1142,6 +1209,32 @@
                 the one before, the bounce compounds, and the loss runs off to infinity. That single
                 number — the curvature — is the villain the optimizer family tree is built to outwit.
               </p>
+              <figure class="fig fig-lr">
+                <div class="fig-triptych">
+                  {#each lrRegimes as g}
+                    <div class="fig-cell">
+                      <svg viewBox="0 0 150 150" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                        <ellipse cx={g.cx} cy={g.cy} rx="58" ry="46" class="fig-contour" style="stroke-opacity:0.10" />
+                        <ellipse cx={g.cx} cy={g.cy} rx="37" ry="29" class="fig-contour" style="stroke-opacity:0.16" />
+                        <ellipse cx={g.cx} cy={g.cy} rx="18" ry="14" class="fig-contour" style="stroke-opacity:0.24" />
+                        <circle cx={g.cx} cy={g.cy} r="3" fill="#10b981" />
+                        <path d={g.d} fill="none" stroke={g.color} stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" />
+                        {#each g.dots as d, i}
+                          {#if i > 0}<circle cx={d.x} cy={d.y} r="1.7" fill={g.color} />{/if}
+                        {/each}
+                        <circle cx={g.dots[0].x} cy={g.dots[0].y} r="4.2" fill="#f59e0b" stroke="#fff" stroke-width="1.2" />
+                      </svg>
+                      <div class="fig-cell-label" style="color:{g.color}">{g.label}</div>
+                      <div class="fig-cell-sub">{g.sub}</div>
+                    </div>
+                  {/each}
+                </div>
+                <figcaption class="fig-cap">
+                  Gradient descent from the same start (orange) at three step sizes, on one bowl. Below the
+                  stability limit it settles — sluggishly, or briskly; cross the limit and every step
+                  overshoots a little more than the last.
+                </figcaption>
+              </figure>
               {#if chapterPresets['ch-gamma']}
                 <div class="opt-cta">
                   <span>Try it live:</span>
@@ -1297,6 +1390,27 @@
                 soft landing. Under noise, decay isn’t a luxury — it is <em>how a stochastic run converges
                 at all.</em>
               </p>
+              <figure class="fig">
+                <svg viewBox="0 0 460 150" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                  {#each [62, 42, 24] as rr, i}
+                    <ellipse cx="112" cy="74" rx={rr} ry={rr * 0.8} class="fig-contour" style="stroke-opacity:{0.1 + i * 0.05}" />
+                  {/each}
+                  {#each noiseBall.big as d}<circle cx={d.x} cy={d.y} r={d.r} fill="#f59e0b" opacity="0.5" />{/each}
+                  <circle cx="112" cy="74" r="3.5" fill="#10b981" stroke="#fff" stroke-width="1" />
+                  {#each [62, 42, 24] as rr, i}
+                    <ellipse cx="348" cy="74" rx={rr} ry={rr * 0.8} class="fig-contour" style="stroke-opacity:{0.1 + i * 0.05}" />
+                  {/each}
+                  {#each noiseBall.small as d}<circle cx={d.x} cy={d.y} r={d.r} fill="#10b981" opacity="0.55" />{/each}
+                  <circle cx="348" cy="74" r="3.5" fill="#10b981" stroke="#fff" stroke-width="1" />
+                  <text x="112" y="142" class="fig-svg-label">large γ — wide noise ball</text>
+                  <text x="348" y="142" class="fig-svg-label">γ → 0 — the ring closes in</text>
+                </svg>
+                <figcaption class="fig-cap">
+                  Under noisy gradients the run never quite stops — it orbits the minimum in a cloud whose
+                  radius grows with γ (left). Bleed γ toward zero and the cloud draws in to a point (right):
+                  the schedule, doing its quiet job.
+                </figcaption>
+              </figure>
               <p class="look">
                 Watch it: set a small <strong>Batch size</strong> so the loss settles into a fuzzy band on
                 <strong>Const</strong>, then switch the schedule to <strong>Cosine</strong> and see the
@@ -1335,6 +1449,28 @@
                 reaches Adam, finally splits into the branches still being explored today. The
                 picker is grouped to match.
               </p>
+              <figure class="fig">
+                <svg viewBox="0 0 {ravineFig.W} {ravineFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                  {#each [0, 1, 2, 3] as i}
+                    <ellipse cx={ravineFig.min.x} cy={ravineFig.min.y} rx={70 + i * 100} ry={15 + i * 17} class="fig-contour" style="stroke-opacity:{0.2 - i * 0.04}" />
+                  {/each}
+                  <path d={ravineFig.gd} fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" />
+                  <path d={ravineFig.mom} fill="none" stroke="#a855f7" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" />
+                  <circle cx={ravineFig.min.x} cy={ravineFig.min.y} r="4.5" fill="none" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3,2.5" />
+                  <circle cx={ravineFig.start.x} cy={ravineFig.start.y} r="4.2" fill="#f59e0b" stroke="#fff" stroke-width="1.2" />
+                  <g transform="translate(13,15)">
+                    <line x1="0" y1="0" x2="15" y2="0" stroke="#94a3b8" stroke-width="2.5" />
+                    <text x="20" y="3.5" class="fig-svg-label" style="text-anchor:start">plain GD — zig-zags</text>
+                    <line x1="0" y1="15" x2="15" y2="15" stroke="#a855f7" stroke-width="2.5" />
+                    <text x="20" y="18.5" class="fig-svg-label" style="text-anchor:start">momentum — glides</text>
+                  </g>
+                </svg>
+                <figcaption class="fig-cap">
+                  The ravine: a valley far steeper across than along. One safe step size makes plain GD
+                  (grey) rattle wall to wall while it crawls along the floor; momentum (violet) builds
+                  speed down the valley and glides to the minimum.
+                </figcaption>
+              </figure>
               <p>
                 Here they are racing on the same ravine from the same start — every one running its
                 real update rule, the dots arriving in their true step counts. Click a name to add or
@@ -1975,6 +2111,37 @@
   .concept-text-overlay h4 { margin-top: 0; }
   .concept-text-overlay p { margin-bottom: 0.6rem; }
   .concept-text-overlay p:last-child { margin-bottom: 0; }
+
+  /* ---------- Inline teaching figures ---------- */
+  .fig { margin: 1.6rem 0; }
+  .fig > svg,
+  .fig-triptych {
+    display: block;
+    width: 100%;
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+  }
+  .fig > svg { padding: 0.4rem; }
+  .fig-triptych {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+  }
+  .fig-cell { padding: 0.7rem 0.4rem 0.85rem; text-align: center; border-right: 1px solid var(--color-border); }
+  .fig-cell:last-child { border-right: none; }
+  .fig-cell svg { display: block; width: 100%; height: auto; }
+  .fig-cell-label { font-size: 0.8rem; font-weight: 700; margin-top: 0.3rem; }
+  .fig-cell-sub { font-size: 0.72rem; color: var(--color-text-tertiary); margin-top: 0.1rem; }
+  .fig :global(.fig-contour) { fill: none; stroke: #10b981; stroke-width: 1; }
+  .fig :global(.fig-svg-label) {
+    fill: var(--color-text-secondary); font-size: 11px; font-weight: 600;
+    text-anchor: middle; font-family: inherit;
+  }
+  .fig-cap {
+    font-size: 0.8rem; line-height: 1.55; text-align: center;
+    color: var(--color-text-tertiary); margin: 0.6rem auto 0; max-width: 56ch;
+  }
 
   /* ---------- Formulas ---------- */
   .formula-display {
