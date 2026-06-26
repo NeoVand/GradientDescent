@@ -763,6 +763,20 @@
     return { big: cloud(112, 74, 25, 52), small: cloud(348, 74, 6.5, 52) };
   })();
 
+  // 4) Loss is a landscape — the flat contour map is the 3-D surface from
+  // above. Right panel: level rings stacked by height z ∝ r² (an oblique bowl).
+  const landscapeFig = (() => {
+    const cx = 348, baseY = 95;
+    const rings: { rx: number; ry: number; cy: number; o: number }[] = [];
+    for (let k = 6; k >= 1; k--) {
+      const rx = k * 8.3;
+      rings.push({ rx, ry: rx * 0.36, cy: baseY - k * k * 1.7, o: 0.14 + (6 - k) * 0.12 });
+    }
+    const topL = { x: cx - 6 * 8.3, y: baseY - 36 * 1.7 };
+    const topR = { x: cx + 6 * 8.3, y: baseY - 36 * 1.7 };
+    return { cx, baseY, rings, topL, topR };
+  })();
+
   const chIcon: Record<string, any> = {
     'ch-bowl': BookOpen, 'ch-landscape': Mountain, 'ch-downhill': TrendingDown,
     'ch-step': Compass, 'ch-gamma': Zap, 'ch-optimizers': Rocket, 'ch-noise': Waves,
@@ -990,6 +1004,42 @@
                 mean a steep slope. Flip the panel to <strong>3D</strong> and the same map lifts into
                 real hills and valleys you can rotate.
               </p>
+              <figure class="fig">
+                <svg viewBox="0 0 460 150" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                  <defs>
+                    <radialGradient id="lf-bowl" cx="50%" cy="50%" r="55%">
+                      <stop offset="0%" stop-color="#fde047" stop-opacity="0.5" />
+                      <stop offset="45%" stop-color="#10b981" stop-opacity="0.22" />
+                      <stop offset="100%" stop-color="#10b981" stop-opacity="0" />
+                    </radialGradient>
+                  </defs>
+                  <!-- left: the contour map, from straight above -->
+                  <ellipse cx="112" cy="72" rx="70" ry="62" fill="url(#lf-bowl)" />
+                  {#each [62, 48, 34, 20, 8] as rr}
+                    <ellipse cx="112" cy="72" rx={rr} ry={rr * 0.9} class="fig-contour" style="stroke-opacity:0.3" />
+                  {/each}
+                  <circle cx="112" cy="72" r="3.5" fill="#f59e0b" stroke="#fff" stroke-width="1" />
+                  <text x="112" y="142" class="fig-svg-label">the map — from straight above</text>
+                  <!-- arrow: same thing, two views -->
+                  <g stroke="var(--color-text-tertiary)" fill="none" stroke-width="1.4" opacity="0.55">
+                    <line x1="200" y1="72" x2="236" y2="72" />
+                    <path d="M230,67 L237,72 L230,77" />
+                  </g>
+                  <!-- right: the surface, lifted into 3-D -->
+                  <path d="M {landscapeFig.topL.x},{landscapeFig.topL.y} Q {landscapeFig.cx - 26},{landscapeFig.baseY + 6} {landscapeFig.cx},{landscapeFig.baseY}" fill="none" stroke="#10b981" stroke-width="1.4" stroke-opacity="0.5" />
+                  <path d="M {landscapeFig.topR.x},{landscapeFig.topR.y} Q {landscapeFig.cx + 26},{landscapeFig.baseY + 6} {landscapeFig.cx},{landscapeFig.baseY}" fill="none" stroke="#10b981" stroke-width="1.4" stroke-opacity="0.5" />
+                  {#each landscapeFig.rings as r}
+                    <ellipse cx={landscapeFig.cx} cy={r.cy} rx={r.rx} ry={r.ry} class="fig-contour" style="stroke-opacity:{r.o}" />
+                  {/each}
+                  <circle cx={landscapeFig.cx} cy={landscapeFig.baseY} r="3.5" fill="#f59e0b" stroke="#fff" stroke-width="1" />
+                  <text x={landscapeFig.cx} y="142" class="fig-svg-label">the surface — from the side</text>
+                </svg>
+                <figcaption class="fig-cap">
+                  The same loss, two ways: the flat contour map (left) is exactly the 3-D surface (right)
+                  seen from straight above. Each ring joins points of equal loss; the bright dimple is the
+                  basin every run is trying to reach.
+                </figcaption>
+              </figure>
               <p class="look">
                 Look at the Loss &amp; Gradient panel right now: the bright dimple is where the loss
                 is lowest, and the marker is trying to reach it.
