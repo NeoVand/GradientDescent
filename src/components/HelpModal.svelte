@@ -322,7 +322,7 @@
   // Citations + inventor portraits, keyed by optimizer name so the optTree
   // cards stay readable. Portraits are placeholders (initials) until real
   // images are dropped into /public/inventors/ at the paths below.
-  type Cite = { wiki?: string; paper?: string; cite?: string; person?: string; img?: string };
+  type Cite = { wiki?: string; paper?: string; cite?: string; person?: string; img?: string; credit?: string };
   const OPT_CITE: Record<string, Cite> = {
     'Gradient Descent': {
       wiki: 'https://en.wikipedia.org/wiki/Gradient_descent',
@@ -342,7 +342,8 @@
     Nesterov: {
       wiki: 'https://en.wikipedia.org/wiki/Stochastic_gradient_descent#Momentum',
       person: 'Yurii Nesterov',
-      img: '/inventors/nesterov.jpg'
+      img: '/inventors/nesterov.jpg',
+      credit: 'Photo: Renate Schmid / Oberwolfach (MFO), CC BY-SA 2.0 DE'
     },
     AdaGrad: {
       wiki: 'https://en.wikipedia.org/wiki/Stochastic_gradient_descent#AdaGrad',
@@ -356,7 +357,8 @@
       paper: 'https://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf',
       cite: 'Hinton, 2012',
       person: 'Geoffrey Hinton',
-      img: '/inventors/hinton.jpg'
+      img: '/inventors/hinton.jpg',
+      credit: 'Photo: Arthur Petron, CC BY-SA 4.0'
     },
     AdaDelta: {
       paper: 'https://arxiv.org/abs/1212.5701',
@@ -1123,8 +1125,8 @@
               <p>
                 There’s even a sharp edge to it: push γ past roughly <strong>two divided by the
                 steepness of the valley</strong> and the steps grow instead of shrink, and the run
-                diverges. That “steepness” is the <strong>curvature</strong> — and taming it is the
-                whole subject of Part III.
+                diverges. That “steepness” is the <strong>curvature</strong> — and outwitting it is
+                what the optimizer family tree in Part III is built for.
               </p>
 
               <p>
@@ -1138,7 +1140,7 @@
                 Stay under that line and each step lands closer to the bottom than the last, so the run
                 converges. Cross it and the opposite happens: every step overshoots a little more than
                 the one before, the bounce compounds, and the loss runs off to infinity. That single
-                number — the curvature — is the villain the whole next part is built to outwit.
+                number — the curvature — is the villain the optimizer family tree is built to outwit.
               </p>
               {#if chapterPresets['ch-gamma']}
                 <div class="opt-cta">
@@ -1432,7 +1434,7 @@
                       <span class="opt-by">{c.by}</span>
                     </div>
                     {#if cite?.person}
-                      <div class="opt-portrait" title={cite.person}>
+                      <div class="opt-portrait" title={cite.credit ? `${cite.person} · ${cite.credit}` : cite.person}>
                         <span class="opt-portrait-ph" aria-hidden="true">{initials(cite.person)}</span>
                         {#if cite.img}
                           <img class="opt-portrait-img" src={cite.img} alt={cite.person} loading="lazy" on:error={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')} />
@@ -2141,7 +2143,9 @@
   .opt-portrait-img {
     position: absolute; inset: 0; z-index: 1;
     width: 100%; height: 100%;
-    object-fit: cover; border-radius: 50%;
+    object-fit: cover;
+    object-position: center top; /* portraits frame the head near the top */
+    border-radius: 50%;
     border: 1px solid var(--color-border);
     background: var(--color-bg-secondary);
   }
