@@ -151,12 +151,12 @@
     fix?: string;
     brk?: string;
     prereq?: boolean;
-    act?: { no: string; title: string };
+    act?: { no: string; title: string; intro?: string };
   };
 
   const optTree: OptChapter[] = [
     {
-      act: { no: 'Act I', title: 'Follow the slope' },
+      act: { no: 'Act I', title: 'Follow the slope', intro: 'The whole story starts with a single move — and then spends 170 years repairing it. It helps to read what follows as a conversation between methods: <em>here is the flaw, here is the fix, here is the new flaw the fix introduced.</em>' },
       year: '1847',
       name: 'Gradient Descent',
       by: 'Augustin-Louis Cauchy',
@@ -167,7 +167,7 @@
       brk: 'one γ for every parameter, so it zig-zags across ravines (the grey racer above)'
     },
     {
-      act: { no: 'Act II', title: 'Add memory' },
+      act: { no: 'Act II', title: 'Add memory', intro: 'Plain descent is forgetful: every step is decided by the slope underfoot and nothing else. The next two fixes both come from giving the marker a <strong>memory</strong> of the steps before — starting with the small averaging tool they are both built from.' },
       prereq: true,
       year: 'tool',
       name: 'The moving average',
@@ -196,7 +196,7 @@
       fix: 'corrects the overshoot before it happens'
     },
     {
-      act: { no: 'Act III', title: 'A learning rate per parameter' },
+      act: { no: 'Act III', title: 'A learning rate per parameter', intro: 'Momentum fought the ravine by smoothing across <em>time</em>. Here is a different attack on the same wall: leave time alone and give every <em>parameter</em> its own step size, so the cramped direction and the roomy one stop having to share a single γ.' },
       year: '2011',
       name: 'AdaGrad',
       by: 'Duchi, Hazan & Singer',
@@ -226,7 +226,7 @@
       brk: 'one knob fewer, but no γ to crank when you DO want it faster'
     },
     {
-      act: { no: 'Act IV', title: 'Put the two together' },
+      act: { no: 'Act IV', title: 'Put the two together', intro: 'Two good ideas are now on the table — momentum’s smoothing of the gradient, and a per-parameter step size. They mend different halves of the ravine and they do not get in each other’s way, so the obvious move is to use <strong>both at once</strong>. That move became the most widely used optimizer in deep learning.' },
       year: '2014',
       name: 'Adam',
       by: 'Kingma & Ba — "adaptive moments"',
@@ -266,7 +266,7 @@
       brk: 'only smooths the opening steps; past warmup it just is Adam'
     },
     {
-      act: { no: 'Branch', title: 'Sign steps' },
+      act: { no: 'Branch', title: 'Sign steps', intro: 'The first fork throws away the piece everyone had been copying — the adaptive √ scaling — and asks what is left when a step is nothing but a direction and a single fixed size.' },
       year: '2023',
       name: 'Lion',
       by: 'Chen et al. (Google) — found by program search, not designed',
@@ -277,7 +277,7 @@
       brk: 'the step never shrinks, so it orbits the minimum until γ is decayed by a schedule'
     },
     {
-      act: { no: 'Branch', title: 'Use curvature' },
+      act: { no: 'Branch', title: 'Use curvature', intro: 'A second fork goes the opposite way: instead of dropping information, it adds some. Every method so far reads only the <em>slope</em>; this branch also reads how the slope is <strong>bending</strong>.' },
       year: '1680s',
       name: 'Newton',
       by: 'Isaac Newton — the original, three centuries early',
@@ -298,7 +298,7 @@
       brk: 'only the diagonal: blind to the off-axis stretch Newton corrects'
     },
     {
-      act: { no: 'Branch', title: 'Tune itself' },
+      act: { no: 'Branch', title: 'Tune itself', intro: 'The last fork aims at the one knob nothing has managed to remove. Even the adaptive methods still made you choose γ; this branch tries to read it straight off the problem.' },
       year: '2024',
       name: 'Prodigy',
       by: 'Mishchenko & Defazio — the learning rate, removed',
@@ -882,6 +882,17 @@
                 <strong>opposite</strong> way, along <strong>−∇ℒ</strong>. That negative gradient is
                 the single most important arrow in this whole app.
               </p>
+              <p>
+                Why <em>steepest</em>? Picture standing on the slope and trying every direction you
+                could step. Each heading has its own rate of climb, and the gradient is simply the one
+                whose climb is fastest. Every other direction is a watered-down version of it: its
+                steepness is the gradient’s shadow cast onto that heading — full strength straight along
+                ∇ℒ, and fading to <em>nothing</em> at a right angle to it. Those flat, right-angle
+                directions are exactly the <strong>contour lines</strong> on the map: walk along a
+                contour and the loss never changes, so the steepest way off it has to be square across
+                it. <em>The gradient is always perpendicular to the contours</em> — which is why the
+                field arrows below cut straight through the white loops rather than running along them.
+              </p>
 
               <div class="concept concept-bg-overlay">
                 <svg class="concept-bg-svg" viewBox={`0 0 ${gradVizW} ${gradVizH}`} preserveAspectRatio="xMidYMid slice">
@@ -924,7 +935,10 @@
               <p>
                 Formally, the gradient is a column of <strong>partial derivatives</strong> — one
                 slope per parameter. Each entry answers a single, narrow question: <em>if I wiggle
-                only this knob and hold the other still, how fast does the loss change?</em>
+                only this knob and hold the other still, how fast does the loss change?</em> There is
+                nothing mystical in measuring one: nudge α by a hair, see how far the loss moved, and
+                divide the change by the nudge. Do that once for α and once for β and you have the two
+                numbers the gradient is built from.
               </p>
               <div class="formula-display">{@html texD(formulas.gradientDefinition)}</div>
               <p>
@@ -934,6 +948,14 @@
                 almost nothing at the basin floor — at the very bottom there is no downhill left, so
                 the gradient, and the step it drives, fades to zero. The marker arriving and going
                 still <em>is</em> the gradient vanishing.
+              </p>
+              <p>
+                One honest caveat to carry forward: the gradient is only the truth <em>right where you
+                stand.</em> Zoom in close enough and any smooth surface flattens into a tilted plane,
+                and ∇ℒ is exactly that tilt — but step too far and the real ground curves away from the
+                plane you trusted. That gap between the slope underfoot and the surface a stride away is
+                the whole reason a step can be <em>too big</em>, and taming it is what the learning rate
+                exists to do.
               </p>
             </section>
 
@@ -1230,6 +1252,7 @@
                 {/if}
                 {#if c.act}
                   <div class="opt-act"><span class="act-no">{c.act.no}</span><span class="act-title">{c.act.title}</span></div>
+                  {#if c.act.intro}<p class="opt-act-intro">{@html c.act.intro}</p>{/if}
                 {/if}
                 {@const cite = OPT_CITE[c.name]}
                 <div class="opt-card" class:prereq-card={c.prereq}>
@@ -1909,6 +1932,14 @@
     color: #f59e0b;
   }
   .act-title { font-weight: 700; font-size: 0.95rem; color: var(--color-text-primary); }
+  .opt-act-intro {
+    margin: 0 0 1rem;
+    color: var(--color-text-secondary);
+    font-size: 0.92rem;
+    line-height: 1.65;
+  }
+  .opt-act-intro :global(em) { color: var(--color-text-primary); font-style: italic; }
+  .opt-act-intro :global(strong) { color: var(--color-text-primary); font-weight: 650; }
 
   .opt-card {
     border: 1px solid var(--color-border);
