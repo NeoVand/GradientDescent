@@ -700,6 +700,41 @@
     'ch-schedule': Activity,
     'ch-problems': Layers, 'ch-experiments': FlaskConical, 'ch-panels': Map, 'ch-keys': Keyboard
   };
+
+  // "Further reading" per concept chapter — Wikipedia for the idea, the
+  // landmark paper where there is one. (Optimizer cards carry their own
+  // citations via OPT_CITE.) Verified canonical URLs.
+  type ChRef = { kind: 'wiki' | 'paper'; label: string; href: string };
+  const chRefs: Record<string, ChRef[]> = {
+    'ch-bowl': [
+      { kind: 'wiki', label: 'Mathematical optimization', href: 'https://en.wikipedia.org/wiki/Mathematical_optimization' },
+      { kind: 'wiki', label: 'Mean squared error', href: 'https://en.wikipedia.org/wiki/Mean_squared_error' }
+    ],
+    'ch-landscape': [
+      { kind: 'wiki', label: 'Level set', href: 'https://en.wikipedia.org/wiki/Level_set' },
+      { kind: 'paper', label: 'Visualizing loss landscapes — Li et al., 2018', href: 'https://arxiv.org/abs/1712.09913' }
+    ],
+    'ch-downhill': [
+      { kind: 'wiki', label: 'Gradient', href: 'https://en.wikipedia.org/wiki/Gradient' },
+      { kind: 'wiki', label: 'Directional derivative', href: 'https://en.wikipedia.org/wiki/Directional_derivative' }
+    ],
+    'ch-step': [
+      { kind: 'wiki', label: 'Gradient descent', href: 'https://en.wikipedia.org/wiki/Gradient_descent' }
+    ],
+    'ch-gamma': [
+      { kind: 'wiki', label: 'Learning rate', href: 'https://en.wikipedia.org/wiki/Learning_rate' },
+      { kind: 'wiki', label: 'Condition number', href: 'https://en.wikipedia.org/wiki/Condition_number' }
+    ],
+    'ch-schedule': [
+      { kind: 'wiki', label: 'Learning-rate schedule', href: 'https://en.wikipedia.org/wiki/Learning_rate#Learning_rate_schedule' },
+      { kind: 'paper', label: 'Cosine annealing / SGDR — Loshchilov & Hutter, 2017', href: 'https://arxiv.org/abs/1608.03983' },
+      { kind: 'paper', label: 'Warmup — Goyal et al., 2017', href: 'https://arxiv.org/abs/1706.02677' }
+    ],
+    'ch-noise': [
+      { kind: 'wiki', label: 'Stochastic gradient descent', href: 'https://en.wikipedia.org/wiki/Stochastic_gradient_descent' },
+      { kind: 'paper', label: 'Stochastic approximation — Robbins & Monro, 1951', href: 'https://doi.org/10.1214/aoms/1177729586' }
+    ]
+  };
 </script>
 
 <svelte:window on:keydown={handleKeydown} />
@@ -849,6 +884,17 @@
                   </button>
                 </div>
               {/if}
+              {#if chRefs['ch-bowl']}
+                <div class="ch-refs">
+                  <span class="ch-refs-label">Further reading</span>
+                  {#each chRefs['ch-bowl'] as r}
+                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
+                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
+                      {r.label}
+                    </a>
+                  {/each}
+                </div>
+              {/if}
             </section>
 
             <!-- ============== 2 · LOSS IS A LANDSCAPE ============== -->
@@ -885,6 +931,17 @@
                   <button class="try-btn" on:click={() => runPreset('ch-landscape')}>
                     <Play size={13} strokeWidth={2.5} /><span>{chapterPresets['ch-landscape'].title}</span>
                   </button>
+                </div>
+              {/if}
+              {#if chRefs['ch-landscape']}
+                <div class="ch-refs">
+                  <span class="ch-refs-label">Further reading</span>
+                  {#each chRefs['ch-landscape'] as r}
+                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
+                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
+                      {r.label}
+                    </a>
+                  {/each}
                 </div>
               {/if}
             </section>
@@ -990,6 +1047,17 @@
                   </button>
                 </div>
               {/if}
+              {#if chRefs['ch-downhill']}
+                <div class="ch-refs">
+                  <span class="ch-refs-label">Further reading</span>
+                  {#each chRefs['ch-downhill'] as r}
+                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
+                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
+                      {r.label}
+                    </a>
+                  {/each}
+                </div>
+              {/if}
             </section>
 
             <!-- ============== 4 · ONE STEP ============== -->
@@ -1023,6 +1091,17 @@
                   <button class="try-btn" on:click={() => runPreset('ch-step')}>
                     <Play size={13} strokeWidth={2.5} /><span>{chapterPresets['ch-step'].title}</span>
                   </button>
+                </div>
+              {/if}
+              {#if chRefs['ch-step']}
+                <div class="ch-refs">
+                  <span class="ch-refs-label">Further reading</span>
+                  {#each chRefs['ch-step'] as r}
+                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
+                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
+                      {r.label}
+                    </a>
+                  {/each}
                 </div>
               {/if}
             </section>
@@ -1067,6 +1146,17 @@
                   <button class="try-btn" on:click={() => runPreset('ch-gamma')}>
                     <Play size={13} strokeWidth={2.5} /><span>{chapterPresets['ch-gamma'].title}</span>
                   </button>
+                </div>
+              {/if}
+              {#if chRefs['ch-gamma']}
+                <div class="ch-refs">
+                  <span class="ch-refs-label">Further reading</span>
+                  {#each chRefs['ch-gamma'] as r}
+                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
+                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
+                      {r.label}
+                    </a>
+                  {/each}
                 </div>
               {/if}
             </section>
@@ -1141,6 +1231,17 @@
                   </button>
                 </div>
               {/if}
+              {#if chRefs['ch-schedule']}
+                <div class="ch-refs">
+                  <span class="ch-refs-label">Further reading</span>
+                  {#each chRefs['ch-schedule'] as r}
+                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
+                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
+                      {r.label}
+                    </a>
+                  {/each}
+                </div>
+              {/if}
             </section>
 
             <!-- ============== 7 · NOISE / SGD ============== -->
@@ -1205,6 +1306,17 @@
                   <button class="try-btn" on:click={() => runPreset('ch-noise')}>
                     <Play size={13} strokeWidth={2.5} /><span>{chapterPresets['ch-noise'].title}</span>
                   </button>
+                </div>
+              {/if}
+              {#if chRefs['ch-noise']}
+                <div class="ch-refs">
+                  <span class="ch-refs-label">Further reading</span>
+                  {#each chRefs['ch-noise'] as r}
+                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
+                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
+                      {r.label}
+                    </a>
+                  {/each}
                 </div>
               {/if}
             </section>
@@ -2049,6 +2161,17 @@
   }
   .opt-cite-link:hover { color: #10b981; }
   .opt-cite-link :global(svg) { opacity: 0.75; }
+  /* Per-chapter "Further reading" row — same link styling as a card citation. */
+  .ch-refs {
+    display: flex; align-items: baseline; gap: 0.4rem 0.9rem; flex-wrap: wrap;
+    margin-top: 1.6rem; padding-top: 0.6rem;
+    border-top: 1px solid var(--color-border);
+  }
+  .ch-refs-label {
+    font-size: 0.625rem; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--color-text-tertiary);
+  }
   .opt-year {
     font-family: 'SF Mono', Monaco, monospace;
     font-size: 0.625rem; font-weight: 800;
