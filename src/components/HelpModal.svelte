@@ -907,10 +907,16 @@
       const mx = (a.x + b.x) / 2;
       return `M ${a.x.toFixed(1)},${a.y.toFixed(1)} C ${mx.toFixed(1)},${a.y.toFixed(1)} ${mx.toFixed(1)},${b.y.toFixed(1)} ${b.x.toFixed(1)},${b.y.toFixed(1)}`;
     };
-    const edges = data.filter(n => n.parent).map(n => ({
-      d: curve(pos(n.parent as OptimizerId), pos(n.id)),
-      w: Math.max(1.4, 5 - depth[n.id] * 0.8)
-    }));
+    // Each branch carries its endpoints + the two node colours so it can be
+    // stroked with a gradient interpolating parent → child.
+    const edges = data.filter(n => n.parent).map(n => {
+      const a = pos(n.parent as OptimizerId), b = pos(n.id);
+      return {
+        d: curve(a, b), w: Math.max(1.4, 5 - depth[n.id] * 0.8),
+        x1: a.x, y1: a.y, x2: b.x, y2: b.y,
+        c0: RACE_COLORS[n.parent as OptimizerId], c1: RACE_COLORS[n.id]
+      };
+    });
     const merges = data.filter(n => n.merge).map(n => ({ d: curve(pos(n.merge as OptimizerId), pos(n.id)) }));
     // Nodes are plain colour-coded disks (root a touch larger) — cleaner than
     // a leaf glyph at this size.
@@ -1764,11 +1770,19 @@
               </p>
               <figure class="fig fig-tree">
                 <svg viewBox="0 0 {familyTree.W} {familyTree.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                  <defs>
+                    {#each familyTree.edges as e, i}
+                      <linearGradient id="tree-edge-{i}" gradientUnits="userSpaceOnUse" x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2}>
+                        <stop offset="0%" stop-color={e.c0} />
+                        <stop offset="100%" stop-color={e.c1} />
+                      </linearGradient>
+                    {/each}
+                  </defs>
                   {#each familyTree.merges as m}
                     <path d={m.d} class="tree-merge" />
                   {/each}
-                  {#each familyTree.edges as e}
-                    <path d={e.d} class="tree-branch" stroke-width={e.w} />
+                  {#each familyTree.edges as e, i}
+                    <path d={e.d} class="tree-branch" stroke="url(#tree-edge-{i})" stroke-width={e.w} />
                   {/each}
                   {#each familyTree.nodes as n (n.id)}
                     <g transform="translate({n.x.toFixed(1)},{n.y.toFixed(1)})">
@@ -2464,7 +2478,7 @@
   }
   /* The optimizer family tree */
   .fig-tree > svg { padding: 0.3rem 0.4rem; }
-  .tree-branch { fill: none; stroke: #93a585; stroke-linecap: round; stroke-opacity: 0.7; }
+  .tree-branch { fill: none; stroke-linecap: round; stroke-opacity: 0.85; }
   .tree-merge { fill: none; stroke: #a855f7; stroke-width: 1.3; stroke-dasharray: 3,3; stroke-opacity: 0.5; }
   .tree-label { font-size: 10.5px; font-weight: 600; font-family: inherit; fill: var(--color-text-secondary); text-anchor: middle; }
   /* Live 3-D gradient bowl */
