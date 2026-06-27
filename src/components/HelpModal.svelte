@@ -34,7 +34,7 @@
 
   // Tiny γ-vs-step previews for the scheduling chapter, sampled from the SAME
   // schedule factors the trainer uses, so the curves are honest.
-  const SCH_W = 150, SCH_H = 78, SCH_PAD = 7;
+  const SCH_W = 132, SCH_H = 60, SCH_PAD = 6;
   const scheduleCurves = scheduleOrder.map((id) => {
     const f = schedules[id].factor;
     const N = 72, T = 100;
@@ -2295,7 +2295,7 @@
   .look {
     font-size: 0.9rem;
     color: var(--color-text-tertiary);
-    border-left: 3px solid rgba(16, 185, 129, 0.4);
+    border-left: 2px solid var(--color-border);
     padding-left: 0.85rem;
     font-style: italic;
   }
@@ -2312,8 +2312,8 @@
   .recipe {
     margin: 0 0 1rem 0;
     padding: 0.85rem 1.1rem;
-    border-left: 3px solid #10b981;
-    background: rgba(16, 185, 129, 0.06);
+    border-left: 2px solid var(--color-border);
+    background: var(--color-bg-tertiary);
     border-radius: 0 8px 8px 0;
     font-size: 1.0rem;
     line-height: 1.65;
@@ -2325,31 +2325,32 @@
   /* ---------- Schedule preview cards ---------- */
   .schedule-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.7rem;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
     margin: 1.15rem 0 1.5rem;
   }
   .schedule-card {
     border: 1px solid var(--color-border);
-    border-radius: 10px;
+    border-radius: 8px;
     background: var(--color-bg-tertiary);
-    padding: 0.6rem 0.75rem 0.75rem;
+    padding: 0.45rem 0.5rem 0.55rem;
   }
   .schedule-card svg { display: block; width: 100%; height: auto; }
   .sch-axis { stroke: var(--color-border); stroke-width: 1; }
   .sch-curve { stroke: #10b981; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .schedule-name {
-    font-size: 0.9rem;
+    font-size: 0.76rem;
     font-weight: 700;
     color: var(--color-text-primary);
-    margin-top: 0.45rem;
+    margin-top: 0.3rem;
   }
   .schedule-desc {
-    font-size: 0.78rem;
-    line-height: 1.45;
+    font-size: 0.66rem;
+    line-height: 1.35;
     color: var(--color-text-tertiary);
-    margin-top: 0.12rem;
+    margin-top: 0.1rem;
   }
+  @media (max-width: 560px) { .schedule-grid { grid-template-columns: repeat(2, 1fr); } }
 
   /* ---------- Concept blocks ---------- */
   .concept {
@@ -2449,14 +2450,13 @@
   .proof {
     margin: 1.6rem 0;
     border: 1px solid var(--color-border);
-    border-left: 3px solid #10b981;
     border-radius: 10px;
     background: var(--color-bg-tertiary);
     padding: 1rem 1.2rem;
   }
   .proof-title {
     font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
-    color: #10b981; margin-bottom: 0.7rem;
+    color: var(--color-text-secondary); margin-bottom: 0.7rem;
   }
   .proof-p { font-size: 0.88rem; line-height: 1.65; margin: 0 0 0.7rem; }
   .proof :global(.formula-display) { margin: 0.6rem 0; }
@@ -2696,7 +2696,7 @@
     font-size: 0.875rem;
     color: var(--color-text-tertiary);
     font-style: italic;
-    border-left: 3px solid rgba(16, 185, 129, 0.4);
+    border-left: 2px solid var(--color-border);
     padding-left: 0.85rem;
     margin: 0.6rem 0;
   }
@@ -2788,7 +2788,7 @@
   /* ---------- Experiments ---------- */
   .experiment {
     background: var(--color-bg-tertiary);
-    border-left: 3px solid #10b981;
+    border-left: 2px solid var(--color-border);
     border-radius: 8px;
     padding: 0.75rem 1rem;
     margin-bottom: 0.625rem;
