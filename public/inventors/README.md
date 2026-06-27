@@ -10,7 +10,7 @@ Use square-ish images (they're shown as a ~50px circle, framed with
 listed below (referenced from `HelpModal.svelte`, `OPT_CITE`). Each was downscaled
 to ≈ 420 px on the longest side to keep the bundle small.
 
-## In place (11 of 14 cards)
+## In place (all 14 cards)
 
 ### Wikimedia Commons — verified licences
 
@@ -47,14 +47,11 @@ permission before any production/commercial release.
 | `liu-radam.jpg` | Liyuan (Lucas) Liu | RAdam | media.licdn.com (LinkedIn profile photo) |
 | `jiang-radam.jpg` | Haoming Jiang | RAdam | scholar.googleusercontent.com (Google Scholar photo) |
 | `he-radam.jpg` | Pengcheng He | RAdam | media.licdn.com (LinkedIn profile photo) |
+| `chen-lion.jpg` | Xiangning Chen | Lion | xiangning-chen.me/images/me.png (homepage; converted to JPG) |
+| `liu-sophia.jpg` | Hong Liu | Sophia | liuhong99.github.io/images/hong.jpg (homepage) |
+| `mishchenko.jpg` | Konstantin Mishchenko | Prodigy | konstmish.com (homepage avatar) |
 
-## Still placeholders (monogram until an image is dropped in)
-
-An exhaustive Wikimedia Commons check (Wikidata P18, Commons API namespace 6,
-infoboxes) found no properly-licensed image for these three:
-
-| File | Person | Optimizer |
-|------|--------|-----------|
-| `chen-lion.jpg` | Xiangning Chen | Lion |
-| `liu-sophia.jpg` | Hong Liu | Sophia |
-| `mishchenko.jpg` | Konstantin Mishchenko | Prodigy |
+All 14 optimizer cards now show a portrait. (Note: `chen-lion.jpg` is Chen's
+stylized homepage photo — a beanie, looking down — since neither it nor his
+Google Scholar photo is a clean front-facing headshot; swap if a better one
+turns up.)
