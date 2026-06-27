@@ -1,0 +1,21 @@
+# Cloudflare Pages headers. Hashed build assets are content-addressed, so they
+# can cache forever; the entry points must revalidate every load so a new deploy
+# (and its new service worker) is picked up instead of a stale copy.
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/sw.js
+  Cache-Control: no-cache
+
+/registerSW.js
+  Cache-Control: no-cache
+
+/manifest.webmanifest
+  Cache-Control: no-cache
+
+/index.html
+  Cache-Control: no-cache
+
+/
+  Cache-Control: no-cache

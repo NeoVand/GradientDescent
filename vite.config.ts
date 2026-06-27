@@ -15,7 +15,12 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icon.svg'],
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,woff2}']
+        globPatterns: ['**/*.{js,css,html,svg,woff2}'],
+        // A fresh build's service worker takes over immediately and drops the
+        // previous precache, so a reload never serves a stale shell.
+        clientsClaim: true,
+        skipWaiting: true,
+        cleanupOutdatedCaches: true
       },
       manifest: {
         name: 'Gradient Lab',
