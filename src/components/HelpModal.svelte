@@ -912,11 +912,11 @@
       w: Math.max(1.4, 5 - depth[n.id] * 0.8)
     }));
     const merges = data.filter(n => n.merge).map(n => ({ d: curve(pos(n.merge as OptimizerId), pos(n.id)) }));
-    // Uniform leaf tilt — every leaf reaches the same way (toward the canopy),
-    // which reads far cleaner than tilting each one along its own branch.
+    // Nodes are plain colour-coded disks (root a touch larger) — cleaner than
+    // a leaf glyph at this size.
     const nodes = data.map(n => {
       const p = pos(n.id);
-      return { ...n, x: p.x, y: p.y, ang: -18, color: RACE_COLORS[n.id], root: n.parent === null };
+      return { ...n, x: p.x, y: p.y, color: RACE_COLORS[n.id], root: n.parent === null };
     });
     return { W, H, edges, merges, nodes };
   })();
@@ -1772,11 +1772,8 @@
                   {/each}
                   {#each familyTree.nodes as n (n.id)}
                     <g transform="translate({n.x.toFixed(1)},{n.y.toFixed(1)})">
-                      <g transform="rotate({n.ang.toFixed(1)})">
-                        <path d="M -7,0 C -2,-5.6 5.5,-5.6 9.5,0 C 5.5,5.6 -2,5.6 -7,0 Z" fill={n.color} stroke="#fff" stroke-width="0.9" />
-                        <line x1="-5" y1="0" x2="8" y2="0" stroke="#fff" stroke-opacity="0.55" stroke-width="0.7" />
-                      </g>
-                      <text class="tree-label" x="0" y="-11">{n.name}</text>
+                      <circle r={n.root ? 6.5 : 5} fill={n.color} stroke="#fff" stroke-width="1.4" />
+                      <text class="tree-label" x="0" y="-10">{n.name}</text>
                     </g>
                   {/each}
                 </svg>
