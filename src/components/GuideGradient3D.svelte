@@ -16,6 +16,7 @@
   let controls: OrbitControls | null = null;
   let raf = 0;
   let ro: ResizeObserver | null = null;
+  let themeObs: MutationObserver | null = null;
 
   const K = 0.62; // bowl curvature: height = K(x²+y²)
   // World point on the surface for a parameter (x,y). PlaneGeometry is built in
@@ -62,15 +63,24 @@
     geo.rotateX(-Math.PI / 2);
     geo.computeVertexNormals();
     const surfMat = new THREE.MeshStandardMaterial({
-      color: 0x10b981, transparent: true, opacity: 0.16,
+      color: 0x10b981, transparent: true, opacity: 0.14,
       roughness: 0.85, metalness: 0, side: THREE.DoubleSide
     });
     scene.add(new THREE.Mesh(geo, surfMat));
-    const wire = new THREE.LineSegments(
-      new THREE.WireframeGeometry(geo),
-      new THREE.LineBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.3 })
-    );
-    scene.add(wire);
+    const wireMat = new THREE.LineBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.34 });
+    scene.add(new THREE.LineSegments(new THREE.WireframeGeometry(geo), wireMat));
+
+    // The wireframe needs far more contrast on the near-white light background
+    // than on the dark panel — track the theme and recolour the grid live.
+    const applyTheme = () => {
+      const dk = document.documentElement.getAttribute('data-theme') !== 'light';
+      wireMat.color.setHex(dk ? 0x34d399 : 0x0f766e);
+      wireMat.opacity = dk ? 0.34 : 0.62;
+      surfMat.opacity = dk ? 0.14 : 0.13;
+    };
+    applyTheme();
+    themeObs = new MutationObserver(applyTheme);
+    themeObs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
     // ---- the point P on the wall ----
     const Px = 0.62, Py = 0.62;
@@ -85,8 +95,8 @@
     // ---- the level ring through P (a contour at P's height) ----
     const rLev = Math.hypot(Px, Py);
     const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(rLev, 0.007, 10, 90),
-      new THREE.MeshBasicMaterial({ color: 0x34d399 })
+      new THREE.TorusGeometry(rLev, 0.0035, 8, 96),
+      new THREE.MeshBasicMaterial({ color: 0x10b981 })
     );
     ring.rotation.x = Math.PI / 2;
     ring.position.y = K * rLev * rLev;
@@ -97,11 +107,24 @@
     // d/ds surf(Px+ux·s, Py+uy·s) = (ux, 2K(Px·ux+Py·uy), −uy)
     const upDir = new THREE.Vector3(ux, 2 * K * (Px * ux + Py * uy), -uy).normalize();
     const dnDir = upDir.clone().multiplyScalar(-1);
-    const grad = new THREE.ArrowHelper(upDir, P, 0.72, 0xf59e0b, 0.2, 0.13);
-    (grad.line.material as THREE.LineBasicMaterial).linewidth = 2;
-    scene.add(grad);
-    const negGrad = new THREE.ArrowHelper(dnDir, P, 0.6, 0x34d399, 0.18, 0.12);
-    scene.add(negGrad);
+    // Solid arrows (cylinder shaft + cone head) — a 1px ArrowHelper line looked
+    // thin and unprofessional next to its big head, so build them from geometry.
+    const makeArrow = (dir: THREE.Vector3, origin: THREE.Vector3, length: number, hex: number) => {
+      const g = new THREE.Group();
+      const mat = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.45, metalness: 0 });
+      const headLen = 0.15, headR = 0.05, shaftR = 0.018;
+      const shaftLen = Math.max(0.01, length - headLen);
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(shaftR, shaftR, shaftLen, 20), mat);
+      shaft.position.y = shaftLen / 2;
+      const head = new THREE.Mesh(new THREE.ConeGeometry(headR, headLen, 22), mat);
+      head.position.y = shaftLen + headLen / 2;
+      g.add(shaft, head);
+      g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+      g.position.copy(origin);
+      return g;
+    };
+    scene.add(makeArrow(upDir, P, 0.72, 0xf59e0b));
+    scene.add(makeArrow(dnDir, P, 0.58, 0x34d399));
 
     // ---- basin marker at the bottom ----
     const basin = new THREE.Mesh(
@@ -132,6 +155,7 @@
   onDestroy(() => {
     cancelAnimationFrame(raf);
     ro?.disconnect();
+    themeObs?.disconnect();
     controls?.dispose();
     if (renderer) {
       renderer.dispose();
