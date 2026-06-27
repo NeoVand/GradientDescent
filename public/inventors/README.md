@@ -50,8 +50,12 @@ permission before any production/commercial release.
 | `chen-lion.jpg` | Xiangning Chen | Lion | xiangning-chen.me/images/me.png (homepage; converted to JPG) |
 | `liu-sophia.jpg` | Hong Liu | Sophia | liuhong99.github.io/images/hong.jpg (homepage) |
 | `mishchenko.jpg` | Konstantin Mishchenko | Prodigy | konstmish.com (homepage avatar) |
+| `defazio.jpg` | Aaron Defazio | Prodigy (co-author) | aarondefazio.com/portrait.jpg |
 
-All 14 optimizer cards now show a portrait. (Note: `chen-lion.jpg` is Chen's
+All 14 optimizer cards now show a portrait. (Tijmen Tieleman, co-author of the
+RMSProp lecture, has no fetchable photo — his Toronto page and Scholar carry
+none, and the minds.ai team photo is WAF-blocked — so RMSProp stays Hinton-only,
+matching its byline.) (Note: `chen-lion.jpg` is Chen's
 stylized homepage photo — a beanie, looking down — since neither it nor his
 Google Scholar photo is a clean front-facing headshot; swap if a better one
 turns up.)

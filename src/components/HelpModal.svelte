@@ -431,8 +431,10 @@
     Prodigy: {
       paper: 'https://arxiv.org/abs/2306.06101',
       cite: 'arXiv:2306.06101',
-      person: 'Konstantin Mishchenko',
-      img: '/inventors/mishchenko.jpg'
+      people: [
+        { name: 'Konstantin Mishchenko', img: '/inventors/mishchenko.jpg' },
+        { name: 'Aaron Defazio', img: '/inventors/defazio.jpg' }
+      ]
     }
   };
   // Two-letter monogram for the portrait placeholder (first + last initial).
