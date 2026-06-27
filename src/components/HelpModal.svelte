@@ -800,43 +800,7 @@
     return { cx, baseY, rings, topL, topR };
   })();
 
-  // 5) The gradient in 3-D — an oblique wireframe bowl with the gradient drawn
-  // on its wall (steepest ascent) and −∇ℒ pointing to the basin, both running
-  // perpendicular to the level ring they sit on. Isometric projection of
-  // z = k(x²+y²).
-  const gradient3D = (() => {
-    const N = 9, R = 1.45, k = 0.55;
-    const f = (x: number, y: number) => k * (x * x + y * y);
-    const cx = 232, cyB = 150, S = 43, zS = 44;
-    const proj = (x: number, y: number, z: number): Pt => ({
-      x: cx + (x - y) * 0.866 * S,
-      y: cyB + (x + y) * 0.5 * S - z * zS
-    });
-    const lines: { d: string; back: boolean }[] = [];
-    for (let i = 0; i < N; i++) {
-      const t = -R + (2 * R) * (i / (N - 1));
-      const a: Pt[] = [], b: Pt[] = [];
-      for (let j = 0; j < N; j++) {
-        const s = -R + (2 * R) * (j / (N - 1));
-        a.push(proj(t, s, f(t, s)));
-        b.push(proj(s, t, f(s, t)));
-      }
-      lines.push({ d: 'M ' + a.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' L '), back: t < 0 });
-      lines.push({ d: 'M ' + b.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' L '), back: t < 0 });
-    }
-    const Px = 0.82, Py = 0.82, Pz = f(Px, Py);
-    const P = proj(Px, Py, Pz);
-    const m = Math.hypot(Px, Py), ux = Px / m, uy = Py / m, d = 0.72;
-    const up = proj(Px + ux * d, Py + uy * d, f(Px + ux * d, Py + uy * d));
-    const dn = proj(Px - ux * d, Py - uy * d, f(Px - ux * d, Py - uy * d));
-    const rLev = m;
-    const ring: Pt[] = [];
-    for (let q = 0; q <= 48; q++) {
-      const a = 2 * Math.PI * (q / 48);
-      ring.push(proj(rLev * Math.cos(a), rLev * Math.sin(a), Pz));
-    }
-    return { lines, P, up, dn, ringD: 'M ' + ring.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' L ') + ' Z' };
-  })();
+  // (The gradient chapter's 3-D bowl is a real WebGL scene — see GuideGradient3D.svelte.)
 
   // The "climb-rate rose": stepping a unit distance in direction θ changes the
   // loss at rate ‖∇ℒ‖cosθ. Drawn as spokes whose length is |cosθ|, the tips
@@ -1291,25 +1255,21 @@
                 worth seeing why, first in three dimensions, then in one short line of proof.
               </p>
               <figure class="fig">
-                <svg viewBox="0 0 460 196" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                  <defs>
-                    <marker id="g3d-up" viewBox="0 -5 10 10" refX="7.5" refY="0" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,-5L10,0L0,5" fill="#f59e0b" /></marker>
-                    <marker id="g3d-dn" viewBox="0 -5 10 10" refX="7.5" refY="0" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,-5L10,0L0,5" fill="#10b981" /></marker>
-                  </defs>
-                  {#each gradient3D.lines as l}
-                    <path d={l.d} fill="none" class="fig-contour" style="stroke-opacity:{l.back ? 0.1 : 0.26}" />
-                  {/each}
-                  <path d={gradient3D.ringD} fill="none" stroke="#34d399" stroke-width="1.7" stroke-dasharray="4,2.5" stroke-opacity="0.95" />
-                  <line x1={gradient3D.P.x} y1={gradient3D.P.y} x2={gradient3D.dn.x} y2={gradient3D.dn.y} stroke="#10b981" stroke-width="2.4" marker-end="url(#g3d-dn)" />
-                  <line x1={gradient3D.P.x} y1={gradient3D.P.y} x2={gradient3D.up.x} y2={gradient3D.up.y} stroke="#f59e0b" stroke-width="2.4" marker-end="url(#g3d-up)" />
-                  <circle cx={gradient3D.P.x} cy={gradient3D.P.y} r="3.6" fill="#f59e0b" stroke="#fff" stroke-width="1.3" />
-                  <text x={gradient3D.up.x + 6} y={gradient3D.up.y - 1} class="fig-svg-label" style="text-anchor:start;fill:#f59e0b">∇ℒ — steepest ↑</text>
-                  <text x={gradient3D.dn.x + 4} y={gradient3D.dn.y + 13} class="fig-svg-label" style="text-anchor:start;fill:#10b981">−∇ℒ — to the basin</text>
-                </svg>
+                <div class="fig-3d">
+                  {#await import('./GuideGradient3D.svelte') then m}
+                    <svelte:component this={m.default} />
+                  {/await}
+                  <div class="fig-3d-legend">
+                    <span><span class="leg-sw leg-amber"></span>{@html tex(String.raw`\nabla\mathcal{L}`)} — steepest ascent</span>
+                    <span><span class="leg-sw leg-emerald"></span>−{@html tex(String.raw`\nabla\mathcal{L}`)} — toward the basin</span>
+                  </div>
+                  <div class="fig-3d-hint">drag to orbit</div>
+                </div>
                 <figcaption class="fig-cap">
-                  The same picture in 3-D: on the wall of the bowl, ∇ℒ points straight up the steepest
-                  rise and −∇ℒ straight down toward the basin — both exactly perpendicular to the dashed
-                  contour ring they sit on.
+                  The same idea in three dimensions: on the wall of the bowl,
+                  {@html tex(String.raw`\nabla\mathcal{L}`)} (amber) points straight up the steepest rise
+                  and −{@html tex(String.raw`\nabla\mathcal{L}`)} (emerald) straight down toward the basin —
+                  both perpendicular to the green level ring they sit on. Drag to spin it.
                 </figcaption>
               </figure>
 
@@ -2428,6 +2388,29 @@
   .tree-branch { fill: none; stroke: #93a585; stroke-linecap: round; stroke-opacity: 0.7; }
   .tree-merge { fill: none; stroke: #a855f7; stroke-width: 1.3; stroke-dasharray: 3,3; stroke-opacity: 0.5; }
   .tree-label { font-size: 10.5px; font-weight: 600; font-family: inherit; fill: var(--color-text-secondary); text-anchor: middle; }
+  /* Live 3-D gradient bowl */
+  .fig-3d {
+    position: relative; width: 100%; height: 300px;
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .fig-3d-legend {
+    position: absolute; top: 11px; left: 13px;
+    display: flex; flex-direction: column; gap: 4px;
+    font-size: 0.78rem; color: var(--color-text-secondary);
+    pointer-events: none;
+  }
+  .fig-3d-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+  .leg-sw { width: 11px; height: 3px; border-radius: 2px; display: inline-block; }
+  .leg-amber { background: #f59e0b; }
+  .leg-emerald { background: #34d399; }
+  .fig-3d-hint {
+    position: absolute; bottom: 9px; right: 13px;
+    font-size: 0.7rem; color: var(--color-text-tertiary);
+    pointer-events: none; opacity: 0.7;
+  }
 
   /* ---------- Proof callout (the steepest-descent argument) ---------- */
   .proof {
