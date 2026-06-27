@@ -322,7 +322,8 @@
   // Citations + inventor portraits, keyed by optimizer name so the optTree
   // cards stay readable. Portraits are placeholders (initials) until real
   // images are dropped into /public/inventors/ at the paths below.
-  type Cite = { wiki?: string; paper?: string; cite?: string; person?: string; img?: string; credit?: string };
+  type Author = { name: string; img?: string; credit?: string };
+  type Cite = { wiki?: string; paper?: string; cite?: string; person?: string; img?: string; credit?: string; people?: Author[] };
   const OPT_CITE: Record<string, Cite> = {
     'Gradient Descent': {
       wiki: 'https://en.wikipedia.org/wiki/Gradient_descent',
@@ -349,8 +350,11 @@
       wiki: 'https://en.wikipedia.org/wiki/Stochastic_gradient_descent#AdaGrad',
       paper: 'https://jmlr.org/papers/v12/duchi11a.html',
       cite: 'Duchi et al., 2011',
-      person: 'John Duchi',
-      img: '/inventors/duchi.jpg'
+      people: [
+        { name: 'John Duchi', img: '/inventors/duchi.jpg' },
+        { name: 'Elad Hazan', img: '/inventors/hazan.jpg' },
+        { name: 'Yoram Singer', img: '/inventors/singer.jpg' }
+      ]
     },
     RMSProp: {
       wiki: 'https://en.wikipedia.org/wiki/Stochastic_gradient_descent#RMSProp',
@@ -370,8 +374,10 @@
       wiki: 'https://en.wikipedia.org/wiki/Stochastic_gradient_descent#Adam',
       paper: 'https://arxiv.org/abs/1412.6980',
       cite: 'arXiv:1412.6980',
-      person: 'Diederik Kingma',
-      img: '/inventors/kingma.jpg'
+      people: [
+        { name: 'Diederik Kingma', img: '/inventors/kingma.jpg' },
+        { name: 'Jimmy Ba', img: '/inventors/ba.jpg' }
+      ]
     },
     Nadam: {
       paper: 'https://www.semanticscholar.org/paper/d44efdc542f2cc5e196f04bc76bc783bfd7084af',
@@ -382,8 +388,10 @@
     AdamW: {
       paper: 'https://arxiv.org/abs/1711.05101',
       cite: 'arXiv:1711.05101',
-      person: 'Ilya Loshchilov',
-      img: '/inventors/loshchilov.jpg'
+      people: [
+        { name: 'Ilya Loshchilov', img: '/inventors/loshchilov.jpg' },
+        { name: 'Frank Hutter', img: '/inventors/hutter.jpg' }
+      ]
     },
     RAdam: {
       paper: 'https://arxiv.org/abs/1908.03265',
@@ -1612,6 +1620,7 @@
                   {#if c.act.intro}<p class="opt-act-intro">{@html c.act.intro}</p>{/if}
                 {/if}
                 {@const cite = OPT_CITE[c.name]}
+                {@const authors = cite?.people ?? (cite?.person ? [{ name: cite.person, img: cite.img, credit: cite.credit }] : [])}
                 <div class="opt-card" class:prereq-card={c.prereq}>
                   <div class="opt-top">
                     <div class="opt-head">
@@ -1619,12 +1628,16 @@
                       <span class="opt-name">{c.name}</span>
                       <span class="opt-by">{c.by}</span>
                     </div>
-                    {#if cite?.person}
-                      <div class="opt-portrait" title={cite.credit ? `${cite.person} · ${cite.credit}` : cite.person}>
-                        <span class="opt-portrait-ph" aria-hidden="true">{initials(cite.person)}</span>
-                        {#if cite.img}
-                          <img class="opt-portrait-img" src={cite.img} alt={cite.person} loading="lazy" on:error={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')} />
-                        {/if}
+                    {#if authors.length}
+                      <div class="opt-portraits" class:multi={authors.length > 1}>
+                        {#each authors as a (a.name)}
+                          <div class="opt-portrait" title={a.credit ? `${a.name} · ${a.credit}` : a.name}>
+                            <span class="opt-portrait-ph" aria-hidden="true">{initials(a.name)}</span>
+                            {#if a.img}
+                              <img class="opt-portrait-img" src={a.img} alt={a.name} loading="lazy" on:error={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')} />
+                            {/if}
+                          </div>
+                        {/each}
                       </div>
                     {/if}
                   </div>
@@ -1638,7 +1651,7 @@
                   {/if}
                   {#if cite?.wiki || cite?.paper}
                     <div class="opt-cite">
-                      {#if cite.person}<span class="opt-cite-who">{cite.person}</span>{/if}
+                      {#if authors.length}<span class="opt-cite-who">{authors.map(a => a.name).join(', ')}</span>{/if}
                       {#if cite.wiki}
                         <a class="opt-cite-link" href={cite.wiki} target="_blank" rel="noopener noreferrer">
                           <BookOpen size={11} strokeWidth={2.2} /> Wikipedia
@@ -2342,6 +2355,12 @@
      right corner of each card. */
   .opt-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.85rem; }
   .opt-head { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.3rem; }
+  /* One author, or a small facepile for co-authored methods (AdaGrad, Adam, AdamW). */
+  .opt-portraits { display: flex; flex-shrink: 0; }
+  .opt-portraits.multi .opt-portrait { width: 44px; height: 44px; }
+  .opt-portraits.multi .opt-portrait:not(:first-child) { margin-left: -16px; }
+  .opt-portraits.multi .opt-portrait-ph,
+  .opt-portraits.multi .opt-portrait-img { box-shadow: 0 0 0 2px var(--color-bg-primary); }
   .opt-portrait {
     flex-shrink: 0;
     position: relative;
