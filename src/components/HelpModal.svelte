@@ -396,8 +396,11 @@
     RAdam: {
       paper: 'https://arxiv.org/abs/1908.03265',
       cite: 'arXiv:1908.03265',
-      person: 'Liyuan Liu',
-      img: '/inventors/liu-radam.jpg'
+      people: [
+        { name: 'Liyuan Liu', img: '/inventors/liu-radam.jpg' },
+        { name: 'Haoming Jiang', img: '/inventors/jiang-radam.jpg' },
+        { name: 'Pengcheng He', img: '/inventors/he-radam.jpg' }
+      ]
     },
     Lion: {
       paper: 'https://arxiv.org/abs/2302.06675',

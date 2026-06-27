@@ -10,7 +10,7 @@ Use square-ish images (they're shown as a ~50px circle, framed with
 listed below (referenced from `HelpModal.svelte`, `OPT_CITE`). Each was downscaled
 to ≈ 420 px on the longest side to keep the bundle small.
 
-## In place (10 of 14 cards)
+## In place (11 of 14 cards)
 
 ### Wikimedia Commons — verified licences
 
@@ -44,15 +44,17 @@ permission before any production/commercial release.
 | `dozat.jpg` | Timothy Dozat | Nadam | pbs.twimg.com (profile image) |
 | `loshchilov.jpg` | Ilya Loshchilov | AdamW | (Google image result, original source TBD) |
 | `hutter.jpg` | Frank Hutter | AdamW | chessprogramming.org (`…/240px-Frank_hutter.jpg`) |
+| `liu-radam.jpg` | Liyuan (Lucas) Liu | RAdam | media.licdn.com (LinkedIn profile photo) |
+| `jiang-radam.jpg` | Haoming Jiang | RAdam | scholar.googleusercontent.com (Google Scholar photo) |
+| `he-radam.jpg` | Pengcheng He | RAdam | media.licdn.com (LinkedIn profile photo) |
 
 ## Still placeholders (monogram until an image is dropped in)
 
 An exhaustive Wikimedia Commons check (Wikidata P18, Commons API namespace 6,
-infoboxes) found no properly-licensed image for these four:
+infoboxes) found no properly-licensed image for these three:
 
 | File | Person | Optimizer |
 |------|--------|-----------|
-| `liu-radam.jpg` | Liyuan Liu | RAdam |
 | `chen-lion.jpg` | Xiangning Chen | Lion |
 | `liu-sophia.jpg` | Hong Liu | Sophia |
 | `mishchenko.jpg` | Konstantin Mishchenko | Prodigy |
