@@ -753,31 +753,65 @@
   })();
 
   // 2) The ravine — one γ safe across the steep axis crawls along the gentle
-  // one. GD zig-zags wall to wall; momentum builds speed and glides. Both are
-  // real iterations on the same anisotropic quadratic, then fit to the box.
+  // one. GD zig-zags wall to wall; momentum builds speed and glides. Real
+  // iterations on an anisotropic quadratic, over a reversed-viridis density
+  // heatmap + contours so it matches the race / landscape panels.
   const ravineFig = (() => {
-    const W = 460, H = 150, pad = 18;
+    const W = 460, H = 150;
+    const X0 = -1.18, X1 = 0.36, Y0 = -0.72, Y1 = 0.72;
     const ax = 0.05, ay = 1.0;            // gentle along x, steep across y
-    const start: Pt = { x: -1, y: 0.6 };
+    const loss = (x: number, y: number) => 0.5 * (ax * x * x + ay * y * y);
+    const sx = (x: number) => ((x - X0) / (X1 - X0)) * W;
+    const sy = (y: number) => ((Y1 - y) / (Y1 - Y0)) * H;
+
+    // density heatmap (log loss → reversed viridis, the app's look)
+    const gw = 124, gh = 42;
+    const vals: number[] = new Array(gw * gh);
+    let vMin = Infinity, vMax = -Infinity;
+    for (let j = 0; j < gh; j++) {
+      const y = Y1 - ((j + 0.5) / gh) * (Y1 - Y0);
+      for (let i = 0; i < gw; i++) {
+        const v = loss(X0 + ((i + 0.5) / gw) * (X1 - X0), y);
+        vals[j * gw + i] = v;
+        if (v < vMin) vMin = v;
+        if (v > vMax) vMax = v;
+      }
+    }
+    const EPS = 0.0006;
+    const lMin = Math.log(vMin + EPS), lMax = Math.log(vMax + EPS);
+    const canvas = document.createElement('canvas');
+    canvas.width = gw; canvas.height = gh;
+    const ctx = canvas.getContext('2d')!;
+    const img = ctx.createImageData(gw, gh);
+    for (let k = 0; k < vals.length; k++) {
+      const t = Math.min(1, Math.max(0, (Math.log(vals[k] + EPS) - lMin) / (lMax - lMin)));
+      const col = rgb(interpolateViridis(1 - t));
+      img.data[k * 4] = col.r; img.data[k * 4 + 1] = col.g; img.data[k * 4 + 2] = col.b; img.data[k * 4 + 3] = 217;
+    }
+    ctx.putImageData(img, 0, 0);
+    const heatURL = canvas.toDataURL();
+    const levels: number[] = [];
+    for (let k = 1; k < 9; k++) levels.push(Math.exp(lMin + (k / 9) * (lMax - lMin)) - EPS);
+    const toPath = geoPath();
+    const contourPaths = contours().size([gw, gh]).thresholds(levels)(vals)
+      .map((poly, idx) => ({ d: toPath(poly) ?? '', o: 0.1 + 0.02 * idx }));
+
+    const start: Pt = { x: -1.02, y: 0.58 };
     const simGD = () => {
       const g = 1.72; let p = { ...start }; const out: Pt[] = [{ ...p }];
-      for (let k = 0; k < 30; k++) { p = { x: p.x - g * ax * p.x, y: p.y - g * ay * p.y }; out.push({ ...p }); }
+      for (let k = 0; k < 34; k++) { p = { x: p.x - g * ax * p.x, y: p.y - g * ay * p.y }; out.push({ ...p }); }
       return out;
     };
     const simMom = () => {
       const g = 0.6, mu = 0.86; let v = { x: 0, y: 0 }, p = { ...start }; const out: Pt[] = [{ ...p }];
-      for (let k = 0; k < 30; k++) { v = { x: mu * v.x + ax * p.x, y: mu * v.y + ay * p.y }; p = { x: p.x - g * v.x, y: p.y - g * v.y }; out.push({ ...p }); }
+      for (let k = 0; k < 34; k++) { v = { x: mu * v.x + ax * p.x, y: mu * v.y + ay * p.y }; p = { x: p.x - g * v.x, y: p.y - g * v.y }; out.push({ ...p }); }
       return out;
     };
-    const gd = simGD(), mom = simMom();
-    const all = [...gd, ...mom, { x: 0, y: 0 }];
-    const xmin = Math.min(...all.map(p => p.x)), xmax = Math.max(...all.map(p => p.x));
-    const ymax = Math.max(...all.map(p => Math.abs(p.y)), 0.001);
-    const xspan = (xmax - xmin) * 1.18; // leave the minimum a little off the right edge
-    const sx = (x: number) => pad + ((x - xmin) / xspan) * (W - 2 * pad);
-    const sy = (y: number) => H / 2 - (y / (ymax * 1.18)) * (H / 2 - pad);
-    const path = (arr: Pt[]) => 'M ' + arr.map(p => `${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(' L ');
-    return { W, H, gd: path(gd), mom: path(mom),
+    const toScreen = (arr: Pt[]) => arr.map(p => ({ x: sx(p.x), y: sy(p.y) }));
+    const gdPts = toScreen(simGD()), momPts = toScreen(simMom());
+    const path = (pts: Pt[]) => 'M ' + pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' L ');
+    return { W, H, gw, gh, heatURL, contourPaths,
+      gd: path(gdPts), mom: path(momPts), gdPts, momPts,
       min: { x: sx(0), y: sy(0) }, start: { x: sx(start.x), y: sy(start.y) } };
   })();
 
@@ -1689,19 +1723,33 @@
                 picker is grouped to match.
               </p>
               <figure class="fig">
-                <svg viewBox="0 0 {ravineFig.W} {ravineFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                  {#each [0, 1, 2, 3] as i}
-                    <ellipse cx={ravineFig.min.x} cy={ravineFig.min.y} rx={70 + i * 100} ry={15 + i * 17} class="fig-contour" style="stroke-opacity:{0.2 - i * 0.04}" />
-                  {/each}
-                  <path d={ravineFig.gd} fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" />
-                  <path d={ravineFig.mom} fill="none" stroke="#a855f7" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" />
-                  <circle cx={ravineFig.min.x} cy={ravineFig.min.y} r="4.5" fill="none" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3,2.5" />
-                  <circle cx={ravineFig.start.x} cy={ravineFig.start.y} r="4.2" fill="#f59e0b" stroke="#fff" stroke-width="1.2" />
-                  <g transform="translate(13,15)">
-                    <line x1="0" y1="0" x2="15" y2="0" stroke="#94a3b8" stroke-width="2.5" />
-                    <text x="20" y="3.5" class="fig-svg-label" style="text-anchor:start">plain GD — zig-zags</text>
-                    <line x1="0" y1="15" x2="15" y2="15" stroke="#a855f7" stroke-width="2.5" />
-                    <text x="20" y="18.5" class="fig-svg-label" style="text-anchor:start">momentum — glides</text>
+                <svg class="fig-heat" viewBox="0 0 {ravineFig.W} {ravineFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                  <defs>
+                    <clipPath id="ravine-clip"><rect x="0" y="0" width={ravineFig.W} height={ravineFig.H} /></clipPath>
+                    <clipPath id="ravine-contour-clip"><rect x="1.5" y="1.5" width={ravineFig.W - 3} height={ravineFig.H - 3} /></clipPath>
+                  </defs>
+                  <g clip-path="url(#ravine-clip)">
+                    <image href={ravineFig.heatURL} x="0" y="0" width={ravineFig.W} height={ravineFig.H} preserveAspectRatio="none" />
+                    <g clip-path="url(#ravine-contour-clip)">
+                      <g transform="scale({ravineFig.W / ravineFig.gw}, {ravineFig.H / ravineFig.gh})">
+                        {#each ravineFig.contourPaths as cp}
+                          <path d={cp.d} fill="none" stroke="#fff" stroke-opacity={cp.o} stroke-width="1" vector-effect="non-scaling-stroke" />
+                        {/each}
+                      </g>
+                    </g>
+                    <circle cx={ravineFig.min.x} cy={ravineFig.min.y} r="5" fill="none" stroke="#10b981" stroke-width="1.6" stroke-dasharray="3,2.5" />
+                    <path d={ravineFig.gd} fill="none" stroke="#e2e8f0" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" />
+                    <path d={ravineFig.mom} fill="none" stroke="#d8b4fe" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" />
+                    {#each ravineFig.gdPts as p}<circle cx={p.x} cy={p.y} r="1.6" fill="#f1f5f9" />{/each}
+                    {#each ravineFig.momPts as p}<circle cx={p.x} cy={p.y} r="1.9" fill="#e9d5ff" />{/each}
+                    <circle cx={ravineFig.start.x} cy={ravineFig.start.y} r="4.2" fill="#f59e0b" stroke="#fff" stroke-width="1.3" />
+                    <g transform="translate(11,12)">
+                      <rect x="-5" y="-9" width="152" height="33" rx="5" fill="#0a1218" opacity="0.4" />
+                      <line x1="2" y1="0" x2="17" y2="0" stroke="#e2e8f0" stroke-width="2.5" />
+                      <text x="22" y="3.5" class="fig-svg-label" style="text-anchor:start;fill:#fff">plain GD — zig-zags</text>
+                      <line x1="2" y1="15" x2="17" y2="15" stroke="#d8b4fe" stroke-width="2.5" />
+                      <text x="22" y="18.5" class="fig-svg-label" style="text-anchor:start;fill:#fff">momentum — glides</text>
+                    </g>
                   </g>
                 </svg>
                 <figcaption class="fig-cap">
