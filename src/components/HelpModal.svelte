@@ -826,10 +826,11 @@
   // reflows automatically, so a new optimizer just needs a row here + a colour.
   const familyTree = (() => {
     type TNode = { id: OptimizerId; name: string; year: string; parent: OptimizerId | null; merge?: OptimizerId };
+    // Order matters: the adaptive branch first, then Momentum/Nesterov placed
+    // right beneath Adam, then the Newton branch — so the dashed Momentum→Adam
+    // merge stays a short local hop instead of crossing the whole tree.
     const data: TNode[] = [
       { id: 'gd', name: 'Gradient Descent', year: '1847', parent: null },
-      { id: 'momentum', name: 'Momentum', year: '1964', parent: 'gd' },
-      { id: 'nesterov', name: 'Nesterov', year: '1983', parent: 'momentum' },
       { id: 'adagrad', name: 'AdaGrad', year: '2011', parent: 'gd' },
       { id: 'rmsprop', name: 'RMSProp', year: '2012', parent: 'adagrad' },
       { id: 'adadelta', name: 'AdaDelta', year: '2012', parent: 'rmsprop' },
@@ -838,9 +839,11 @@
       { id: 'adamw', name: 'AdamW', year: '2017', parent: 'adam' },
       { id: 'radam', name: 'RAdam', year: '2019', parent: 'adam' },
       { id: 'lion', name: 'Lion', year: '2023', parent: 'adam' },
+      { id: 'prodigy', name: 'Prodigy', year: '2024', parent: 'adam' },
+      { id: 'momentum', name: 'Momentum', year: '1964', parent: 'gd' },
+      { id: 'nesterov', name: 'Nesterov', year: '1983', parent: 'momentum' },
       { id: 'newton', name: 'Newton', year: '1680s', parent: 'gd' },
-      { id: 'sophia', name: 'Sophia', year: '2023', parent: 'newton' },
-      { id: 'prodigy', name: 'Prodigy', year: '2024', parent: 'adam' }
+      { id: 'sophia', name: 'Sophia', year: '2023', parent: 'newton' }
     ];
     const kids = (pid: OptimizerId | null) => data.filter(n => n.parent === pid).map(n => n.id);
     const depth: Record<string, number> = {};
@@ -868,12 +871,11 @@
       w: Math.max(1.4, 5 - depth[n.id] * 0.8)
     }));
     const merges = data.filter(n => n.merge).map(n => ({ d: curve(pos(n.merge as OptimizerId), pos(n.id)) }));
+    // Uniform leaf tilt — every leaf reaches the same way (toward the canopy),
+    // which reads far cleaner than tilting each one along its own branch.
     const nodes = data.map(n => {
       const p = pos(n.id);
-      const par = n.parent ? pos(n.parent) : { x: p.x - 20, y: p.y };
-      return { ...n, x: p.x, y: p.y,
-        ang: Math.atan2(p.y - par.y, p.x - par.x) * 180 / Math.PI,
-        color: RACE_COLORS[n.id], root: n.parent === null };
+      return { ...n, x: p.x, y: p.y, ang: -18, color: RACE_COLORS[n.id], root: n.parent === null };
     });
     return { W, H, edges, merges, nodes };
   })();
