@@ -143,7 +143,8 @@
     lossDefinition: String.raw`\mathcal{L}(\alpha,\beta) = \tfrac{1}{n}\sum_{i=1}^{n} \big(\hat{y}_i - y_i\big)^{2}`,
     gradientDefinition: String.raw`\nabla \mathcal{L} = \begin{bmatrix} \partial \mathcal{L}/\partial \alpha \\[2pt] \partial \mathcal{L}/\partial \beta \end{bmatrix}`,
     stepRule: String.raw`\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \nabla \mathcal{L}`,
-    stability: String.raw`\gamma < \frac{2}{\lambda_{\max}}`
+    stability: String.raw`\gamma < \frac{2}{\lambda_{\max}}`,
+    directional: String.raw`D_{\mathbf{u}}\,\mathcal{L} \;=\; \nabla \mathcal{L}\cdot\mathbf{u} \;=\; \lVert \nabla \mathcal{L}\rVert\,\cos\theta`
   };
 
   // ---------- The optimizer story ----------
@@ -799,6 +800,60 @@
     return { cx, baseY, rings, topL, topR };
   })();
 
+  // 5) The gradient in 3-D — an oblique wireframe bowl with the gradient drawn
+  // on its wall (steepest ascent) and −∇ℒ pointing to the basin, both running
+  // perpendicular to the level ring they sit on. Isometric projection of
+  // z = k(x²+y²).
+  const gradient3D = (() => {
+    const N = 9, R = 1.45, k = 0.55;
+    const f = (x: number, y: number) => k * (x * x + y * y);
+    const cx = 232, cyB = 150, S = 43, zS = 44;
+    const proj = (x: number, y: number, z: number): Pt => ({
+      x: cx + (x - y) * 0.866 * S,
+      y: cyB + (x + y) * 0.5 * S - z * zS
+    });
+    const lines: { d: string; back: boolean }[] = [];
+    for (let i = 0; i < N; i++) {
+      const t = -R + (2 * R) * (i / (N - 1));
+      const a: Pt[] = [], b: Pt[] = [];
+      for (let j = 0; j < N; j++) {
+        const s = -R + (2 * R) * (j / (N - 1));
+        a.push(proj(t, s, f(t, s)));
+        b.push(proj(s, t, f(s, t)));
+      }
+      lines.push({ d: 'M ' + a.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' L '), back: t < 0 });
+      lines.push({ d: 'M ' + b.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' L '), back: t < 0 });
+    }
+    const Px = 0.82, Py = 0.82, Pz = f(Px, Py);
+    const P = proj(Px, Py, Pz);
+    const m = Math.hypot(Px, Py), ux = Px / m, uy = Py / m, d = 0.72;
+    const up = proj(Px + ux * d, Py + uy * d, f(Px + ux * d, Py + uy * d));
+    const dn = proj(Px - ux * d, Py - uy * d, f(Px - ux * d, Py - uy * d));
+    const rLev = m;
+    const ring: Pt[] = [];
+    for (let q = 0; q <= 48; q++) {
+      const a = 2 * Math.PI * (q / 48);
+      ring.push(proj(rLev * Math.cos(a), rLev * Math.sin(a), Pz));
+    }
+    return { lines, P, up, dn, ringD: 'M ' + ring.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' L ') + ' Z' };
+  })();
+
+  // The "climb-rate rose": stepping a unit distance in direction θ changes the
+  // loss at rate ‖∇ℒ‖cosθ. Drawn as spokes whose length is |cosθ|, the tips
+  // trace two circles — longest along ±∇ℒ, zero along the contour. The proof,
+  // made visible.
+  const climbRose = (() => {
+    const cx = 70, cy = 70, R = 52, M = 28;
+    const spokes: { x2: number; y2: number; asc: boolean }[] = [];
+    for (let q = 0; q < M; q++) {
+      const a = 2 * Math.PI * (q / M);
+      const rate = Math.cos(a);
+      const len = Math.abs(rate) * R;
+      spokes.push({ x2: cx + Math.cos(a) * len, y2: cy + Math.sin(a) * len, asc: rate >= 0 });
+    }
+    return { cx, cy, R, spokes };
+  })();
+
   const chIcon: Record<string, any> = {
     'ch-bowl': BookOpen, 'ch-landscape': Mountain, 'ch-downhill': TrendingDown,
     'ch-step': Compass, 'ch-gamma': Zap, 'ch-optimizers': Rocket, 'ch-noise': Waves,
@@ -1172,6 +1227,68 @@
                 the gradient, and the step it drives, fades to zero. The marker arriving and going
                 still <em>is</em> the gradient vanishing.
               </p>
+
+              <p>
+                We keep calling −∇ℒ the <em>steepest</em> way down. That is not loose talk — and it is
+                worth seeing why, first in three dimensions, then in one short line of proof.
+              </p>
+              <figure class="fig">
+                <svg viewBox="0 0 460 196" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                  <defs>
+                    <marker id="g3d-up" viewBox="0 -5 10 10" refX="7.5" refY="0" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,-5L10,0L0,5" fill="#f59e0b" /></marker>
+                    <marker id="g3d-dn" viewBox="0 -5 10 10" refX="7.5" refY="0" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,-5L10,0L0,5" fill="#10b981" /></marker>
+                  </defs>
+                  {#each gradient3D.lines as l}
+                    <path d={l.d} fill="none" class="fig-contour" style="stroke-opacity:{l.back ? 0.1 : 0.26}" />
+                  {/each}
+                  <path d={gradient3D.ringD} fill="none" stroke="#34d399" stroke-width="1.7" stroke-dasharray="4,2.5" stroke-opacity="0.95" />
+                  <line x1={gradient3D.P.x} y1={gradient3D.P.y} x2={gradient3D.dn.x} y2={gradient3D.dn.y} stroke="#10b981" stroke-width="2.4" marker-end="url(#g3d-dn)" />
+                  <line x1={gradient3D.P.x} y1={gradient3D.P.y} x2={gradient3D.up.x} y2={gradient3D.up.y} stroke="#f59e0b" stroke-width="2.4" marker-end="url(#g3d-up)" />
+                  <circle cx={gradient3D.P.x} cy={gradient3D.P.y} r="3.6" fill="#f59e0b" stroke="#fff" stroke-width="1.3" />
+                  <text x={gradient3D.up.x + 6} y={gradient3D.up.y - 1} class="fig-svg-label" style="text-anchor:start;fill:#f59e0b">∇ℒ — steepest ↑</text>
+                  <text x={gradient3D.dn.x + 4} y={gradient3D.dn.y + 13} class="fig-svg-label" style="text-anchor:start;fill:#10b981">−∇ℒ — to the basin</text>
+                </svg>
+                <figcaption class="fig-cap">
+                  The same picture in 3-D: on the wall of the bowl, ∇ℒ points straight up the steepest
+                  rise and −∇ℒ straight down toward the basin — both exactly perpendicular to the dashed
+                  contour ring they sit on.
+                </figcaption>
+              </figure>
+
+              <div class="proof">
+                <div class="proof-title">Why −∇ℒ is exactly the steepest descent</div>
+                <div class="proof-body">
+                  <div class="proof-text">
+                    <p>
+                      Take a unit step in any direction <strong>u</strong>. The loss changes at a rate
+                      equal to the gradient’s <em>shadow</em> on that direction — their dot product. With
+                      θ the angle between <strong>u</strong> and ∇ℒ:
+                    </p>
+                    <div class="formula-display center">{@html texD(formulas.directional)}</div>
+                    <p>
+                      Because cos θ only ever runs from +1 to −1, that rate is largest when
+                      <strong>u</strong> lines up with ∇ℒ (θ = 0, the fastest <em>rise</em>), exactly zero
+                      at a right angle (θ = 90°, walking a contour — the loss holds still), and most
+                      negative along <strong>−∇ℒ</strong> (θ = 180°, the fastest <em>fall</em>). No
+                      direction can beat it. <span class="proof-qed">∎</span>
+                    </p>
+                  </div>
+                  <svg class="proof-rose" viewBox="0 0 140 140" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                    <circle cx={climbRose.cx + climbRose.R / 2} cy={climbRose.cy} r={climbRose.R / 2} fill="none" class="fig-contour" style="stroke-opacity:0.2" />
+                    <circle cx={climbRose.cx - climbRose.R / 2} cy={climbRose.cy} r={climbRose.R / 2} fill="none" class="fig-contour" style="stroke-opacity:0.2" />
+                    <line x1="6" y1={climbRose.cy} x2="134" y2={climbRose.cy} class="fig-contour" style="stroke-opacity:0.14" stroke-dasharray="3,3" />
+                    {#each climbRose.spokes as s}
+                      <line x1={climbRose.cx} y1={climbRose.cy} x2={s.x2} y2={s.y2} stroke={s.asc ? '#f59e0b' : '#10b981'} stroke-width="1.5" opacity="0.85" />
+                    {/each}
+                    <circle cx={climbRose.cx} cy={climbRose.cy} r="2.6" fill="var(--color-text-primary)" />
+                    <text x="136" y={climbRose.cy - 4} class="fig-svg-label" style="text-anchor:end;fill:#f59e0b">∇ℒ</text>
+                    <text x="4" y={climbRose.cy - 4} class="fig-svg-label" style="text-anchor:start;fill:#10b981">−∇ℒ</text>
+                    <text x={climbRose.cx} y="13" class="fig-svg-label" style="fill:var(--color-text-tertiary)">flat</text>
+                    <text x={climbRose.cx} y="134" class="fig-svg-label" style="fill:var(--color-text-tertiary)">flat</text>
+                  </svg>
+                </div>
+              </div>
+
               <p>
                 One honest caveat to carry forward: the gradient is only the truth <em>right where you
                 stand.</em> Zoom in close enough and any smooth surface flattens into a tilted plane,
@@ -2220,6 +2337,28 @@
     font-size: 0.8rem; line-height: 1.55; text-align: center;
     color: var(--color-text-tertiary); margin: 0.6rem auto 0; max-width: 56ch;
   }
+
+  /* ---------- Proof callout (the steepest-descent argument) ---------- */
+  .proof {
+    margin: 1.6rem 0;
+    border: 1px solid var(--color-border);
+    border-left: 3px solid #10b981;
+    border-radius: 10px;
+    background: var(--color-bg-tertiary);
+    padding: 1rem 1.2rem;
+  }
+  .proof-title {
+    font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+    color: #10b981; margin-bottom: 0.7rem;
+  }
+  .proof-body { display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 1.1rem; align-items: center; }
+  .proof-text p { font-size: 0.88rem; line-height: 1.6; margin: 0 0 0.6rem; }
+  .proof-text p:last-child { margin-bottom: 0; }
+  .proof-text :global(.formula-display) { margin: 0.5rem 0; }
+  .proof-rose { width: 100%; height: auto; align-self: center; }
+  .proof-rose text { font-size: 11px; font-weight: 600; font-family: inherit; text-anchor: middle; }
+  .proof-qed { color: #10b981; font-weight: 700; margin-left: 0.15rem; }
+  @media (max-width: 760px) { .proof-body { grid-template-columns: 1fr; } .proof-rose { max-width: 160px; margin: 0 auto; } }
 
   /* ---------- Formulas ---------- */
   .formula-display {
