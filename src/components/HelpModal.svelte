@@ -2577,7 +2577,7 @@
 
   .opt-act {
     display: flex; align-items: baseline; gap: 0.5rem;
-    margin: 1.6rem 0 0.7rem;
+    margin: 1.7rem 0 0.6rem;
   }
   .act-no {
     font-family: 'SF Mono', Monaco, monospace;
@@ -2587,7 +2587,7 @@
   }
   .act-title { font-weight: 700; font-size: 0.95rem; color: var(--color-text-primary); }
   .opt-act-intro {
-    margin: 0 0 1rem;
+    margin: 0 0 0.75rem;
     color: var(--color-text-secondary);
     font-size: 0.92rem;
     line-height: 1.65;
@@ -2695,7 +2695,7 @@
     font-size: 0.9rem;
     line-height: 1.6;
     color: var(--color-text-secondary);
-    margin: 1.8rem 0 0.1rem;
+    margin: 1.7rem 0 0.75rem;
   }
   .opt-lead strong { color: var(--color-text-primary); }
   .opt-lead :global(em) { color: var(--color-text-primary); font-style: italic; }
