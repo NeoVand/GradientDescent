@@ -802,20 +802,22 @@
 
   // (The gradient chapter's 3-D bowl is a real WebGL scene — see GuideGradient3D.svelte.)
 
-  // The "climb-rate rose": stepping a unit distance in direction θ changes the
-  // loss at rate ‖∇ℒ‖cosθ. Drawn as spokes whose length is |cosθ|, the tips
-  // trace two circles — longest along ±∇ℒ, zero along the contour. The proof,
-  // made visible.
-  const climbRose = (() => {
-    const cx = 70, cy = 70, R = 52, M = 28;
-    const spokes: { x2: number; y2: number; asc: boolean }[] = [];
-    for (let q = 0; q < M; q++) {
-      const a = 2 * Math.PI * (q / M);
-      const rate = Math.cos(a);
-      const len = Math.abs(rate) * R;
-      spokes.push({ x2: cx + Math.cos(a) * len, y2: cy + Math.sin(a) * len, asc: rate >= 0 });
+  // Proof figure, right panel: the rate of change ‖∇ℒ‖cosθ as the direction u
+  // sweeps from along ∇ℒ (θ=0, max) through a contour (θ=90°, zero) to −∇ℒ
+  // (θ=180°, min). A plain cosine — the claim, plotted.
+  const proofCurve = (() => {
+    const x0 = 286, x1 = 410, yc = 76, amp = 50, N = 60;
+    const asc: string[] = [], desc: string[] = [];
+    for (let i = 0; i <= N; i++) {
+      const th = Math.PI * (i / N);
+      const x = x0 + (i / N) * (x1 - x0), y = yc - Math.cos(th) * amp;
+      const pt = `${x.toFixed(1)},${y.toFixed(1)}`;
+      if (th <= Math.PI / 2 + 1e-9) asc.push(pt);
+      if (th >= Math.PI / 2 - 1e-9) desc.push(pt);
     }
-    return { cx, cy, R, spokes };
+    return { x0, x1, yc, amp,
+      ascD: 'M ' + asc.join(' L '), descD: 'M ' + desc.join(' L '),
+      p0: { x: x0, y: yc - amp }, p90: { x: (x0 + x1) / 2, y: yc }, p180: { x: x1, y: yc + amp } };
   })();
 
   // 6) The optimizer family tree, drawn as an actual tree. DATA-DRIVEN: each
@@ -1274,37 +1276,58 @@
               </figure>
 
               <div class="proof">
-                <div class="proof-title">Why −∇ℒ is exactly the steepest descent</div>
-                <div class="proof-body">
-                  <div class="proof-text">
-                    <p>
-                      Take a unit step in any direction <strong>u</strong>. The loss changes at a rate
-                      equal to the gradient’s <em>shadow</em> on that direction — their dot product. With
-                      θ the angle between <strong>u</strong> and ∇ℒ:
-                    </p>
-                    <div class="formula-display center">{@html texD(formulas.directional)}</div>
-                    <p>
-                      Because cos θ only ever runs from +1 to −1, that rate is largest when
-                      <strong>u</strong> lines up with ∇ℒ (θ = 0, the fastest <em>rise</em>), exactly zero
-                      at a right angle (θ = 90°, walking a contour — the loss holds still), and most
-                      negative along <strong>−∇ℒ</strong> (θ = 180°, the fastest <em>fall</em>). No
-                      direction can beat it. <span class="proof-qed">∎</span>
-                    </p>
-                  </div>
-                  <svg class="proof-rose" viewBox="0 0 140 140" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                    <circle cx={climbRose.cx + climbRose.R / 2} cy={climbRose.cy} r={climbRose.R / 2} fill="none" class="fig-contour" style="stroke-opacity:0.2" />
-                    <circle cx={climbRose.cx - climbRose.R / 2} cy={climbRose.cy} r={climbRose.R / 2} fill="none" class="fig-contour" style="stroke-opacity:0.2" />
-                    <line x1="6" y1={climbRose.cy} x2="134" y2={climbRose.cy} class="fig-contour" style="stroke-opacity:0.14" stroke-dasharray="3,3" />
-                    {#each climbRose.spokes as s}
-                      <line x1={climbRose.cx} y1={climbRose.cy} x2={s.x2} y2={s.y2} stroke={s.asc ? '#f59e0b' : '#10b981'} stroke-width="1.5" opacity="0.85" />
-                    {/each}
-                    <circle cx={climbRose.cx} cy={climbRose.cy} r="2.6" fill="var(--color-text-primary)" />
-                    <text x="136" y={climbRose.cy - 4} class="fig-svg-label" style="text-anchor:end;fill:#f59e0b">∇ℒ</text>
-                    <text x="4" y={climbRose.cy - 4} class="fig-svg-label" style="text-anchor:start;fill:#10b981">−∇ℒ</text>
-                    <text x={climbRose.cx} y="13" class="fig-svg-label" style="fill:var(--color-text-tertiary)">flat</text>
-                    <text x={climbRose.cx} y="134" class="fig-svg-label" style="fill:var(--color-text-tertiary)">flat</text>
+                <div class="proof-title">Why the negative gradient is exactly the steepest descent</div>
+                <p class="proof-p">
+                  Take a unit step in some direction {@html tex(String.raw`\mathbf{u}`)}. The loss changes
+                  at a rate equal to the gradient’s <em>shadow</em> on that direction — their dot product
+                  {@html tex(String.raw`\nabla\mathcal{L}\cdot\mathbf{u}`)}. Writing {@html tex(String.raw`\theta`)}
+                  for the angle between {@html tex(String.raw`\mathbf{u}`)} and {@html tex(String.raw`\nabla\mathcal{L}`)},
+                  that shadow has length {@html tex(String.raw`\lVert\nabla\mathcal{L}\rVert\cos\theta`)}:
+                </p>
+                <div class="formula-display center">{@html texD(formulas.directional)}</div>
+                <figure class="proof-fig">
+                  <svg viewBox="0 0 420 162" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                    <defs>
+                      <marker id="pf-grad" viewBox="0 -5 10 10" refX="8" refY="0" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,-5L10,0L0,5" fill="#f59e0b" /></marker>
+                      <marker id="pf-u" viewBox="0 -5 10 10" refX="8" refY="0" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,-5L10,0L0,5" fill="var(--color-text-tertiary)" /></marker>
+                    </defs>
+                    <line x1="261" y1="16" x2="261" y2="150" class="fig-contour" style="stroke-opacity:0.16" />
+                    <!-- Panel A · the shadow (projection of ∇ℒ onto u) -->
+                    <line x1="74" y1="110" x2="246" y2="110" stroke="var(--color-text-tertiary)" stroke-width="1.2" stroke-dasharray="3,3" stroke-opacity="0.6" marker-end="url(#pf-u)" />
+                    <line x1="74" y1="110" x2="202.2" y2="110" stroke="#3b82f6" stroke-width="4.5" stroke-linecap="round" />
+                    <line x1="202.2" y1="36" x2="202.2" y2="110" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="2.5,2.5" stroke-opacity="0.75" />
+                    <path d="M 195.2,110 L 195.2,103 L 202.2,103" fill="none" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-opacity="0.75" />
+                    <line x1="74" y1="110" x2="200" y2="37.2" stroke="#f59e0b" stroke-width="2.6" marker-end="url(#pf-grad)" />
+                    <path d="M 102,110 A 28,28 0 0 0 98,95.5" fill="none" stroke="var(--color-text-tertiary)" stroke-width="1.2" />
+                    <circle cx="74" cy="110" r="2.8" fill="var(--color-text-primary)" />
+                    <text x="206" y="34" class="proof-lbl" style="text-anchor:start;fill:#f59e0b">∇ℒ</text>
+                    <text x="250" y="114" class="proof-lbl" style="text-anchor:start;fill:var(--color-text-secondary)">u</text>
+                    <text x="111" y="103" class="proof-lbl" style="fill:var(--color-text-tertiary)">θ</text>
+                    <text x="138" y="126" class="proof-lbl" style="fill:#3b82f6">‖∇ℒ‖ cos θ</text>
+                    <!-- Panel B · rate vs angle is a cosine -->
+                    <line x1={proofCurve.x0 - 8} y1={proofCurve.yc} x2={proofCurve.x1 + 8} y2={proofCurve.yc} stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="3,3" stroke-opacity="0.45" />
+                    <path d={proofCurve.ascD} fill="none" stroke="#f59e0b" stroke-width="2.4" stroke-linecap="round" />
+                    <path d={proofCurve.descD} fill="none" stroke="#10b981" stroke-width="2.4" stroke-linecap="round" />
+                    <circle cx={proofCurve.p0.x} cy={proofCurve.p0.y} r="3.1" fill="#f59e0b" />
+                    <circle cx={proofCurve.p90.x} cy={proofCurve.p90.y} r="3.1" fill="var(--color-text-tertiary)" />
+                    <circle cx={proofCurve.p180.x} cy={proofCurve.p180.y} r="3.1" fill="#10b981" />
+                    <text x={proofCurve.p0.x - 3} y={proofCurve.p0.y - 8} class="proof-lbl" style="text-anchor:start;fill:#f59e0b">along ∇ℒ</text>
+                    <text x={proofCurve.p90.x} y={proofCurve.p90.y - 9} class="proof-lbl" style="fill:var(--color-text-tertiary)">contour · flat</text>
+                    <text x={proofCurve.p180.x + 3} y={proofCurve.p180.y + 13} class="proof-lbl" style="text-anchor:end;fill:#10b981">along −∇ℒ</text>
                   </svg>
-                </div>
+                  <figcaption class="proof-figcap">
+                    Left: the rate is ∇ℒ’s shadow on <strong>u</strong>. Right: sweep <strong>u</strong>
+                    around and that shadow traces a cosine — biggest along ∇ℒ, zero across a contour,
+                    most negative along −∇ℒ.
+                  </figcaption>
+                </figure>
+                <p class="proof-p">
+                  Because {@html tex(String.raw`\cos\theta`)} only ever runs from +1 to −1, that rate is
+                  largest when {@html tex(String.raw`\mathbf{u}`)} lines up with {@html tex(String.raw`\nabla\mathcal{L}`)}
+                  (the fastest <em>rise</em>), exactly zero at a right angle (walking a contour — the loss
+                  holds still), and most negative along {@html tex(String.raw`-\nabla\mathcal{L}`)} (the
+                  fastest <em>fall</em>). No direction can beat it. <span class="proof-qed">∎</span>
+                </p>
               </div>
 
               <p>
@@ -2425,14 +2448,13 @@
     font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
     color: #10b981; margin-bottom: 0.7rem;
   }
-  .proof-body { display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 1.1rem; align-items: center; }
-  .proof-text p { font-size: 0.88rem; line-height: 1.6; margin: 0 0 0.6rem; }
-  .proof-text p:last-child { margin-bottom: 0; }
-  .proof-text :global(.formula-display) { margin: 0.5rem 0; }
-  .proof-rose { width: 100%; height: auto; align-self: center; }
-  .proof-rose text { font-size: 11px; font-weight: 600; font-family: inherit; text-anchor: middle; }
+  .proof-p { font-size: 0.88rem; line-height: 1.65; margin: 0 0 0.7rem; }
+  .proof :global(.formula-display) { margin: 0.6rem 0; }
+  .proof-fig { margin: 0.7rem 0 0.5rem; }
+  .proof-fig svg { display: block; width: 100%; height: auto; }
+  .proof-lbl { font-size: 10.5px; font-weight: 600; font-family: inherit; text-anchor: middle; }
+  .proof-figcap { font-size: 0.74rem; line-height: 1.5; text-align: center; color: var(--color-text-tertiary); margin-top: 0.45rem; }
   .proof-qed { color: #10b981; font-weight: 700; margin-left: 0.15rem; }
-  @media (max-width: 760px) { .proof-body { grid-template-columns: 1fr; } .proof-rose { max-width: 160px; margin: 0 auto; } }
 
   /* ---------- Formulas ---------- */
   .formula-display {
