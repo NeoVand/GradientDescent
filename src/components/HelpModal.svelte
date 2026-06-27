@@ -160,6 +160,7 @@
     fix?: string;
     brk?: string;
     prereq?: boolean;
+    lead?: string; // story transition rendered just before the card
     act?: { no: string; title: string; intro?: string };
   };
 
@@ -188,6 +189,7 @@
     {
       year: '1964',
       name: 'Momentum',
+      lead: 'Armed with that one little tool, the first cure almost designs itself. If a single gradient is a gust of wind, a moving average of them is the <em>prevailing</em> wind — exactly what a marker rattling across a ravine is missing: a memory of which way is consistently downhill.',
       by: 'Boris Polyak — the "heavy ball"',
       idea:
         'The failure to fix: plain descent bounces wall to wall in a ravine. The cure: give the marker mass. Keep a velocity — a moving average of past gradients — and let each new gradient nudge it. The side-to-side wobble averages out while the steady downhill push compounds into a tailwind, so it glides along the valley floor instead of rattling across it.',
@@ -198,6 +200,7 @@
     {
       year: '1983',
       name: 'Nesterov',
+      lead: 'But a heavy ball has a temper. The very inertia that carries it along the valley floor also carries it clean past the bottom, so it has to double back and climb — momentum’s gift and its flaw are the same thing. The next fix is almost philosophical: <em>look before you leap.</em>',
       by: 'Yurii Nesterov — accelerated gradient',
       idea:
         'The failure to fix: momentum overshoots because it looks where it stands. The cure: look ahead. Measure the gradient where the velocity is about to carry you, not where you are — like braking into a corner instead of after it. The same heavy ball, now with foresight; it settles without the orbit. On a smooth convex bowl this look-ahead provably converges as fast as any method using only gradients ever can — you cannot do better with the slope alone.',
@@ -218,6 +221,7 @@
     {
       year: '2012',
       name: 'RMSProp',
+      lead: 'AdaGrad’s generosity was also its undoing. Because it never forgets a single past gradient, its memory only ever grows — and a step divided by a forever-growing number can only shrink, until the marker freezes mid-journey. What if it could <em>forget?</em>',
       by: 'Geoffrey Hinton — never formally published; the world cites a Coursera slide',
       idea:
         'The failure to fix: AdaGrad’s ever-growing memory chokes long runs. The cure: let it forget. Swap the growing sum for a moving average of squared gradients (the tool from Act II). Old gradients fade, so the per-parameter step size stays alive even on long, winding, non-convex problems.',
@@ -227,6 +231,7 @@
     {
       year: '2012',
       name: 'AdaDelta',
+      lead: 'Forgetting kept the steps alive, and for most people that closed the case. But Matthew Zeiler, squinting at the very same update that very same year, caught something nobody else had: the equation was, quite literally, <em>dimensionally wrong.</em>',
       by: 'Matthew Zeiler — same year, same fix, one step further',
       idea:
         'RMSProp’s twin, born the same year against the same AdaGrad flaw — but Zeiler spotted a deeper oddity: a raw gradient step has the wrong units. AdaDelta divides by RMS[∇] like RMSProp, then multiplies by the RMS of its OWN recent steps. The two memories make the ratio dimensionless, and the learning rate falls out of the math entirely — there is nothing left to set but the decay ρ.',
@@ -248,6 +253,7 @@
     {
       year: '2016',
       name: 'Nadam',
+      lead: 'Adam looked like the end of the road — robust, popular, everywhere at once. It wasn’t. Within a couple of years three different people each tugged on a single loose thread, and one careful refinement at a time, sanded it smoother. The first of them had been paying very close attention back in Act II.',
       by: 'Timothy Dozat — Nesterov-accelerated Adam',
       idea:
         'The first refinement. Remember Act II, where Nesterov beat plain momentum by measuring the gradient a step ahead? Nadam plays that exact trick inside Adam: swap the bias-corrected momentum m̂ for a blend that leans toward where the momentum is heading, then divide by the same adaptive √ŝ. A small change bought for a little less overshoot and a slightly quicker settle.',
@@ -257,6 +263,7 @@
     {
       year: '2017',
       name: 'AdamW',
+      lead: 'The second thread was the one that mattered most in practice — and it had been hiding in plain sight inside nearly every training run on Earth. The culprit was a line everyone trusted without a second glance: <em>weight decay.</em>',
       by: 'Loshchilov & Hutter — the actual default today',
       idea:
         'The refinement that matters most: nearly every large model — GPT, BERT, the lot — trains with AdamW, not plain Adam. Weight decay gently pulls every parameter toward zero to curb overfitting; Adam folded that pull into the gradient, where its adaptive √ŝ scaling then distorted it. AdamW decouples them — the λθ decay lands straight on θ, outside the scaling. One honest caveat here: these toy losses carry no overfitting to regularize, so λ shows up as a literal, visible pull of the marker toward the origin. Crank it and watch the fit drift inward; set it to 0 and you are back to exact Adam.',
@@ -267,6 +274,7 @@
     {
       year: '2019',
       name: 'RAdam',
+      lead: 'The third thread was the quietest of all. For years practitioners had patched a rough spot in Adam’s opening steps with a hand-tuned <em>warmup</em>, half-superstition — runs just blew up without it, and nobody could say exactly why. What if that warmup could be <em>derived</em> instead of guessed?',
       by: 'Liu et al. — Adam’s warmup, automated',
       idea:
         'The third refinement closes a quieter Adam wart. In the first handful of steps Adam has barely any squared-gradient history, so its √ŝ scaling is pure noise — the practitioner’s fix was a hand-tuned warmup that crept the rate up by hand. RAdam computes how trustworthy that variance actually is (a number ρ_t) and, until it can be trusted, just skips the scaling and takes a plain momentum step. A rectification factor then eases the adaptive part in. Warmup, but derived rather than guessed — nothing to tune.',
@@ -299,6 +307,7 @@
     {
       year: '2023',
       name: 'Sophia',
+      lead: 'Newton’s method is the king nobody can afford — exact, and ruinously expensive, all because of that one beautiful matrix. So the question for the age of billion-parameter models is blunt: can you keep the <em>idea</em> and throw away the bill?',
       by: 'Liu et al. — Newton, cut down to fit an LLM',
       idea:
         'Newton’s curvature is unbeatable and unaffordable; Sophia keeps the affordable part. Drop the full Hessian for just its DIAGONAL — one curvature number per parameter, no matrix to invert — and precondition the momentum by it. Then the safety move: CLIP every coordinate’s step to ±ρ. Where the diagonal estimate is tiny or noisy (and m/h would blow up) the clip bounds the move; where it’s solid, the step stays curvature-scaled. Light enough that it trained GPT-class models roughly twice as fast as Adam by step count — second-order thinking that actually ships.',
@@ -1622,6 +1631,7 @@
                   <div class="opt-act"><span class="act-no">{c.act.no}</span><span class="act-title">{c.act.title}</span></div>
                   {#if c.act.intro}<p class="opt-act-intro">{@html c.act.intro}</p>{/if}
                 {/if}
+                {#if c.lead}<p class="opt-lead">{@html c.lead}</p>{/if}
                 {@const cite = OPT_CITE[c.name]}
                 {@const authors = cite?.people ?? (cite?.person ? [{ name: cite.person, img: cite.img, credit: cite.credit }] : [])}
                 <div class="opt-card" class:prereq-card={c.prereq}>
@@ -2449,6 +2459,8 @@
     margin: 1.8rem 0 0.1rem;
   }
   .opt-lead strong { color: var(--color-text-primary); }
+  .opt-lead :global(em) { color: var(--color-text-primary); font-style: italic; }
+  .opt-lead :global(strong) { color: var(--color-text-primary); font-weight: 650; }
 
   /* The 2025 matrix-optimizer note: real, relevant, deliberately not runnable. */
   .opt-frontier {
