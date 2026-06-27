@@ -854,6 +854,64 @@
     return { cx, cy, R, spokes };
   })();
 
+  // 6) The optimizer family tree, drawn as an actual tree. DATA-DRIVEN: each
+  // node lists a parent (and reuses RACE_COLORS); the tidy left→right layout
+  // (x = lineage depth, y = leaf order, parents centred on their children)
+  // reflows automatically, so a new optimizer just needs a row here + a colour.
+  const familyTree = (() => {
+    type TNode = { id: OptimizerId; name: string; year: string; parent: OptimizerId | null; merge?: OptimizerId };
+    const data: TNode[] = [
+      { id: 'gd', name: 'Gradient Descent', year: '1847', parent: null },
+      { id: 'momentum', name: 'Momentum', year: '1964', parent: 'gd' },
+      { id: 'nesterov', name: 'Nesterov', year: '1983', parent: 'momentum' },
+      { id: 'adagrad', name: 'AdaGrad', year: '2011', parent: 'gd' },
+      { id: 'rmsprop', name: 'RMSProp', year: '2012', parent: 'adagrad' },
+      { id: 'adadelta', name: 'AdaDelta', year: '2012', parent: 'rmsprop' },
+      { id: 'adam', name: 'Adam', year: '2014', parent: 'rmsprop', merge: 'momentum' },
+      { id: 'nadam', name: 'Nadam', year: '2016', parent: 'adam' },
+      { id: 'adamw', name: 'AdamW', year: '2017', parent: 'adam' },
+      { id: 'radam', name: 'RAdam', year: '2019', parent: 'adam' },
+      { id: 'lion', name: 'Lion', year: '2023', parent: 'adam' },
+      { id: 'newton', name: 'Newton', year: '1680s', parent: 'gd' },
+      { id: 'sophia', name: 'Sophia', year: '2023', parent: 'newton' },
+      { id: 'prodigy', name: 'Prodigy', year: '2024', parent: 'adam' }
+    ];
+    const kids = (pid: OptimizerId | null) => data.filter(n => n.parent === pid).map(n => n.id);
+    const depth: Record<string, number> = {};
+    const setDepth = (id: OptimizerId, d: number) => { depth[id] = d; kids(id).forEach(c => setDepth(c, d + 1)); };
+    setDepth('gd', 0);
+    let r = 0; const rowOf: Record<string, number> = {};
+    const assign = (id: OptimizerId) => {
+      const ks = kids(id);
+      if (!ks.length) { rowOf[id] = r++; return; }
+      ks.forEach(assign);
+      rowOf[id] = (rowOf[ks[0]] + rowOf[ks[ks.length - 1]]) / 2;
+    };
+    assign('gd');
+    const maxDepth = Math.max(...Object.values(depth)), maxRow = r - 1;
+    const padL = 72, padR = 76, padT = 26, dyR = 42, W = 640;
+    const dx = (W - padL - padR) / maxDepth;
+    const H = padT + maxRow * dyR + 32;
+    const pos = (id: OptimizerId): Pt => ({ x: padL + depth[id] * dx, y: padT + rowOf[id] * dyR });
+    const curve = (a: Pt, b: Pt) => {
+      const mx = (a.x + b.x) / 2;
+      return `M ${a.x.toFixed(1)},${a.y.toFixed(1)} C ${mx.toFixed(1)},${a.y.toFixed(1)} ${mx.toFixed(1)},${b.y.toFixed(1)} ${b.x.toFixed(1)},${b.y.toFixed(1)}`;
+    };
+    const edges = data.filter(n => n.parent).map(n => ({
+      d: curve(pos(n.parent as OptimizerId), pos(n.id)),
+      w: Math.max(1.4, 5 - depth[n.id] * 0.8)
+    }));
+    const merges = data.filter(n => n.merge).map(n => ({ d: curve(pos(n.merge as OptimizerId), pos(n.id)) }));
+    const nodes = data.map(n => {
+      const p = pos(n.id);
+      const par = n.parent ? pos(n.parent) : { x: p.x - 20, y: p.y };
+      return { ...n, x: p.x, y: p.y,
+        ang: Math.atan2(p.y - par.y, p.x - par.x) * 180 / Math.PI,
+        color: RACE_COLORS[n.id], root: n.parent === null };
+    });
+    return { W, H, edges, merges, nodes };
+  })();
+
   const chIcon: Record<string, any> = {
     'ch-bowl': BookOpen, 'ch-landscape': Mountain, 'ch-downhill': TrendingDown,
     'ch-step': Compass, 'ch-gamma': Zap, 'ch-optimizers': Rocket, 'ch-noise': Waves,
@@ -1661,6 +1719,34 @@
                 </figcaption>
               </figure>
               <p>
+                Every fix that follows is a leaf on one tree. Here is the whole lineage at a glance —
+                170 years from Cauchy’s root to today’s canopy, each branch running parent → child:
+              </p>
+              <figure class="fig fig-tree">
+                <svg viewBox="0 0 {familyTree.W} {familyTree.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                  {#each familyTree.merges as m}
+                    <path d={m.d} class="tree-merge" />
+                  {/each}
+                  {#each familyTree.edges as e}
+                    <path d={e.d} class="tree-branch" stroke-width={e.w} />
+                  {/each}
+                  {#each familyTree.nodes as n (n.id)}
+                    <g transform="translate({n.x.toFixed(1)},{n.y.toFixed(1)})">
+                      <g transform="rotate({n.ang.toFixed(1)})">
+                        <path d="M -7,0 C -2,-5.6 5.5,-5.6 9.5,0 C 5.5,5.6 -2,5.6 -7,0 Z" fill={n.color} stroke="#fff" stroke-width="0.9" />
+                        <line x1="-5" y1="0" x2="8" y2="0" stroke="#fff" stroke-opacity="0.55" stroke-width="0.7" />
+                      </g>
+                      <text class="tree-label" x="0" y="-11">{n.name}</text>
+                    </g>
+                  {/each}
+                </svg>
+                <figcaption class="fig-cap">
+                  Every leaf is an optimizer in the picker; branches run parent → child, and the dashed
+                  violet strand marks where momentum and the adaptive line merge into Adam. Colours match
+                  the race below, and new methods join the canopy as the field grows.
+                </figcaption>
+              </figure>
+              <p>
                 Here they are racing on the same ravine from the same start — every one running its
                 real update rule, the dots arriving in their true step counts. Click a name to add or
                 remove it; hover one to pick it out of the pack:
@@ -2337,6 +2423,11 @@
     font-size: 0.8rem; line-height: 1.55; text-align: center;
     color: var(--color-text-tertiary); margin: 0.6rem auto 0; max-width: 56ch;
   }
+  /* The optimizer family tree */
+  .fig-tree > svg { padding: 0.3rem 0.4rem; }
+  .tree-branch { fill: none; stroke: #93a585; stroke-linecap: round; stroke-opacity: 0.7; }
+  .tree-merge { fill: none; stroke: #a855f7; stroke-width: 1.3; stroke-dasharray: 3,3; stroke-opacity: 0.5; }
+  .tree-label { font-size: 10.5px; font-weight: 600; font-family: inherit; fill: var(--color-text-secondary); text-anchor: middle; }
 
   /* ---------- Proof callout (the steepest-descent argument) ---------- */
   .proof {
