@@ -2000,24 +2000,27 @@
                         {/each}
                       </g>
                     </g>
-                    <circle cx={ravineFig.min.x} cy={ravineFig.min.y} r="5" fill="none" stroke="#10b981" stroke-width="1.6" stroke-dasharray="3,2.5" />
-                    <path d={ravineFig.gd} fill="none" stroke="#e2e8f0" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" />
-                    <path d={ravineFig.mom} fill="none" stroke="#d8b4fe" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" />
-                    {#each ravineFig.gdPts as p}<circle cx={p.x} cy={p.y} r="1.6" fill="#f1f5f9" />{/each}
-                    {#each ravineFig.momPts as p}<circle cx={p.x} cy={p.y} r="1.9" fill="#e9d5ff" />{/each}
+                    <circle cx={ravineFig.min.x} cy={ravineFig.min.y} r="5" fill="none" stroke="#34d399" stroke-width="1.8" stroke-dasharray="3,2.5" />
+                    <!-- dark halos so the trajectories read on any colour -->
+                    <path d={ravineFig.gd} fill="none" stroke="#0a1218" stroke-opacity="0.55" stroke-width="3.8" stroke-linejoin="round" stroke-linecap="round" />
+                    <path d={ravineFig.mom} fill="none" stroke="#0a1218" stroke-opacity="0.55" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round" />
+                    <path d={ravineFig.gd} fill="none" stroke="#ffffff" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round" />
+                    <path d={ravineFig.mom} fill="none" stroke="#c084fc" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" />
+                    {#each ravineFig.gdPts as p}<circle cx={p.x} cy={p.y} r="1.7" fill="#ffffff" stroke="#0a1218" stroke-opacity="0.55" stroke-width="0.7" />{/each}
+                    {#each ravineFig.momPts as p}<circle cx={p.x} cy={p.y} r="2" fill="#c084fc" stroke="#0a1218" stroke-opacity="0.55" stroke-width="0.7" />{/each}
                     <circle cx={ravineFig.start.x} cy={ravineFig.start.y} r="4.2" fill="#f59e0b" stroke="#fff" stroke-width="1.3" />
                     <g transform="translate(11,12)">
-                      <rect x="-5" y="-9" width="152" height="33" rx="5" fill="#0a1218" opacity="0.4" />
-                      <line x1="2" y1="0" x2="17" y2="0" stroke="#e2e8f0" stroke-width="2.5" />
+                      <rect x="-5" y="-9" width="152" height="33" rx="5" fill="#0a1218" opacity="0.55" />
+                      <line x1="2" y1="0" x2="17" y2="0" stroke="#ffffff" stroke-width="2.5" />
                       <text x="22" y="3.5" class="fig-svg-label" style="text-anchor:start;fill:#fff">plain GD — zig-zags</text>
-                      <line x1="2" y1="15" x2="17" y2="15" stroke="#d8b4fe" stroke-width="2.5" />
+                      <line x1="2" y1="15" x2="17" y2="15" stroke="#c084fc" stroke-width="2.5" />
                       <text x="22" y="18.5" class="fig-svg-label" style="text-anchor:start;fill:#fff">momentum — glides</text>
                     </g>
                   </g>
                 </svg>
                 <figcaption class="fig-cap">
                   The ravine: a valley far steeper across than along. One safe step size makes plain GD
-                  (grey) rattle wall to wall while it crawls along the floor; momentum (violet) builds
+                  (white) rattle wall to wall while it crawls along the floor; momentum (violet) builds
                   speed down the valley and glides to the minimum.
                 </figcaption>
               </figure>
