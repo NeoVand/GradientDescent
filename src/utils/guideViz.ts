@@ -26,6 +26,14 @@ const INTERP: Record<Colormap, (t: number) => string> = {
   viridis: interpolateViridis, magma: interpolateMagma, inferno: interpolateInferno,
   plasma: interpolatePlasma, cividis: interpolateCividis, cubehelix: interpolateCubehelixDefault
 };
+/** Colormap colors low→high as an array (for an in-SVG <linearGradient>). */
+export function cmapStopColors(cmap: Colormap, n = 8): string[] {
+  const interp = INTERP[cmap] ?? interpolateViridis;
+  const out: string[] = [];
+  for (let k = 0; k <= n; k++) out.push(interp(k / n));
+  return out;
+}
+
 // Density drives contour-ring count and field resolution together (app parity).
 export const CONTOUR_N: Record<FieldDensity, number> = { sparse: 9, normal: 16, dense: 28 };
 export const FIELD_RES: Record<FieldDensity, number> = { sparse: 10, normal: 15, dense: 22 };

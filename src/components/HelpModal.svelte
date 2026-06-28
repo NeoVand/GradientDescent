@@ -30,7 +30,7 @@
   import { optimizers, optimizerOrder, defaultHyper, type OptimizerId } from '../utils/optimizers';
   import GuideVizLayers from './GuideVizLayers.svelte';
   import {
-    tintGridURL, contourPathsFor, fieldArrows, streamlinesFor, colormapStops,
+    tintGridURL, contourPathsFor, fieldArrows, streamlinesFor, colormapStops, cmapStopColors,
     CONTOUR_N, FIELD_RES, GUIDE_VIZ_DEFAULT, type VizState
   } from '../utils/guideViz';
 
@@ -652,10 +652,27 @@
       racers,
       gw,
       gh,
+      vals, visMin: vMin, visMax: vMax,
+      domain: { x0: X0, x1: X1, y0: Y0, y1: Y1 }, grad, px, py,
       start: [px(start[0]), py(start[1])],
       min: [px(minPt[0]), py(minPt[1])]
     };
   })();
+
+  // ---- Reactive Layers state for the race figure ----
+  let raceViz: VizState = { ...GUIDE_VIZ_DEFAULT };
+  const raceLogMin = Math.log(raceDemo.visMin + 0.001);
+  const raceLogMax = Math.log(raceDemo.visMax + 0.001);
+  $: raceHeat = tintGridURL(raceDemo.vals, raceDemo.gw, raceDemo.gh, raceLogMin, raceLogMax, raceViz.colormap);
+  $: raceCont = raceViz.contours
+    ? contourPathsFor(raceDemo.vals, raceDemo.gw, raceDemo.gh, raceLogMin, raceLogMax, CONTOUR_N[raceViz.density])
+    : [];
+  $: raceArrows = raceViz.field === 'arrows'
+    ? fieldArrows(raceDemo.grad, raceDemo.domain, { px: raceDemo.px, py: raceDemo.py }, FIELD_RES[raceViz.density])
+    : [];
+  $: raceFlow = raceViz.field === 'streamlines'
+    ? streamlinesFor(raceDemo.grad, raceDemo.domain, { px: raceDemo.px, py: raceDemo.py }, FIELD_RES[raceViz.density])
+    : [];
 
   // ----- Gradient concept SVG: a real vector field that fills the figure -----
   const gradVizW = 300;
@@ -2095,16 +2112,22 @@
                     <!-- Contours close along the grid edge; clip them a hair inside
                          the frame so those boundary segments don't draw a white box. -->
                     <clipPath id="race-contour-clip"><rect x="1.5" y="1.5" width={RACE_W - 3} height={RACE_H - 3} /></clipPath>
+                    <marker id="race-arrow" viewBox="0 -5 10 10" refX="7" refY="0" markerWidth="4" markerHeight="4" orient="auto"><path d="M0,-5L10,0L0,5" fill="#cdd9f2" /></marker>
+                    <linearGradient id="race-cbar" x1="0" y1="0" x2="0" y2="1">
+                      {#each cmapStopColors(raceViz.colormap) as col, i}<stop offset={i / 8} stop-color={col} />{/each}
+                    </linearGradient>
                   </defs>
                   <g clip-path="url(#race-clip)">
-                    <image href={raceDemo.heatURL} x="0" y="0" width={RACE_W} height={RACE_H} preserveAspectRatio="none" />
+                    <image href={raceHeat} x="0" y="0" width={RACE_W} height={RACE_H} preserveAspectRatio="none" />
                     <g clip-path="url(#race-contour-clip)">
                       <g transform="scale({RACE_W / raceDemo.gw}, {RACE_H / raceDemo.gh})">
-                        {#each raceDemo.contourPaths as cp}
+                        {#each raceCont as cp}
                           <path d={cp.d} fill="none" stroke="#fff" stroke-opacity={cp.o} stroke-width="1" vector-effect="non-scaling-stroke" />
                         {/each}
                       </g>
                     </g>
+                    {#each raceFlow as d}<path d={d} fill="none" stroke="#cdd9f2" stroke-width="0.9" stroke-opacity="0.5" />{/each}
+                    {#each raceArrows as a}<line x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} stroke="#cdd9f2" stroke-width={a.w} opacity={a.o} marker-end="url(#race-arrow)" />{/each}
                     {#each raceDemo.racers as r (r.id)}
                       {@const hot = raceHover === r.id}
                       {@const dim = raceHover !== null && !hot}
@@ -2122,8 +2145,15 @@
                         <animateMotion path={r.d} keyPoints="0;1;1" keyTimes="0;{r.frac};1" calcMode="linear" dur="7s" repeatCount="indefinite" />
                       </circle>
                     {/each}
+                    <!-- loss colorbar (bottom-right, in viewBox coords) -->
+                    <g>
+                      <rect x="439" y="164" width="7" height="50" rx="2" fill="url(#race-cbar)" stroke="rgba(255,255,255,0.32)" stroke-width="0.5" />
+                      <text x="442.5" y="159" class="fig-svg-label" style="fill:#fff;stroke:#0a1218;stroke-width:2.4;paint-order:stroke;font-size:8px">{raceDemo.visMax.toFixed(0)}</text>
+                      <text x="442.5" y="224" class="fig-svg-label" style="fill:#fff;stroke:#0a1218;stroke-width:2.4;paint-order:stroke;font-size:8px">{raceDemo.visMin.toFixed(1)}</text>
+                    </g>
                   </g>
                 </svg>
+                <GuideVizLayers state={raceViz} onpatch={(p) => (raceViz = { ...raceViz, ...p })} />
                 <div class="race-legend">
                   {#each raceDemo.racers as r (r.id)}
                     <button
