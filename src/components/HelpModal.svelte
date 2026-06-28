@@ -30,7 +30,7 @@
   import { optimizers, optimizerOrder, defaultHyper, type OptimizerId } from '../utils/optimizers';
   import GuideVizLayers from './GuideVizLayers.svelte';
   import {
-    tintGridURL, contourPathsFor, fieldArrows, streamlinesFor, colormapStops, cmapStopColors,
+    tintGridURL, contourPathsFor, fieldArrows, colormapStops, cmapStopColors,
     CONTOUR_N, FIELD_RES, GUIDE_VIZ_DEFAULT, type VizState
   } from '../utils/guideViz';
 
@@ -670,9 +670,6 @@
   $: raceArrows = raceViz.field === 'arrows'
     ? fieldArrows(raceDemo.grad, raceDemo.domain, { px: raceDemo.px, py: raceDemo.py }, FIELD_RES[raceViz.density])
     : [];
-  $: raceFlow = raceViz.field === 'streamlines'
-    ? streamlinesFor(raceDemo.grad, raceDemo.domain, { px: raceDemo.px, py: raceDemo.py }, FIELD_RES[raceViz.density])
-    : [];
 
   // ----- Gradient concept SVG: a real vector field that fills the figure -----
   const gradVizW = 300;
@@ -834,9 +831,6 @@
     : [];
   $: ravArrows = ravineViz.field === 'arrows'
     ? fieldArrows(ravineFig.grad, ravineFig.domain, { px: ravineFig.px, py: ravineFig.py }, FIELD_RES[ravineViz.density])
-    : [];
-  $: ravFlow = ravineViz.field === 'streamlines'
-    ? streamlinesFor(ravineFig.grad, ravineFig.domain, { px: ravineFig.px, py: ravineFig.py }, FIELD_RES[ravineViz.density])
     : [];
 
   // 3) The noise ball — SGD orbits the minimum in a cloud whose radius scales
@@ -2013,7 +2007,7 @@
                   <defs>
                     <clipPath id="ravine-clip"><rect x="0" y="0" width={ravineFig.W} height={ravineFig.H} /></clipPath>
                     <clipPath id="ravine-contour-clip"><rect x="1.5" y="1.5" width={ravineFig.W - 3} height={ravineFig.H - 3} /></clipPath>
-                    <marker id="ravine-arrow" viewBox="0 -5 10 10" refX="7" refY="0" markerWidth="4" markerHeight="4" orient="auto"><path d="M0,-5L10,0L0,5" fill="#cdd9f2" /></marker>
+                    <marker id="ravine-arrow" viewBox="0 -5 10 10" refX="7" refY="0" markerWidth="3.1" markerHeight="3.1" orient="auto"><path d="M0,-5L10,0L0,5" fill="#cdd9f2" /></marker>
                   </defs>
                   <g clip-path="url(#ravine-clip)">
                     <image href={ravHeat} x="0" y="0" width={ravineFig.W} height={ravineFig.H} preserveAspectRatio="none" />
@@ -2024,7 +2018,6 @@
                         {/each}
                       </g>
                     </g>
-                    {#each ravFlow as d}<path d={d} fill="none" stroke="#cdd9f2" stroke-width="0.9" stroke-opacity="0.5" />{/each}
                     {#each ravArrows as a}<line x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} stroke="#cdd9f2" stroke-width={a.w} opacity={a.o} marker-end="url(#ravine-arrow)" />{/each}
                     <circle cx={ravineFig.min.x} cy={ravineFig.min.y} r="5" fill="none" stroke="#34d399" stroke-width="1.8" stroke-dasharray="3,2.5" />
                     <!-- dark halos so the trajectories read on any colour -->
@@ -2036,11 +2029,13 @@
                     {#each ravineFig.momPts as p}<circle cx={p.x} cy={p.y} r="2" fill="#c084fc" stroke="#0a1218" stroke-opacity="0.55" stroke-width="0.7" />{/each}
                     <circle cx={ravineFig.start.x} cy={ravineFig.start.y} r="4.2" fill="#f59e0b" stroke="#fff" stroke-width="1.3" />
                     <g transform="translate(11,12)">
-                      <rect x="-5" y="-9" width="152" height="33" rx="5" fill="#0a1218" opacity="0.55" />
-                      <line x1="2" y1="0" x2="17" y2="0" stroke="#ffffff" stroke-width="2.5" />
-                      <text x="22" y="3.5" class="fig-svg-label" style="text-anchor:start;fill:#fff">plain GD — zig-zags</text>
-                      <line x1="2" y1="15" x2="17" y2="15" stroke="#c084fc" stroke-width="2.5" />
-                      <text x="22" y="18.5" class="fig-svg-label" style="text-anchor:start;fill:#fff">momentum — glides</text>
+                      <rect x="-5" y="-9" width="152" height="33" rx="6" fill="#ffffff" fill-opacity="0.86" stroke="#0f172a" stroke-opacity="0.14" stroke-width="0.6" />
+                      <!-- GD swatch keeps its dark halo so the white line reads on the light panel -->
+                      <line x1="2" y1="0" x2="17" y2="0" stroke="#0a1218" stroke-opacity="0.5" stroke-width="3.6" stroke-linecap="round" />
+                      <line x1="2" y1="0" x2="17" y2="0" stroke="#ffffff" stroke-width="2" stroke-linecap="round" />
+                      <text x="22" y="3.5" class="fig-svg-label" style="text-anchor:start;fill:#1e293b">plain GD — zig-zags</text>
+                      <line x1="2" y1="15" x2="17" y2="15" stroke="#a855f7" stroke-width="2.6" stroke-linecap="round" />
+                      <text x="22" y="18.5" class="fig-svg-label" style="text-anchor:start;fill:#1e293b">momentum — glides</text>
                     </g>
                   </g>
                 </svg>
@@ -2112,7 +2107,7 @@
                     <!-- Contours close along the grid edge; clip them a hair inside
                          the frame so those boundary segments don't draw a white box. -->
                     <clipPath id="race-contour-clip"><rect x="1.5" y="1.5" width={RACE_W - 3} height={RACE_H - 3} /></clipPath>
-                    <marker id="race-arrow" viewBox="0 -5 10 10" refX="7" refY="0" markerWidth="4" markerHeight="4" orient="auto"><path d="M0,-5L10,0L0,5" fill="#cdd9f2" /></marker>
+                    <marker id="race-arrow" viewBox="0 -5 10 10" refX="7" refY="0" markerWidth="3.1" markerHeight="3.1" orient="auto"><path d="M0,-5L10,0L0,5" fill="#cdd9f2" /></marker>
                     <linearGradient id="race-cbar" x1="0" y1="0" x2="0" y2="1">
                       {#each cmapStopColors(raceViz.colormap) as col, i}<stop offset={i / 8} stop-color={col} />{/each}
                     </linearGradient>
@@ -2126,7 +2121,6 @@
                         {/each}
                       </g>
                     </g>
-                    {#each raceFlow as d}<path d={d} fill="none" stroke="#cdd9f2" stroke-width="0.9" stroke-opacity="0.5" />{/each}
                     {#each raceArrows as a}<line x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} stroke="#cdd9f2" stroke-width={a.w} opacity={a.o} marker-end="url(#race-arrow)" />{/each}
                     {#each raceDemo.racers as r (r.id)}
                       {@const hot = raceHover === r.id}

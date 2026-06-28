@@ -2,7 +2,7 @@
  * Layered visualization for the guide's two landscape figures (the ravine and
  * the 14-optimizer race), mirroring the app's Loss & Gradient "Layers" control:
  * a selectable colormap density, iso-loss contours, and an optional gradient
- * field (arrows or flow). The figures own analytic loss/gradient functions, so
+ * field of −∇ℒ arrows. The figures own analytic loss/gradient functions, so
  * these helpers work off a raw value grid + a screen-mapping pair rather than
  * the app's data-driven LossGrid.
  */
@@ -85,7 +85,7 @@ export function fieldArrows(grad: Grad, dom: Domain, map: Mapper, res: number): 
   const cols = res;
   const rows = Math.max(3, Math.round(res * Math.abs((y1 - y0) * sys) / Math.abs((x1 - x0) * sxs)));
   const cellW = Math.abs((x1 - x0) * sxs) / cols, cellH = Math.abs((y1 - y0) * sys) / rows;
-  const maxLen = Math.min(cellW, cellH) * 0.92;
+  const maxLen = Math.min(cellW, cellH) * 0.62;
   let maxMag = 0;
   const raw: { sx: number; sy: number; dsx: number; dsy: number; mag: number }[] = [];
   for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
@@ -99,34 +99,13 @@ export function fieldArrows(grad: Grad, dom: Domain, map: Mapper, res: number): 
   for (const r of raw) {
     if (!(r.mag > 1e-9)) continue;
     const norm = r.mag / maxMag;
-    const len = maxLen * (0.28 + 0.72 * norm);
+    const len = maxLen * (0.3 + 0.7 * norm);
     const dm = Math.hypot(r.dsx, r.dsy) || 1;
     out.push({
       x1: r.sx, y1: r.sy,
       x2: r.sx + (r.dsx / dm) * len, y2: r.sy + (r.dsy / dm) * len,
-      o: 0.3 + 0.5 * norm, w: 0.8 + 0.7 * norm
+      o: 0.3 + 0.5 * norm, w: 0.6 + 0.5 * norm
     });
   }
   return out;
-}
-
-/** Downhill streamlines (flow): seed on a grid, march along −∇ℒ̂ to a sink. */
-export function streamlinesFor(grad: Grad, dom: Domain, map: Mapper, res: number): string[] {
-  const { x0, x1, y0, y1 } = dom;
-  const seeds = Math.max(4, Math.round(res * 0.7));
-  const step = Math.min(x1 - x0, y1 - y0) / 90;
-  const lines: string[] = [];
-  for (let j = 0; j < seeds; j++) for (let i = 0; i < seeds; i++) {
-    let x = x0 + (x1 - x0) * ((i + 0.5) / seeds), y = y0 + (y1 - y0) * ((j + 0.5) / seeds);
-    const pts: string[] = [`${map.px(x).toFixed(1)},${map.py(y).toFixed(1)}`];
-    for (let s = 0; s < 60; s++) {
-      const [gx, gy] = grad(x, y), mag = Math.hypot(gx, gy);
-      if (!(mag > 1e-5)) break;
-      x -= (gx / mag) * step; y -= (gy / mag) * step;
-      if (x < x0 || x > x1 || y < y0 || y > y1) break;
-      pts.push(`${map.px(x).toFixed(1)},${map.py(y).toFixed(1)}`);
-    }
-    if (pts.length > 6) lines.push('M ' + pts.join(' L '));
-  }
-  return lines;
 }

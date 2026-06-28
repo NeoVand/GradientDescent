@@ -31,7 +31,6 @@
         <span class="gv-label">Field</span>
         <div class="gv-seg">
           <button class:on={state.field === 'arrows'} on:click={() => onpatch({ field: 'arrows' })}>Arrows</button>
-          <button class:on={state.field === 'streamlines'} on:click={() => onpatch({ field: 'streamlines' })}>Flow</button>
           <button class:on={state.field === 'off'} on:click={() => onpatch({ field: 'off' })}>Off</button>
         </div>
       </div>
