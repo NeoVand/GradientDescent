@@ -1036,14 +1036,17 @@
     ],
     'ch-downhill': [
       { kind: 'wiki', label: 'Gradient', href: 'https://en.wikipedia.org/wiki/Gradient' },
-      { kind: 'wiki', label: 'Directional derivative', href: 'https://en.wikipedia.org/wiki/Directional_derivative' }
+      { kind: 'wiki', label: 'Directional derivative', href: 'https://en.wikipedia.org/wiki/Directional_derivative' },
+      { kind: 'wiki', label: 'Backpropagation', href: 'https://en.wikipedia.org/wiki/Backpropagation' },
+      { kind: 'paper', label: 'Automatic differentiation: a survey — Baydin et al., 2018', href: 'https://arxiv.org/abs/1502.05767' }
     ],
     'ch-step': [
       { kind: 'wiki', label: 'Gradient descent', href: 'https://en.wikipedia.org/wiki/Gradient_descent' }
     ],
     'ch-gamma': [
       { kind: 'wiki', label: 'Learning rate', href: 'https://en.wikipedia.org/wiki/Learning_rate' },
-      { kind: 'wiki', label: 'Condition number', href: 'https://en.wikipedia.org/wiki/Condition_number' }
+      { kind: 'wiki', label: 'Condition number', href: 'https://en.wikipedia.org/wiki/Condition_number' },
+      { kind: 'paper', label: 'Gradient clipping (exploding gradients) — Pascanu et al., 2013', href: 'https://arxiv.org/abs/1211.5063' }
     ],
     'ch-schedule': [
       { kind: 'wiki', label: 'Learning-rate schedule', href: 'https://en.wikipedia.org/wiki/Learning_rate#Learning_rate_schedule' },
@@ -1205,6 +1208,22 @@
                 The squaring is the quiet hero here: it punishes a big miss far more than a small one,
                 and it makes the loss a smooth, rounded <em>bowl</em> rather than a creased tent — and
                 a smooth bowl is exactly what lets us roll downhill in the chapters ahead.
+              </p>
+              <p>
+                Squared error is the right “how wrong” when the answer is a <em>number</em>. But several
+                problems here ask a <em>yes/no</em> question — is this point inside the circle? on which
+                side of the line? — and there the model outputs a <strong>probability</strong>
+                {@html tex(String.raw`\hat{y}\in(0,1)`)} that the answer is “yes.” The natural loss then
+                is <strong>cross-entropy</strong> (log-loss):
+              </p>
+              <div class="formula-display">{@html texD(String.raw`\mathcal{L} = -\big[\,y\,\log \hat{y} + (1-y)\,\log(1-\hat{y})\,\big]`)}</div>
+              <p>
+                It is gentle when the model is confidently right and brutal when it is confidently wrong:
+                predict {@html tex(String.raw`\hat{y}=0.99`)} while the truth is {@html tex(String.raw`y=0`)}
+                and {@html tex(String.raw`-\log(1-\hat{y})`)} rockets toward infinity. It is precisely the
+                negative log-likelihood of a coin-flip (Bernoulli) model — which is why it, not squared
+                error, is the standard loss for classification: squared error for numbers, cross-entropy
+                for categories.
               </p>
               {#if chapterPresets['ch-bowl']}
                 <div class="opt-cta">
@@ -1492,6 +1511,15 @@
                 divide the change by the nudge. Do that once for α and once for β and you have the two
                 numbers the gradient is built from.
               </p>
+              <p class="aside">
+                Two knobs make that easy — but a real model has millions or billions, and nudging each
+                one in turn would be hopeless. They use <strong>backpropagation</strong> (reverse-mode
+                automatic differentiation): one backward sweep of the chain rule that hands back the
+                derivative for <em>every</em> parameter at once, at about the cost of a single forward
+                pass (Rumelhart, Hinton &amp; Williams, 1986; Baydin et al., 2018). The meaning is exactly
+                the {@html tex(String.raw`\nabla\mathcal{L}`)} here — it is just computed without ever
+                nudging anything.
+              </p>
               <div class="formula-display">{@html texD(formulas.gradientDefinition)}</div>
               <p>
                 Stack those two answers into a little arrow and you have ∇ℒ. Its
@@ -1689,6 +1717,16 @@
                 the one before, the bounce compounds, and the loss runs off to infinity. That single
                 number — the curvature — is the villain the optimizer family tree is built to outwit.
               </p>
+              <p class="aside">
+                Sometimes the blow-up comes not from γ but from a freak gradient — a cliff in the
+                surface, or the deep, recurrent networks where gradients can <strong>explode</strong>.
+                The standard guard is <strong>gradient clipping</strong>: if the gradient’s length
+                exceeds a threshold {@html tex(String.raw`c`)}, rescale it back to that length before
+                stepping, {@html tex(String.raw`\nabla\mathcal{L} \leftarrow c\,\nabla\mathcal{L}/\lVert\nabla\mathcal{L}\rVert`)},
+                keeping its direction but capping its size (Pascanu et al., 2013). The opposite failure —
+                gradients that <strong>vanish</strong> on a flat plateau — just stalls a run, the quiet
+                trap from the landscape chapter.
+              </p>
               <figure class="fig fig-lr">
                 <div class="fig-triptych">
                   {#each lrRegimes as g}
@@ -1838,7 +1876,9 @@
                 different direction. But it is cheap, and — this is the quiet miracle that makes modern
                 training possible — it still points the right way <em>on average</em>. Averaging your
                 way downhill through that noise is the <strong>S</strong> (stochastic) in
-                <strong>SGD</strong>, stochastic gradient descent.
+                <strong>SGD</strong>, stochastic gradient descent. (Two words of vocabulary while we are
+                here: one batch update is an <strong>iteration</strong> or step; one full sweep through
+                the whole dataset is an <strong>epoch</strong>.)
               </p>
               <p>
                 Slide the <strong>Batch size</strong> down from <em>All</em> toward <em>1</em> and a
