@@ -778,7 +778,7 @@
   // iterations on an anisotropic quadratic, over a reversed-viridis density
   // heatmap + contours so it matches the race / landscape panels.
   const ravineFig = (() => {
-    const W = 460, H = 150;
+    const W = 460, H = 345;               // 4:3 — a taller cross-section of the valley
     const X0 = -1.18, X1 = 0.36, Y0 = -0.72, Y1 = 0.72;
     const ax = 0.05, ay = 1.0;            // gentle along x, steep across y
     const loss = (x: number, y: number) => 0.5 * (ax * x * x + ay * y * y);
@@ -788,7 +788,7 @@
 
     // Raw value grid (the heatmap, contours and field are derived reactively
     // from this so the Layers control can re-tint / re-draw without a recompute).
-    const gw = 124, gh = 42;
+    const gw = 124, gh = 96;
     const vals: number[] = new Array(gw * gh);
     let vMin = Infinity, vMax = -Infinity;
     for (let j = 0; j < gh; j++) {
