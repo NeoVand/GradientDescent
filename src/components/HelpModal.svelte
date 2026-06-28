@@ -847,7 +847,7 @@
   // sweeps from along ∇ℒ (θ=0, max) through a contour (θ=90°, zero) to −∇ℒ
   // (θ=180°, min). A plain cosine — the claim, plotted.
   const proofCurve = (() => {
-    const x0 = 286, x1 = 410, yc = 76, amp = 50, N = 60;
+    const x0 = 252, x1 = 378, yc = 80, amp = 46, N = 60;
     const asc: string[] = [], desc: string[] = [];
     for (let i = 0; i <= N; i++) {
       const th = Math.PI * (i / N);
@@ -1335,24 +1335,24 @@
                 </p>
                 <div class="formula-display center">{@html texD(formulas.directional)}</div>
                 <figure class="proof-fig">
-                  <svg viewBox="0 0 420 162" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                  <svg viewBox="0 0 420 156" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
                     <defs>
                       <marker id="pf-grad" viewBox="0 -5 10 10" refX="8" refY="0" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,-5L10,0L0,5" fill="#f59e0b" /></marker>
                       <marker id="pf-u" viewBox="0 -5 10 10" refX="8" refY="0" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,-5L10,0L0,5" fill="var(--color-text-tertiary)" /></marker>
                     </defs>
-                    <line x1="261" y1="16" x2="261" y2="150" class="fig-contour" style="stroke-opacity:0.16" />
-                    <!-- Panel A · the shadow (projection of ∇ℒ onto u) -->
-                    <line x1="74" y1="110" x2="246" y2="110" stroke="var(--color-text-tertiary)" stroke-width="1.2" stroke-dasharray="3,3" stroke-opacity="0.6" marker-end="url(#pf-u)" />
-                    <line x1="74" y1="110" x2="202.2" y2="110" stroke="#3b82f6" stroke-width="4.5" stroke-linecap="round" />
-                    <line x1="202.2" y1="36" x2="202.2" y2="110" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="2.5,2.5" stroke-opacity="0.75" />
-                    <path d="M 195.2,110 L 195.2,103 L 202.2,103" fill="none" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-opacity="0.75" />
-                    <line x1="74" y1="110" x2="200" y2="37.2" stroke="#f59e0b" stroke-width="2.6" marker-end="url(#pf-grad)" />
-                    <path d="M 102,110 A 28,28 0 0 0 98,95.5" fill="none" stroke="var(--color-text-tertiary)" stroke-width="1.2" />
-                    <circle cx="74" cy="110" r="2.8" fill="var(--color-text-primary)" />
-                    <text x="206" y="34" class="proof-lbl" style="text-anchor:start;fill:#f59e0b">∇ℒ</text>
-                    <text x="250" y="114" class="proof-lbl" style="text-anchor:start;fill:var(--color-text-secondary)">u</text>
-                    <text x="111" y="103" class="proof-lbl" style="fill:var(--color-text-tertiary)">θ</text>
-                    <text x="138" y="126" class="proof-lbl" style="fill:#3b82f6">‖∇ℒ‖ cos θ</text>
+                    <line x1="210" y1="16" x2="210" y2="146" class="fig-contour" style="stroke-opacity:0.16" />
+                    <!-- Panel A · the shadow (projection of ∇ℒ onto u) — centred in the left half -->
+                    <line x1="36" y1="112" x2="174" y2="112" stroke="var(--color-text-tertiary)" stroke-width="1.2" stroke-dasharray="3,3" stroke-opacity="0.6" marker-end="url(#pf-u)" />
+                    <line x1="36" y1="112" x2="130.5" y2="112" stroke="#3b82f6" stroke-width="4.5" stroke-linecap="round" />
+                    <line x1="130.5" y1="48.3" x2="130.5" y2="112" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="2.5,2.5" stroke-opacity="0.75" />
+                    <path d="M 123.5,112 L 123.5,105 L 130.5,105" fill="none" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-opacity="0.75" />
+                    <line x1="36" y1="112" x2="128.6" y2="49.5" stroke="#f59e0b" stroke-width="2.6" marker-end="url(#pf-grad)" />
+                    <path d="M 64,112 A 28,28 0 0 0 60.4,97.6" fill="none" stroke="var(--color-text-tertiary)" stroke-width="1.2" />
+                    <circle cx="36" cy="112" r="2.8" fill="var(--color-text-primary)" />
+                    <text x="134" y="46" class="proof-lbl" style="text-anchor:start;fill:#f59e0b">∇ℒ</text>
+                    <text x="178" y="116" class="proof-lbl" style="text-anchor:start;fill:var(--color-text-secondary)">u</text>
+                    <text x="72" y="105" class="proof-lbl" style="fill:var(--color-text-tertiary)">θ</text>
+                    <text x="83" y="128" class="proof-lbl" style="fill:#3b82f6">‖∇ℒ‖ cos θ</text>
                     <!-- Panel B · rate vs angle is a cosine -->
                     <line x1={proofCurve.x0 - 8} y1={proofCurve.yc} x2={proofCurve.x1 + 8} y2={proofCurve.yc} stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="3,3" stroke-opacity="0.45" />
                     <path d={proofCurve.ascD} fill="none" stroke="#f59e0b" stroke-width="2.4" stroke-linecap="round" />
@@ -2473,8 +2473,8 @@
     text-anchor: middle; font-family: inherit;
   }
   .fig-cap {
-    font-size: 0.8rem; line-height: 1.55; text-align: center;
-    color: var(--color-text-tertiary); margin: 0.6rem auto 0; max-width: 56ch;
+    font-size: 0.8rem; line-height: 1.5; text-align: left;
+    color: var(--color-text-tertiary); margin: 0.55rem 0 0;
   }
   /* The optimizer family tree */
   .fig-tree > svg { padding: 0.3rem 0.4rem; }
@@ -2522,7 +2522,7 @@
   .proof-fig { margin: 0.7rem 0 0.5rem; }
   .proof-fig svg { display: block; width: 100%; height: auto; }
   .proof-lbl { font-size: 10.5px; font-weight: 600; font-family: inherit; text-anchor: middle; }
-  .proof-figcap { font-size: 0.74rem; line-height: 1.5; text-align: center; color: var(--color-text-tertiary); margin-top: 0.45rem; }
+  .proof-figcap { font-size: 0.76rem; line-height: 1.5; text-align: left; color: var(--color-text-tertiary); margin-top: 0.5rem; }
   .proof-qed { color: #10b981; font-weight: 700; margin-left: 0.15rem; }
 
   /* ---------- Formulas ---------- */
@@ -2636,10 +2636,10 @@
   .race-caption {
     font-size: 0.78rem;
     color: var(--color-text-tertiary);
-    text-align: center;
+    text-align: left;
     margin-top: 0.4rem;
     line-height: 1.5;
-    padding: 0 1rem 0.7rem;
+    padding: 0.1rem 0.2rem 0.7rem;
   }
 
   .opt-act {
