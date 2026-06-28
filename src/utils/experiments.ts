@@ -192,6 +192,23 @@ export const experiments: Experiment[] = [
  * the guide looks these up by chapter id.
  */
 export const chapterPresets: Record<string, Experiment> = {
+  'ch-generalize': {
+    id: 'preset-generalize',
+    title: 'Watch a model fit the noise',
+    blurb: '',
+    apply() {
+      applyProblem('linear-regression');
+      datasetStore.setNoiseLevel(2);
+      datasetStore.regenerateData();
+      recordInitialHistory();
+      startTraining();
+      showCoach(
+        'info',
+        'With the noise cranked up, training drives the loss down by bending the fit toward the random scatter — but the basin no longer sits on the dashed true line. Driving training loss to zero here means memorizing noise, not learning the signal. That gap is overfitting.',
+        17000
+      );
+    }
+  },
   'ch-shapes': {
     id: 'preset-shapes',
     title: 'Fall into a local minimum',

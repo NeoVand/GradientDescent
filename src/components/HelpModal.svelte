@@ -88,6 +88,7 @@
     { part: 'Part III · Descent in the real world' },
     { id: 'ch-noise', n: '7', title: 'Mini-batches & the S in SGD' },
     { id: 'ch-optimizers', n: '8', title: 'The optimizer family tree' },
+    { id: 'ch-generalize', n: '9', title: 'Training loss isn’t the goal' },
     { part: 'Part IV · The zoo' },
     { id: 'ch-problems', n: '9', title: 'The 22 landscapes' },
     { id: 'ch-experiments', n: '10', title: 'Things to try' },
@@ -975,6 +976,34 @@
       leftBasin: areaPath(0, ridge), rightBasin: areaPath(ridge, 1),
       startA: mk(0.45), startB: mk(0.59), localMin: mk(0.30), globalMin: mk(0.74),
       SW, SH, gw, gh, saddleURL, saddleContours
+    };
+  })();
+
+  // 8) Generalization — training loss falls forever, but test loss (held-out
+  // data) bottoms out then climbs as the model starts fitting noise. The dip is
+  // where early stopping wants to stop.
+  const genFig = (() => {
+    const W = 460, H = 188, padL = 40, padR = 16, padT = 18, padB = 34;
+    const train = (t: number) => 0.9 * Math.exp(-3.4 * t) + 0.05;
+    const test = (t: number) => 0.9 * Math.exp(-3.4 * t) + 0.13 + 0.92 * t * t;
+    const Lo = 0, Hi = 1.12;
+    const sx = (t: number) => padL + t * (W - padL - padR);
+    const sy = (v: number) => (H - padB) - ((v - Lo) / (Hi - Lo)) * (H - padT - padB);
+    const line = (f: (t: number) => number) => {
+      const pts: string[] = [];
+      for (let i = 0; i <= 100; i++) { const t = i / 100; pts.push(`${sx(t).toFixed(1)},${sy(f(t)).toFixed(1)}`); }
+      return 'M ' + pts.join(' L ');
+    };
+    // test minimum (early-stop point)
+    let tStar = 0, best = Infinity;
+    for (let i = 0; i <= 200; i++) { const t = i / 200; const v = test(t); if (v < best) { best = v; tStar = t; } }
+    return {
+      W, H, padL, padB, padT,
+      trainD: line(train), testD: line(test),
+      x0: sx(0), x1: sx(1), yBase: sy(Lo),
+      stop: { x: sx(tStar), y: sy(test(tStar)), yTop: sy(Hi) },
+      trainEnd: { x: sx(1), y: sy(train(1)) }, testEnd: { x: sx(1), y: sy(test(1)) },
+      testStart: { x: sx(0), y: sy(test(0)) }
     };
   })();
 
@@ -2189,7 +2218,100 @@
               {/if}
             </section>
 
-            <!-- ============== 9 · THE PROBLEMS ============== -->
+            <!-- ============== 9 · TRAINING LOSS ISN'T THE GOAL ============== -->
+            <section data-ch="ch-generalize" id="ch-generalize">
+              <h3><svelte:component this={chIcon['ch-generalize']} size={18} strokeWidth={2} /> Training loss isn’t the goal</h3>
+
+              <p>
+                Every chapter so far has worked to drive the <em>training</em> loss down. But that number
+                is only a stand-in for what we actually want. We don’t care about fitting the data we
+                already have — we care about predicting data we <strong>haven’t seen</strong>. Doing well
+                on new data is <strong>generalization</strong>, and it is the whole point.
+              </p>
+              <p>
+                The loss we minimize is the average error over the training set — the <strong>empirical
+                risk</strong> — but the real target is the average error over <em>all</em> future data,
+                the <strong>true risk</strong>. With limited or noisy data the two come apart. Push the
+                training loss too low and the model starts memorizing the quirks and noise of <em>this</em>
+                sample: training loss keeps falling while error on held-out data turns and climbs. That
+                divergence is <strong>overfitting</strong>.
+              </p>
+
+              <figure class="fig">
+                <svg viewBox="0 0 {genFig.W} {genFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                  <line x1={genFig.padL} y1={genFig.yBase} x2={genFig.x1} y2={genFig.yBase} class="fig-contour" style="stroke-opacity:0.35" />
+                  <line x1={genFig.padL} y1={genFig.padT} x2={genFig.padL} y2={genFig.yBase} class="fig-contour" style="stroke-opacity:0.35" />
+                  <line x1={genFig.stop.x} y1={genFig.stop.yTop} x2={genFig.stop.x} y2={genFig.yBase} stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="3,3" stroke-opacity="0.65" />
+                  <path d={genFig.testD} fill="none" stroke="#f59e0b" stroke-width="2.3" stroke-linecap="round" />
+                  <path d={genFig.trainD} fill="none" stroke="#10b981" stroke-width="2.3" stroke-linecap="round" />
+                  <circle cx={genFig.stop.x} cy={genFig.stop.y} r="3.6" fill="#f59e0b" stroke="#fff" stroke-width="1.2" />
+                  <text x={genFig.testEnd.x - 4} y={genFig.testEnd.y + 2} class="fig-svg-label" style="text-anchor:end;fill:#f59e0b">test loss</text>
+                  <text x={genFig.trainEnd.x - 4} y={genFig.trainEnd.y - 7} class="fig-svg-label" style="text-anchor:end;fill:#10b981">training loss</text>
+                  <text x={genFig.stop.x} y={genFig.stop.yTop - 3} class="fig-svg-label" style="fill:var(--color-text-tertiary)">early stop</text>
+                  <text x={genFig.padL - 6} y={genFig.padT + 4} class="fig-svg-label" style="text-anchor:end;fill:var(--color-text-tertiary)">loss</text>
+                  <text x={genFig.x1} y={genFig.yBase + 18} class="fig-svg-label" style="text-anchor:end;fill:var(--color-text-tertiary)">training time →</text>
+                </svg>
+                <figcaption class="fig-cap">
+                  Training loss (green) keeps falling; test loss (amber), measured on held-out data, bottoms
+                  out and then rises as the model begins fitting noise. The dip is where you’d want to stop.
+                </figcaption>
+              </figure>
+
+              <p>
+                Two fixes follow directly. The first is to <em>measure</em> the gap: hold out part of the
+                data as a <strong>test</strong> (or validation) set, and watch its loss alongside the
+                training loss — that is the second curve in the <strong>Loss History</strong> panel. The
+                second is <strong>early stopping</strong>: end training at the test-loss minimum rather
+                than the training-loss minimum. It is the simplest regularizer there is, and in the
+                quadratic case it is provably close to an explicit weight penalty (Prechelt, 1998;
+                Goodfellow et al., 2016, §7.8).
+              </p>
+              <p>
+                That penalty is <strong>regularization</strong>: instead of minimizing the loss alone, add
+                a term that prefers smaller, simpler parameters,
+              </p>
+              <div class="formula-display center">{@html texD(String.raw`\min_{\boldsymbol{\theta}}\;\; \mathcal{L}(\boldsymbol{\theta}) \;+\; \tfrac{\lambda}{2}\,\lVert \boldsymbol{\theta}\rVert^2`)}</div>
+              <p>
+                where {@html tex(String.raw`\lambda`)} sets how hard to pull toward zero. For plain SGD the
+                gradient of that penalty is exactly <strong>weight decay</strong> —
+                {@html tex(String.raw`\boldsymbol{\theta} \leftarrow (1-\gamma\lambda)\,\boldsymbol{\theta} - \gamma\nabla\mathcal{L}`)}
+                — shrinking every weight a touch each step (Krogh &amp; Hertz, 1991). This is the same
+                {@html tex(String.raw`\lambda`)} you met on <strong>AdamW</strong>, which decouples the
+                decay from the adaptive scaling so it behaves like a true penalty again.
+              </p>
+              <p>
+                Geometry has the last word, and it loops back to the noise chapter. Not all minima
+                generalize equally: a <em>wide, flat</em> basin is forgiving — small shifts in the data
+                barely move the loss — while a <em>sharp</em> one is brittle. Flat minima tend to
+                generalize better (Hochreiter &amp; Schmidhuber, 1997), the restless noise of small-batch
+                SGD tends to settle into them, and very large batches tend to find sharper minima with a
+                measurable generalization gap (Keskar et al., 2017). So the real target was never the exact
+                bottom of the training bowl — it is a low, <em>wide</em> region that also sits low on data
+                you will never see. Optimization gets you down; generalization decides whether down was
+                worth reaching.
+              </p>
+              {#if chapterPresets['ch-generalize']}
+                <div class="opt-cta">
+                  <span>Try it live:</span>
+                  <button class="try-btn" on:click={() => runPreset('ch-generalize')}>
+                    <Play size={13} strokeWidth={2.5} /><span>{chapterPresets['ch-generalize'].title}</span>
+                  </button>
+                </div>
+              {/if}
+              {#if chRefs['ch-generalize']}
+                <div class="ch-refs">
+                  <span class="ch-refs-label">Further reading</span>
+                  {#each chRefs['ch-generalize'] as r}
+                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
+                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
+                      {r.label}
+                    </a>
+                  {/each}
+                </div>
+              {/if}
+            </section>
+
+            <!-- ============== 10 · THE PROBLEMS ============== -->
             <section data-ch="ch-problems" id="ch-problems">
               <div class="part-label">Part IV · The zoo</div>
               <h3><svelte:component this={chIcon['ch-problems']} size={18} strokeWidth={2} /> The 22 landscapes</h3>
