@@ -43,7 +43,11 @@
     Droplets,
     Mountain,
     Info,
-    Rocket,
+    Scaling,
+    Magnet,
+    Scissors,
+    Blend,
+    SlidersHorizontal,
     Waves,
     Target,
     Radio,
@@ -392,12 +396,25 @@
         ? lerpHex('#10b981', '#f59e0b', (lrSliderPos - 55) / 25)
         : lerpHex('#f59e0b', '#ef4444', (lrSliderPos - 80) / 20);
 
-  const HYPER_COLORS: Record<string, string> = {
-    mu: '#a855f7',    // momentum family: violet
-    beta1: '#a855f7', // Adam's momentum decay: same violet — same concept
-    beta2: '#14b8a6', // Adam's scale decay: teal — the RMS memory
-    rho: '#14b8a6'    // RMSProp's decay: same teal — same concept
+  // Each hyperparameter maps — by its descriptive label, not its raw key — to a
+  // concept that drives BOTH its icon and its colour, so the same idea always
+  // reads the same way (keying by `key` mislabels e.g. Lion's β₂ or Sophia's ρ).
+  //   • momentum / inertia  → gauge, violet
+  //   • adaptive scale (RMS)→ resize, teal
+  //   • direction blend     → blend, violet (still a momentum thing)
+  //   • weight decay        → magnet (pull to origin), amber
+  //   • step clip           → scissors, rose
+  const HYPER_META: Record<string, { icon: any; color: string }> = {
+    'Momentum':        { icon: Gauge,    color: '#a855f7' },
+    'Momentum decay':  { icon: Gauge,    color: '#a855f7' },
+    'Direction blend': { icon: Blend,    color: '#a855f7' },
+    'Decay':           { icon: Scaling,  color: '#14b8a6' },
+    'Scale decay':     { icon: Scaling,  color: '#14b8a6' },
+    'Weight decay':    { icon: Magnet,   color: '#f59e0b' },
+    'Clip':            { icon: Scissors, color: '#fb7185' }
   };
+  const HYPER_FALLBACK = { icon: SlidersHorizontal, color: '#10b981' };
+  const hyperMeta = (label: string) => HYPER_META[label] ?? HYPER_FALLBACK;
 
   const SLIDER_COLORS = {
     points: '#3b82f6',
@@ -706,15 +723,16 @@
 
     <!-- Per-optimizer hyperparameters (rendered from the optimizer's spec) -->
     {#each currentOptimizer.hyperparams as spec (optimizerSel.id + '-' + spec.key)}
+      {@const meta = hyperMeta(spec.label)}
       <div class="ctl">
         <div class="row">
-          <span class="icon"><Rocket size={16} strokeWidth={2} /></span>
+          <span class="icon"><svelte:component this={meta.icon} size={16} strokeWidth={2} /></span>
           <span class="row-label">{spec.label} <span class="greek-label">({spec.symbol})</span></span>
           <button class="info-btn" aria-label="About {spec.label}" use:tooltip={spec.hint}>
             <Info size={13} strokeWidth={2} />
           </button>
           <div class="row-spring"></div>
-          <span class="row-value" style="color: {HYPER_COLORS[spec.key] ?? '#10b981'}">{(optimizerSel.hyper[spec.key] ?? spec.default).toFixed(spec.step < 0.01 ? 3 : 2)}</span>
+          <span class="row-value" style="color: {meta.color}">{(optimizerSel.hyper[spec.key] ?? spec.default).toFixed(spec.step < 0.01 ? 3 : 2)}</span>
         </div>
         <input
           id={'hyper-' + spec.key}
@@ -724,7 +742,7 @@
           max={spec.max}
           step={spec.step}
           value={optimizerSel.hyper[spec.key] ?? spec.default}
-          style="--fill: {(((optimizerSel.hyper[spec.key] ?? spec.default) - spec.min) / (spec.max - spec.min)) * 100}%; --slider-color: {HYPER_COLORS[spec.key] ?? '#10b981'}"
+          style="--fill: {(((optimizerSel.hyper[spec.key] ?? spec.default) - spec.min) / (spec.max - spec.min)) * 100}%; --slider-color: {meta.color}"
           on:input={(e) => setHyper(spec.key, parseFloat(e.currentTarget.value))}
         />
       </div>

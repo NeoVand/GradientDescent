@@ -96,7 +96,7 @@ const MU_SPEC: HyperparamSpec = {
   max: 0.99,
   step: 0.01,
   default: 0.9,
-  hint: 'Fraction of the previous velocity kept each step. 0 = plain GD.'
+  hint: 'How much of the last step’s velocity carries into this one — inertia.<br/><span style="opacity:0.8;font-size:0.7rem">0 = plain gradient descent · 0.9 = heavy glide</span>'
 };
 
 export const gradientDescent: Optimizer = {
@@ -182,7 +182,7 @@ const RHO_SPEC: HyperparamSpec = {
   max: 0.999,
   step: 0.001,
   default: 0.9,
-  hint: 'How slowly the squared-gradient average forgets. Higher = smoother.'
+  hint: 'How long it remembers recent gradient sizes when scaling each parameter’s step.<br/><span style="opacity:0.8;font-size:0.7rem">Higher = smoother, steadier per-parameter rates</span>'
 };
 
 export const rmsprop: Optimizer = {
@@ -231,7 +231,7 @@ const ADADELTA_RHO: HyperparamSpec = {
   max: 0.999,
   step: 0.001,
   default: 0.95,
-  hint: 'How slowly both running averages — of squared gradients and squared updates — forget.'
+  hint: 'How long it remembers recent gradient and step sizes — it scales each move from both.<br/><span style="opacity:0.8;font-size:0.7rem">Higher = smoother, steadier rates</span>'
 };
 
 export const adadelta: Optimizer = {
@@ -272,7 +272,7 @@ const BETA1_SPEC: HyperparamSpec = {
   max: 0.999,
   step: 0.001,
   default: 0.9,
-  hint: 'EMA rate of the gradient (first moment).'
+  hint: 'How much past gradient direction is blended in — Adam’s momentum.<br/><span style="opacity:0.8;font-size:0.7rem">Higher = smoother, more inertia (0.9 is typical)</span>'
 };
 
 const BETA2_SPEC: HyperparamSpec = {
@@ -283,7 +283,7 @@ const BETA2_SPEC: HyperparamSpec = {
   max: 0.9999,
   step: 0.0001,
   default: 0.999,
-  hint: 'EMA rate of the squared gradient (second moment).'
+  hint: 'How steadily each parameter’s step size adapts to recent gradient sizes.<br/><span style="opacity:0.8;font-size:0.7rem">Higher = slower, smoother rate changes (0.999 is typical)</span>'
 };
 
 export const adam: Optimizer = {
@@ -381,7 +381,7 @@ const ADAMW_WD: HyperparamSpec = {
   max: 0.3,
   step: 0.005,
   default: 0.1,
-  hint: 'Decoupled pull toward the origin each step, applied outside the adaptive scaling. 0 = plain Adam.'
+  hint: 'A gentle pull of every parameter toward zero each step — discourages large weights.<br/><span style="opacity:0.8;font-size:0.7rem">0 = plain Adam · acts separately from the step scaling</span>'
 };
 
 export const adamw: Optimizer = {
@@ -569,7 +569,7 @@ const SOPHIA_BETA1: HyperparamSpec = {
   max: 0.999,
   step: 0.001,
   default: 0.9,
-  hint: 'EMA rate of the gradient (first moment).'
+  hint: 'How much past gradient direction is blended in — the momentum.<br/><span style="opacity:0.8;font-size:0.7rem">Higher = smoother, more inertia</span>'
 };
 
 const SOPHIA_RHO: HyperparamSpec = {
@@ -580,7 +580,7 @@ const SOPHIA_RHO: HyperparamSpec = {
   max: 2,
   step: 0.01,
   default: 0.5,
-  hint: 'Per-coordinate step cap. Small ρ = very cautious — Sophia’s guard against bad curvature estimates.'
+  hint: 'Caps how far any one step can move, so a bad curvature estimate can’t throw it off.<br/><span style="opacity:0.8;font-size:0.7rem">Smaller = more cautious</span>'
 };
 
 export const sophia: Optimizer = {
@@ -636,7 +636,7 @@ const LION_BETA1: HyperparamSpec = {
   max: 0.999,
   step: 0.001,
   default: 0.9,
-  hint: 'Momentum vs. fresh gradient that sets the step direction (only its sign is used).'
+  hint: 'Balances stored momentum against the fresh gradient to pick the step direction.<br/><span style="opacity:0.8;font-size:0.7rem">Lion then steps a fixed size along that direction’s sign</span>'
 };
 
 const LION_BETA2: HyperparamSpec = {
@@ -647,7 +647,7 @@ const LION_BETA2: HyperparamSpec = {
   max: 0.9999,
   step: 0.0001,
   default: 0.99,
-  hint: 'How slowly the momentum buffer forgets past gradients.'
+  hint: 'How long the momentum buffer remembers past gradients.<br/><span style="opacity:0.8;font-size:0.7rem">Higher = more inertia</span>'
 };
 
 export const lion: Optimizer = {
@@ -708,7 +708,7 @@ const PRODIGY_BETA1: HyperparamSpec = {
   max: 0.999,
   step: 0.001,
   default: 0.9,
-  hint: 'EMA rate of the gradient (first moment).'
+  hint: 'How much past gradient direction is blended in — the momentum.<br/><span style="opacity:0.8;font-size:0.7rem">Higher = smoother, more inertia</span>'
 };
 
 const PRODIGY_BETA2: HyperparamSpec = {
@@ -719,7 +719,7 @@ const PRODIGY_BETA2: HyperparamSpec = {
   max: 0.9999,
   step: 0.0001,
   default: 0.999,
-  hint: 'EMA rate of the squared gradient, and of the distance accumulators.'
+  hint: 'How steadily the step scaling adapts — Prodigy also uses it to size its auto learning rate.<br/><span style="opacity:0.8;font-size:0.7rem">Higher = smoother, slower changes</span>'
 };
 
 export const prodigy: Optimizer = {
