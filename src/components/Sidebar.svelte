@@ -902,7 +902,7 @@
         class="step-button"
         on:click={stepOnce}
         disabled={isTraining}
-        title="Single gradient step"
+        aria-label="Step forward"
       >
         <StepForward size={18} strokeWidth={2} />
       </button>
@@ -922,7 +922,7 @@
           {/if}
         </div>
       </button>
-      <button class="reset-button" on:click={resetRun} title="Reset">
+      <button class="reset-button" on:click={resetRun} aria-label="Reset run">
         <RotateCcw size={18} strokeWidth={2} />
       </button>
     </div>
@@ -1672,6 +1672,45 @@
     gap: 0.5rem;
     align-items: stretch;
     margin-top: 0.125rem;
+  }
+
+  /* Styled tooltips for the step / reset buttons (text = the button's
+     aria-label), shown above on hover or keyboard focus. The step tip is
+     left-anchored and the reset tip right-anchored so neither spills out of
+     the sidebar. */
+  .step-button,
+  .reset-button {
+    position: relative;
+  }
+  .step-button::after,
+  .reset-button::after {
+    content: attr(aria-label);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    padding: 0.3rem 0.55rem;
+    border-radius: 7px;
+    background: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+    opacity: 0;
+    transform: translateY(4px);
+    pointer-events: none;
+    transition: opacity 0.14s ease, transform 0.14s ease;
+    z-index: 100;
+  }
+  .step-button::after { left: 0; }
+  .reset-button::after { right: 0; }
+  .step-button:hover::after,
+  .step-button:focus-visible::after,
+  .reset-button:hover::after,
+  .reset-button:focus-visible::after {
+    opacity: 1;
+    transform: translateY(0);
   }
 
   .step-button {
