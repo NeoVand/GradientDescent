@@ -350,22 +350,21 @@ import CoursePanel from './components/CoursePanel.svelte';
     class="help-btn"
     class:tool-on={$courseStore.active}
     on:click={() => ($courseStore.active ? closeCourse() : startCourse())}
-    title="Course — ten predict-then-run lessons, from slopes to a tiny neural net"
+    aria-label="Guided course"
   >
     <Compass size={19} strokeWidth={2.5} />
   </button>
-  <button class="help-btn" class:tool-on={showSharePopover} on:click={toggleSharePopover} title="Share this exact scenario — or turn it into a challenge">
+  <button class="help-btn" class:tool-on={showSharePopover} on:click={toggleSharePopover} aria-label="Share scenario">
     <Share2 size={18} strokeWidth={2.5} />
   </button>
-  <button class="help-btn" on:click={() => showHelpModal = true} title="Help & Guide">
+  <button class="help-btn" on:click={() => showHelpModal = true} aria-label="Help & guide">
     <GraduationCap size={20} strokeWidth={2.5} />
   </button>
   <button
     class="help-btn"
     class:tool-on={isFullscreen}
     on:click={toggleFullscreen}
-    title={isFullscreen ? 'Exit full screen' : 'Full screen'}
-    aria-label={isFullscreen ? 'Exit full screen' : 'Enter full screen'}
+    aria-label={isFullscreen ? 'Exit full screen' : 'Full screen'}
   >
     {#if isFullscreen}
       <Minimize size={18} strokeWidth={2.5} />
@@ -373,7 +372,7 @@ import CoursePanel from './components/CoursePanel.svelte';
       <Maximize size={18} strokeWidth={2.5} />
     {/if}
   </button>
-  <button class="help-btn" on:click={() => themeStore.toggle()} title="Toggle theme">
+  <button class="help-btn" on:click={() => themeStore.toggle()} aria-label={theme === 'light' ? 'Dark mode' : 'Light mode'}>
     {#if theme === 'light'}
       <Moon size={20} strokeWidth={2.5} />
     {:else}
@@ -507,6 +506,7 @@ import CoursePanel from './components/CoursePanel.svelte';
   }
   
   .help-btn {
+    position: relative;
     width: 36px;
     height: 36px;
     border-radius: 50%;
@@ -519,7 +519,36 @@ import CoursePanel from './components/CoursePanel.svelte';
     padding: 0;
     box-shadow: none;
   }
-  
+
+  /* Styled tooltip above each tool button (the text is the button's aria-label).
+     Right-anchored so the rightmost button never spills past the screen edge. */
+  .help-btn::after {
+    content: attr(aria-label);
+    position: absolute;
+    bottom: calc(100% + 9px);
+    right: 0;
+    padding: 0.3rem 0.55rem;
+    border-radius: 7px;
+    background: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+    opacity: 0;
+    transform: translateY(4px);
+    pointer-events: none;
+    transition: opacity 0.14s ease, transform 0.14s ease;
+    z-index: 100;
+  }
+  .help-btn:hover::after,
+  .help-btn:focus-visible::after {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
   /* Light mode buttons */
   :global([data-theme='light']) .help-btn {
     background: rgba(255, 255, 255, 0.7);
