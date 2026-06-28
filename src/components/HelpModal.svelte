@@ -1024,6 +1024,16 @@
     'ch-noise': [
       { kind: 'wiki', label: 'Stochastic gradient descent', href: 'https://en.wikipedia.org/wiki/Stochastic_gradient_descent' },
       { kind: 'paper', label: 'Stochastic approximation — Robbins & Monro, 1951', href: 'https://doi.org/10.1214/aoms/1177729586' }
+    ],
+    'ch-optimizers': [
+      { kind: 'wiki', label: 'Condition number', href: 'https://en.wikipedia.org/wiki/Condition_number' },
+      { kind: 'paper', label: 'Why momentum really works — Goh, Distill 2017', href: 'https://distill.pub/2017/momentum/' },
+      { kind: 'paper', label: 'An overview of gradient-descent optimizers — Ruder, 2016', href: 'https://arxiv.org/abs/1609.04747' }
+    ],
+    'ch-generalize': [
+      { kind: 'wiki', label: 'Overfitting', href: 'https://en.wikipedia.org/wiki/Overfitting' },
+      { kind: 'paper', label: 'Sharp minima & the generalization gap — Keskar et al., 2017', href: 'https://arxiv.org/abs/1609.04836' },
+      { kind: 'paper', label: 'Early stopping (Deep Learning, §7.8) — Goodfellow et al., 2016', href: 'https://www.deeplearningbook.org/contents/regularization.html' }
     ]
   };
 </script>
@@ -1890,6 +1900,22 @@
                 reaches Adam, finally splits into the branches still being explored today. The
                 picker is grouped to match.
               </p>
+              <p>
+                That ravine has a precise name: <strong>ill-conditioning</strong>. A smooth bowl curves
+                at two rates — gently along its floor ({@html tex(String.raw`\lambda_{\min}`)}) and
+                steeply across it ({@html tex(String.raw`\lambda_{\max}`)}) — and their ratio is the
+                <strong>condition number</strong> {@html tex(String.raw`\kappa = \lambda_{\max}/\lambda_{\min}`)}.
+                A round bowl has {@html tex(String.raw`\kappa = 1`)} and one good step reaches the bottom;
+                a long, thin ravine has a huge {@html tex(String.raw`\kappa`)}, and that one number sets
+                how slowly you converge. Even with the best fixed step,
+                {@html tex(String.raw`\gamma = 2/(\lambda_{\min}+\lambda_{\max})`)}, each move closes the
+                gap to the minimum by only a factor {@html tex(String.raw`(\kappa-1)/(\kappa+1)`)} — which
+                creeps toward 1 as {@html tex(String.raw`\kappa`)} grows, so a stretched valley crawls no
+                matter how you tune {@html tex(String.raw`\gamma`)}. Momentum sharpens that to roughly
+                {@html tex(String.raw`(\sqrt{\kappa}-1)/(\sqrt{\kappa}+1)`)}, a
+                {@html tex(String.raw`\sqrt{\kappa}`)} speed-up — the first hint of why the whole family
+                below exists.
+              </p>
               <figure class="fig">
                 <svg class="fig-heat" viewBox="0 0 {ravineFig.W} {ravineFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
                   <defs>
@@ -2148,6 +2174,17 @@
                   <button class="try-btn" on:click={() => runExperiment(raceExperiment)}>
                     <Play size={13} strokeWidth={2.5} /><span>Race them on Rosenbrock</span>
                   </button>
+                </div>
+              {/if}
+              {#if chRefs['ch-optimizers']}
+                <div class="ch-refs">
+                  <span class="ch-refs-label">Further reading</span>
+                  {#each chRefs['ch-optimizers'] as r}
+                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
+                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
+                      {r.label}
+                    </a>
+                  {/each}
                 </div>
               {/if}
             </section>
