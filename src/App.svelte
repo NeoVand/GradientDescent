@@ -25,7 +25,8 @@ import CoursePanel from './components/CoursePanel.svelte';
     resetOptimizerState,
     courseStore,
     challengeStore,
-    selectedProblem
+    selectedProblem,
+    vizLayersStore
   } from './stores/stores';
   import { startTraining, stopTraining, stepOnce, resetRun, runEndStore, applyProblem } from './utils/trainer';
   import { startCourse, closeCourse } from './utils/lessons';
@@ -219,6 +220,24 @@ import CoursePanel from './components/CoursePanel.svelte';
         if (!$currentProblemConfig?.oneParam) {
           landscapeViewStore.set($landscapeViewStore === '2d' ? '3d' : '2d');
         }
+        break;
+      case 'a':
+      case 'A': {
+        // Toggle the −∇ℒ arrow field on the Loss & Gradient panel.
+        const f = get(vizLayersStore).field;
+        vizLayersStore.patch({ field: f === 'arrows' ? 'off' : 'arrows' });
+        break;
+      }
+      case 'f':
+      case 'F': {
+        // Toggle the streamline (flow) field.
+        const f = get(vizLayersStore).field;
+        vizLayersStore.patch({ field: f === 'streamlines' ? 'off' : 'streamlines' });
+        break;
+      }
+      case 'c':
+      case 'C':
+        vizLayersStore.patch({ contours: !get(vizLayersStore).contours });
         break;
       case 'ArrowLeft':
         e.preventDefault();
