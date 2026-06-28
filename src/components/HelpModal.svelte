@@ -2041,14 +2041,14 @@
                     {#each ravineFig.gdPts as p}<circle cx={p.x} cy={p.y} r="1.7" fill="#ffffff" stroke="#0a1218" stroke-opacity="0.55" stroke-width="0.7" />{/each}
                     {#each ravineFig.momPts as p}<circle cx={p.x} cy={p.y} r="2" fill="#c084fc" stroke="#0a1218" stroke-opacity="0.55" stroke-width="0.7" />{/each}
                     <circle cx={ravineFig.start.x} cy={ravineFig.start.y} r="4.2" fill="#f59e0b" stroke="#fff" stroke-width="1.3" />
-                    <g transform="translate(11,12)">
-                      <rect x="-5" y="-9" width="152" height="33" rx="6" fill="#ffffff" fill-opacity="0.86" stroke="#0f172a" stroke-opacity="0.14" stroke-width="0.6" />
+                    <g transform="translate(9,9)">
+                      <rect x="-4" y="-7" width="116" height="25" rx="5" fill="#ffffff" fill-opacity="0.86" stroke="#0f172a" stroke-opacity="0.14" stroke-width="0.5" />
                       <!-- GD swatch keeps its dark halo so the white line reads on the light panel -->
-                      <line x1="2" y1="0" x2="17" y2="0" stroke="#0a1218" stroke-opacity="0.5" stroke-width="3.6" stroke-linecap="round" />
-                      <line x1="2" y1="0" x2="17" y2="0" stroke="#ffffff" stroke-width="2" stroke-linecap="round" />
-                      <text x="22" y="3.5" class="fig-svg-label" style="text-anchor:start;fill:#1e293b">plain GD — zig-zags</text>
-                      <line x1="2" y1="15" x2="17" y2="15" stroke="#a855f7" stroke-width="2.6" stroke-linecap="round" />
-                      <text x="22" y="18.5" class="fig-svg-label" style="text-anchor:start;fill:#1e293b">momentum — glides</text>
+                      <line x1="1" y1="0" x2="12" y2="0" stroke="#0a1218" stroke-opacity="0.5" stroke-width="2.8" stroke-linecap="round" />
+                      <line x1="1" y1="0" x2="12" y2="0" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" />
+                      <text x="16" y="2.4" class="fig-svg-label" style="text-anchor:start;fill:#1e293b;font-size:8.5px">plain GD — zig-zags</text>
+                      <line x1="1" y1="11" x2="12" y2="11" stroke="#a855f7" stroke-width="2.1" stroke-linecap="round" />
+                      <text x="16" y="13.4" class="fig-svg-label" style="text-anchor:start;fill:#1e293b;font-size:8.5px">momentum — glides</text>
                     </g>
                   </g>
                 </svg>
