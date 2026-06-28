@@ -24,7 +24,7 @@
   import 'katex/dist/katex.min.css';
   import { rgb, geoPath } from 'd3';
   import { contours } from 'd3-contour';
-  import { interpolateViridis } from 'd3-scale-chromatic';
+  import { interpolateViridis, interpolateCubehelixDefault } from 'd3-scale-chromatic';
   import { experiments, chapterPresets } from '../utils/experiments';
   import { schedules, scheduleOrder } from '../utils/schedules';
   import { optimizers, optimizerOrder, defaultHyper, type OptimizerId } from '../utils/optimizers';
@@ -980,8 +980,10 @@
       return d + ` L ${sx(b).toFixed(1)},${PYb} Z`;
     };
     const mk = (x: number) => ({ x: sx(x), y: sy(L(x)) });
-    // 2-D saddle density (linear normalize — values straddle zero)
-    const SW = 176, SH = 126, gw = 60, gh = 44;
+    // 2-D saddle density (linear normalize — values straddle zero). A 4:3 panel
+    // so the square x²−y² domain doesn't read as squished, in the same cubehelix
+    // spectrum the ravine / landscape panels default to.
+    const SW = 190, SH = 143, gw = 60, gh = 44;
     const f = (x: number, y: number) => x * x - y * y;
     const vals: number[] = new Array(gw * gh);
     let vmin = Infinity, vmax = -Infinity;
@@ -992,7 +994,7 @@
     const canvas = document.createElement('canvas'); canvas.width = gw; canvas.height = gh;
     const ctx = canvas.getContext('2d')!; const img = ctx.createImageData(gw, gh);
     for (let k = 0; k < vals.length; k++) {
-      const col = rgb(interpolateViridis(1 - (vals[k] - vmin) / (vmax - vmin)));
+      const col = rgb(interpolateCubehelixDefault(1 - (vals[k] - vmin) / (vmax - vmin)));
       img.data[k * 4] = col.r; img.data[k * 4 + 1] = col.g; img.data[k * 4 + 2] = col.b; img.data[k * 4 + 3] = 220;
     }
     ctx.putImageData(img, 0, 0);
@@ -1000,11 +1002,21 @@
     const levels: number[] = []; for (let k = 1; k < 8; k++) levels.push(vmin + (k / 8) * (vmax - vmin));
     const toPath = geoPath();
     const saddleContours = contours().size([gw, gh]).thresholds(levels)(vals).map(poly => toPath(poly) ?? '');
+    // The little cross of slope arrows, centred and scaled to the panel: inward
+    // along x (downhill into the centre), outward along y (uphill out of it).
+    const cxS = SW / 2, cyS = SH / 2;
+    const hOut = SW * 0.19, hIn = SW * 0.095, vIn = SH * 0.14, vOut = SH * 0.265;
+    const saddleArrows = [
+      { x1: cxS + hOut, y1: cyS, x2: cxS + hIn, y2: cyS },
+      { x1: cxS - hOut, y1: cyS, x2: cxS - hIn, y2: cyS },
+      { x1: cxS, y1: cyS - vIn, x2: cxS, y2: cyS - vOut },
+      { x1: cxS, y1: cyS + vIn, x2: cxS, y2: cyS + vOut }
+    ];
     return {
       curveD, PYb, ridgeX: sx(ridge),
       leftBasin: areaPath(0, ridge), rightBasin: areaPath(ridge, 1),
       startA: mk(0.45), startB: mk(0.59), localMin: mk(0.30), globalMin: mk(0.74),
-      SW, SH, gw, gh, saddleURL, saddleContours
+      SW, SH, gw, gh, saddleURL, saddleContours, cxS, cyS, saddleArrows
     };
   })();
 
@@ -1382,7 +1394,7 @@
               </p>
 
               <figure class="fig">
-                <svg viewBox="0 0 460 176" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                <svg viewBox="0 0 460 188" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
                   <defs>
                     <marker id="shp-arw" viewBox="0 -5 10 10" refX="7.5" refY="0" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,-5L10,0L0,5" fill="var(--color-text-secondary)" /></marker>
                   </defs>
@@ -1399,17 +1411,16 @@
                   <text x={shapesFig.globalMin.x} y={shapesFig.globalMin.y + 16} class="fig-svg-label" style="fill:var(--color-text-tertiary)">global min</text>
                   <text x={shapesFig.ridgeX} y="16" class="fig-svg-label" style="fill:var(--color-text-tertiary)">ridge</text>
                   <!-- Panel B · a 2-D saddle (x²−y²) -->
-                  <g transform="translate(272,24)">
+                  <g transform="translate(262,28)">
                     <image href={shapesFig.saddleURL} x="0" y="0" width={shapesFig.SW} height={shapesFig.SH} preserveAspectRatio="none" />
                     <g transform="scale({shapesFig.SW / shapesFig.gw},{shapesFig.SH / shapesFig.gh})">
                       {#each shapesFig.saddleContours as d}<path d={d} fill="none" stroke="#fff" stroke-opacity="0.16" stroke-width="1" vector-effect="non-scaling-stroke" />{/each}
                     </g>
-                    <line x1="122" y1="63" x2="105" y2="63" stroke="var(--color-text-secondary)" stroke-width="1.7" marker-end="url(#shp-arw)" />
-                    <line x1="54" y1="63" x2="71" y2="63" stroke="var(--color-text-secondary)" stroke-width="1.7" marker-end="url(#shp-arw)" />
-                    <line x1="88" y1="45" x2="88" y2="28" stroke="var(--color-text-secondary)" stroke-width="1.7" marker-end="url(#shp-arw)" />
-                    <line x1="88" y1="81" x2="88" y2="98" stroke="var(--color-text-secondary)" stroke-width="1.7" marker-end="url(#shp-arw)" />
-                    <circle cx="88" cy="63" r="3.6" fill="#fff" stroke="#0a1218" stroke-width="1" />
-                    <text x="88" y={shapesFig.SH + 14} class="fig-svg-label" style="fill:var(--color-text-tertiary)">saddle point</text>
+                    {#each shapesFig.saddleArrows as a}
+                      <line x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} stroke="var(--color-text-secondary)" stroke-width="1.7" marker-end="url(#shp-arw)" />
+                    {/each}
+                    <circle cx={shapesFig.cxS} cy={shapesFig.cyS} r="3.6" fill="#fff" stroke="#0a1218" stroke-width="1" />
+                    <text x={shapesFig.cxS} y={shapesFig.SH + 14} class="fig-svg-label" style="fill:var(--color-text-tertiary)">saddle point</text>
                   </g>
                 </svg>
                 <figcaption class="fig-cap">
