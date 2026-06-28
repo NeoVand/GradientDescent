@@ -802,22 +802,35 @@
     }
 
     const start: Pt = { x: -1.02, y: 0.58 };
+    // Run long enough that the gentle (x) axis actually reaches the floor — both
+    // trajectories converge onto the minimum at the origin, not a hair short of it.
     const simGD = () => {
       const g = 1.72; let p = { ...start }; const out: Pt[] = [{ ...p }];
-      for (let k = 0; k < 34; k++) { p = { x: p.x - g * ax * p.x, y: p.y - g * ay * p.y }; out.push({ ...p }); }
+      for (let k = 0; k < 80; k++) { p = { x: p.x - g * ax * p.x, y: p.y - g * ay * p.y }; out.push({ ...p }); }
       return out;
     };
     const simMom = () => {
       const g = 0.6, mu = 0.86; let v = { x: 0, y: 0 }, p = { ...start }; const out: Pt[] = [{ ...p }];
-      for (let k = 0; k < 34; k++) { v = { x: mu * v.x + ax * p.x, y: mu * v.y + ay * p.y }; p = { x: p.x - g * v.x, y: p.y - g * v.y }; out.push({ ...p }); }
+      for (let k = 0; k < 82; k++) { v = { x: mu * v.x + ax * p.x, y: mu * v.y + ay * p.y }; p = { x: p.x - g * v.x, y: p.y - g * v.y }; out.push({ ...p }); }
       return out;
     };
     const toScreen = (arr: Pt[]) => arr.map(p => ({ x: sx(p.x), y: sy(p.y) }));
-    const gdPts = toScreen(simGD()), momPts = toScreen(simMom());
+    // The line traces every iterate; the dots are thinned by screen distance so
+    // they don't pile into a blob as the tiny end-steps crawl onto the minimum.
+    const decimate = (pts: Pt[], minD: number) => {
+      const out: Pt[] = [pts[0]]; let last = pts[0];
+      for (let i = 1; i < pts.length - 1; i++) {
+        if (Math.hypot(pts[i].x - last.x, pts[i].y - last.y) >= minD) { out.push(pts[i]); last = pts[i]; }
+      }
+      out.push(pts[pts.length - 1]);
+      return out;
+    };
+    const gdScreen = toScreen(simGD()), momScreen = toScreen(simMom());
     const path = (pts: Pt[]) => 'M ' + pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' L ');
     return { W, H, gw, gh, vals, visMin: vMin, visMax: vMax,
       domain: { x0: X0, x1: X1, y0: Y0, y1: Y1 }, grad, px: sx, py: sy,
-      gd: path(gdPts), mom: path(momPts), gdPts, momPts,
+      gd: path(gdScreen), mom: path(momScreen),
+      gdPts: decimate(gdScreen, 6.5), momPts: decimate(momScreen, 6.5),
       min: { x: sx(0), y: sy(0) }, start: { x: sx(start.x), y: sy(start.y) } };
   })();
 
