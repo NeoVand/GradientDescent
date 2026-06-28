@@ -28,6 +28,11 @@
   import { experiments, chapterPresets } from '../utils/experiments';
   import { schedules, scheduleOrder } from '../utils/schedules';
   import { optimizers, optimizerOrder, defaultHyper, type OptimizerId } from '../utils/optimizers';
+  import GuideVizLayers from './GuideVizLayers.svelte';
+  import {
+    tintGridURL, contourPathsFor, fieldArrows, streamlinesFor, colormapStops,
+    CONTOUR_N, FIELD_RES, GUIDE_VIZ_DEFAULT, type VizState
+  } from '../utils/guideViz';
 
   export let isOpen = false;
   export let onClose: () => void;
@@ -763,10 +768,12 @@
     const X0 = -1.18, X1 = 0.36, Y0 = -0.72, Y1 = 0.72;
     const ax = 0.05, ay = 1.0;            // gentle along x, steep across y
     const loss = (x: number, y: number) => 0.5 * (ax * x * x + ay * y * y);
+    const grad = (x: number, y: number): [number, number] => [ax * x, ay * y];
     const sx = (x: number) => ((x - X0) / (X1 - X0)) * W;
     const sy = (y: number) => ((Y1 - y) / (Y1 - Y0)) * H;
 
-    // density heatmap (log loss → reversed viridis, the app's look)
+    // Raw value grid (the heatmap, contours and field are derived reactively
+    // from this so the Layers control can re-tint / re-draw without a recompute).
     const gw = 124, gh = 42;
     const vals: number[] = new Array(gw * gh);
     let vMin = Infinity, vMax = -Infinity;
@@ -779,24 +786,6 @@
         if (v > vMax) vMax = v;
       }
     }
-    const EPS = 0.0006;
-    const lMin = Math.log(vMin + EPS), lMax = Math.log(vMax + EPS);
-    const canvas = document.createElement('canvas');
-    canvas.width = gw; canvas.height = gh;
-    const ctx = canvas.getContext('2d')!;
-    const img = ctx.createImageData(gw, gh);
-    for (let k = 0; k < vals.length; k++) {
-      const t = Math.min(1, Math.max(0, (Math.log(vals[k] + EPS) - lMin) / (lMax - lMin)));
-      const col = rgb(interpolateViridis(1 - t));
-      img.data[k * 4] = col.r; img.data[k * 4 + 1] = col.g; img.data[k * 4 + 2] = col.b; img.data[k * 4 + 3] = 217;
-    }
-    ctx.putImageData(img, 0, 0);
-    const heatURL = canvas.toDataURL();
-    const levels: number[] = [];
-    for (let k = 1; k < 9; k++) levels.push(Math.exp(lMin + (k / 9) * (lMax - lMin)) - EPS);
-    const toPath = geoPath();
-    const contourPaths = contours().size([gw, gh]).thresholds(levels)(vals)
-      .map((poly, idx) => ({ d: toPath(poly) ?? '', o: 0.1 + 0.02 * idx }));
 
     const start: Pt = { x: -1.02, y: 0.58 };
     const simGD = () => {
@@ -812,10 +801,26 @@
     const toScreen = (arr: Pt[]) => arr.map(p => ({ x: sx(p.x), y: sy(p.y) }));
     const gdPts = toScreen(simGD()), momPts = toScreen(simMom());
     const path = (pts: Pt[]) => 'M ' + pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' L ');
-    return { W, H, gw, gh, heatURL, contourPaths,
+    return { W, H, gw, gh, vals, visMin: vMin, visMax: vMax,
+      domain: { x0: X0, x1: X1, y0: Y0, y1: Y1 }, grad, px: sx, py: sy,
       gd: path(gdPts), mom: path(momPts), gdPts, momPts,
       min: { x: sx(0), y: sy(0) }, start: { x: sx(start.x), y: sy(start.y) } };
   })();
+
+  // ---- Reactive Layers state for the ravine figure ----
+  let ravineViz: VizState = { ...GUIDE_VIZ_DEFAULT };
+  const ravLogMin = Math.log(ravineFig.visMin + 0.001);
+  const ravLogMax = Math.log(ravineFig.visMax + 0.001);
+  $: ravHeat = tintGridURL(ravineFig.vals, ravineFig.gw, ravineFig.gh, ravLogMin, ravLogMax, ravineViz.colormap);
+  $: ravCont = ravineViz.contours
+    ? contourPathsFor(ravineFig.vals, ravineFig.gw, ravineFig.gh, ravLogMin, ravLogMax, CONTOUR_N[ravineViz.density])
+    : [];
+  $: ravArrows = ravineViz.field === 'arrows'
+    ? fieldArrows(ravineFig.grad, ravineFig.domain, { px: ravineFig.px, py: ravineFig.py }, FIELD_RES[ravineViz.density])
+    : [];
+  $: ravFlow = ravineViz.field === 'streamlines'
+    ? streamlinesFor(ravineFig.grad, ravineFig.domain, { px: ravineFig.px, py: ravineFig.py }, FIELD_RES[ravineViz.density])
+    : [];
 
   // 3) The noise ball — SGD orbits the minimum in a cloud whose radius scales
   // with γ; decay γ and the cloud closes to a point. Deterministic scatter so
@@ -1986,20 +1991,24 @@
                 below exists.
               </p>
               <figure class="fig">
+                <div class="fig-viz">
                 <svg class="fig-heat" viewBox="0 0 {ravineFig.W} {ravineFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
                   <defs>
                     <clipPath id="ravine-clip"><rect x="0" y="0" width={ravineFig.W} height={ravineFig.H} /></clipPath>
                     <clipPath id="ravine-contour-clip"><rect x="1.5" y="1.5" width={ravineFig.W - 3} height={ravineFig.H - 3} /></clipPath>
+                    <marker id="ravine-arrow" viewBox="0 -5 10 10" refX="7" refY="0" markerWidth="4" markerHeight="4" orient="auto"><path d="M0,-5L10,0L0,5" fill="#cdd9f2" /></marker>
                   </defs>
                   <g clip-path="url(#ravine-clip)">
-                    <image href={ravineFig.heatURL} x="0" y="0" width={ravineFig.W} height={ravineFig.H} preserveAspectRatio="none" />
+                    <image href={ravHeat} x="0" y="0" width={ravineFig.W} height={ravineFig.H} preserveAspectRatio="none" />
                     <g clip-path="url(#ravine-contour-clip)">
                       <g transform="scale({ravineFig.W / ravineFig.gw}, {ravineFig.H / ravineFig.gh})">
-                        {#each ravineFig.contourPaths as cp}
+                        {#each ravCont as cp}
                           <path d={cp.d} fill="none" stroke="#fff" stroke-opacity={cp.o} stroke-width="1" vector-effect="non-scaling-stroke" />
                         {/each}
                       </g>
                     </g>
+                    {#each ravFlow as d}<path d={d} fill="none" stroke="#cdd9f2" stroke-width="0.9" stroke-opacity="0.5" />{/each}
+                    {#each ravArrows as a}<line x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} stroke="#cdd9f2" stroke-width={a.w} opacity={a.o} marker-end="url(#ravine-arrow)" />{/each}
                     <circle cx={ravineFig.min.x} cy={ravineFig.min.y} r="5" fill="none" stroke="#34d399" stroke-width="1.8" stroke-dasharray="3,2.5" />
                     <!-- dark halos so the trajectories read on any colour -->
                     <path d={ravineFig.gd} fill="none" stroke="#0a1218" stroke-opacity="0.55" stroke-width="3.8" stroke-linejoin="round" stroke-linecap="round" />
@@ -2018,6 +2027,14 @@
                     </g>
                   </g>
                 </svg>
+                <GuideVizLayers state={ravineViz} onpatch={(p) => (ravineViz = { ...ravineViz, ...p })} />
+                <div class="fig-cbar">
+                  <span class="fig-cbar-lbl">loss</span>
+                  <span class="fig-cbar-val">{ravineFig.visMax.toFixed(2)}</span>
+                  <div class="fig-cbar-bar" style="background: linear-gradient(to bottom, {colormapStops(ravineViz.colormap)});"></div>
+                  <span class="fig-cbar-val">{ravineFig.visMin.toFixed(2)}</span>
+                </div>
+                </div>
                 <figcaption class="fig-cap">
                   The ravine: a valley far steeper across than along. One safe step size makes plain GD
                   (white) rattle wall to wall while it crawls along the floor; momentum (violet) builds
@@ -2821,6 +2838,23 @@
     border-radius: 12px;
   }
   .fig > svg { padding: 0.4rem; }
+  /* Layered landscape figures (ravine, race): a relative frame holding the SVG,
+     the Layers popover, and the loss colorbar. */
+  .fig-viz {
+    position: relative;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .fig-viz > svg { display: block; width: 100%; }
+  .fig-cbar {
+    position: absolute; right: 9px; bottom: 9px; z-index: 4;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    pointer-events: none;
+  }
+  .fig-cbar-lbl { font-size: 8.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #e2e8f0; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7); }
+  .fig-cbar-val { font-size: 9px; font-weight: 600; color: #e2e8f0; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7); }
+  .fig-cbar-bar { width: 8px; height: 46px; border-radius: 2px; border: 1px solid rgba(255, 255, 255, 0.32); }
   .fig-triptych {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
