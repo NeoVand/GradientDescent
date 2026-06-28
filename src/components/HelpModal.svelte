@@ -18,7 +18,7 @@
     Target, Radio, ScatterChart, Brain,
     Compass, Rocket, Zap,
     BookOpen, FlaskConical, Layers, Map, Play, Pause, RotateCcw, Keyboard,
-    FileText
+    FileText, MountainSnow, TrendingUpDown
   } from 'lucide-svelte';
   import katex from 'katex';
   import 'katex/dist/katex.min.css';
@@ -79,6 +79,7 @@
     { part: 'Part I · The landscape' },
     { id: 'ch-bowl', n: '1', title: 'The bottom of a bowl' },
     { id: 'ch-landscape', n: '2', title: 'Loss is a landscape' },
+    { id: 'ch-shapes', n: '3', title: 'When the bowl isn’t a bowl' },
     { part: 'Part II · Walking downhill' },
     { id: 'ch-downhill', n: '3', title: 'Which way is downhill?' },
     { id: 'ch-step', n: '4', title: 'One step of descent' },
@@ -927,10 +928,61 @@
     return { W, H, edges, merges, nodes };
   })();
 
+  // 7) The shape of the landscape. Left: a 1-D loss with a shallow local min and
+  // a deep global min split by a ridge — two starts on either side roll to
+  // different basins. Right: a 2-D saddle (x²−y²) as a density, where −∇f flows
+  // IN along one axis and OUT along the other.
+  const shapesFig = (() => {
+    const PX0 = 16, PX1 = 244, PYt = 24, PYb = 150, Lmin = 0.1, Lmax = 0.86;
+    const L = (x: number) => 0.78
+      - 0.34 * Math.exp(-((x - 0.30) ** 2) / (2 * 0.055 ** 2))
+      - 0.60 * Math.exp(-((x - 0.74) ** 2) / (2 * 0.062 ** 2));
+    const sx = (x: number) => PX0 + x * (PX1 - PX0);
+    const sy = (v: number) => PYb - ((v - Lmin) / (Lmax - Lmin)) * (PYb - PYt);
+    const pts: Pt[] = [];
+    for (let i = 0; i <= 150; i++) { const x = i / 150; pts.push({ x: sx(x), y: sy(L(x)) }); }
+    const curveD = 'M ' + pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' L ');
+    let ridge = 0.52, best = -Infinity;
+    for (let x = 0.42; x <= 0.64; x += 0.001) { const v = L(x); if (v > best) { best = v; ridge = x; } }
+    const areaPath = (a: number, b: number) => {
+      let d = `M ${sx(a).toFixed(1)},${PYb}`;
+      for (let i = 0; i <= 90; i++) { const x = a + (b - a) * (i / 90); d += ` L ${sx(x).toFixed(1)},${sy(L(x)).toFixed(1)}`; }
+      return d + ` L ${sx(b).toFixed(1)},${PYb} Z`;
+    };
+    const mk = (x: number) => ({ x: sx(x), y: sy(L(x)) });
+    // 2-D saddle density (linear normalize — values straddle zero)
+    const SW = 176, SH = 126, gw = 60, gh = 44;
+    const f = (x: number, y: number) => x * x - y * y;
+    const vals: number[] = new Array(gw * gh);
+    let vmin = Infinity, vmax = -Infinity;
+    for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+      const v = f(-1 + 2 * ((i + 0.5) / gw), 1 - 2 * ((j + 0.5) / gh));
+      vals[j * gw + i] = v; if (v < vmin) vmin = v; if (v > vmax) vmax = v;
+    }
+    const canvas = document.createElement('canvas'); canvas.width = gw; canvas.height = gh;
+    const ctx = canvas.getContext('2d')!; const img = ctx.createImageData(gw, gh);
+    for (let k = 0; k < vals.length; k++) {
+      const col = rgb(interpolateViridis(1 - (vals[k] - vmin) / (vmax - vmin)));
+      img.data[k * 4] = col.r; img.data[k * 4 + 1] = col.g; img.data[k * 4 + 2] = col.b; img.data[k * 4 + 3] = 220;
+    }
+    ctx.putImageData(img, 0, 0);
+    const saddleURL = canvas.toDataURL();
+    const levels: number[] = []; for (let k = 1; k < 8; k++) levels.push(vmin + (k / 8) * (vmax - vmin));
+    const toPath = geoPath();
+    const saddleContours = contours().size([gw, gh]).thresholds(levels)(vals).map(poly => toPath(poly) ?? '');
+    return {
+      curveD, PYb, ridgeX: sx(ridge),
+      leftBasin: areaPath(0, ridge), rightBasin: areaPath(ridge, 1),
+      startA: mk(0.45), startB: mk(0.59), localMin: mk(0.30), globalMin: mk(0.74),
+      SW, SH, gw, gh, saddleURL, saddleContours
+    };
+  })();
+
   const chIcon: Record<string, any> = {
-    'ch-bowl': BookOpen, 'ch-landscape': Mountain, 'ch-downhill': TrendingDown,
+    'ch-bowl': BookOpen, 'ch-landscape': Mountain, 'ch-shapes': MountainSnow,
+    'ch-downhill': TrendingDown,
     'ch-step': Compass, 'ch-gamma': Zap, 'ch-optimizers': Rocket, 'ch-noise': Waves,
-    'ch-schedule': Activity,
+    'ch-schedule': Activity, 'ch-generalize': TrendingUpDown,
     'ch-problems': Layers, 'ch-experiments': FlaskConical, 'ch-panels': Map, 'ch-keys': Keyboard
   };
 
@@ -941,7 +993,13 @@
   const chRefs: Record<string, ChRef[]> = {
     'ch-bowl': [
       { kind: 'wiki', label: 'Mathematical optimization', href: 'https://en.wikipedia.org/wiki/Mathematical_optimization' },
-      { kind: 'wiki', label: 'Mean squared error', href: 'https://en.wikipedia.org/wiki/Mean_squared_error' }
+      { kind: 'wiki', label: 'Mean squared error', href: 'https://en.wikipedia.org/wiki/Mean_squared_error' },
+      { kind: 'wiki', label: 'Cross-entropy', href: 'https://en.wikipedia.org/wiki/Cross-entropy' }
+    ],
+    'ch-shapes': [
+      { kind: 'wiki', label: 'Maxima and minima', href: 'https://en.wikipedia.org/wiki/Maxima_and_minima' },
+      { kind: 'wiki', label: 'Saddle point', href: 'https://en.wikipedia.org/wiki/Saddle_point' },
+      { kind: 'paper', label: 'Saddle points in high dimensions — Dauphin et al., 2014', href: 'https://arxiv.org/abs/1406.2572' }
     ],
     'ch-landscape': [
       { kind: 'wiki', label: 'Level set', href: 'https://en.wikipedia.org/wiki/Level_set' },
@@ -1215,7 +1273,111 @@
               {/if}
             </section>
 
-            <!-- ============== 3 · WHICH WAY IS DOWNHILL ============== -->
+            <!-- ============== 3 · WHEN THE BOWL ISN'T A BOWL ============== -->
+            <section data-ch="ch-shapes" id="ch-shapes">
+              <h3><svelte:component this={chIcon['ch-shapes']} size={18} strokeWidth={2} /> When the bowl isn’t a bowl</h3>
+
+              <p>
+                So far the landscape has been one tidy bowl with a single lowest point. That is the
+                exception, not the rule. A real loss surface can ripple with many dips, rise into
+                ridges, and stretch into near-flat plains — and each of those features changes what
+                gradient descent does.
+              </p>
+              <p>
+                A dip lower than everything around it is a <strong>local minimum</strong>; the single
+                lowest dip anywhere is the <strong>global minimum</strong> — the answer we actually want.
+                Gradient descent only ever feels the slope <em>under its feet</em>, so it cannot tell the
+                two apart: it rolls into whatever valley it is already in and stops. Each minimum owns a
+                <strong>basin of attraction</strong> — the starting points that drain into it — and the
+                ridge between two basins is the watershed. That is why <em>where you start</em> can matter
+                as much as how you step: move the first guess across a ridge and the run ends somewhere
+                else entirely, which is what makes <strong>initialization</strong> a real design choice.
+              </p>
+
+              <figure class="fig">
+                <svg viewBox="0 0 460 176" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                  <defs>
+                    <marker id="shp-arw" viewBox="0 -5 10 10" refX="7.5" refY="0" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,-5L10,0L0,5" fill="var(--color-text-secondary)" /></marker>
+                  </defs>
+                  <!-- Panel A · a 1-D landscape with two basins -->
+                  <path d={shapesFig.leftBasin} fill="#f59e0b" opacity="0.1" />
+                  <path d={shapesFig.rightBasin} fill="#10b981" opacity="0.1" />
+                  <line x1={shapesFig.ridgeX} y1="22" x2={shapesFig.ridgeX} y2={shapesFig.PYb} class="fig-contour" style="stroke-opacity:0.35" stroke-dasharray="3,3" />
+                  <path d={shapesFig.curveD} fill="none" stroke="var(--color-text-secondary)" stroke-width="2" stroke-linejoin="round" />
+                  <circle cx={shapesFig.localMin.x} cy={shapesFig.localMin.y} r="3" fill="#f59e0b" />
+                  <circle cx={shapesFig.globalMin.x} cy={shapesFig.globalMin.y} r="3" fill="#10b981" />
+                  <circle cx={shapesFig.startA.x} cy={shapesFig.startA.y} r="4" fill="#f59e0b" stroke="#fff" stroke-width="1.2" />
+                  <circle cx={shapesFig.startB.x} cy={shapesFig.startB.y} r="4" fill="#10b981" stroke="#fff" stroke-width="1.2" />
+                  <text x={shapesFig.localMin.x} y={shapesFig.localMin.y + 16} class="fig-svg-label" style="fill:var(--color-text-tertiary)">local min</text>
+                  <text x={shapesFig.globalMin.x} y={shapesFig.globalMin.y + 16} class="fig-svg-label" style="fill:var(--color-text-tertiary)">global min</text>
+                  <text x={shapesFig.ridgeX} y="16" class="fig-svg-label" style="fill:var(--color-text-tertiary)">ridge</text>
+                  <!-- Panel B · a 2-D saddle (x²−y²) -->
+                  <g transform="translate(272,24)">
+                    <image href={shapesFig.saddleURL} x="0" y="0" width={shapesFig.SW} height={shapesFig.SH} preserveAspectRatio="none" />
+                    <g transform="scale({shapesFig.SW / shapesFig.gw},{shapesFig.SH / shapesFig.gh})">
+                      {#each shapesFig.saddleContours as d}<path d={d} fill="none" stroke="#fff" stroke-opacity="0.16" stroke-width="1" vector-effect="non-scaling-stroke" />{/each}
+                    </g>
+                    <line x1="122" y1="63" x2="105" y2="63" stroke="var(--color-text-secondary)" stroke-width="1.7" marker-end="url(#shp-arw)" />
+                    <line x1="54" y1="63" x2="71" y2="63" stroke="var(--color-text-secondary)" stroke-width="1.7" marker-end="url(#shp-arw)" />
+                    <line x1="88" y1="45" x2="88" y2="28" stroke="var(--color-text-secondary)" stroke-width="1.7" marker-end="url(#shp-arw)" />
+                    <line x1="88" y1="81" x2="88" y2="98" stroke="var(--color-text-secondary)" stroke-width="1.7" marker-end="url(#shp-arw)" />
+                    <circle cx="88" cy="63" r="3.6" fill="#fff" stroke="#0a1218" stroke-width="1" />
+                    <text x="88" y={shapesFig.SH + 14} class="fig-svg-label" style="fill:var(--color-text-tertiary)">saddle point</text>
+                  </g>
+                </svg>
+                <figcaption class="fig-cap">
+                  Left: a 1-D loss with a shallow local minimum and a deep global one, split by a ridge —
+                  the amber start drains into the shallow basin, the emerald start (just across the ridge)
+                  into the deep one. Right: a 2-D saddle, downhill <em>into</em> the centre along one axis
+                  and <em>out</em> along the other — the gradient is zero there, yet it is no minimum.
+                </figcaption>
+              </figure>
+
+              <p>
+                There is a subtler trap than a local minimum. A <strong>saddle point</strong> is a spot
+                where the ground curves <em>down</em> one way and <em>up</em> another — a mountain pass.
+                The gradient there is zero, exactly as at a minimum
+                ({@html tex(String.raw`\nabla\mathcal{L} = \mathbf{0}`)}), so a method that watches only
+                the slope can grind almost to a halt even though one step sideways would keep it falling.
+                Broad, gentle <strong>plateaus</strong>, where the gradient nearly vanishes, slow a run the
+                same way — more quietly.
+              </p>
+              <p>
+                In two dimensions, bad local minima look like the main hazard. In the millions of
+                dimensions a real model lives in, the reverse holds: critical points are
+                <em>overwhelmingly</em> saddles, and almost every true minimum sits close to the global
+                one in value. The hard part of training a large network is escaping saddles and plateaus,
+                not dodging bad valleys — a finding (Dauphin et al., 2014) that reshaped how the field
+                thinks about non-convex optimization.
+              </p>
+              <p>
+                This is the backdrop for Part III. Plain descent stalls on saddles, crawls across
+                plateaus, and settles in the first basin it finds. The momentum, noise, and curvature
+                tricks ahead are, in large part, ways to keep moving when the slope alone is no longer
+                enough to go on.
+              </p>
+              {#if chapterPresets['ch-shapes']}
+                <div class="opt-cta">
+                  <span>Try it live:</span>
+                  <button class="try-btn" on:click={() => runPreset('ch-shapes')}>
+                    <Play size={13} strokeWidth={2.5} /><span>{chapterPresets['ch-shapes'].title}</span>
+                  </button>
+                </div>
+              {/if}
+              {#if chRefs['ch-shapes']}
+                <div class="ch-refs">
+                  <span class="ch-refs-label">Further reading</span>
+                  {#each chRefs['ch-shapes'] as r}
+                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
+                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
+                      {r.label}
+                    </a>
+                  {/each}
+                </div>
+              {/if}
+            </section>
+
+            <!-- ============== 4 · WHICH WAY IS DOWNHILL ============== -->
             <section data-ch="ch-downhill" id="ch-downhill">
               <div class="part-label">Part II · Walking downhill</div>
               <h3><svelte:component this={chIcon['ch-downhill']} size={18} strokeWidth={2} /> Which way is downhill?</h3>
@@ -2044,7 +2206,7 @@
               <h3><svelte:component this={chIcon['ch-panels']} size={18} strokeWidth={2} /> Reading the panels</h3>
               <ul class="viz-list">
                 <li><strong>Data plot</strong> — the data points and the current model. For curve fits, blue solid is the current fit and green dashed is the truth. For 2D problems, the orange marker shows your parameters directly on the plot.</li>
-                <li><strong>Loss &amp; Gradient</strong> — the landscape from Chapter 2: bright = low loss, white contours join equal-loss points, and the field arrows are −∇ℒ. On the marker, the <span class="ink-blue">blue arrow</span> is steepest descent and the <span class="ink-red">red arrow</span> is the step actually taken (Chapters 3–4). Drag the marker to teleport.</li>
+                <li><strong>Loss &amp; Gradient</strong> — the loss landscape seen from above: bright = low loss, white contours join equal-loss points, and the field arrows are −∇ℒ. On the marker, the <span class="ink-blue">blue arrow</span> is steepest descent and the <span class="ink-red">red arrow</span> is the step actually taken. Drag the marker to teleport.</li>
                 <li><strong>Loss History</strong> — train and test loss versus step. A clean decline is healthy; spikes mean you’re overshooting (too much γ or μ); a persistent train/test gap hints at overfitting.</li>
               </ul>
             </section>

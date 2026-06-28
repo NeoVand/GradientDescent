@@ -192,6 +192,21 @@ export const experiments: Experiment[] = [
  * the guide looks these up by chapter id.
  */
 export const chapterPresets: Record<string, Experiment> = {
+  'ch-shapes': {
+    id: 'preset-shapes',
+    title: 'Fall into a local minimum',
+    blurb: '',
+    apply() {
+      applyProblem('double-well-1d');
+      applyOptimizer('gd');
+      startTraining();
+      showCoach(
+        'info',
+        'Two valleys, one deeper than the other. Gradient descent only feels the local slope, so it settles into whichever basin it started in — hit Reset then Train a few times and watch where you start decide where you land.',
+        16000
+      );
+    }
+  },
   'ch-bowl': {
     id: 'preset-bowl',
     title: 'Roll into the bowl',
