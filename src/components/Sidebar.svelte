@@ -401,13 +401,14 @@
   // reads the same way (keying by `key` mislabels e.g. Lion's β₂ or Sophia's ρ).
   //   • momentum / inertia  → gauge, violet
   //   • adaptive scale (RMS)→ resize, teal
-  //   • direction blend     → blend, violet (still a momentum thing)
+  //   • direction blend     → blend, blue (its own hue: Lion pairs it with
+  //                           momentum decay, so they must not both read violet)
   //   • weight decay        → magnet (pull to origin), amber
   //   • step clip           → scissors, rose
   const HYPER_META: Record<string, { icon: any; color: string }> = {
     'Momentum':        { icon: Gauge,    color: '#a855f7' },
     'Momentum decay':  { icon: Gauge,    color: '#a855f7' },
-    'Direction blend': { icon: Blend,    color: '#a855f7' },
+    'Direction blend': { icon: Blend,    color: '#60a5fa' },
     'Decay':           { icon: Scaling,  color: '#14b8a6' },
     'Scale decay':     { icon: Scaling,  color: '#14b8a6' },
     'Weight decay':    { icon: Magnet,   color: '#f59e0b' },
