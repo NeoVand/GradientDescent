@@ -99,7 +99,10 @@
   // changes — cheap (one 110² canvas), no grid/field recompute.
   $: heatURL = scene ? gridToImageURL(scene.grid, layers.colormap) : '';
   $: legendStops = colormapStops(layers.colormap);
-  const DENSITY_RES: Record<FieldDensity, number> = { sparse: 15, normal: 23, dense: 33 };
+  // Only two settings are exposed (Low → normal, High → dense); 'sparse' is kept
+  // for the type/guide but unreachable here. Low = the old medium, High = a touch
+  // denser than the old high.
+  const DENSITY_RES: Record<FieldDensity, number> = { sparse: 15, normal: 23, dense: 38 };
   const COLORMAPS: Colormap[] = ['viridis', 'magma', 'inferno', 'plasma', 'cividis', 'cubehelix'];
   let showLayers = false;
   let layersBtn: HTMLButtonElement;
@@ -814,7 +817,7 @@
     if (!scene || layers.field !== 'streamlines' || !problemConfig) return;
     const range = parameterRange;
     const span = range.max - range.min;
-    const sepDiv = ({ sparse: 20, normal: 30, dense: 55 } as Record<FieldDensity, number>)[layers.density] ?? 30;
+    const sepDiv = ({ sparse: 20, normal: 30, dense: 64 } as Record<FieldDensity, number>)[layers.density] ?? 30;
 
     const cfg = problemConfig;
     const data = trainData;
@@ -1352,8 +1355,7 @@
                 <div class="lp-row">
                   <span class="lp-label">Density</span>
                   <div class="lp-seg">
-                    <button class:on={layers.density === 'sparse'} on:click={() => vizLayersStore.patch({ density: 'sparse' })}>Low</button>
-                    <button class:on={layers.density === 'normal'} on:click={() => vizLayersStore.patch({ density: 'normal' })}>Med</button>
+                    <button class:on={layers.density !== 'dense'} on:click={() => vizLayersStore.patch({ density: 'normal' })}>Low</button>
                     <button class:on={layers.density === 'dense'} on:click={() => vizLayersStore.patch({ density: 'dense' })}>High</button>
                   </div>
                 </div>

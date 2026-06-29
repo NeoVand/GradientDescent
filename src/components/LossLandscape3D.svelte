@@ -53,14 +53,16 @@
 
   // Field sampling resolution per density (the draped field is recomputed at
   // this resolution, decoupled from the cached scene — same idea as the 2D view).
-  const FIELD_RES_3D: Record<FieldDensity, number> = { sparse: 11, normal: 16, dense: 24 };
+  // Only Low/High are exposed (Low → normal, High → dense). 3D reads far sparser
+  // than 2D at equal res, so both tiers are pushed up: Low matches the old 3D
+  // "High", and High is denser still.
+  const FIELD_RES_3D: Record<FieldDensity, number> = { sparse: 11, normal: 24, dense: 34 };
   import { runStartStep } from '../utils/trainer';
 
   // Visualization layers, kept in sync with the 2D view via vizLayersStore.
   let cmap: Colormap = get(vizLayersStore).colormap;
   let layers3d = get(vizLayersStore);
-  let vectorField3d: THREE.LineSegments | null = null;
-  let vectorField3dHeads: THREE.Mesh | null = null;
+  let vectorField3d: THREE.LineSegments | THREE.Mesh | null = null;
 
   // Basins of attraction: when on, the surface is colored by WHICH minimum
   // plain GD reaches from each point (categorical palette) instead of the
@@ -305,12 +307,6 @@
       (vectorField3d.material as THREE.Material).dispose();
       vectorField3d = null;
     }
-    if (vectorField3dHeads) {
-      scene3.remove(vectorField3dHeads);
-      vectorField3dHeads.geometry.dispose();
-      (vectorField3dHeads.material as THREE.Material).dispose();
-      vectorField3dHeads = null;
-    }
     if (!currentScene || layers3d.field === 'off') return;
 
     // Recompute from the live config/data (not the cached scene field) so the
@@ -326,13 +322,11 @@
     const c: [number, number, number] = [0.86, 0.91, 1.0];
     const LIFT = 0.012;
 
-    const verts: number[] = [];
-    const cols: number[] = [];
-    const headVerts: number[] = []; // arrowhead triangles (arrows only)
-
     if (layers3d.field === 'streamlines') {
       // Flowing draped lines (evenly-spaced, Jobard–Lefebvre), colored
       // dim → bright downhill so the flow direction reads from any angle.
+      const verts: number[] = [];
+      const cols: number[] = [];
       for (const line of buildStreamlines3d(config, trainData, range)) {
         const last = line.length - 1;
         for (let i = 0; i < last; i++) {
@@ -344,89 +338,86 @@
           cols.push(c[0] * f0, c[1] * f0, c[2] * f0, c[0] * f1, c[1] * f1, c[2] * f1);
         }
       }
-    } else {
-      // Arrows: a short downhill segment at each field sample, length ∝ |∇|.
-      // Blue-noise placement (utils/poisson) — even spread, no grid rows.
-      const span = range.max - range.min;
-      const res = FIELD_RES_3D[layers3d.density] ?? 16;
-      let maxMag = 0;
-      const arrows = poissonDiskSample(range.min, range.max, span / res).map(p => {
-        const gr = config.computeGradient(trainData, { a: p.x, b: p.y });
-        const mag = Math.hypot(gr.a, gr.b);
-        if (Number.isFinite(mag) && mag > maxMag) maxMag = mag;
-        return { a: p.x, b: p.y, ga: gr.a, gb: gr.b, mag };
+      if (!verts.length) return;
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
+      geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(cols), 3));
+      const mat = new THREE.LineBasicMaterial({
+        vertexColors: true, transparent: true, opacity: 0.95, depthTest: true, depthWrite: false
       });
-      const LEN = 0.09;
-      // A proper arrow: a shaft line plus a FIXED-SIZE solid triangle head
-      // draped on the surface. Fixed size (not scaled by magnitude) keeps every
-      // head identical and clean, like the 2D marker; only the shaft length
-      // carries the magnitude. The head is clamped on tiny arrows so it never
-      // outruns its shaft.
-      const HEAD_LEN = 0.026; // arrowhead length, world units
-      const HEAD_W = 0.017; // arrowhead half-width, world units
-      const dim: [number, number, number] = [c[0] * 0.5, c[1] * 0.5, c[2] * 0.5];
-      const surfY = (x: number, z: number) => {
-        const q = fromXZ(x, z);
-        return heightAt(q.a, q.b) + LIFT + 0.003;
-      };
-      for (const ar of arrows) {
-        const d = dirVec(-ar.ga, -ar.gb);
-        if (!d) continue;
-        const norm = maxMag > 0 ? ar.mag / maxMag : 0;
-        const len = LEN * (0.12 + 0.88 * norm); // flat = tiny, steep = bold
-        const x0 = toX(ar.a), z0 = toZ(ar.b);
-        const xt = x0 + d.x * len, zt = z0 + d.z * len;
-        // Head dimensions (shrunk together if the shaft is shorter than a head).
-        const hl = Math.min(HEAD_LEN, len * 0.7);
-        const hw = HEAD_W * (hl / HEAD_LEN);
-        const bx = xt - d.x * hl, bz = zt - d.z * hl; // base centre of the head
-        // Shaft: origin → head base. Every vertex (shaft AND head) is draped to
-        // the surface with the same surfY, so the shaft meets the head instead
-        // of floating at the origin's height on a slope.
-        verts.push(x0, surfY(x0, z0), z0, bx, surfY(bx, bz), bz);
-        cols.push(dim[0], dim[1], dim[2], c[0], c[1], c[2]); // base dim → tip bright
-        // Solid triangle head: tip + two base corners, each draped to the surface.
-        const px = -d.z, pz = d.x; // perpendicular to d in the (x,z) plane
-        const lx = bx + px * hw, lz = bz + pz * hw;
-        const rx = bx - px * hw, rz = bz - pz * hw;
-        headVerts.push(
-          xt, surfY(xt, zt), zt,
-          lx, surfY(lx, lz), lz,
-          rx, surfY(rx, rz), rz
-        );
-      }
+      vectorField3d = new THREE.LineSegments(geo, mat);
+      vectorField3d.renderOrder = 7;
+      scene3.add(vectorField3d);
+      return;
     }
 
-    if (!verts.length) return;
+    // Arrows: a flat-ribbon shaft + a solid triangle head, both draped on the
+    // surface — so they read like the 2D arrows (a visible tail with width, not
+    // a 1px WebGL line). Blue-noise placement (utils/poisson); shaft length ∝ |∇|.
+    const span = range.max - range.min;
+    const res = FIELD_RES_3D[layers3d.density] ?? 16;
+    let maxMag = 0;
+    const arrows = poissonDiskSample(range.min, range.max, span / res).map(p => {
+      const gr = config.computeGradient(trainData, { a: p.x, b: p.y });
+      const mag = Math.hypot(gr.a, gr.b);
+      if (Number.isFinite(mag) && mag > maxMag) maxMag = mag;
+      return { a: p.x, b: p.y, ga: gr.a, gb: gr.b, mag };
+    });
+    const LEN = 0.09;
+    // Fixed-size head (only the shaft length carries magnitude), shrunk on tiny
+    // arrows so it never outruns its shaft. Slightly smaller than before.
+    const HEAD_LEN = 0.021; // arrowhead length, world units
+    const HEAD_W = 0.013; // arrowhead half-width, world units
+    const SHAFT_HW = 0.005; // shaft ribbon half-width — the visible tail
+    const dim: [number, number, number] = [c[0] * 0.5, c[1] * 0.5, c[2] * 0.5];
+    const surfY = (x: number, z: number) => {
+      const q = fromXZ(x, z);
+      return heightAt(q.a, q.b) + LIFT + 0.003;
+    };
+    const triVerts: number[] = [];
+    const triCols: number[] = [];
+    for (const ar of arrows) {
+      const d = dirVec(-ar.ga, -ar.gb);
+      if (!d) continue;
+      const norm = maxMag > 0 ? ar.mag / maxMag : 0;
+      const len = LEN * (0.12 + 0.88 * norm); // flat = tiny, steep = bold
+      const x0 = toX(ar.a), z0 = toZ(ar.b);
+      const xt = x0 + d.x * len, zt = z0 + d.z * len;
+      const hl = Math.min(HEAD_LEN, len * 0.7);
+      const hw = HEAD_W * (hl / HEAD_LEN);
+      const bx = xt - d.x * hl, bz = zt - d.z * hl; // base centre of the head
+      const px = -d.z, pz = d.x; // perpendicular to d in the (x,z) plane
+      // Shaft ribbon: origin → head base, a flat quad draped on the surface,
+      // fading dim base → bright tip like the 2D field.
+      const sLx = x0 + px * SHAFT_HW, sLz = z0 + pz * SHAFT_HW;
+      const sRx = x0 - px * SHAFT_HW, sRz = z0 - pz * SHAFT_HW;
+      const eLx = bx + px * SHAFT_HW, eLz = bz + pz * SHAFT_HW;
+      const eRx = bx - px * SHAFT_HW, eRz = bz - pz * SHAFT_HW;
+      triVerts.push(sLx, surfY(sLx, sLz), sLz, sRx, surfY(sRx, sRz), sRz, eLx, surfY(eLx, eLz), eLz);
+      triCols.push(dim[0], dim[1], dim[2], dim[0], dim[1], dim[2], c[0], c[1], c[2]);
+      triVerts.push(eLx, surfY(eLx, eLz), eLz, sRx, surfY(sRx, sRz), sRz, eRx, surfY(eRx, eRz), eRz);
+      triCols.push(c[0], c[1], c[2], dim[0], dim[1], dim[2], c[0], c[1], c[2]);
+      // Solid triangle head: tip + two base corners, each draped to the surface.
+      const lx = bx + px * hw, lz = bz + pz * hw;
+      const rx = bx - px * hw, rz = bz - pz * hw;
+      triVerts.push(xt, surfY(xt, zt), zt, lx, surfY(lx, lz), lz, rx, surfY(rx, rz), rz);
+      triCols.push(c[0], c[1], c[2], c[0], c[1], c[2], c[0], c[1], c[2]);
+    }
+    if (!triVerts.length) return;
     const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
-    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(cols), 3));
-    const mat = new THREE.LineBasicMaterial({
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(triVerts), 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(triCols), 3));
+    const mat = new THREE.MeshBasicMaterial({
       vertexColors: true,
       transparent: true,
       opacity: 0.95,
       depthTest: true, // occluded by the surface — no more x-ray through hills
-      depthWrite: false
+      depthWrite: false,
+      side: THREE.DoubleSide
     });
-    vectorField3d = new THREE.LineSegments(geo, mat);
+    vectorField3d = new THREE.Mesh(geo, mat);
     vectorField3d.renderOrder = 7;
     scene3.add(vectorField3d);
-
-    if (headVerts.length) {
-      const hgeo = new THREE.BufferGeometry();
-      hgeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(headVerts), 3));
-      const hmat = new THREE.MeshBasicMaterial({
-        color: new THREE.Color(c[0], c[1], c[2]),
-        transparent: true,
-        opacity: 0.95,
-        depthTest: true,
-        depthWrite: false,
-        side: THREE.DoubleSide
-      });
-      vectorField3dHeads = new THREE.Mesh(hgeo, hmat);
-      vectorField3dHeads.renderOrder = 7;
-      scene3.add(vectorField3dHeads);
-    }
   }
 
   /**
@@ -440,7 +431,7 @@
     range: { min: number; max: number }
   ): { a: number; b: number }[][] {
     const span = range.max - range.min;
-    const sepDiv = ({ sparse: 18, normal: 26, dense: 42 } as Record<FieldDensity, number>)[layers3d.density] ?? 26;
+    const sepDiv = ({ sparse: 18, normal: 42, dense: 60 } as Record<FieldDensity, number>)[layers3d.density] ?? 42;
     return placeStreamlines(
       { min: range.min, max: range.max, gradient: (a, b) => config.computeGradient(trainData, { a, b }) },
       { dSep: span / sepDiv }
