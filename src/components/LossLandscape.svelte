@@ -51,9 +51,10 @@
     eigenSym2,
     conditionNumber,
     newtonStep,
-    isPositiveDefinite,
+    classifyDefiniteness,
     type Hessian2,
-    type Eigen2
+    type Eigen2,
+    type Definiteness
   } from '../utils/hessian';
   import { canExportVideo, exportRunWebM } from '../utils/replay';
   import type { ModelParameters } from '../types/types';
@@ -143,7 +144,7 @@
     eig: Eigen2;
     kappa: number;
     newton: ModelParameters | null;
-    posDef: boolean;
+    type: Definiteness;
   }
 
   $: lensInfo = computeLensInfo(lensOn, oneParam, parameters, trainData, problemConfig, currentGradient);
@@ -166,7 +167,7 @@
       eig,
       kappa: conditionNumber(eig),
       newton: newtonStep(hess, grad),
-      posDef: isPositiveDefinite(hess)
+      type: classifyDefiniteness(eig)
     };
   }
 
@@ -180,6 +181,18 @@
     if (k >= 100) return k.toExponential(1).replace('e+', 'e');
     return k.toFixed(1);
   }
+
+  // The definiteness chip in the stats — so κ can't be read as a stretched bowl
+  // when the point is actually a saddle.
+  const LENS_TYPE_LABEL: Record<Definiteness, string> = {
+    bowl: 'bowl', saddle: 'saddle', ridge: 'ridge', flat: 'flat'
+  };
+  const LENS_TYPE_HINT: Record<Definiteness, string> = {
+    bowl: 'Both curvatures positive — a local bowl. Newton (violet) jumps toward its bottom.',
+    saddle: 'Curvatures of opposite sign — a saddle/pass. Red dashed = the downhill escape direction.',
+    ridge: 'Both curvatures negative — a ridge/local max. Every direction curves downhill (red dashed).',
+    flat: 'No measurable curvature here — a plateau. κ is undefined (∞).'
+  };
 
   // ---------- Basins of attraction ----------
   // Color every cell by which minimum plain GD (at the current γ) reaches
@@ -1018,10 +1031,15 @@
   }
 
   /**
-   * The curvature lens at the marker: the local quadratic's principal-axis
-   * ellipse (radius ∝ 1/√|λ| — long axis = shallow direction), or crossed
-   * axes when the point is a saddle (red dashed = the escape direction),
-   * plus a violet Newton-step ghost arrow when the local bowl is convex.
+   * The curvature lens at the marker. The drawing matches the local shape:
+   *  - bowl   : a level-set ellipse (computed in SCREEN space, so it lines up
+   *             with the contours even when the α/β pixel scales differ) plus a
+   *             violet Newton arrow drawn at TRUE scale — it visibly jumps toward
+   *             the bowl's bottom, the contrast against steepest-descent −∇ℒ.
+   *  - saddle : the two principal axes — solid = the uphill wall, red dashed =
+   *             the downhill escape direction.
+   *  - ridge  : both axes red dashed (every direction curves down).
+   *  - flat   : nothing (κ reads ∞ in the stats).
    */
   function drawLens(
     marker: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -1031,77 +1049,69 @@
     const layer = marker.select<SVGGElement>('.lens-layer');
     if (layer.empty()) return;
     layer.selectAll('*').remove();
-    if (!lensInfo || markerOffMap) return;
+    if (!lensInfo || markerOffMap || lensInfo.type === 'flat') return;
 
-    const { eig, newton, posDef } = lensInfo;
-    const isDark = true; // the lens draws over the always-dark landscape canvas
+    const { hess, newton, type } = lensInfo;
 
-    // Radii from |λ|: the shallow axis gets the long radius.
-    const R_MAX = 42;
-    const R_MIN = 7;
-    const abs1 = Math.abs(eig.lambda1); // largest |λ| → short axis
-    const abs2 = Math.abs(eig.lambda2);
-    if (abs1 < 1e-12) return; // locally flat: nothing meaningful to draw
-    const rShort = Math.max(R_MIN, R_MAX * Math.sqrt(abs2 / abs1));
-    const rLong = R_MAX;
+    // Curvature as it appears ON SCREEN: H_screen = M⁻ᵀ H M⁻¹ with the
+    // (anisotropic) param→pixel map M = diag(kx, −ky). Its eigenvectors are the
+    // on-screen principal axes; eigenvalues keep H's signs (Sylvester inertia).
+    const Hs: Hessian2 = {
+      h11: hess.h11 / (kx * kx),
+      h12: -hess.h12 / (kx * ky),
+      h22: hess.h22 / (ky * ky)
+    };
+    const es = eigenSym2(Hs);
+    const absS1 = Math.abs(es.lambda1); // larger |λ| → steep screen axis
+    const absS2 = Math.abs(es.lambda2); // smaller |λ| → shallow screen axis
+    if (absS1 < 1e-12) return;
 
-    // Screen angle of the *shallow* eigenvector (v2 — the long axis)
-    const angLong = (Math.atan2(-eig.v2[1] * ky, eig.v2[0] * kx) * 180) / Math.PI;
+    const R_MAX = 40, R_MIN = 4;
+    const rSteep = Math.max(R_MIN, R_MAX * Math.sqrt(absS2 / absS1)); // along v1
+    const rShallow = R_MAX; // along v2
+    const angOf = (v: [number, number]) => (Math.atan2(v[1], v[0]) * 180) / Math.PI;
 
-    if (eig.lambda1 > 0 && eig.lambda2 > 0) {
-      // Convex bowl: level-set ellipse + faint principal axes
-      const strokeC = isDark ? '#f8fafc' : '#334155';
+    if (type === 'bowl') {
+      // Level-set ellipse: long (shallow, v2) axis = R_MAX, short (steep) = rSteep.
       layer.append('ellipse')
-        .attr('rx', rLong)
-        .attr('ry', rShort)
-        .attr('transform', `rotate(${angLong})`)
-        .attr('fill', 'none')
-        .attr('stroke', strokeC)
-        .attr('stroke-width', 1.3)
-        .style('opacity', 0.6);
-      layer.append('line')
-        .attr('x1', -rLong).attr('x2', rLong).attr('y1', 0).attr('y2', 0)
-        .attr('transform', `rotate(${angLong})`)
-        .attr('stroke', strokeC)
-        .attr('stroke-width', 0.8)
-        .style('opacity', 0.28);
-      layer.append('line')
-        .attr('x1', 0).attr('x2', 0).attr('y1', -rShort).attr('y2', rShort)
-        .attr('transform', `rotate(${angLong})`)
-        .attr('stroke', strokeC)
-        .attr('stroke-width', 0.8)
-        .style('opacity', 0.28);
-    } else {
-      // Saddle (or concave): solid emerald = uphill-curving axis,
-      // red dashed = the downhill escape direction.
-      const negV = eig.lambda1 < 0 ? eig.v1 : eig.v2;
-      const posV = eig.lambda1 < 0 ? eig.v2 : eig.v1;
-      const angNeg = (Math.atan2(-negV[1] * ky, negV[0] * kx) * 180) / Math.PI;
-      const angPos = (Math.atan2(-posV[1] * ky, posV[0] * kx) * 180) / Math.PI;
-      layer.append('line')
-        .attr('x1', -rLong).attr('x2', rLong).attr('y1', 0).attr('y2', 0)
-        .attr('transform', `rotate(${angNeg})`)
-        .attr('stroke', '#f87171')
-        .attr('stroke-width', 1.6)
-        .attr('stroke-dasharray', '6,4')
+        .attr('rx', rShallow)
+        .attr('ry', rSteep)
+        .attr('transform', `rotate(${angOf(es.v2)})`)
+        .attr('fill', '#67e8f9')
+        .attr('fill-opacity', 0.06)
+        .attr('stroke', '#e0f2fe')
+        .attr('stroke-width', 1.4)
         .style('opacity', 0.85);
-      layer.append('line')
-        .attr('x1', -rShort * 0.8).attr('x2', rShort * 0.8).attr('y1', 0).attr('y2', 0)
-        .attr('transform', `rotate(${angPos})`)
-        .attr('stroke', '#34d399')
-        .attr('stroke-width', 1.6)
-        .style('opacity', 0.75);
+    } else {
+      // saddle / ridge: principal axes, red dashed where curvature is downhill.
+      const drawAxis = (v: [number, number], r: number, lam: number) => {
+        const down = lam < 0;
+        layer.append('line')
+          .attr('x1', -r).attr('x2', r).attr('y1', 0).attr('y2', 0)
+          .attr('transform', `rotate(${angOf(v)})`)
+          .attr('stroke', down ? '#f87171' : '#e0f2fe')
+          .attr('stroke-width', 1.7)
+          .attr('stroke-dasharray', down ? '6,4' : null)
+          .attr('stroke-linecap', 'round')
+          .style('opacity', down ? 0.9 : 0.8);
+      };
+      drawAxis(es.v1, rSteep, es.lambda1);
+      drawAxis(es.v2, rShallow, es.lambda2);
     }
 
-    // Newton ghost: where a second-order method would head (convex only)
-    if (newton && posDef) {
+    // Newton step −H⁻¹∇ℒ, drawn at TRUE screen scale (capped), only where it
+    // actually minimizes (a bowl). Length shows how far one second-order jump
+    // lands — short near the bottom, a bold leap from up the wall.
+    if (type === 'bowl' && newton) {
       const sx = newton.a * kx;
       const sy = -newton.b * ky;
-      const m = Math.hypot(sx, sy);
-      if (Number.isFinite(m) && m > 1e-9) {
+      const L = Math.hypot(sx, sy);
+      if (Number.isFinite(L) && L > 1e-9) {
+        const CAP = 72;
+        const s = Math.min(L, CAP) / L;
         layer.append('line')
           .attr('x1', 0).attr('y1', 0)
-          .attr('x2', (sx / m) * 28).attr('y2', (sy / m) * 28)
+          .attr('x2', sx * s).attr('y2', sy * s)
           .attr('stroke', '#8b5cf6')
           .attr('stroke-width', 2.5)
           .attr('stroke-dasharray', '5,3')
@@ -1457,6 +1467,7 @@
         <span class="readout-item"><em>‖∇ℒ‖</em> {fmtMag(gradMag)}</span>
         {#if lensInfo}
           <span class="readout-item" title="Condition number |λ₁|/|λ₂| of the local Hessian — how stretched the bowl is here. Big κ = ill-conditioned = plain GD zig-zags."><em>κ</em> {fmtKappa(lensInfo.kappa)}</span>
+          <span class="readout-item lens-type lens-{lensInfo.type}" title={LENS_TYPE_HINT[lensInfo.type]}>{LENS_TYPE_LABEL[lensInfo.type]}</span>
         {/if}
       {/if}
     </div>
@@ -1510,14 +1521,14 @@
           </span>
         {/if}
         {#if lensInfo && view === '2d'}
-          <span class="vec-item" title="The Newton step −H⁻¹∇ℒ: where a second-order method would head. It points straight at the local quadratic's minimum, regardless of how stretched the bowl is.">
+          <span class="vec-item" title="The Newton step −H⁻¹∇ℒ, drawn at true scale: where one second-order jump lands. In a stretched bowl it heads straight for the bottom while −∇ℒ would zig-zag. Shown only in a bowl, where it actually minimizes.">
             <svg width="20" height="10" viewBox="0 0 20 10" aria-hidden="true">
               <line x1="1" y1="5" x2="12" y2="5" stroke="#8b5cf6" stroke-width="2" stroke-dasharray="3,2" stroke-linecap="round" />
               <path d="M12,1.5 L19,5 L12,8.5 Z" fill="#8b5cf6" />
             </svg>
             <span>Newton</span>
           </span>
-          <span class="vec-item" title="Level set of the local quadratic approximation: long axis = shallow direction, short axis = steep. On a saddle it becomes crossed lines; red dashed = the escape direction.">
+          <span class="vec-item" title="Local curvature at the marker. In a bowl: a level-set ellipse (long axis = shallow direction). At a saddle or ridge: the principal axes, red dashed = a downhill (escape) direction. The κ chip in the stats names the shape.">
             <svg width="20" height="10" viewBox="0 0 20 10" aria-hidden="true">
               <ellipse cx="10" cy="5" rx="8" ry="3.5" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.7" />
             </svg>
@@ -1924,6 +1935,22 @@
     opacity: 0.7;
     margin-right: 0.2rem;
   }
+
+  /* Definiteness chip next to κ — names the local shape so κ can't mislead. */
+  .lens-type {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.625rem;
+    padding: 0.04rem 0.34rem;
+    border-radius: 999px;
+    line-height: 1.4;
+  }
+  .lens-bowl { color: #34d399; background: rgba(52, 211, 153, 0.16); }
+  .lens-saddle { color: #f59e0b; background: rgba(245, 158, 11, 0.16); }
+  .lens-ridge { color: #f87171; background: rgba(248, 113, 113, 0.16); }
+  .lens-flat { color: #94a3b8; background: rgba(148, 163, 184, 0.16); }
 
   /* Challenge target pill: top-right corner of the plot (readout owns
      the top-left) */

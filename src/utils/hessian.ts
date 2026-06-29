@@ -105,3 +105,28 @@ export function isPositiveDefinite(hess: Hessian2): boolean {
   // Sylvester: leading minors positive.
   return hess.h11 > 0 && hess.h11 * hess.h22 - hess.h12 * hess.h12 > 0;
 }
+
+/** Local shape from the eigenvalue signs. */
+export type Definiteness = 'bowl' | 'saddle' | 'ridge' | 'flat';
+
+/**
+ * Classify a point by the signs of its curvature eigenvalues:
+ *  - bowl   : both positive (a local minimum's neighbourhood; Newton minimizes)
+ *  - ridge  : both negative (a local maximum's neighbourhood)
+ *  - saddle : opposite signs (down one way, up the other)
+ *  - flat   : no measurable curvature in either direction
+ * A near-zero second eigenvalue (a degenerate trough/crest) folds into bowl/ridge
+ * by the sign of the live axis — its extreme stretch shows up in κ instead.
+ */
+export function classifyDefiniteness(e: Eigen2): Definiteness {
+  const a1 = e.lambda1; // |a1| ≥ |a2|
+  const a2 = e.lambda2;
+  if (Math.abs(a1) < 1e-8) return 'flat';
+  const tol = Math.abs(a1) * 1e-4;
+  const s1 = a1 > tol ? 1 : a1 < -tol ? -1 : 0;
+  const s2 = a2 > tol ? 1 : a2 < -tol ? -1 : 0;
+  if (s1 > 0 && s2 > 0) return 'bowl';
+  if (s1 < 0 && s2 < 0) return 'ridge';
+  if (s1 * s2 < 0) return 'saddle';
+  return s1 > 0 ? 'bowl' : 'ridge'; // degenerate: one axis ≈ flat
+}
