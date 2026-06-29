@@ -13,11 +13,12 @@ import type {
   ModelParameters,
   ProblemConfig,
   TrainingConfig,
-  TrainingHistoryPoint
+  TrainingHistoryPoint,
+  ScheduleId
 } from '../types/types';
 import { problemConfigs } from '../utils/problems';
 import { setSeed, newSeed, shuffle } from '../utils/rng';
-import { optimizers, defaultHyper, type OptimizerId, type OptimizerState } from '../utils/optimizers';
+import { optimizers, defaultHyper, optimizerOrder, type OptimizerId, type OptimizerState } from '../utils/optimizers';
 import { customModel, type RegressionModel, type ClassificationModel } from '../utils/customModel';
 import {
   computeLossGrid,
@@ -409,8 +410,11 @@ export function recordInitialHistory() {
 // parameters, internal state, and trail. Owned by the trainer's race loop;
 // the 2D landscape renders the trails.
 export interface Racer {
-  id: import('../utils/optimizers').OptimizerId;
+  id: OptimizerId;
   color: string;
+  /** Effective learning rate / hyperparameters for this run (defaults + overrides). */
+  lr: number;
+  hyper: Record<string, number>;
   params: ModelParameters;
   state: OptimizerState;
   trail: ModelParameters[];
@@ -425,6 +429,90 @@ export interface RaceState {
 }
 
 export const raceStore = writable<RaceState | null>(null);
+
+// ========== Race configuration (which optimizers race, their params) ==========
+// The race lineup and per-optimizer parameter overrides are user-editable
+// through the Race-settings modal. Overrides are sparse: an absent value falls
+// back to the problem's curated default at race time.
+export interface RaceOverride {
+  lr?: number;
+  hyper?: Record<string, number>;
+}
+export interface RaceConfig {
+  enabled: OptimizerId[];
+  overrides: Partial<Record<OptimizerId, RaceOverride>>;
+  maxSteps: number;
+  stepsPerSecond: number;
+  schedule: ScheduleId;
+  batchSize: number | 'all';
+}
+
+const DEFAULT_RACE_CONFIG: RaceConfig = {
+  enabled: ['gd', 'momentum', 'rmsprop', 'adam'],
+  overrides: {},
+  maxSteps: 300,
+  stepsPerSecond: 30,
+  schedule: 'constant',
+  batchSize: 'all'
+};
+
+function createRaceConfigStore() {
+  const KEY = 'gd-race-config';
+  const load = (): RaceConfig => {
+    if (typeof window === 'undefined') return structuredClone(DEFAULT_RACE_CONFIG);
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) return { ...structuredClone(DEFAULT_RACE_CONFIG), ...JSON.parse(raw) };
+    } catch {
+      /* ignore malformed storage */
+    }
+    return structuredClone(DEFAULT_RACE_CONFIG);
+  };
+  const store = writable<RaceConfig>(load());
+  const persist = (v: RaceConfig) => {
+    if (typeof window !== 'undefined') {
+      try { localStorage.setItem(KEY, JSON.stringify(v)); } catch { /* quota */ }
+    }
+  };
+  const commit = (next: RaceConfig) => { persist(next); return next; };
+
+  return {
+    subscribe: store.subscribe,
+    /** Add or remove an optimizer from the lineup (keeps `enabled` in spec order). */
+    toggle: (id: OptimizerId) =>
+      store.update(v => commit({
+        ...v,
+        enabled: v.enabled.includes(id)
+          ? v.enabled.filter(x => x !== id)
+          : optimizerOrder.filter(x => x === id || v.enabled.includes(x))
+      })),
+    /** Merge an override for one optimizer (lr and/or individual hyperparameters). */
+    setOverride: (id: OptimizerId, patch: RaceOverride) =>
+      store.update(v => {
+        const prev = v.overrides[id] ?? {};
+        const merged: RaceOverride = {
+          ...prev,
+          ...patch,
+          hyper: { ...(prev.hyper ?? {}), ...(patch.hyper ?? {}) }
+        };
+        return commit({ ...v, overrides: { ...v.overrides, [id]: merged } });
+      }),
+    /** Drop all overrides for one optimizer (back to curated defaults). */
+    clearOverride: (id: OptimizerId) =>
+      store.update(v => {
+        const next = { ...v.overrides };
+        delete next[id];
+        return commit({ ...v, overrides: next });
+      }),
+    setMaxSteps: (n: number) => store.update(v => commit({ ...v, maxSteps: n })),
+    setSpeed: (n: number) => store.update(v => commit({ ...v, stepsPerSecond: n })),
+    setSchedule: (s: ScheduleId) => store.update(v => commit({ ...v, schedule: s })),
+    setBatchSize: (b: number | 'all') => store.update(v => commit({ ...v, batchSize: b })),
+    reset: () => store.update(() => commit(structuredClone(DEFAULT_RACE_CONFIG)))
+  };
+}
+
+export const raceConfigStore = createRaceConfigStore();
 
 // ========== Landscape View Store ==========
 // Which rendering of the loss landscape is active. Persisted so returning

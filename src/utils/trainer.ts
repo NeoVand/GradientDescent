@@ -26,6 +26,7 @@ import {
   recordInitialHistory,
   lossSceneStore,
   raceStore,
+  raceConfigStore,
   showCoach,
   clearCoach,
   courseStore,
@@ -34,7 +35,7 @@ import {
   type Racer
 } from '../stores/stores';
 import { problemConfigs } from './problems';
-import { optimizers, defaultHyper, type OptimizerId } from './optimizers';
+import { optimizers, defaultHyper, optimizerOrder, type OptimizerId } from './optimizers';
 import { computeHessian } from './hessian';
 import { normalizedLogLoss } from './lossGrid';
 import { schedules } from './schedules';
@@ -85,6 +86,17 @@ function hasDiverged(params: { a: number; b: number }, loss: number): boolean {
  */
 function sampleBatch(trainData: DataPoint[]): DataPoint[] {
   const bs = get(trainingStore).batchSize;
+  if (bs === 'all' || bs >= trainData.length) return trainData;
+  const idx = trainData.map((_, i) => i);
+  for (let i = idx.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [idx[i], idx[j]] = [idx[j], idx[i]];
+  }
+  return idx.slice(0, bs).map(i => trainData[i]);
+}
+
+/** Like sampleBatch, but with the race's own batch size (not the trainer's). */
+function sampleRaceBatch(trainData: DataPoint[], bs: number | 'all'): DataPoint[] {
   if (bs === 'all' || bs >= trainData.length) return trainData;
   const idx = trainData.map((_, i) => i);
   for (let i = idx.length - 1; i > 0; i--) {
@@ -417,16 +429,29 @@ function evaluateRun(steps: number) {
 }
 
 // ====================== Race mode ======================
-// Four contrasting optimizers descend from the marker's current position,
-// each with its own curated γ/μ for the active problem. First to the basin
-// wins; the coach posts the finishing order.
+// A user-chosen lineup of optimizers descends from the marker's current
+// position; each carries its curated γ/hyperparameters for the active problem
+// unless overridden in Race settings. First to the basin wins; the coach posts
+// the finishing order. Lineup, per-optimizer params and the race budget/speed
+// all live in `raceConfigStore`.
 
-const RACE_LINEUP: Array<{ id: OptimizerId; color: string }> = [
-  { id: 'gd', color: '#94a3b8' },       // slate
-  { id: 'momentum', color: '#a855f7' }, // purple
-  { id: 'rmsprop', color: '#22d3ee' },  // cyan
-  { id: 'adam', color: '#f43f5e' }      // rose
-];
+/** A distinct, stable colour per optimizer for its race trail. */
+export const RACE_COLORS: Record<OptimizerId, string> = {
+  gd: '#94a3b8',       // slate
+  momentum: '#a855f7', // violet
+  nesterov: '#c084fc', // light violet
+  adagrad: '#f59e0b',  // amber
+  rmsprop: '#22d3ee',  // cyan
+  adadelta: '#14b8a6', // teal
+  adam: '#f43f5e',     // rose
+  nadam: '#fb7185',    // light rose
+  adamw: '#ef4444',    // red
+  radam: '#f97316',    // orange
+  newton: '#3b82f6',   // blue
+  sophia: '#6366f1',   // indigo
+  lion: '#eab308',     // gold
+  prodigy: '#10b981'   // green
+};
 
 let raceInterval: number | null = null;
 
@@ -436,24 +461,38 @@ export function startRace() {
   runEndStore.set(null);
   divergenceStore.set(null);
 
-  const start = get(parametersStore);
-  const racers: Racer[] = RACE_LINEUP.map(({ id, color }) => ({
-    id,
-    color,
-    params: { ...start },
-    state: optimizers[id].init(),
-    trail: [{ ...start }],
-    steps: 0,
-    finished: false,
-    diverged: false
-  }));
-  raceStore.set({ racers, running: true });
-  if (!courseActive()) {
-    showCoach('info', 'Racing GD, Momentum, RMSProp, and Adam from the same start — each with its own γ. First to the basin wins.', 0);
+  const cfg = get(raceConfigStore);
+  const problem = get(selectedProblem);
+  // Keep the lineup in canonical order; never start an empty race.
+  const ids = optimizerOrder.filter(id => cfg.enabled.includes(id));
+  if (ids.length === 0) {
+    showCoach('warn', 'No optimizers selected for the race — open Race settings and pick at least one.', 6000);
+    return;
   }
 
-  const cap = Math.max(get(trainingStore).totalSteps, 100);
-  const intervalMs = Math.max(8, Math.round(1000 / get(trainingStore).stepsPerSecond));
+  const start = get(parametersStore);
+  const racers: Racer[] = ids.map((id) => {
+    const ov = cfg.overrides[id] ?? {};
+    return {
+      id,
+      color: RACE_COLORS[id],
+      lr: ov.lr ?? resolveLearningRate(id, problem),
+      hyper: { ...hyperForProblem(id, problem), ...(ov.hyper ?? {}) },
+      params: { ...start },
+      state: optimizers[id].init(),
+      trail: [{ ...start }],
+      steps: 0,
+      finished: false,
+      diverged: false
+    };
+  });
+  raceStore.set({ racers, running: true });
+  if (!courseActive()) {
+    showCoach('info', `Racing ${ids.length} optimizer${ids.length === 1 ? '' : 's'} from the same start — first to the basin wins.`, 0);
+  }
+
+  const cap = Math.max(cfg.maxSteps, 20);
+  const intervalMs = Math.max(8, Math.round(1000 / cfg.stepsPerSecond));
   raceInterval = window.setInterval(() => stepRace(cap), intervalMs);
 }
 
@@ -464,6 +503,7 @@ function stepRace(cap: number) {
     return;
   }
 
+  const cfg = get(raceConfigStore);
   const problem = get(selectedProblem);
   const config = problemConfigs[problem];
   const trainData = get(datasetStore).data.filter(p => p.isTraining);
@@ -473,21 +513,26 @@ function stepRace(cap: number) {
   }
   const scene = get(lossSceneStore);
 
+  // One shared minibatch per tick so every racer sees the same data this step;
+  // the schedule scales each racer's γ by its progress through the budget.
+  const batch = sampleRaceBatch(trainData, cfg.batchSize);
+  const schedFactor = schedules[cfg.schedule].factor;
+
   let anyActive = false;
   for (const r of rs.racers) {
     if (r.finished || r.diverged || r.steps >= cap) continue;
 
-    const gradient = config.computeGradient(trainData, r.params);
+    const gradient = config.computeGradient(batch, r.params);
     const raceRange = config.parameterRange ?? { min: -7, max: 7 };
     const ctx = optimizers[r.id].usesHessian
-      ? { hessian: computeHessian(config, trainData, r.params), range: raceRange }
+      ? { hessian: computeHessian(config, batch, r.params), range: raceRange }
       : { range: raceRange };
     const out = optimizers[r.id].step(
       r.params,
       gradient,
       r.state,
-      resolveLearningRate(r.id, problem),
-      hyperForProblem(r.id, problem),
+      r.lr * schedFactor(r.steps, cap),
+      r.hyper,
       ctx
     );
     const loss = config.computeLoss(trainData, out.params);

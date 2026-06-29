@@ -562,15 +562,27 @@
           .attr('stroke-linejoin', 'round')
           .style('opacity', 0.9);
       }
+      // Pin a head that has wandered off the visible frame to the edge with a
+      // dashed, faded look — exactly how the training marker handles off-map
+      // positions — instead of letting the clip swallow it whole.
       const head = r.trail[r.trail.length - 1];
+      const rad = r.finished ? 5.5 : 4.5;
+      const rawX = xScale(head.a);
+      const rawY = yScale(head.b);
+      const offMap =
+        !Number.isFinite(rawX) || !Number.isFinite(rawY) ||
+        rawX < 0 || rawX > innerWidth || rawY < 0 || rawY > innerHeight;
+      const cx = Math.max(rad, Math.min(innerWidth - rad, Number.isFinite(rawX) ? rawX : innerWidth / 2));
+      const cy = Math.max(rad, Math.min(innerHeight - rad, Number.isFinite(rawY) ? rawY : innerHeight / 2));
       layer.append('circle')
-        .attr('cx', xScale(head.a))
-        .attr('cy', yScale(head.b))
-        .attr('r', r.finished ? 5.5 : 4.5)
+        .attr('cx', cx)
+        .attr('cy', cy)
+        .attr('r', rad)
         .attr('fill', r.color)
         .attr('stroke', '#fff')
         .attr('stroke-width', 1.2)
-        .style('opacity', r.diverged ? 0.35 : 1);
+        .attr('stroke-dasharray', offMap ? '3,2.5' : null)
+        .style('opacity', r.diverged ? 0.35 : offMap ? 0.7 : 1);
     }
   }
 

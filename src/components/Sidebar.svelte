@@ -43,11 +43,6 @@
     Droplets,
     Mountain,
     Info,
-    Scaling,
-    Magnet,
-    Scissors,
-    Blend,
-    SlidersHorizontal,
     Waves,
     Target,
     Radio,
@@ -61,11 +56,16 @@
     Timer,
     Shapes,
     ClipboardPaste,
-    PanelLeftClose
+    PanelLeftClose,
+    Settings2
   } from 'lucide-svelte';
+  import RaceSettingsModal from './RaceSettingsModal.svelte';
+  import { hyperMeta } from '../utils/hyperMeta';
 
   /** On mobile the sidebar is a drawer; this collapses it. Unset on desktop. */
   export let onClose: (() => void) | null = null;
+
+  let showRaceSettings = false;
 
   // Compact labels for the schedule segmented control
   const SCHEDULE_LABELS: Record<ScheduleId, string> = {
@@ -396,26 +396,7 @@
         ? lerpHex('#10b981', '#f59e0b', (lrSliderPos - 55) / 25)
         : lerpHex('#f59e0b', '#ef4444', (lrSliderPos - 80) / 20);
 
-  // Each hyperparameter maps — by its descriptive label, not its raw key — to a
-  // concept that drives BOTH its icon and its colour, so the same idea always
-  // reads the same way (keying by `key` mislabels e.g. Lion's β₂ or Sophia's ρ).
-  //   • momentum / inertia  → gauge, violet
-  //   • adaptive scale (RMS)→ resize, teal
-  //   • direction blend     → blend, blue (its own hue: Lion pairs it with
-  //                           momentum decay, so they must not both read violet)
-  //   • weight decay        → magnet (pull to origin), amber
-  //   • step clip           → scissors, rose
-  const HYPER_META: Record<string, { icon: any; color: string }> = {
-    'Momentum':        { icon: Gauge,    color: '#a855f7' },
-    'Momentum decay':  { icon: Gauge,    color: '#a855f7' },
-    'Direction blend': { icon: Blend,    color: '#60a5fa' },
-    'Decay':           { icon: Scaling,  color: '#14b8a6' },
-    'Scale decay':     { icon: Scaling,  color: '#14b8a6' },
-    'Weight decay':    { icon: Magnet,   color: '#f59e0b' },
-    'Clip':            { icon: Scissors, color: '#fb7185' }
-  };
-  const HYPER_FALLBACK = { icon: SlidersHorizontal, color: '#10b981' };
-  const hyperMeta = (label: string) => HYPER_META[label] ?? HYPER_FALLBACK;
+  // Per-hyperparameter icon + colour (shared with the Race-settings modal).
 
   const SLIDER_COLORS = {
     points: '#3b82f6',
@@ -946,17 +927,28 @@
       </button>
     </div>
 
-    <!-- Race: all four optimizer families from the marker's current spot -->
-    <button
-      class="race-button"
-      class:racing={raceRunning}
-      on:click={() => (raceRunning ? stopRace() : startRace())}
-      disabled={isTraining}
-      title="Race GD, Momentum, RMSProp, and Adam from the current marker position"
-    >
-      <Flag size={14} strokeWidth={2.25} />
-      <span>{raceRunning ? 'Stop race' : 'Race optimizers'}</span>
-    </button>
+    <!-- Race: the chosen lineup descends from the marker's current spot. -->
+    <div class="race-row">
+      <button
+        class="race-button"
+        class:racing={raceRunning}
+        on:click={() => (raceRunning ? stopRace() : startRace())}
+        disabled={isTraining}
+        use:tooltip={'Race the selected optimizers from the marker’s current position<br/><span style="opacity:0.8;font-size:0.7rem">Edit the lineup and parameters with the gear ⚙</span>'}
+      >
+        <Flag size={14} strokeWidth={2.25} />
+        <span>{raceRunning ? 'Stop race' : 'Race optimizers'}</span>
+      </button>
+      <button
+        class="race-settings-btn"
+        on:click={() => (showRaceSettings = true)}
+        disabled={isTraining}
+        aria-label="Race settings"
+        use:tooltip={'Race settings'}
+      >
+        <Settings2 size={17} strokeWidth={2.1} />
+      </button>
+    </div>
     </div>
   </div>
 </div>
@@ -964,6 +956,10 @@
 <!-- Closes the fixed-positioned pickers on an outside click -->
 {#if showProblemDropdown || showOptimizerDropdown}
   <button class="dropdown-backdrop" aria-label="Close menu" on:click={closeDropdowns}></button>
+{/if}
+
+{#if showRaceSettings}
+  <RaceSettingsModal onClose={() => (showRaceSettings = false)} />
 {/if}
 
 <style>
@@ -1871,15 +1867,42 @@
   /* Race button: full-width secondary action under the transport row */
   /* Secondary action: a clearly-visible emerald outline + tint (theme-aware
      via --color-success), distinct from the filled Train button. */
+  /* Race + its settings gear share a row. */
+  .race-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0.4rem;
+    /* Breathing room from the transport row above — keeps it from crowding
+       Reset/Train when the deck is short (mobile, or a tight viewport). */
+    margin-top: calc(4px + 0.4 * var(--air));
+  }
+  .race-settings-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.65rem;
+    border: 1.5px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-bg-secondary);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .race-settings-btn:hover:not(:disabled) {
+    border-color: var(--color-success);
+    color: var(--color-success);
+    background: color-mix(in srgb, var(--color-success) 12%, transparent);
+  }
+  .race-settings-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
   .race-button {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.45rem;
-    width: 100%;
-    /* Breathing room from the transport row above — keeps it from crowding
-       Reset/Train when the deck is short (mobile, or a tight viewport). */
-    margin-top: calc(4px + 0.4 * var(--air));
+    flex: 1;
+    min-width: 0;
     padding: calc(5.5px + 0.35 * var(--air));
     border: 1.5px solid var(--color-success);
     border-radius: 8px;
