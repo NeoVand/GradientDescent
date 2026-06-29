@@ -27,6 +27,7 @@ import {
   lossSceneStore,
   raceStore,
   raceConfigStore,
+  raceHoverStore,
   showCoach,
   clearCoach,
   courseStore,
@@ -460,6 +461,7 @@ export function startRace() {
   stopRace();
   runEndStore.set(null);
   divergenceStore.set(null);
+  raceHoverStore.set(null);
 
   const cfg = get(raceConfigStore);
   const problem = get(selectedProblem);

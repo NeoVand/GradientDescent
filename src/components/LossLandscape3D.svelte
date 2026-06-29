@@ -29,6 +29,7 @@
     divergenceStore,
     clearCoach,
     raceStore,
+    raceHoverStore,
     optimizerStore,
     optimizerStateStore,
     trainingStore,
@@ -550,40 +551,58 @@
     if (!currentScene || !rs) return;
     raceGroup = new THREE.Group();
     const { min, max } = currentScene.range;
+    // Spotlight the hovered racer (others dim) — mirrors the 2D layer.
+    const hover = get(raceHoverStore);
 
     for (const racer of rs.racers) {
+      const hot = hover === racer.id;
+      const dim = hover !== null && !hot;
       const pts: THREE.Vector3[] = [];
       for (const p of racer.trail) {
         const a = Math.max(min, Math.min(max, p.a));
         const b = Math.max(min, Math.min(max, p.b));
         if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
-        pts.push(new THREE.Vector3(toX(a), heightAt(a, b) + 0.015, toZ(b)));
+        const v = new THREE.Vector3(toX(a), heightAt(a, b) + 0.018, toZ(b));
+        // Skip near-duplicate points: zero-length tangents give TubeGeometry
+        // NaN frames that poison the whole mesh into invisibility.
+        if (pts.length === 0 || pts[pts.length - 1].distanceToSquared(v) > 1e-10) pts.push(v);
       }
+      const trailOpacity = racer.diverged ? (dim ? 0.14 : 0.5) : hot ? 1 : dim ? 0.18 : 0.96;
       if (pts.length >= 2) {
-        const geo = new THREE.BufferGeometry().setFromPoints(pts);
-        const mat = new THREE.LineBasicMaterial({
-          color: new THREE.Color(racer.color),
-          transparent: true,
-          opacity: racer.diverged ? 0.3 : 0.9,
-          depthTest: false,
-          depthWrite: false
-        });
-        const line = new THREE.Line(geo, mat);
-        line.renderOrder = 9;
-        raceGroup.add(line);
+        // A solid colored tube (not a 1px WebGL line, which barely shows on the
+        // surface) — the same treatment as the descent trail. Downsample long
+        // trails so rebuilding every race tick stays cheap.
+        const stride = Math.max(1, Math.ceil(pts.length / 70));
+        const tubePts = pts.filter((_, i) => i % stride === 0);
+        if (tubePts[tubePts.length - 1] !== pts[pts.length - 1]) tubePts.push(pts[pts.length - 1]);
+        if (tubePts.length >= 2) {
+          const curve = new THREE.CatmullRomCurve3(tubePts, false, 'centripetal');
+          const geo = new THREE.TubeGeometry(curve, Math.min(150, tubePts.length * 2), hot ? 0.0105 : 0.0065, 6, false);
+          const mat = new THREE.MeshBasicMaterial({
+            color: new THREE.Color(racer.color),
+            transparent: true,
+            opacity: trailOpacity,
+            depthTest: false,
+            depthWrite: false
+          });
+          const tube = new THREE.Mesh(geo, mat);
+          tube.renderOrder = hot ? 10 : 9;
+          raceGroup.add(tube);
+        }
       }
       if (pts.length > 0) {
+        const baseR = racer.finished ? 0.022 : 0.017;
         const head = new THREE.Mesh(
-          new THREE.SphereGeometry(racer.finished ? 0.024 : 0.019, 12, 8),
+          new THREE.SphereGeometry(hot ? baseR * 1.5 : baseR, 14, 10),
           new THREE.MeshBasicMaterial({
             color: new THREE.Color(racer.color),
             transparent: true,
-            opacity: racer.diverged ? 0.35 : 1,
+            opacity: racer.diverged ? (dim ? 0.2 : 0.45) : hot ? 1 : dim ? 0.2 : 1,
             depthTest: false,
             depthWrite: false
           })
         );
-        head.renderOrder = 11;
+        head.renderOrder = hot ? 12 : 11;
         head.position.copy(pts[pts.length - 1]);
         raceGroup.add(head);
       }
@@ -1000,6 +1019,9 @@
       raceStore.subscribe(rs => {
         if (currentScene) buildRaceTrails(rs);
         if (currentScene) updateMarker();
+      }),
+      raceHoverStore.subscribe(() => {
+        if (currentScene) buildRaceTrails(get(raceStore));
       }),
       optimizerStore.subscribe(() => {
         if (currentScene) updateMarker();

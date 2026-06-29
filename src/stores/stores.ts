@@ -430,6 +430,10 @@ export interface RaceState {
 
 export const raceStore = writable<RaceState | null>(null);
 
+/** Which racer the user is hovering in the legend (spotlit; others dim).
+ *  Shared so both the 2D and 3D landscapes can react to it. */
+export const raceHoverStore = writable<OptimizerId | null>(null);
+
 // ========== Race configuration (which optimizers race, their params) ==========
 // The race lineup and per-optimizer parameter overrides are user-editable
 // through the Race-settings modal. Overrides are sparse: an absent value falls

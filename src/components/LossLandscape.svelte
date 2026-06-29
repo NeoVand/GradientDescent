@@ -28,6 +28,7 @@
     clearCoach,
     landscapeViewStore,
     raceStore,
+    raceHoverStore,
     trainingStore,
     challengeStore,
     optimizerStore,
@@ -325,9 +326,13 @@
     updateTrail();
   }
 
-  // Race trails layer follows the race store
+  // Race trails layer follows the race store. Hovering a legend entry spotlights
+  // that racer (others dim) — the same mechanism as the guide's race figure,
+  // shared via a store so the 3D view reacts to it too.
   $: race = $raceStore;
+  $: hover = $raceHoverStore;
   $: if (svgElement && race !== undefined) {
+    void hover; // re-highlight the trails when the hovered racer changes
     updateRaceTrails();
   }
 
@@ -552,15 +557,17 @@
       .y(p => yScale(p.b));
 
     for (const r of race.racers) {
+      const hot = hover === r.id;
+      const dim = hover !== null && !hot;
       if (r.trail.length >= 2) {
         layer.append('path')
           .attr('d', lineGen(r.trail))
           .attr('fill', 'none')
           .attr('stroke', r.color)
-          .attr('stroke-width', 2.2)
+          .attr('stroke-width', hot ? 3.4 : 2.2)
           .attr('stroke-linecap', 'round')
           .attr('stroke-linejoin', 'round')
-          .style('opacity', 0.9);
+          .style('opacity', r.diverged ? (dim ? 0.12 : 0.3) : hot ? 1 : dim ? 0.12 : 0.9);
       }
       // Pin a head that has wandered off the visible frame to the edge with a
       // dashed, faded look — exactly how the training marker handles off-map
@@ -577,12 +584,12 @@
       layer.append('circle')
         .attr('cx', cx)
         .attr('cy', cy)
-        .attr('r', rad)
+        .attr('r', hot ? rad + 1.4 : rad)
         .attr('fill', r.color)
         .attr('stroke', '#fff')
         .attr('stroke-width', 1.2)
         .attr('stroke-dasharray', offMap ? '3,2.5' : null)
-        .style('opacity', r.diverged ? 0.35 : offMap ? 0.7 : 1);
+        .style('opacity', r.diverged ? (dim ? 0.18 : 0.35) : hot ? 1 : dim ? 0.12 : offMap ? 0.7 : 1);
     }
   }
 
@@ -1465,7 +1472,10 @@
         <span class="key-val">{minLossValue.toFixed(2)}</span>
       </div>
     {/if}
-    <!-- Marker-arrow key, bottom-left corner (all views speak this language) -->
+    <!-- Marker-arrow key, bottom-left corner (all views speak this language).
+         Hidden during a race — the single-marker vectors don't apply, and the
+         race legend takes the left side. -->
+    {#if !race}
     <div class="vec-key" style="left: {margin.left + 8}px; bottom: {margin.bottom + 8}px;">
         <span class="vec-item" title="Steepest-descent direction at the marker: −∇ℒ, straight downhill">
           <svg width="20" height="10" viewBox="0 0 20 10" aria-hidden="true">
@@ -1513,6 +1523,7 @@
           </span>
         {/if}
     </div>
+    {/if}
     {#if $challengeStore}
       <div
         class="challenge-pill {$challengeStore.status}"
@@ -1526,11 +1537,16 @@
       </div>
     {/if}
     {#if race}
-      <div class="race-legend">
+      <div class="race-legend" style="left: {margin.left + 8}px; top: {margin.top + 34}px;">
         {#each race.racers as r (r.id)}
-          <span class="race-item" class:dim={r.diverged}>
+          <span
+            class="race-item" class:dim={r.diverged} class:hot={hover === r.id}
+            role="listitem"
+            on:mouseenter={() => raceHoverStore.set(r.id)}
+            on:mouseleave={() => raceHoverStore.set(null)}
+          >
             <span class="race-dot" style="background: {r.color}"></span>
-            <span>{optimizers[r.id].name}</span>
+            <span class="race-name">{optimizers[r.id].name}</span>
             {#if r.finished}<span class="race-flag">✓</span>{/if}
             {#if r.diverged}<span class="race-flag">✗</span>{/if}
           </span>
@@ -1959,14 +1975,16 @@
   }
 
   /* Race legend: who's which color, bottom center of the plot */
+  /* Vertical lineup overlaid on the top-left of the plot, just below the
+     param/grad readout. Hover an entry to spotlight that racer in the plot. */
   .race-legend {
     position: absolute;
-    bottom: 14%;
-    left: 50%;
-    transform: translateX(-50%);
     display: flex;
-    gap: 0.75rem;
-    padding: 0.3rem 0.7rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.1rem;
+    max-height: calc(100% - 48px);
+    padding: 0.3rem 0.4rem;
     border-radius: 8px;
     font-size: 0.6875rem;
     font-weight: 600;
@@ -1976,12 +1994,12 @@
   }
 
   :global([data-theme='light']) .race-legend {
-    background: rgba(255, 255, 255, 0.82);
+    background: rgba(255, 255, 255, 0.42);
     color: #334155;
   }
 
   :global([data-theme='dark']) .race-legend {
-    background: rgba(6, 9, 19, 0.72);
+    background: rgba(6, 9, 19, 0.4);
     color: #cbd5e1;
   }
 
@@ -1989,11 +2007,18 @@
     display: flex;
     align-items: center;
     gap: 0.3rem;
+    padding: 0.1rem 0.25rem;
+    border-radius: 5px;
+    pointer-events: auto;
+    cursor: default;
+    transition: opacity 0.15s ease, background 0.15s ease;
   }
 
-  .race-item.dim {
-    opacity: 0.45;
-  }
+  .race-item.dim { opacity: 0.5; }
+  .race-item.hot { background: rgba(127, 127, 127, 0.22); }
+  .race-item.hot .race-name { font-weight: 800; }
+  :global([data-theme='light']) .race-item.hot { color: #0f172a; }
+  :global([data-theme='dark']) .race-item.hot { color: #fff; }
 
   .race-dot {
     width: 9px;
