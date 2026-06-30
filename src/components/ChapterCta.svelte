@@ -17,11 +17,8 @@
 <div class="ch-cta" class:has-lesson={lessonId}>
   {#if lessonId && onLesson}
     <button class="ch-cta-primary" on:click={onLesson}>
-      <span class="ch-cta-ic"><GraduationCap size={16} strokeWidth={2.3} /></span>
-      <span class="ch-cta-text">
-        <span class="ch-cta-main">Try this as a lesson</span>
-        <span class="ch-cta-sub">predict → run → learn</span>
-      </span>
+      <GraduationCap size={15} strokeWidth={2.4} />
+      <span>Learn by doing</span>
     </button>
     {#if demo}
       <button class="ch-cta-demo" on:click={demo}>
@@ -44,27 +41,36 @@
     margin-top: 1.1rem;
   }
 
+  /* Primary "Learn by doing" — a single-line emerald pill, themed so the
+     label keeps strong contrast in both modes (deep emerald + white in light,
+     bright emerald + near-black in dark). */
   .ch-cta-primary {
     display: inline-flex;
     align-items: center;
-    gap: 0.6rem;
-    padding: 0.5rem 0.9rem;
+    gap: 0.45rem;
+    padding: 0.5rem 1rem;
     border: none;
-    border-radius: 10px;
-    background: #10b981;
+    border-radius: 9px;
+    background: #047857;
     color: #fff;
+    font-size: 0.875rem;
+    font-weight: 700;
     cursor: pointer;
-    text-align: left;
-    transition: background 0.15s ease, transform 0.1s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+    transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
   }
-  .ch-cta-primary:hover { background: #059669; transform: translateY(-1px); }
+  .ch-cta-primary:hover { background: #065f46; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(4, 120, 87, 0.35); }
   .ch-cta-primary:active { transform: scale(0.98); }
 
-  .ch-cta-ic { display: inline-flex; flex-shrink: 0; }
-
-  .ch-cta-text { display: flex; flex-direction: column; line-height: 1.18; }
-  .ch-cta-main { font-size: 0.85rem; font-weight: 800; }
-  .ch-cta-sub { font-size: 0.6563rem; font-weight: 600; opacity: 0.85; letter-spacing: 0.01em; }
+  :global([data-theme='dark']) .ch-cta-primary {
+    background: #10b981;
+    color: #04130d;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  }
+  :global([data-theme='dark']) .ch-cta-primary:hover {
+    background: #34d399;
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+  }
 
   .ch-cta-demo {
     display: inline-flex;
