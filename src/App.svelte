@@ -23,13 +23,12 @@ import CoursePanel from './components/CoursePanel.svelte';
     landscapeViewStore,
     historyStore,
     resetOptimizerState,
-    courseStore,
+    tourActiveStore,
     challengeStore,
     selectedProblem,
     vizLayersStore
   } from './stores/stores';
   import { startTraining, stopTraining, stepOnce, resetRun, runEndStore, applyProblem } from './utils/trainer';
-  import { startCourseIntro, closeCourse } from './utils/lessons';
   import { applyUrlState, encodeStateUrl } from './utils/urlState';
   import { Sun, Moon, Compass, Menu, Share2, GraduationCap, Maximize, Minimize, Play, Pause } from 'lucide-svelte';
 
@@ -59,6 +58,18 @@ import CoursePanel from './components/CoursePanel.svelte';
       // rejection some browsers throw if it's somehow blocked.
       Promise.resolve(req?.call(el)).catch(() => {});
     }
+  }
+
+  // ---------- Product tour (driver.js, lazy-loaded) ----------
+  const isMobile = () =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches;
+
+  async function startTour() {
+    // Pull driver.js + its CSS in only when the tour actually runs, so they
+    // never touch first paint. The tour filters itself to on-screen anchors,
+    // so on mobile it reduces to the always-visible plots.
+    const { runTour } = await import('./utils/tour');
+    runTour();
   }
 
   // Lock body scroll while the drawer is open on mobile
@@ -102,6 +113,15 @@ import CoursePanel from './components/CoursePanel.svelte';
       // opens straight into the playground — no guide modal; the Help
       // button is one click away whenever it's wanted.
       applyProblem(get(selectedProblem));
+
+      // First-time visitors get the product tour once, on desktop. The "seen"
+      // flag is set when the tour starts (not when it finishes), so closing it
+      // early never re-nags. Defer two frames so every plot anchor has mounted.
+      let seenTour = true;
+      try { seenTour = !!localStorage.getItem('gl-tour-seen'); } catch { /* private mode */ }
+      if (!seenTour && !isMobile()) {
+        requestAnimationFrame(() => requestAnimationFrame(() => startTour()));
+      }
     }
 
     return () => {
@@ -194,7 +214,7 @@ import CoursePanel from './components/CoursePanel.svelte';
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    if (showHelpModal || drawerOpen) return;
+    if (showHelpModal || drawerOpen || get(tourActiveStore)) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const t = e.target as HTMLElement | null;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
@@ -282,7 +302,7 @@ import CoursePanel from './components/CoursePanel.svelte';
     {/if}
     <span>{isTraining ? 'Pause' : 'Train'}</span>
   </button>
-  <button class="topbar-btn" class:active={$courseStore.active} on:click={() => ($courseStore.active ? closeCourse() : startCourseIntro())} aria-label="Course">
+  <button class="topbar-btn" on:click={startTour} aria-label="Take a tour">
     <Compass size={20} strokeWidth={2.5} />
   </button>
   <button class="topbar-btn" class:active={showSharePopover} on:click={toggleSharePopover} aria-label="Share">
@@ -320,21 +340,21 @@ import CoursePanel from './components/CoursePanel.svelte';
            have no data, so the landscape takes the whole row -->
       <div class="top-row" class:single={isAnalytic}>
         {#if !isAnalytic}
-          <div class="data-viz-container">
+          <div class="data-viz-container" data-tour="plot-data">
             <DataVisualization />
           </div>
         {/if}
-        <div class="loss-landscape-container">
+        <div class="loss-landscape-container" data-tour="plot-landscape">
           <LossLandscape />
         </div>
       </div>
 
       <!-- Bottom row: Loss history chart and parameter values -->
       <div class="bottom-row">
-        <div class="loss-history-container">
+        <div class="loss-history-container" data-tour="plot-history">
           <LossHistory />
         </div>
-        <div class="guide-panel-container">
+        <div class="guide-panel-container" data-tour="plot-guide">
           <GuidePanel />
         </div>
       </div>
@@ -348,16 +368,15 @@ import CoursePanel from './components/CoursePanel.svelte';
 <div class="floating-buttons">
   <button
     class="help-btn"
-    class:tool-on={$courseStore.active}
-    on:click={() => ($courseStore.active ? closeCourse() : startCourseIntro())}
-    aria-label="Guided course"
+    on:click={startTour}
+    aria-label="Take a tour"
   >
     <Compass size={19} strokeWidth={2.5} />
   </button>
   <button class="help-btn" class:tool-on={showSharePopover} on:click={toggleSharePopover} aria-label="Share scenario">
     <Share2 size={18} strokeWidth={2.5} />
   </button>
-  <button class="help-btn" on:click={() => showHelpModal = true} aria-label="Help & guide">
+  <button class="help-btn" on:click={() => showHelpModal = true} aria-label="Help & guide" data-tour="help-button">
     <GraduationCap size={20} strokeWidth={2.5} />
   </button>
   <button
@@ -971,4 +990,80 @@ import CoursePanel from './components/CoursePanel.svelte';
     /* Hide desktop floating buttons on mobile (replaced by top-bar buttons) */
     .floating-buttons { display: none; }
   }
+
+  /* ---------- driver.js product-tour popover (themed to match) ----------
+     The popover renders at <body> level (outside this component), so every
+     override is :global. data-theme on <html> is an ancestor, so the tour
+     auto-switches with the app theme. */
+  :global(.driver-popover.gl-tour) {
+    background: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    box-shadow: 0 18px 48px var(--color-shadow);
+    max-width: 336px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  :global(.driver-popover.gl-tour .driver-popover-title) {
+    color: var(--color-text-primary);
+    font-size: 1rem;
+    font-weight: 700;
+  }
+  :global(.driver-popover.gl-tour .driver-popover-description) {
+    color: var(--color-text-secondary);
+    font-size: 0.85rem;
+    line-height: 1.55;
+  }
+  :global(.driver-popover.gl-tour .driver-popover-progress-text) {
+    color: var(--color-text-tertiary);
+    font-size: 0.72rem;
+  }
+  :global(.driver-popover.gl-tour .driver-popover-close-btn) {
+    color: var(--color-text-tertiary);
+    font-size: 1.4rem;
+  }
+  :global(.driver-popover.gl-tour .driver-popover-close-btn:hover) {
+    color: var(--color-text-primary);
+  }
+  :global(.driver-popover.gl-tour button.driver-popover-next-btn) {
+    background: #10b981;
+    color: #04130d;
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    text-shadow: none;
+    padding: 0.36rem 0.72rem;
+    font-size: 0.8rem;
+  }
+  :global(.driver-popover.gl-tour button.driver-popover-next-btn:hover) {
+    background: #059669;
+    color: #fff;
+  }
+  :global(.driver-popover.gl-tour button.driver-popover-prev-btn) {
+    background: transparent;
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    text-shadow: none;
+    font-size: 0.8rem;
+  }
+  :global(.driver-popover.gl-tour button.driver-popover-prev-btn:hover) {
+    color: var(--color-text-primary);
+    border-color: var(--color-text-tertiary);
+  }
+  :global(.driver-popover.gl-tour .driver-popover-arrow-side-left.driver-popover-arrow) { border-left-color: var(--color-bg-secondary); }
+  :global(.driver-popover.gl-tour .driver-popover-arrow-side-right.driver-popover-arrow) { border-right-color: var(--color-bg-secondary); }
+  :global(.driver-popover.gl-tour .driver-popover-arrow-side-top.driver-popover-arrow) { border-top-color: var(--color-bg-secondary); }
+  :global(.driver-popover.gl-tour .driver-popover-arrow-side-bottom.driver-popover-arrow) { border-bottom-color: var(--color-bg-secondary); }
+
+  /* Welcome step content */
+  :global(.gl-tour .gl-tour-welcome) { display: flex; flex-direction: column; gap: 0.55rem; }
+  :global(.gl-tour .gl-tour-brand) { display: flex; align-items: center; gap: 0.5rem; }
+  :global(.gl-tour .gl-tour-mark) { font-family: 'Times New Roman', Georgia, serif; font-style: italic; font-size: 1.6rem; line-height: 1; color: #10b981; }
+  :global(.gl-tour .gl-tour-name) { font-size: 1.15rem; font-weight: 800; color: var(--color-text-primary); }
+  :global(.gl-tour .gl-tour-tag) { margin: 0; font-size: 0.85rem; line-height: 1.55; color: var(--color-text-secondary); }
+  :global(.gl-tour .gl-tour-meta) { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.15rem; }
+  :global(.gl-tour .gl-tour-gh) { display: inline-flex; align-items: center; gap: 0.35rem; color: #10b981; text-decoration: none; font-size: 0.78rem; font-weight: 600; }
+  :global(.gl-tour .gl-tour-gh:hover) { text-decoration: underline; }
+  :global(.gl-tour .gl-tour-by) { font-size: 0.75rem; color: var(--color-text-tertiary); }
 </style>

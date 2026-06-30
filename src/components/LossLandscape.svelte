@@ -1314,7 +1314,7 @@
         <span>Loss & Gradient</span>
       </h2>
       {#if !oneParam}
-        <div class="view-toggle" role="group" aria-label="Landscape view">
+        <div class="view-toggle" role="group" aria-label="Landscape view" data-tour="landscape-view-toggle">
           <button
             class:active={view === '2d'}
             on:click={() => landscapeViewStore.set('2d')}
@@ -1326,7 +1326,7 @@
         </div>
       {/if}
     </div>
-    <div class="header-tools" role="toolbar" aria-label="Landscape tools">
+    <div class="header-tools" role="toolbar" aria-label="Landscape tools" data-tour="landscape-tools">
         <span class="layers-control">
           <button
             class="tool-btn"

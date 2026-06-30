@@ -26,6 +26,7 @@
     "d3": "^7.9.0",
     "d3-contour": "^4.0.2",
     "d3-scale-chromatic": "^3.1.0",
+    "driver.js": "^1.6.0",
     "katex": "^0.16.45",
     "lucide-svelte": "^1.0.1",
     "three": "^0.184.0"

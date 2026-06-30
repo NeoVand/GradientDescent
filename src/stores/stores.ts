@@ -661,6 +661,12 @@ export const courseStore = writable<CourseState>({
   answer: null
 });
 
+// ========== Tour Store ==========
+// True while the driver.js product tour is running. Lives in a store (not a
+// module flag in tour.ts) so the always-loaded app shell can suppress its
+// keyboard shortcuts without importing the lazily-loaded tour module.
+export const tourActiveStore = writable(false);
+
 // ========== Theme Store ==========
 // Manages the current theme (light or dark)
 export type Theme = 'light' | 'dark';

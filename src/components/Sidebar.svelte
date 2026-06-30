@@ -449,7 +449,7 @@
     <div class="sidebar-content" on:scroll={closeDropdowns}>
 
   <!-- ===================== PROBLEM ===================== -->
-  <div class="section">
+  <div class="section" data-tour="problem-picker">
     <div class="section-label">
       <span>Problem</span>
     </div>
@@ -504,7 +504,7 @@
 
   <!-- ===================== DATA (hidden for pure analytic surfaces) ===================== -->
   {#if !isAnalytic}
-  <div class="section">
+  <div class="section" data-tour="data-section">
     <div class="section-label">
       <span>Data</span>
       <button
@@ -576,7 +576,7 @@
     {/if}
 
     <!-- Points -->
-    <div class="ctl">
+    <div class="ctl" data-tour="data-points">
       <div class="row">
         <span class="icon"><MapPin size={16} strokeWidth={2} /></span>
         <span class="row-label">Points</span>
@@ -600,7 +600,7 @@
     </div>
 
     <!-- Noise -->
-    <div class="ctl">
+    <div class="ctl" data-tour="data-noise">
       <div class="row">
         <span class="icon"><Droplets size={16} strokeWidth={2} /></span>
         <span class="row-label">Noise</span>
@@ -622,7 +622,7 @@
     </div>
 
     <!-- Train/Test Split -->
-    <div class="ctl">
+    <div class="ctl" data-tour="data-split">
       <div class="row">
         <span class="icon"><PieChart size={16} strokeWidth={2} /></span>
         <span class="row-label">Train/Test Split</span>
@@ -668,7 +668,7 @@
       <span>Optimizer</span>
     </div>
 
-    <div class="problem-selector" class:open={showOptimizerDropdown}>
+    <div class="problem-selector" class:open={showOptimizerDropdown} data-tour="optimizer-picker">
       <button
         class="problem-button"
         bind:this={optimizerBtn}
@@ -704,6 +704,8 @@
     </div>
 
     <!-- Per-optimizer hyperparameters (rendered from the optimizer's spec) -->
+    {#if currentOptimizer.hyperparams.length}
+    <div class="hyper-group" data-tour="optimizer-hypers">
     {#each currentOptimizer.hyperparams as spec (optimizerSel.id + '-' + spec.key)}
       {@const meta = hyperMeta(spec.label)}
       <div class="ctl">
@@ -729,9 +731,11 @@
         />
       </div>
     {/each}
+    </div>
+    {/if}
 
     <!-- Learning Rate (log scale) -->
-    <div class="ctl">
+    <div class="ctl" data-tour="learning-rate">
       <div class="row">
         <span class="icon"><Zap size={16} strokeWidth={2} /></span>
         <span class="row-label">Learn Rate <span class="greek-label">(γ)</span></span>
@@ -755,7 +759,7 @@
     </div>
 
     <!-- LR Schedule -->
-    <div class="ctl">
+    <div class="ctl" data-tour="lr-schedule">
       <div class="row">
         <span class="icon"><Timer size={16} strokeWidth={2} /></span>
         <span class="row-label">Schedule</span>
@@ -803,7 +807,7 @@
     {/if}
 
     <!-- Batch Size -->
-    <div class="ctl">
+    <div class="ctl" data-tour="batch-size">
       <div class="row">
         <span class="icon"><Layers size={16} strokeWidth={2} /></span>
         <span class="row-label">Batch Size</span>
@@ -833,7 +837,7 @@
   <!-- ===================== RUN: its own card, aligned with the app's
        bottom row (same shared height) ===================== -->
   <div class="panel run-panel">
-    <div class="section run-inner">
+    <div class="section run-inner" data-tour="run-section">
     <div class="section-label">
       <span>Run</span>
     </div>
@@ -903,6 +907,7 @@
         on:click={stepOnce}
         disabled={isTraining}
         aria-label="Step forward"
+        data-tour="run-step"
       >
         <StepForward size={18} strokeWidth={2} />
       </button>
@@ -911,6 +916,7 @@
         class:training={isTraining}
         on:click={() => (isTraining ? stopTraining() : startTraining())}
         style="--progress: {trainingProgress}%;"
+        data-tour="run-train"
       >
         <div class="button-content">
           {#if isTraining}
@@ -922,7 +928,7 @@
           {/if}
         </div>
       </button>
-      <button class="reset-button" on:click={resetRun} aria-label="Reset run">
+      <button class="reset-button" on:click={resetRun} aria-label="Reset run" data-tour="run-reset">
         <RotateCcw size={18} strokeWidth={2} />
       </button>
     </div>
@@ -934,6 +940,7 @@
         class:racing={raceRunning}
         on:click={() => (raceRunning ? stopRace() : startRace())}
         disabled={isTraining}
+        data-tour="run-race"
         use:tooltip={'Race the selected optimizers from the marker’s current position<br/><span style="opacity:0.8;font-size:0.7rem">Edit the lineup and parameters with the gear ⚙</span>'}
       >
         <Flag size={14} strokeWidth={2.25} />
@@ -944,6 +951,7 @@
         on:click={() => (showRaceSettings = true)}
         disabled={isTraining}
         aria-label="Race settings"
+        data-tour="run-race-settings"
         use:tooltip={'Race settings'}
       >
         <Settings2 size={17} strokeWidth={2.1} />
@@ -1098,6 +1106,14 @@
     flex-direction: column;
     gap: calc(5px + 0.5 * var(--air));
     flex-shrink: 0;
+  }
+
+  /* Groups the per-optimizer sliders for the product tour without changing
+     their layout — it carries the same column gap as the parent section. */
+  .hyper-group {
+    display: flex;
+    flex-direction: column;
+    gap: calc(5px + 0.5 * var(--air));
   }
 
   /* The top rail stitches its sections into one continuous panel surface (no
