@@ -3272,17 +3272,20 @@
   .course-banner-text { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
   .course-banner-text strong { font-size: 0.95rem; font-weight: 700; color: var(--color-text-primary); }
   .course-banner-text span { font-size: 0.82rem; color: var(--color-text-secondary); line-height: 1.45; }
+  /* Same vibrant-emerald + near-black treatment as the chapters' "Learn by
+     doing" pill, so the two read as one family. */
   .course-banner-btn {
     flex-shrink: 0;
     display: inline-flex; align-items: center; gap: 0.45rem;
-    padding: 0.55rem 1rem;
+    padding: 0.55rem 1.05rem;
     border: none; border-radius: 9px;
-    background: #10b981; color: #fff;
+    background: #10b981; color: #04130d;
     font-size: 0.85rem; font-weight: 700;
     cursor: pointer;
-    transition: background 0.15s ease, transform 0.1s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+    transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
   }
-  .course-banner-btn:hover { background: #059669; transform: translateY(-1px); }
+  .course-banner-btn:hover { background: #34d399; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35); }
   .course-banner-btn:active { transform: scale(0.98); }
 
   .try-btn {

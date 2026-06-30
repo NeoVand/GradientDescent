@@ -41,9 +41,10 @@
     margin-top: 1.1rem;
   }
 
-  /* Primary "Learn by doing" — a single-line emerald pill, themed so the
-     label keeps strong contrast in both modes (deep emerald + white in light,
-     bright emerald + near-black in dark). */
+  /* Primary "Learn by doing" — a single-line, vibrant emerald pill with
+     near-black text. Bright in both modes (so it never reads "dark" in day
+     mode) while keeping high contrast — the same treatment as the app's Train
+     button in light mode. */
   .ch-cta-primary {
     display: inline-flex;
     align-items: center;
@@ -51,26 +52,16 @@
     padding: 0.5rem 1rem;
     border: none;
     border-radius: 9px;
-    background: #047857;
-    color: #fff;
+    background: #10b981;
+    color: #04130d;
     font-size: 0.875rem;
     font-weight: 700;
     cursor: pointer;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
     transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
   }
-  .ch-cta-primary:hover { background: #065f46; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(4, 120, 87, 0.35); }
+  .ch-cta-primary:hover { background: #34d399; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35); }
   .ch-cta-primary:active { transform: scale(0.98); }
-
-  :global([data-theme='dark']) .ch-cta-primary {
-    background: #10b981;
-    color: #04130d;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  }
-  :global([data-theme='dark']) .ch-cta-primary:hover {
-    background: #34d399;
-    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
-  }
 
   .ch-cta-demo {
     display: inline-flex;
