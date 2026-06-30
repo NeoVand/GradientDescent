@@ -25,7 +25,7 @@
   import { rgb, geoPath } from 'd3';
   import { contours } from 'd3-contour';
   import { interpolateViridis, interpolateCubehelixDefault } from 'd3-scale-chromatic';
-  import { experiments, chapterPresets } from '../utils/experiments';
+  import { experiments, chapterPresets, optimizerDemos } from '../utils/experiments';
   import { schedules, scheduleOrder } from '../utils/schedules';
   import { optimizers, optimizerOrder, defaultHyper, type OptimizerId } from '../utils/optimizers';
   import GuideVizLayers from './GuideVizLayers.svelte';
@@ -87,6 +87,14 @@
     if (!lessonId) return;
     onClose();
     enterCourseFromChapter(lessonId);
+  }
+
+  // Close the book and run the tailored demo for an optimizer card.
+  function runOptDemo(name: string) {
+    const demo = optimizerDemos[name];
+    if (!demo) return;
+    onClose();
+    demo();
   }
 
   // Formulas render straight to HTML — no element refs, no afterUpdate.
@@ -2249,6 +2257,11 @@
                       {#if c.brk}<span class="opt-break">✗ {@html mathText(c.brk)}</span>{/if}
                     </div>
                   {/if}
+                  {#if !c.prereq && optimizerDemos[c.name]}
+                    <button class="opt-demo" on:click={() => runOptDemo(c.name)}>
+                      <Play size={12} strokeWidth={2.6} /> <span>See {c.name} run</span>
+                    </button>
+                  {/if}
                   {#if cite?.wiki || cite?.paper}
                     <div class="opt-cite">
                       {#if authors.length}<span class="opt-cite-who">{authors.map(a => a.name).join(', ')}</span>{/if}
@@ -3213,6 +3226,25 @@
   .opt-foot { display: flex; gap: 0.5rem 1.25rem; flex-wrap: wrap; font-size: 0.78rem; font-weight: 600; margin-top: 0.45rem; }
   .opt-fix { color: #10b981; }
   .opt-break { color: #f59e0b; }
+
+  /* One-click demo for this optimizer — closes the book and runs it live. */
+  .opt-demo {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 0.7rem;
+    padding: 0.4rem 0.75rem;
+    border: 1px solid rgba(16, 185, 129, 0.45);
+    border-radius: 8px;
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+  }
+  .opt-demo:hover { background: rgba(16, 185, 129, 0.2); border-color: #10b981; transform: translateY(-1px); }
+  .opt-demo:active { transform: scale(0.98); }
 
   .aside {
     font-size: 0.875rem;
