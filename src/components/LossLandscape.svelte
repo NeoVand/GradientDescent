@@ -36,8 +36,8 @@
     markerDragging,
     vizLayersStore,
     basinsEnabledStore,
-    type FieldDensity,
-    type Colormap
+    COLORMAPS,
+    type FieldDensity
   } from '../stores/stores';
   import { gridToImageURL, colormapStops, contourThresholds, CONTOUR_COUNT } from '../utils/lossGrid';
   import { placeStreamlines } from '../utils/streamlines';
@@ -104,7 +104,6 @@
   // for the type/guide but unreachable here. Low = the old medium, High = a touch
   // denser than the old high.
   const DENSITY_RES: Record<FieldDensity, number> = { sparse: 15, normal: 23, dense: 38 };
-  const COLORMAPS: Colormap[] = ['viridis', 'magma', 'inferno', 'plasma', 'cividis', 'cubehelix'];
   let showLayers = false;
   let layersBtn: HTMLButtonElement;
   // The panel header clips its overflow, so the popover is fixed-positioned

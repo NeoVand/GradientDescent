@@ -17,10 +17,7 @@
 import { rgb } from 'd3';
 import {
   interpolateViridis,
-  interpolateMagma,
   interpolateInferno,
-  interpolatePlasma,
-  interpolateCividis,
   interpolateCubehelixDefault
 } from 'd3-scale-chromatic';
 import type { DataPoint, ModelParameters, ProblemConfig } from '../types/types';
@@ -33,10 +30,7 @@ import type { Colormap, FieldDensity } from '../stores/stores';
 // end color reappears near the basin and the scale reads as "circular".
 const INTERPOLATORS: Record<Colormap, (t: number) => string> = {
   viridis: interpolateViridis,
-  magma: interpolateMagma,
   inferno: interpolateInferno,
-  plasma: interpolatePlasma,
-  cividis: interpolateCividis,
   cubehelix: interpolateCubehelixDefault
 };
 

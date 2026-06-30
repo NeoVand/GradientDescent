@@ -547,7 +547,9 @@ export const landscapeViewStore = createLandscapeViewStore();
 // ========== Visualization Layers Store ==========
 // What the loss landscape draws on top of the heatmap, shared by the 2D, 1D,
 // and 3D views so a toggle flipped in one holds in the others. Persisted.
-export type Colormap = 'viridis' | 'magma' | 'inferno' | 'plasma' | 'cividis' | 'cubehelix';
+export type Colormap = 'viridis' | 'inferno' | 'cubehelix';
+/** The colormaps offered everywhere (the layers picker and the guide). */
+export const COLORMAPS: Colormap[] = ['viridis', 'inferno', 'cubehelix'];
 export type FieldMode = 'arrows' | 'streamlines' | 'off';
 export type FieldDensity = 'sparse' | 'normal' | 'dense';
 
@@ -575,7 +577,13 @@ function createVizLayersStore() {
     if (typeof window === 'undefined') return { ...DEFAULT_VIZ_LAYERS };
     try {
       const raw = localStorage.getItem(KEY);
-      if (raw) return { ...DEFAULT_VIZ_LAYERS, ...JSON.parse(raw) };
+      if (raw) {
+        const merged = { ...DEFAULT_VIZ_LAYERS, ...JSON.parse(raw) };
+        // A colormap we no longer offer (saved before this list shrank) falls
+        // back to the default so the picker always has a live selection.
+        if (!COLORMAPS.includes(merged.colormap)) merged.colormap = DEFAULT_VIZ_LAYERS.colormap;
+        return merged;
+      }
     } catch {
       // ignore malformed storage
     }

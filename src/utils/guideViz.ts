@@ -8,23 +8,19 @@
  */
 import { rgb, geoPath } from 'd3';
 import { contours } from 'd3-contour';
-import {
-  interpolateViridis, interpolateMagma, interpolateInferno,
-  interpolatePlasma, interpolateCividis, interpolateCubehelixDefault
-} from 'd3-scale-chromatic';
+import { interpolateViridis, interpolateInferno, interpolateCubehelixDefault } from 'd3-scale-chromatic';
 import type { Colormap, FieldDensity, FieldMode } from '../stores/stores';
 
 export { colormapStops } from './lossGrid';
+export { COLORMAPS } from '../stores/stores';
 export type { Colormap, FieldDensity, FieldMode };
 
 export type VizState = { field: FieldMode; contours: boolean; colormap: Colormap; density: FieldDensity };
 /** The guide's defaults: same as Loss & Gradient but with the field OFF. */
 export const GUIDE_VIZ_DEFAULT: VizState = { field: 'off', contours: true, colormap: 'cubehelix', density: 'normal' };
 
-export const COLORMAPS: Colormap[] = ['viridis', 'magma', 'inferno', 'plasma', 'cividis', 'cubehelix'];
 const INTERP: Record<Colormap, (t: number) => string> = {
-  viridis: interpolateViridis, magma: interpolateMagma, inferno: interpolateInferno,
-  plasma: interpolatePlasma, cividis: interpolateCividis, cubehelix: interpolateCubehelixDefault
+  viridis: interpolateViridis, inferno: interpolateInferno, cubehelix: interpolateCubehelixDefault
 };
 /** Colormap colors low→high as an array (for an in-SVG <linearGradient>). */
 export function cmapStopColors(cmap: Colormap, n = 8): string[] {
