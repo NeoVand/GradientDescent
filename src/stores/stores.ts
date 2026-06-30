@@ -640,11 +640,12 @@ export interface ChallengeState {
 export const challengeStore = writable<ChallengeState | null>(null);
 
 // ========== Course Store ==========
-// Guided lessons in four explicit steps — setup (look here) → predict
-// (commit to an answer) → run (watch it happen) → learn (the explanation).
-// The panel lives on the landscape; lesson content and flow helpers live
-// in utils/lessons.ts.
-export type CoursePhase = 'setup' | 'predict' | 'running' | 'reveal' | 'done';
+// Guided lessons launched from the guide. A 'welcome' front door explains
+// the loop, then each lesson runs four explicit steps — setup (look here) →
+// predict (commit to an answer) → run (watch it happen) → learn (the
+// explanation). The panel floats over the plots; lesson content and flow
+// helpers live in utils/lessons.ts.
+export type CoursePhase = 'welcome' | 'setup' | 'predict' | 'running' | 'reveal' | 'done';
 
 export interface CourseState {
   active: boolean;
@@ -656,7 +657,7 @@ export interface CourseState {
 export const courseStore = writable<CourseState>({
   active: false,
   idx: 0,
-  phase: 'predict',
+  phase: 'welcome',
   answer: null
 });
 

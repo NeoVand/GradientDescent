@@ -29,7 +29,7 @@ import CoursePanel from './components/CoursePanel.svelte';
     vizLayersStore
   } from './stores/stores';
   import { startTraining, stopTraining, stepOnce, resetRun, runEndStore, applyProblem } from './utils/trainer';
-  import { startCourse, closeCourse } from './utils/lessons';
+  import { startCourseIntro, closeCourse } from './utils/lessons';
   import { applyUrlState, encodeStateUrl } from './utils/urlState';
   import { Sun, Moon, Compass, Menu, Share2, GraduationCap, Maximize, Minimize, Play, Pause } from 'lucide-svelte';
 
@@ -282,7 +282,7 @@ import CoursePanel from './components/CoursePanel.svelte';
     {/if}
     <span>{isTraining ? 'Pause' : 'Train'}</span>
   </button>
-  <button class="topbar-btn" class:active={$courseStore.active} on:click={() => ($courseStore.active ? closeCourse() : startCourse())} aria-label="Course">
+  <button class="topbar-btn" class:active={$courseStore.active} on:click={() => ($courseStore.active ? closeCourse() : startCourseIntro())} aria-label="Course">
     <Compass size={20} strokeWidth={2.5} />
   </button>
   <button class="topbar-btn" class:active={showSharePopover} on:click={toggleSharePopover} aria-label="Share">
@@ -349,7 +349,7 @@ import CoursePanel from './components/CoursePanel.svelte';
   <button
     class="help-btn"
     class:tool-on={$courseStore.active}
-    on:click={() => ($courseStore.active ? closeCourse() : startCourse())}
+    on:click={() => ($courseStore.active ? closeCourse() : startCourseIntro())}
     aria-label="Guided course"
   >
     <Compass size={19} strokeWidth={2.5} />

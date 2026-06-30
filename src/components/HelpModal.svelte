@@ -16,7 +16,7 @@
     X,
     Activity, Mountain, TrendingUp, TrendingDown, Percent, Waves,
     Target, Radio, ScatterChart, Brain,
-    Compass, Rocket, Zap,
+    Compass, Rocket, Zap, GraduationCap,
     BookOpen, FlaskConical, Layers, Map, Play, Pause, RotateCcw, Keyboard,
     FileText, MountainSnow, TrendingUpDown
   } from 'lucide-svelte';
@@ -29,6 +29,8 @@
   import { schedules, scheduleOrder } from '../utils/schedules';
   import { optimizers, optimizerOrder, defaultHyper, type OptimizerId } from '../utils/optimizers';
   import GuideVizLayers from './GuideVizLayers.svelte';
+  import ChapterCta from './ChapterCta.svelte';
+  import { enterCourseFromChapter, startCourseIntro } from '../utils/lessons';
   import {
     tintGridURL, contourPathsFor, fieldArrows, colormapStops, cmapStopColors,
     CONTOUR_N, FIELD_RES, GUIDE_VIZ_DEFAULT, type VizState
@@ -65,6 +67,26 @@
     if (!p) return;
     onClose();
     p.apply();
+  }
+
+  // Chapters whose concept has a hands-on lesson in the guided course. The
+  // chapter's CTA launches the course straight into that lesson; the linear
+  // Next-flow then walks through the rest.
+  const chLesson: Record<string, string> = {
+    'ch-shapes': 'trap',
+    'ch-downhill': 'downhill',
+    'ch-step': 'dead-gradient',
+    'ch-gamma': 'step-size',
+    'ch-noise': 'sgd-noise',
+    'ch-optimizers': 'momentum-race'
+  };
+
+  // Close the book and drop the reader into the lesson for this chapter.
+  function startLessonFromChapter(chId: string) {
+    const lessonId = chLesson[chId];
+    if (!lessonId) return;
+    onClose();
+    enterCourseFromChapter(lessonId);
   }
 
   // Formulas render straight to HTML — no element refs, no afterUpdate.
@@ -1195,6 +1217,19 @@
               </div>
             </div>
 
+            <!-- Prefer learning by doing? Launch the guided course. Each
+                 chapter below also opens its own lesson. -->
+            <div class="course-banner">
+              <div class="course-banner-text">
+                <strong>Prefer to learn by doing?</strong>
+                <span>Take the guided course — ten short predict-then-run lessons. Each chapter below also opens its own.</span>
+              </div>
+              <button class="course-banner-btn" on:click={() => { onClose(); startCourseIntro(); }}>
+                <GraduationCap size={15} strokeWidth={2.3} />
+                <span>Start the course</span>
+              </button>
+            </div>
+
             <!-- ============== 1 · THE BOWL ============== -->
             <section data-ch="ch-bowl" id="ch-bowl">
               <div class="part-label">Part I · The landscape</div>
@@ -1267,12 +1302,7 @@
                 for categories.
               </p>
               {#if chapterPresets['ch-bowl']}
-                <div class="opt-cta">
-                  <span>Try it live:</span>
-                  <button class="try-btn" on:click={() => runPreset('ch-bowl')}>
-                    <Play size={13} strokeWidth={2.5} /><span>{chapterPresets['ch-bowl'].title}</span>
-                  </button>
-                </div>
+                <ChapterCta demo={() => runPreset('ch-bowl')} demoLabel={chapterPresets['ch-bowl'].title} />
               {/if}
               {#if chRefs['ch-bowl']}
                 <div class="ch-refs">
@@ -1352,12 +1382,7 @@
                 is lowest, and the marker is trying to reach it.
               </p>
               {#if chapterPresets['ch-landscape']}
-                <div class="opt-cta">
-                  <span>Try it live:</span>
-                  <button class="try-btn" on:click={() => runPreset('ch-landscape')}>
-                    <Play size={13} strokeWidth={2.5} /><span>{chapterPresets['ch-landscape'].title}</span>
-                  </button>
-                </div>
+                <ChapterCta demo={() => runPreset('ch-landscape')} demoLabel={chapterPresets['ch-landscape'].title} />
               {/if}
               {#if chRefs['ch-landscape']}
                 <div class="ch-refs">
@@ -1454,14 +1479,11 @@
                 tricks ahead are, in large part, ways to keep moving when the slope alone is no longer
                 enough to go on.
               </p>
-              {#if chapterPresets['ch-shapes']}
-                <div class="opt-cta">
-                  <span>Try it live:</span>
-                  <button class="try-btn" on:click={() => runPreset('ch-shapes')}>
-                    <Play size={13} strokeWidth={2.5} /><span>{chapterPresets['ch-shapes'].title}</span>
-                  </button>
-                </div>
-              {/if}
+              <ChapterCta
+                lessonId={chLesson['ch-shapes']}
+                onLesson={() => startLessonFromChapter('ch-shapes')}
+                demo={chapterPresets['ch-shapes'] ? () => runPreset('ch-shapes') : null}
+              />
               {#if chRefs['ch-shapes']}
                 <div class="ch-refs">
                   <span class="ch-refs-label">Further reading</span>
@@ -1656,14 +1678,11 @@
                 the whole reason a step can be <em>too big</em>, and taming it is what the learning rate
                 exists to do.
               </p>
-              {#if chapterPresets['ch-downhill']}
-                <div class="opt-cta">
-                  <span>Try it live:</span>
-                  <button class="try-btn" on:click={() => runPreset('ch-downhill')}>
-                    <Play size={13} strokeWidth={2.5} /><span>{chapterPresets['ch-downhill'].title}</span>
-                  </button>
-                </div>
-              {/if}
+              <ChapterCta
+                lessonId={chLesson['ch-downhill']}
+                onLesson={() => startLessonFromChapter('ch-downhill')}
+                demo={chapterPresets['ch-downhill'] ? () => runPreset('ch-downhill') : null}
+              />
               {#if chRefs['ch-downhill']}
                 <div class="ch-refs">
                   <span class="ch-refs-label">Further reading</span>
@@ -1702,14 +1721,11 @@
                 almost agree. Once you add the tricks in Part III, they’ll split apart — and
                 <em>that gap is the optimizer’s personality.</em>
               </p>
-              {#if chapterPresets['ch-step']}
-                <div class="opt-cta">
-                  <span>Try it live:</span>
-                  <button class="try-btn" on:click={() => runPreset('ch-step')}>
-                    <Play size={13} strokeWidth={2.5} /><span>{chapterPresets['ch-step'].title}</span>
-                  </button>
-                </div>
-              {/if}
+              <ChapterCta
+                lessonId={chLesson['ch-step']}
+                onLesson={() => startLessonFromChapter('ch-step')}
+                demo={chapterPresets['ch-step'] ? () => runPreset('ch-step') : null}
+              />
               {#if chRefs['ch-step']}
                 <div class="ch-refs">
                   <span class="ch-refs-label">Further reading</span>
@@ -1793,14 +1809,11 @@
                   overshoots a little more than the last.
                 </figcaption>
               </figure>
-              {#if chapterPresets['ch-gamma']}
-                <div class="opt-cta">
-                  <span>Try it live:</span>
-                  <button class="try-btn" on:click={() => runPreset('ch-gamma')}>
-                    <Play size={13} strokeWidth={2.5} /><span>{chapterPresets['ch-gamma'].title}</span>
-                  </button>
-                </div>
-              {/if}
+              <ChapterCta
+                lessonId={chLesson['ch-gamma']}
+                onLesson={() => startLessonFromChapter('ch-gamma')}
+                demo={chapterPresets['ch-gamma'] ? () => runPreset('ch-gamma') : null}
+              />
               {#if chRefs['ch-gamma']}
                 <div class="ch-refs">
                   <span class="ch-refs-label">Further reading</span>
@@ -1877,12 +1890,7 @@
                 and the orbit closes to a point.
               </p>
               {#if scheduleExperiment}
-                <div class="opt-cta">
-                  <span>See it now:</span>
-                  <button class="try-btn" on:click={() => runExperiment(scheduleExperiment)}>
-                    <Play size={13} strokeWidth={2.5} /><span>Watch Lion orbit, then land</span>
-                  </button>
-                </div>
+                <ChapterCta demo={() => runExperiment(scheduleExperiment)} demoLabel="Watch Lion orbit, then land" />
               {/if}
               {#if chRefs['ch-schedule']}
                 <div class="ch-refs">
@@ -1976,14 +1984,11 @@
                 <strong>Const</strong>, then switch the schedule to <strong>Cosine</strong> and see the
                 band pinch shut over the final steps.
               </p>
-              {#if chapterPresets['ch-noise']}
-                <div class="opt-cta">
-                  <span>Try it live:</span>
-                  <button class="try-btn" on:click={() => runPreset('ch-noise')}>
-                    <Play size={13} strokeWidth={2.5} /><span>{chapterPresets['ch-noise'].title}</span>
-                  </button>
-                </div>
-              {/if}
+              <ChapterCta
+                lessonId={chLesson['ch-noise']}
+                onLesson={() => startLessonFromChapter('ch-noise')}
+                demo={chapterPresets['ch-noise'] ? () => runPreset('ch-noise') : null}
+              />
               {#if chRefs['ch-noise']}
                 <div class="ch-refs">
                   <span class="ch-refs-label">Further reading</span>
@@ -2305,14 +2310,11 @@
                 </p>
               </div>
 
-              {#if raceExperiment}
-                <div class="opt-cta">
-                  <span>Now run the real thing:</span>
-                  <button class="try-btn" on:click={() => runExperiment(raceExperiment)}>
-                    <Play size={13} strokeWidth={2.5} /><span>Race them on Rosenbrock</span>
-                  </button>
-                </div>
-              {/if}
+              <ChapterCta
+                lessonId={chLesson['ch-optimizers']}
+                onLesson={() => startLessonFromChapter('ch-optimizers')}
+                demo={raceExperiment ? () => runExperiment(raceExperiment) : null}
+              />
               {#if chRefs['ch-optimizers']}
                 <div class="ch-refs">
                   <span class="ch-refs-label">Further reading</span>
@@ -2399,12 +2401,7 @@
                 worth reaching.
               </p>
               {#if chapterPresets['ch-generalize']}
-                <div class="opt-cta">
-                  <span>Try it live:</span>
-                  <button class="try-btn" on:click={() => runPreset('ch-generalize')}>
-                    <Play size={13} strokeWidth={2.5} /><span>{chapterPresets['ch-generalize'].title}</span>
-                  </button>
-                </div>
+                <ChapterCta demo={() => runPreset('ch-generalize')} demoLabel={chapterPresets['ch-generalize'].title} />
               {/if}
               {#if chRefs['ch-generalize']}
                 <div class="ch-refs">
@@ -3242,13 +3239,34 @@
     margin: 0;
   }
 
-  .opt-cta {
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 1rem; flex-wrap: wrap;
-    margin-top: 1rem;
-    font-size: 0.875rem;
-    color: var(--color-text-secondary);
+  /* ---------- Top-of-guide "take the course" banner ---------- */
+  .course-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+    margin: 0 0 2.4rem;
+    padding: 0.95rem 1.1rem;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    border-radius: 12px;
+    background: rgba(16, 185, 129, 0.07);
   }
+  .course-banner-text { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+  .course-banner-text strong { font-size: 0.95rem; font-weight: 700; color: var(--color-text-primary); }
+  .course-banner-text span { font-size: 0.82rem; color: var(--color-text-secondary); line-height: 1.45; }
+  .course-banner-btn {
+    flex-shrink: 0;
+    display: inline-flex; align-items: center; gap: 0.45rem;
+    padding: 0.55rem 1rem;
+    border: none; border-radius: 9px;
+    background: #10b981; color: #fff;
+    font-size: 0.85rem; font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+  }
+  .course-banner-btn:hover { background: #059669; transform: translateY(-1px); }
+  .course-banner-btn:active { transform: scale(0.98); }
 
   .try-btn {
     flex-shrink: 0;

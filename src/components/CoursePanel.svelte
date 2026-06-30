@@ -1,11 +1,12 @@
 <script lang="ts">
   /**
-   * The course card: one lesson at a time, in four explicit steps —
-   * 1 Setup (what's staged, where to look) → 2 Predict (commit to an
-   * answer) → 3 Run (you launch it) → 4 Learn (the explanation).
-   *
-   * Fully navigable: ‹/› move between lessons, the progress dots jump
-   * anywhere, and the card itself drags by its header if it's in the way.
+   * The guided-course player: a floating, draggable panel launched from the
+   * guide. It opens on a welcome screen explaining the predict → run → learn
+   * loop, then walks one lesson at a time through four explicit steps —
+   * 1 Setup (what's staged, where to look) → 2 Predict (commit to an answer)
+   * → 3 Run (you launch it) → 4 Learn (the explanation). A per-lesson
+   * schematic sits beside the text; the panel drags by its header so you can
+   * watch the live landscape behind it.
    */
 
   import { courseStore, raceStore, divergenceStore } from '../stores/stores';
@@ -13,6 +14,7 @@
   import {
     lessons,
     enterLesson,
+    beginCourse,
     beginPredict,
     answerLesson,
     launchLesson,
@@ -21,6 +23,7 @@
     closeCourse,
     restartCourse
   } from '../utils/lessons';
+  import LessonDiagram from './LessonDiagram.svelte';
   import { GraduationCap, X, ArrowRight, RotateCcw, ChevronLeft, ChevronRight, Play, Eye } from 'lucide-svelte';
   import { fly } from 'svelte/transition';
 
@@ -50,7 +53,7 @@
   let startOffset = { x: 0, y: 0 };
 
   // Reopening the course brings the card home — a card dragged half out
-  // of the clipped container must never be lost for good.
+  // of view must never be lost for good.
   let wasActive = false;
   $: {
     if (cs.active && !wasActive) {
@@ -70,9 +73,10 @@
 
   function onWindowMove(e: PointerEvent) {
     if (!dragging) return;
-    // Clamped to the viewport so the header always stays reachable
-    const mx = Math.max(120, window.innerWidth / 2 - 120);
-    const my = Math.max(80, window.innerHeight / 2 - 60);
+    // Clamped so a good chunk of the card — and its header — always stays
+    // on screen (the panel is wide, so leave generous margins).
+    const mx = Math.max(100, window.innerWidth / 2 - 180);
+    const my = Math.max(70, window.innerHeight / 2 - 140);
     dragX = Math.max(-mx, Math.min(mx, startOffset.x + (e.clientX - startPointer.x)));
     dragY = Math.max(-my, Math.min(my, startOffset.y + (e.clientY - startPointer.y)));
   }
@@ -88,25 +92,79 @@
   <div
     class="course-card"
     class:dragging
+    class:wide={cs.phase !== 'welcome' && cs.phase !== 'done'}
     style="transform: translate(-50%, -50%) translate({dragX}px, {dragY}px);"
     role="dialog"
-    aria-label="Course lesson"
+    aria-label="Guided course"
   >
-    {#if cs.phase === 'done'}
-      <div class="card-head" role="group" on:pointerdown={onHeaderDown}>
-        <span class="badge done-badge"><GraduationCap size={13} strokeWidth={2.4} /> Course</span>
-        <span class="title">That's the whole story</span>
-        <button class="close-x" on:click={closeCourse} aria-label="Close course"><X size={15} strokeWidth={2.4} /></button>
+    {#if cs.phase === 'welcome'}
+      <!-- ─────────────── Welcome / front door ─────────────── -->
+      <div class="card-head" class:grab={!dragging} role="group" on:pointerdown={onHeaderDown} title="Drag to move">
+        <span class="badge"><GraduationCap size={13} strokeWidth={2.4} /> Guided course</span>
+        <span class="title">Welcome</span>
+        <button class="close-x" on:click={closeCourse} aria-label="Close course"><X size={16} strokeWidth={2.4} /></button>
       </div>
-      <p class="body-text">
+
+      <div class="welcome">
+        <p class="welcome-lead">
+          Ten short lessons on how optimizers actually move across a loss
+          landscape — slopes, traps, plateaus, momentum, noise, saddles, and a
+          real (tiny) neural network at the end.
+        </p>
+
+        <div class="loop" aria-hidden="true">
+          <span class="loop-step">
+            <span class="loop-ic"><Eye size={16} strokeWidth={2.2} /></span>
+            <b>Predict</b><small>guess what happens</small>
+          </span>
+          <ArrowRight size={15} class="loop-arrow" />
+          <span class="loop-step">
+            <span class="loop-ic"><Play size={16} strokeWidth={2.4} /></span>
+            <b>Run</b><small>watch the real landscape</small>
+          </span>
+          <ArrowRight size={15} class="loop-arrow" />
+          <span class="loop-step">
+            <span class="loop-ic"><GraduationCap size={16} strokeWidth={2.2} /></span>
+            <b>Learn</b><small>see why</small>
+          </span>
+        </div>
+
+        <p class="welcome-note">
+          Each lesson stages a scenario on the live app, so keep an eye on the
+          plots behind this panel — you can drag it aside any time.
+        </p>
+
+        <div class="welcome-cta">
+          {#if cs.idx > 0}
+            <button class="next-btn big" on:click={beginCourse}>
+              <Play size={14} strokeWidth={2.6} />
+              <span>Resume — Lesson {cs.idx + 1}</span>
+            </button>
+            <button class="text-link" on:click={() => enterLesson(0)}>Start over</button>
+          {:else}
+            <button class="next-btn big" on:click={beginCourse}>
+              <Play size={14} strokeWidth={2.6} />
+              <span>Start the course</span>
+            </button>
+          {/if}
+        </div>
+      </div>
+    {:else if cs.phase === 'done'}
+      <!-- ─────────────── Completion ─────────────── -->
+      <div class="card-head" role="group" on:pointerdown={onHeaderDown}>
+        <span class="badge"><GraduationCap size={13} strokeWidth={2.4} /> Course</span>
+        <span class="title">That's the whole story</span>
+        <button class="close-x" on:click={closeCourse} aria-label="Close course"><X size={16} strokeWidth={2.4} /></button>
+      </div>
+      <p class="body-text done-text">
         Slope → step size → traps → plateaus → momentum → SGD → conditioning →
-        adaptivity → saddles — and it all ran on a real (tiny) neural network at the end.
-        Everything bigger is these ideas, repeated billions of times.
+        adaptivity → saddles — and it all ran on a real (tiny) neural network at
+        the end. Everything bigger is these same ideas, repeated billions of times.
       </p>
       <div class="card-footer">
         <div class="dots" aria-hidden="true">
           {#each lessons as _l, i (i)}
-            <button class="dot done" on:click={() => enterLesson(i)} title={lessons[i].title}></button>
+            <button class="dot done" on:click={() => enterLesson(i)} title={lessons[i].title} aria-label="Lesson {i + 1}"></button>
           {/each}
         </div>
         <button class="next-btn" on:click={restartCourse}>
@@ -115,10 +173,11 @@
         </button>
       </div>
     {:else}
+      <!-- ─────────────── A lesson ─────────────── -->
       <div class="card-head" class:grab={!dragging} role="group" on:pointerdown={onHeaderDown} title="Drag to move">
         <span class="badge">Lesson {cs.idx + 1}/{lessons.length}</span>
         <span class="title">{lesson.title}</span>
-        <button class="close-x" on:click={closeCourse} aria-label="Close course"><X size={15} strokeWidth={2.4} /></button>
+        <button class="close-x" on:click={closeCourse} aria-label="Close course"><X size={16} strokeWidth={2.4} /></button>
       </div>
 
       <!-- The four steps, always visible: you can see where you are -->
@@ -126,67 +185,73 @@
         {#each PHASE_STEPS as step, i (step)}
           <span class="step" class:current={i === phaseIndex} class:past={i < phaseIndex}>
             <span class="step-n">{i + 1}</span>
-            <span>{step}</span>
+            <span class="step-lbl">{step}</span>
           </span>
           {#if i < PHASE_STEPS.length - 1}<span class="step-sep"></span>{/if}
         {/each}
       </div>
 
       {#key cs.idx}
-      <div class="lesson-body" in:fly={{ y: 10, duration: 260 }}>
-      {#if cs.phase === 'setup'}
-        <p class="body-text">{lesson.intro}</p>
-        <div class="cta-row">
-          <button class="next-btn" on:click={beginPredict}>
-            <Eye size={13} strokeWidth={2.4} />
-            <span>Make a prediction</span>
-          </button>
-        </div>
-      {:else}
-        <p class="body-text question">{lesson.question}</p>
+        <div class="lesson-grid" in:fly={{ y: 10, duration: 260 }}>
+          <div class="lesson-content">
+            {#if cs.phase === 'setup'}
+              <p class="body-text">{lesson.intro}</p>
+              <div class="cta-row">
+                <button class="next-btn" on:click={beginPredict}>
+                  <Eye size={13} strokeWidth={2.4} />
+                  <span>Make a prediction</span>
+                </button>
+              </div>
+            {:else}
+              <p class="body-text question">{lesson.question}</p>
 
-        <div class="options">
-          {#each lesson.options as opt, i (i)}
-            <button
-              class="option"
-              class:selected={cs.answer === i}
-              class:correct={cs.phase === 'reveal' && i === lesson.correctIndex}
-              class:wrong={cs.phase === 'reveal' && cs.answer === i && i !== lesson.correctIndex}
-              disabled={cs.phase !== 'predict'}
-              on:click={() => answerLesson(i)}
-            >
-              <span class="opt-mark">
-                {cs.phase === 'reveal' && i === lesson.correctIndex ? '✓' : String.fromCharCode(65 + i)}
-              </span>
-              <span>{opt}</span>
-            </button>
-          {/each}
-        </div>
+              <div class="options">
+                {#each lesson.options as opt, i (i)}
+                  <button
+                    class="option"
+                    class:selected={cs.answer === i}
+                    class:correct={cs.phase === 'reveal' && i === lesson.correctIndex}
+                    class:wrong={cs.phase === 'reveal' && cs.answer === i && i !== lesson.correctIndex}
+                    disabled={cs.phase !== 'predict'}
+                    on:click={() => answerLesson(i)}
+                  >
+                    <span class="opt-mark">
+                      {cs.phase === 'reveal' && i === lesson.correctIndex ? '✓' : String.fromCharCode(65 + i)}
+                    </span>
+                    <span>{opt}</span>
+                  </button>
+                {/each}
+              </div>
 
-        {#if cs.phase === 'predict'}
-          <div class="cta-row">
-            <button class="next-btn" disabled={cs.answer === null} on:click={launchLesson}>
-              <Play size={13} strokeWidth={2.6} />
-              <span>{cs.answer === null ? 'Pick an answer first' : lesson.kind === 'race' ? 'Start the race' : 'Run it'}</span>
-            </button>
+              {#if cs.phase === 'predict'}
+                <div class="cta-row">
+                  <button class="next-btn" disabled={cs.answer === null} on:click={launchLesson}>
+                    <Play size={13} strokeWidth={2.6} />
+                    <span>{cs.answer === null ? 'Pick an answer first' : lesson.kind === 'race' ? 'Start the race' : 'Run it'}</span>
+                  </button>
+                </div>
+              {/if}
+
+              {#if cs.phase === 'running'}
+                <div class="running-note">
+                  <span class="pulse" aria-hidden="true"></span>
+                  <span>Running — watch the landscape…</span>
+                </div>
+              {/if}
+
+              {#if cs.phase === 'reveal'}
+                <p class="explain" class:explain-correct={isCorrect}>
+                  <strong>{isCorrect ? 'Correct.' : 'Not quite — see the highlighted answer.'}</strong>
+                  {lesson.explain}
+                </p>
+              {/if}
+            {/if}
           </div>
-        {/if}
 
-        {#if cs.phase === 'running'}
-          <div class="running-note">
-            <span class="pulse" aria-hidden="true"></span>
-            <span>Running — watch the landscape…</span>
-          </div>
-        {/if}
-
-        {#if cs.phase === 'reveal'}
-          <p class="explain" class:explain-correct={isCorrect}>
-            <strong>{isCorrect ? 'Correct.' : 'Not quite — see the highlighted answer.'}</strong>
-            {lesson.explain}
-          </p>
-        {/if}
-      {/if}
-      </div>
+          <aside class="lesson-aside">
+            <LessonDiagram id={lesson.id} />
+          </aside>
+        </div>
       {/key}
 
       <div class="card-footer">
@@ -238,56 +303,60 @@
     position: fixed;
     top: 50%;
     left: 50%;
-    width: min(92vw, 400px);
-    border-radius: 12px;
+    width: min(94vw, 440px);
+    max-height: min(90vh, 620px);
+    display: flex;
+    flex-direction: column;
+    border-radius: 14px;
     border: 1px solid var(--color-border);
-    padding: 0.7rem 0.85rem 0.6rem;
+    padding: 0.95rem 1.1rem 0.85rem;
     z-index: 500;
-    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(10px);
+    box-shadow: 0 22px 60px rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(12px);
     animation: cardIn 0.25s ease;
+  }
+
+  /* Lessons get the two-column layout, so they're wider */
+  .course-card.wide {
+    width: min(94vw, 720px);
   }
 
   .course-card.dragging {
     user-select: none;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 16px 44px rgba(0, 0, 0, 0.45);
   }
 
   @keyframes cardIn {
-    from { opacity: 0; }
+    from { opacity: 0; transform: translate(-50%, -50%) scale(0.98); }
     to   { opacity: 1; }
   }
 
   :global([data-theme='light']) .course-card {
-    background: rgba(255, 255, 255, 0.94);
+    background: rgba(255, 255, 255, 0.95);
     color: #1e293b;
   }
 
   :global([data-theme='dark']) .course-card {
-    background: rgba(10, 16, 28, 0.93);
+    background: rgba(10, 16, 28, 0.94);
     color: #e2e8f0;
   }
 
   .card-head {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.45rem;
+    gap: 0.55rem;
+    margin-bottom: 0.6rem;
+    flex-shrink: 0;
     touch-action: none;
   }
 
-  .card-head.grab {
-    cursor: grab;
-  }
-
-  .course-card.dragging .card-head {
-    cursor: grabbing;
-  }
+  .card-head.grab { cursor: grab; }
+  .course-card.dragging .card-head { cursor: grabbing; }
 
   .badge {
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
+    gap: 0.32rem;
     flex-shrink: 0;
     font-size: 0.625rem;
     font-weight: 800;
@@ -296,12 +365,12 @@
     color: #10b981;
     background: rgba(16, 185, 129, 0.14);
     border-radius: 6px;
-    padding: 0.16rem 0.45rem;
+    padding: 0.2rem 0.5rem;
     font-family: 'SF Mono', Monaco, monospace;
   }
 
   .title {
-    font-size: 0.875rem;
+    font-size: 1rem;
     font-weight: 700;
     flex: 1;
     min-width: 0;
@@ -312,8 +381,8 @@
 
   .close-x {
     flex-shrink: 0;
-    width: 24px;
-    height: 24px;
+    width: 26px;
+    height: 26px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -332,15 +401,16 @@
   .steps {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
-    margin-bottom: 0.55rem;
+    gap: 0.5rem;
+    margin-bottom: 0.85rem;
+    flex-shrink: 0;
   }
 
   .step {
     display: inline-flex;
     align-items: center;
-    gap: 0.28rem;
-    font-size: 0.625rem;
+    gap: 0.34rem;
+    font-size: 0.6875rem;
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -348,22 +418,15 @@
     white-space: nowrap;
   }
 
-  .step.past {
-    opacity: 0.6;
-    color: #10b981;
-  }
-
-  .step.current {
-    opacity: 1;
-    color: #10b981;
-  }
+  .step.past { opacity: 0.6; color: #10b981; }
+  .step.current { opacity: 1; color: #10b981; }
 
   .step-n {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
     border: 1.4px solid currentColor;
     font-size: 0.5625rem;
@@ -380,38 +443,51 @@
     flex: 1;
     height: 1px;
     background: var(--color-border);
-    min-width: 6px;
+    min-width: 8px;
   }
+
+  /* ---------- Two-column lesson body ---------- */
+  .lesson-grid {
+    display: grid;
+    grid-template-columns: 1fr 236px;
+    gap: 1.25rem;
+    align-items: start;
+    overflow: auto;
+    min-height: 0;
+    flex: 1;
+  }
+
+  .lesson-content { min-width: 0; }
+  .lesson-aside { position: sticky; top: 0; }
 
   .body-text {
-    margin: 0 0 0.55rem;
-    font-size: 0.8125rem;
-    line-height: 1.5;
+    margin: 0 0 0.7rem;
+    font-size: 0.9375rem;
+    line-height: 1.6;
   }
 
-  .question {
-    font-weight: 500;
-  }
+  .question { font-weight: 500; }
+  .done-text { font-size: 0.9375rem; }
 
   .options {
     display: flex;
     flex-direction: column;
-    gap: 0.3rem;
+    gap: 0.4rem;
   }
 
   .option {
     display: flex;
     align-items: center;
-    gap: 0.55rem;
+    gap: 0.6rem;
     width: 100%;
     text-align: left;
     border: 1px solid var(--color-border);
-    border-radius: 8px;
+    border-radius: 9px;
     background: transparent;
     color: inherit;
-    font-size: 0.7813rem;
-    line-height: 1.35;
-    padding: 0.42rem 0.55rem;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    padding: 0.55rem 0.7rem;
     cursor: pointer;
     transition: border-color 0.15s ease, background 0.15s ease, opacity 0.15s ease;
   }
@@ -421,65 +497,40 @@
     background: rgba(16, 185, 129, 0.07);
   }
 
-  .option:disabled {
-    cursor: default;
-    opacity: 0.55;
-  }
-
-  .option.selected {
-    border-color: #10b981;
-    background: rgba(16, 185, 129, 0.1);
-    opacity: 1;
-  }
-
-  .option.correct {
-    border-color: #10b981;
-    background: rgba(16, 185, 129, 0.13);
-    opacity: 1;
-  }
-
-  .option.wrong {
-    border-color: rgba(239, 68, 68, 0.65);
-    background: rgba(239, 68, 68, 0.08);
-    opacity: 0.95;
-  }
+  .option:disabled { cursor: default; opacity: 0.55; }
+  .option.selected { border-color: #10b981; background: rgba(16, 185, 129, 0.1); opacity: 1; }
+  .option.correct { border-color: #10b981; background: rgba(16, 185, 129, 0.13); opacity: 1; }
+  .option.wrong { border-color: rgba(239, 68, 68, 0.65); background: rgba(239, 68, 68, 0.08); opacity: 0.95; }
 
   .opt-mark {
     flex-shrink: 0;
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 5px;
-    font-size: 0.625rem;
+    border-radius: 6px;
+    font-size: 0.6875rem;
     font-weight: 800;
     font-family: 'SF Mono', Monaco, monospace;
     background: rgba(148, 163, 184, 0.18);
   }
 
-  .option.selected .opt-mark {
-    background: #10b981;
-    color: #fff;
-  }
-
-  .option.correct .opt-mark {
-    background: #10b981;
-    color: #fff;
-  }
+  .option.selected .opt-mark,
+  .option.correct .opt-mark { background: #10b981; color: #fff; }
 
   .cta-row {
     display: flex;
     justify-content: flex-end;
-    margin-top: 0.55rem;
+    margin-top: 0.7rem;
   }
 
   .running-note {
     display: flex;
     align-items: center;
-    gap: 0.45rem;
-    margin-top: 0.55rem;
-    font-size: 0.75rem;
+    gap: 0.5rem;
+    margin-top: 0.7rem;
+    font-size: 0.8125rem;
     font-weight: 600;
     opacity: 0.8;
   }
@@ -498,36 +549,109 @@
   }
 
   .explain {
-    margin: 0.55rem 0 0;
-    padding: 0.45rem 0.6rem;
-    font-size: 0.75rem;
-    line-height: 1.5;
+    margin: 0.7rem 0 0;
+    padding: 0.55rem 0.7rem;
+    font-size: 0.8125rem;
+    line-height: 1.55;
     border-left: 3px solid rgba(239, 68, 68, 0.7);
-    border-radius: 4px;
+    border-radius: 5px;
     background: rgba(148, 163, 184, 0.08);
   }
 
-  .explain.explain-correct {
-    border-left-color: #10b981;
+  .explain.explain-correct { border-left-color: #10b981; }
+  .explain strong { font-weight: 700; }
+
+  /* ---------- Welcome ---------- */
+  .welcome {
+    overflow: auto;
+    min-height: 0;
   }
 
-  .explain strong {
-    font-weight: 700;
+  .welcome-lead {
+    margin: 0 0 1rem;
+    font-size: 0.9375rem;
+    line-height: 1.6;
   }
 
+  .loop {
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    gap: 0.5rem;
+    margin: 0.2rem 0 1rem;
+  }
+
+  .loop-step {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.18rem;
+    text-align: center;
+    padding: 0.6rem 0.4rem;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: rgba(16, 185, 129, 0.05);
+  }
+
+  .loop-ic {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: rgba(16, 185, 129, 0.16);
+    color: #10b981;
+    margin-bottom: 0.15rem;
+  }
+
+  .loop-step b { font-size: 0.8125rem; font-weight: 700; }
+  .loop-step small { font-size: 0.6875rem; opacity: 0.6; line-height: 1.3; }
+  :global(.loop-arrow) { align-self: center; opacity: 0.4; flex-shrink: 0; }
+
+  .welcome-note {
+    margin: 0 0 1.1rem;
+    font-size: 0.8125rem;
+    line-height: 1.55;
+    opacity: 0.72;
+  }
+
+  .welcome-cta {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+  }
+
+  .text-link {
+    border: none;
+    background: transparent;
+    color: inherit;
+    opacity: 0.6;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .text-link:hover { opacity: 1; color: #10b981; }
+
+  /* ---------- Footer ---------- */
   .card-footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.6rem;
-    margin-top: 0.55rem;
-    min-height: 24px;
+    margin-top: 0.75rem;
+    min-height: 26px;
+    flex-shrink: 0;
   }
 
   .nav-btn {
     flex-shrink: 0;
-    width: 24px;
-    height: 24px;
+    width: 26px;
+    height: 26px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -541,16 +665,8 @@
     transition: all 0.15s ease;
   }
 
-  .nav-btn:hover:not(:disabled) {
-    opacity: 1;
-    border-color: #10b981;
-    color: #10b981;
-  }
-
-  .nav-btn:disabled {
-    opacity: 0.25;
-    cursor: default;
-  }
+  .nav-btn:hover:not(:disabled) { opacity: 1; border-color: #10b981; color: #10b981; }
+  .nav-btn:disabled { opacity: 0.25; cursor: default; }
 
   .dots {
     display: flex;
@@ -558,6 +674,7 @@
     align-items: center;
     flex: 1;
     justify-content: center;
+    flex-wrap: wrap;
   }
 
   .dot {
@@ -571,54 +688,36 @@
     transition: transform 0.12s ease, background 0.12s ease;
   }
 
-  .dot:hover {
-    transform: scale(1.45);
-    border-color: #10b981;
-  }
-
-  .dot.done {
-    background: #10b981;
-    border-color: #10b981;
-  }
-
-  .dot.current {
-    border-color: #10b981;
-    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
-  }
+  .dot:hover { transform: scale(1.45); border-color: #10b981; }
+  .dot.done { background: #10b981; border-color: #10b981; }
+  .dot.current { border-color: #10b981; box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25); }
 
   .next-btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.4rem;
     border: none;
     border-radius: 8px;
     background: #10b981;
     color: #fff;
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
     font-weight: 700;
-    padding: 0.34rem 0.7rem;
+    padding: 0.42rem 0.8rem;
     cursor: pointer;
     transition: background 0.15s ease, transform 0.1s ease;
   }
 
-  .next-btn:hover:not(:disabled) {
-    background: #059669;
-  }
-
-  .next-btn:active:not(:disabled) {
-    transform: scale(0.97);
-  }
-
-  .next-btn:disabled {
-    opacity: 0.45;
-    cursor: default;
-  }
+  .next-btn.big { padding: 0.55rem 1.1rem; font-size: 0.875rem; }
+  .next-btn:hover:not(:disabled) { background: #059669; }
+  .next-btn:active:not(:disabled) { transform: scale(0.97); }
+  .next-btn:disabled { opacity: 0.45; cursor: default; }
 
   @media (max-width: 768px) {
-    .course-card { width: 96%; padding: 0.55rem 0.65rem 0.5rem; }
-    .body-text { font-size: 0.75rem; }
-    .option { font-size: 0.7188rem; }
-    .steps { gap: 0.25rem; }
-    .step span:not(.step-n) { display: none; }
+    .course-card,
+    .course-card.wide { width: 94vw; padding: 0.75rem 0.85rem 0.7rem; }
+    .lesson-grid { grid-template-columns: 1fr; gap: 0.85rem; }
+    .lesson-aside { order: -1; max-width: 240px; margin: 0 auto; position: static; }
+    .loop-step small { display: none; }
+    .step-lbl { display: none; }
   }
 </style>

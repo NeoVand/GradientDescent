@@ -293,14 +293,34 @@ function saveProgress(idx: number) {
   if (typeof window !== 'undefined') localStorage.setItem(PROGRESS_KEY, String(idx));
 }
 
-/** Open the course at the saved lesson and stage its scenario. */
-export function startCourse() {
+/** Resolve a lesson id to its index (0 if unknown). */
+export function lessonIndexById(id: string): number {
+  const i = lessons.findIndex(l => l.id === id);
+  return i < 0 ? 0 : i;
+}
+
+/**
+ * Open the course on its welcome screen — what's coming and how the
+ * predict → run → learn loop works — WITHOUT staging anything yet, so the
+ * live app keeps whatever the reader was looking at until they press Start.
+ */
+export function startCourseIntro() {
   stopTraining();
   stopRace();
   clearCoach();
-  const idx = loadProgress();
-  courseStore.set({ active: true, idx, phase: 'setup', answer: null });
-  lessons[idx].setup();
+  courseStore.set({ active: true, idx: loadProgress(), phase: 'welcome', answer: null });
+}
+
+/** Leave the welcome screen and stage the first/resumed lesson. */
+export function beginCourse() {
+  const s = get(courseStore);
+  if (!s.active || s.phase !== 'welcome') return;
+  enterLesson(s.idx);
+}
+
+/** Launch the course straight into the lesson tied to a guide chapter. */
+export function enterCourseFromChapter(lessonId: string) {
+  enterLesson(lessonIndexById(lessonId));
 }
 
 /** Stage lesson idx from its setup step. The one entry point for all
