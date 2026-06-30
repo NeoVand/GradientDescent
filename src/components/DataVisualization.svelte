@@ -40,12 +40,21 @@
   // a fixed-radius circle (exactly the circle-classifier path). These flags
   // fold the custom problem into those existing paths so nothing is duplicated.
   $: cmodelClass = $customModelStore.classification;
-  $: isClassEditor = problemType === 'custom-classification';
+  // The class-based point editor (place by class, into train OR test) shows for
+  // every binary classifier, not just the custom one. Keep the render flags
+  // below tied to the *specific* problem type so broadening the editor never
+  // mis-routes logistic-regression through the circle path.
+  $: isClassEditor =
+    problemType === 'logistic-regression' ||
+    problemType === 'circle-classifier' ||
+    problemType === 'custom-classification';
   $: isCustomProblem = problemType === 'custom-regression' || problemType === 'custom-classification';
   $: renderCircle =
-    problemType === 'circle-classifier' || (isClassEditor && cmodelClass === 'circle');
+    problemType === 'circle-classifier' ||
+    (problemType === 'custom-classification' && cmodelClass === 'circle');
   $: renderLogistic =
-    problemType === 'logistic-regression' || (isClassEditor && cmodelClass === 'linear');
+    problemType === 'logistic-regression' ||
+    (problemType === 'custom-classification' && cmodelClass === 'linear');
 
   // 2D-point problems: parameters (α, β) live in the *same* coordinate system
   // as the data points (a 2D position). The marker is drawn directly on the
@@ -57,17 +66,17 @@
     problemType === 'circle-classifier' ||
     problemType === 'source-localization' ||
     problemType === 'mean-shift' ||
-    (isClassEditor && cmodelClass === 'circle');
+    (problemType === 'custom-classification' && cmodelClass === 'circle');
 
   // 1D curve-fitting plots are hand-editable via the toolbar: add train
   // points, add test points, or erase. The loss landscape morphs live —
   // the landscape IS the data. (The AR problems are time series — hand-
   // placed points would break their lag structure, so they stay read-only.)
-  // Custom Classification is always editable, with a class toggle instead.
+  // Every binary classifier is editable too, through the class editor — you
+  // place points by class, into the training or the held-out test split.
   $: isEditable =
     isClassEditor ||
     (!is2DPointProblem &&
-      problemType !== 'logistic-regression' &&
       problemType !== 'ar2' &&
       problemType !== 'ar2-rollout');
 
@@ -1030,32 +1039,58 @@
     </h2>
     {#if isClassEditor}
       <div class="header-tools" role="toolbar" aria-label="Class editor">
+        <!-- WHICH class a placed point belongs to (colour = class) -->
         <button
           class="tool-btn"
-          class:active={editTool === 'train' && editClass === 0}
-          use:tooltip={'Place Class 0 points (blue) — click anywhere on the plot. The loss landscape reshapes live.'}
+          class:active={editClass === 0 && editTool !== 'erase'}
+          use:tooltip={'Class 0 — blue circles. Click the plot to place; the loss landscape reshapes live.'}
           aria-label="Place Class 0 points"
-          aria-pressed={editTool === 'train' && editClass === 0}
-          on:click={() => { editTool = 'train'; editClass = 0; }}
+          aria-pressed={editClass === 0 && editTool !== 'erase'}
+          on:click={() => { editClass = 0; if (editTool === 'erase') editTool = 'train'; }}
         >
           <svg width="15" height="15" viewBox="0 0 15 15" aria-hidden="true">
-            <circle cx="6" cy="9" r="4" fill="#3b82f6" />
-            <path d="M10.5 4.5 H14.5 M12.5 2.5 V6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+            <circle cx="7.5" cy="7.5" r="5" fill="#3b82f6" />
           </svg>
         </button>
         <button
           class="tool-btn"
-          class:active={editTool === 'train' && editClass === 1}
-          use:tooltip={'Place Class 1 points (green) — click anywhere on the plot'}
+          class:active={editClass === 1 && editTool !== 'erase'}
+          use:tooltip={'Class 1 — green squares. Click the plot to place a point.'}
           aria-label="Place Class 1 points"
-          aria-pressed={editTool === 'train' && editClass === 1}
-          on:click={() => { editTool = 'train'; editClass = 1; }}
+          aria-pressed={editClass === 1 && editTool !== 'erase'}
+          on:click={() => { editClass = 1; if (editTool === 'erase') editTool = 'train'; }}
         >
           <svg width="15" height="15" viewBox="0 0 15 15" aria-hidden="true">
-            <rect x="2" y="5" width="8" height="8" fill="#10b981" />
-            <path d="M10.5 4.5 H14.5 M12.5 2.5 V6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+            <rect x="2.5" y="2.5" width="10" height="10" fill="#10b981" />
           </svg>
         </button>
+        <span class="tool-sep" aria-hidden="true"></span>
+        <!-- WHICH split it lands in (fill = solid train / dashed test) -->
+        <button
+          class="tool-btn"
+          class:active={editTool === 'train'}
+          use:tooltip={'Training split — solid. These points the model learns from.'}
+          aria-label="Add to training split"
+          aria-pressed={editTool === 'train'}
+          on:click={() => (editTool = 'train')}
+        >
+          <svg width="15" height="15" viewBox="0 0 15 15" aria-hidden="true">
+            <circle cx="7.5" cy="7.5" r="4.6" fill="currentColor" />
+          </svg>
+        </button>
+        <button
+          class="tool-btn"
+          class:active={editTool === 'test'}
+          use:tooltip={'Test split — dashed, held out of training. These define the test error.'}
+          aria-label="Add to test split"
+          aria-pressed={editTool === 'test'}
+          on:click={() => (editTool = 'test')}
+        >
+          <svg width="15" height="15" viewBox="0 0 15 15" aria-hidden="true">
+            <circle cx="7.5" cy="7.5" r="4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2.5,1.8" />
+          </svg>
+        </button>
+        <span class="tool-sep" aria-hidden="true"></span>
         <button
           class="tool-btn erase-btn"
           class:active={editTool === 'erase'}
@@ -1116,6 +1151,8 @@
       class:tool-train={isEditable && editTool === 'train'}
       class:tool-test={isEditable && editTool === 'test'}
       class:tool-erase={isEditable && editTool === 'erase'}
+      class:tool-c0={isClassEditor && editClass === 0 && editTool !== 'erase'}
+      class:tool-c1={isClassEditor && editClass === 1 && editTool !== 'erase'}
     ></svg>
 
     <!-- Empty state: an inviting prompt to start placing points. pointer-events
@@ -1244,6 +1281,14 @@
     padding: 1px;
   }
 
+  /* Hairline divider between the class picker, the split picker and erase */
+  .tool-sep {
+    width: 1px;
+    align-self: stretch;
+    margin: 3px 1px;
+    background: var(--color-border);
+  }
+
   .tool-btn {
     width: 26px;
     height: 24px;
@@ -1287,6 +1332,19 @@
 
   svg.tool-test {
     cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='5.5' fill='rgba(16,185,129,0.3)' stroke='%2310b981' stroke-width='2' stroke-dasharray='3 2'/%3E%3Cpath d='M18.5 2.5v6M15.5 5.5h6' stroke='%2310b981' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 12 12, crosshair;
+  }
+
+  /* Class-editor cursors: colour = class (blue/green), fill = split
+     (solid train / dashed test). These 2-class selectors out-specify the
+     plain train/test cursors above. class-0 train reuses the blue circle. */
+  svg.tool-c0.tool-test {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='5.5' fill='rgba(59,130,246,0.3)' stroke='%233b82f6' stroke-width='2' stroke-dasharray='3 2'/%3E%3Cpath d='M18.5 2.5v6M15.5 5.5h6' stroke='%233b82f6' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 12 12, crosshair;
+  }
+  svg.tool-c1.tool-train {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Crect x='6.5' y='6.5' width='11' height='11' fill='%2310b981' stroke='white' stroke-width='1.5'/%3E%3Cpath d='M18.5 2.5v6M15.5 5.5h6' stroke='%2310b981' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 12 12, crosshair;
+  }
+  svg.tool-c1.tool-test {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Crect x='6.5' y='6.5' width='11' height='11' fill='rgba(16,185,129,0.3)' stroke='%2310b981' stroke-width='2' stroke-dasharray='3 2'/%3E%3Cpath d='M18.5 2.5v6M15.5 5.5h6' stroke='%2310b981' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 12 12, crosshair;
   }
 
   svg.tool-erase {
