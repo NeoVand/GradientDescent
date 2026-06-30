@@ -2523,11 +2523,13 @@
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
   .modal-content {
+    position: relative;
+    --bar-h: 50px; /* shared header/footer height — both equally thin */
     background: var(--color-bg-secondary);
     border-radius: 16px;
     width: 100%;
     max-width: 1040px;
-    max-height: 90vh;
+    height: min(90vh, 880px);
     display: flex;
     flex-direction: column;
     box-shadow: 0 24px 70px rgba(0, 0, 0, 0.4);
@@ -2539,15 +2541,24 @@
     to   { opacity: 1; transform: translateY(0); }
   }
 
-  /* ---------- Header ---------- */
+  /* ---------- Header (frosted overlay; the reading column drifts under it) ---------- */
   .modal-header {
-    padding: 0.62rem 1.5rem;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 4;
+    height: var(--bar-h);
+    padding: 0 1.4rem;
     border-bottom: 1px solid var(--color-border);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.72);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+    backdrop-filter: blur(14px) saturate(1.4);
   }
+  :global([data-theme='dark']) .modal-header { background: rgba(20, 31, 46, 0.7); }
   .modal-title { display: flex; align-items: center; gap: 0.65rem; }
   .modal-icon {
     font-family: 'Times New Roman', 'Georgia', serif;
@@ -2576,7 +2587,7 @@
     margin-left: 0.1rem;
   }
   .close-btn {
-    width: 38px; height: 38px;
+    width: 32px; height: 32px;
     flex-shrink: 0;
     border: none;
     border-radius: 8px;
@@ -2587,16 +2598,20 @@
     transition: background 0.18s, color 0.18s, transform 0.1s;
   }
   /* flex-shrink:0 is the fix — without it the icon collapsed to a 4px sliver
-     (the "tiny cross"). 24px stroke, plain neutral colour, no box. */
-  .close-btn :global(svg) { width: 24px; height: 24px; flex-shrink: 0; }
+     (the "tiny cross"). Plain neutral colour, no box. */
+  .close-btn :global(svg) { width: 20px; height: 20px; flex-shrink: 0; }
   .close-btn:hover { background: var(--color-bg-tertiary); color: var(--color-text-primary); }
   .close-btn:active { transform: scale(0.94); }
 
-  /* ---------- Reading-progress bar ---------- */
+  /* ---------- Reading-progress bar (rides the header's lower edge) ---------- */
   .reading-progress {
+    position: absolute;
+    top: var(--bar-h);
+    left: 0;
+    right: 0;
+    z-index: 4;
     height: 2px;
     background: var(--color-bg-tertiary);
-    flex-shrink: 0;
   }
   .reading-progress-fill {
     height: 100%;
@@ -2618,7 +2633,8 @@
     flex: 0 0 224px;
     border-right: 1px solid var(--color-border);
     overflow-y: auto;
-    padding: 1.1rem 0.65rem 1.5rem;
+    /* clear the frosted header/footer top and bottom */
+    padding: calc(var(--bar-h) + 1rem) 0.65rem calc(var(--bar-h) + 1rem);
     /* Light mode: a soft mint rail, not a dingy grey overlay. Dark mode keeps
        a gentle darkening (below) since the rail sits on a near-black panel. */
     background: rgba(16, 185, 129, 0.06);
@@ -2699,7 +2715,8 @@
   .reading-column {
     max-width: 760px;
     margin: 0 auto;
-    padding: 1.9rem 2.5rem 3rem;
+    /* clear the frosted header/footer so content drifts under, never behind */
+    padding: calc(var(--bar-h) + 1.4rem) 2.5rem calc(var(--bar-h) + 1.6rem);
   }
 
   /* ---------- Cover ---------- */
@@ -3352,11 +3369,20 @@
 
   /* ---------- Footer ---------- */
   .modal-footer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 4;
+    min-height: var(--bar-h);
     border-top: 1px solid var(--color-border);
-    padding: 0.5rem 1.5rem;
-    flex-shrink: 0;
+    padding: 0 1.4rem;
     display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    background: rgba(255, 255, 255, 0.72);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+    backdrop-filter: blur(14px) saturate(1.4);
   }
+  :global([data-theme='dark']) .modal-footer { background: rgba(20, 31, 46, 0.7); }
   .modal-footer p { margin: 0; font-size: 0.8125rem; color: var(--color-text-tertiary); }
   .modal-footer strong { color: #10b981; font-weight: 600; }
   .github-link {
@@ -3379,15 +3405,15 @@
   /* ---------- Mobile ---------- */
   @media (max-width: 768px) {
     .modal-backdrop { padding: 0.5rem; }
-    .modal-content { max-height: 95dvh; border-radius: 14px; }
-    .modal-header { padding: 0.875rem 1rem; }
+    .modal-content { height: 95dvh; border-radius: 14px; --bar-h: 46px; }
+    .modal-header { padding: 0 1rem; }
     .modal-header h2 { font-size: 1.1rem; }
     .modal-icon { font-size: 1.5rem; }
     .book-tag { display: none; }
 
     /* Drop the rail; the reading column takes the full width. */
     .toc { display: none; }
-    .reading-column { padding: 1.25rem 1.1rem 2.5rem; max-width: 100%; }
+    .reading-column { padding: calc(var(--bar-h) + 0.9rem) 1.1rem calc(var(--bar-h) + 1rem); max-width: 100%; }
 
     .hero-svg { height: 150px; }
     .hero-title { font-size: 1.3rem; }
@@ -3402,6 +3428,6 @@
     .concept-text-overlay { position: relative; width: 100%; padding: 1rem 1.25rem; }
 
     .problem-grid { grid-template-columns: 1fr; }
-    .modal-footer { padding: 0.75rem 1rem; }
+    .modal-footer { padding: 0 1rem; }
   }
 </style>
