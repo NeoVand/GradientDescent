@@ -24,7 +24,6 @@
     resetRun,
     applyProblem,
     applyOptimizer,
-    startRace,
     stopRace,
     runStartStep
   } from '../utils/trainer';
@@ -56,8 +55,7 @@
     Timer,
     Shapes,
     ClipboardPaste,
-    PanelLeftClose,
-    Settings2
+    PanelLeftClose
   } from 'lucide-svelte';
   import RaceSettingsModal from './RaceSettingsModal.svelte';
   import { hyperMeta } from '../utils/hyperMeta';
@@ -933,30 +931,21 @@
       </button>
     </div>
 
-    <!-- Race: the chosen lineup descends from the marker's current spot. -->
-    <div class="race-row">
-      <button
-        class="race-button"
-        class:racing={raceRunning}
-        on:click={() => (raceRunning ? stopRace() : startRace())}
-        disabled={isTraining}
-        data-tour="run-race"
-        use:tooltip={'Race the selected optimizers from the marker’s current position<br/><span style="opacity:0.8;font-size:0.7rem">Edit the lineup and parameters with the gear ⚙</span>'}
-      >
-        <Flag size={14} strokeWidth={2.25} />
-        <span>{raceRunning ? 'Stop race' : 'Race optimizers'}</span>
-      </button>
-      <button
-        class="race-settings-btn"
-        on:click={() => (showRaceSettings = true)}
-        disabled={isTraining}
-        aria-label="Race settings"
-        data-tour="run-race-settings"
-        use:tooltip={'Race settings'}
-      >
-        <Settings2 size={17} strokeWidth={2.1} />
-      </button>
-    </div>
+    <!-- Race: one button. It opens the setup (pick the lineup, tune it) and the
+         race launches from there; while racing it stops. -->
+    <button
+      class="race-button"
+      class:racing={raceRunning}
+      on:click={() => (raceRunning ? stopRace() : (showRaceSettings = true))}
+      disabled={isTraining}
+      data-tour="run-race"
+      use:tooltip={raceRunning
+        ? 'Stop the race'
+        : 'Set up and start a race — pick the optimizers, tune them, then launch from the marker’s current position'}
+    >
+      <Flag size={14} strokeWidth={2.25} />
+      <span>{raceRunning ? 'Stop race' : 'Race optimizers'}</span>
+    </button>
     </div>
   </div>
 </div>
@@ -1880,58 +1869,33 @@
     transform: translateY(-1px);
   }
 
-  /* Race button: full-width secondary action under the transport row */
-  /* Secondary action: a clearly-visible emerald outline + tint (theme-aware
-     via --color-success), distinct from the filled Train button. */
-  /* Race + its settings gear share a row. */
-  .race-row {
-    display: flex;
-    align-items: stretch;
-    gap: 0.4rem;
-    /* Breathing room from the transport row above — keeps it from crowding
-       Reset/Train when the deck is short (mobile, or a tight viewport). */
-    margin-top: calc(4px + 0.4 * var(--air));
-  }
-  .race-settings-btn {
-    flex-shrink: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 0.65rem;
-    border: 1.5px solid var(--color-border);
-    border-radius: 8px;
-    background: var(--color-bg-secondary);
-    color: var(--color-text-secondary);
-    cursor: pointer;
-    transition: all 0.15s ease;
-  }
-  .race-settings-btn:hover:not(:disabled) {
-    border-color: var(--color-success);
-    color: var(--color-success);
-    background: color-mix(in srgb, var(--color-success) 12%, transparent);
-  }
-  .race-settings-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-
+  /* Race: one full-width secondary action under the transport row. An emerald
+     outline + tint (theme-aware via --color-success), distinct from the filled
+     Train button — same height and radius as the step/train/reset buttons, so
+     the deck stays symmetric. Opens the setup modal; the race starts there. */
   .race-button {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.45rem;
-    flex: 1;
-    min-width: 0;
-    padding: calc(5.5px + 0.35 * var(--air));
+    gap: 0.5rem;
+    width: 100%;
+    min-height: calc(34px + 0.8 * var(--air));
+    /* Breathing room from the transport row above. */
+    margin-top: calc(4px + 0.4 * var(--air));
+    padding: 0 0.75rem;
     border: 1.5px solid var(--color-success);
     border-radius: 8px;
-    background: color-mix(in srgb, var(--color-success) 14%, transparent);
+    background: color-mix(in srgb, var(--color-success) 12%, transparent);
     color: var(--color-success);
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
     font-weight: 700;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all 0.2s ease;
   }
 
   .race-button:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--color-success) 24%, transparent);
+    background: color-mix(in srgb, var(--color-success) 22%, transparent);
+    transform: translateY(-1px);
   }
 
   .race-button.racing {
