@@ -4,9 +4,9 @@
    * guide. It opens on a welcome screen explaining the predict → run → learn
    * loop, then walks one lesson at a time through four explicit steps —
    * 1 Setup (what's staged, where to look) → 2 Predict (commit to an answer)
-   * → 3 Run (you launch it) → 4 Learn (the explanation). A per-lesson
-   * schematic sits beside the text; the panel drags by its header so you can
-   * watch the live landscape behind it.
+   * → 3 Run (you launch it) → 4 Learn (the explanation). The teaching happens
+   * on the live landscape behind the card — the panel drags by its header so
+   * you can watch it.
    */
 
   import { courseStore, raceStore, divergenceStore } from '../stores/stores';
@@ -23,7 +23,6 @@
     closeCourse,
     restartCourse
   } from '../utils/lessons';
-  import LessonDiagram from './LessonDiagram.svelte';
   import { GraduationCap, X, ArrowRight, RotateCcw, ChevronLeft, ChevronRight, Play, Eye } from 'lucide-svelte';
   import { fly } from 'svelte/transition';
 
@@ -92,7 +91,6 @@
   <div
     class="course-card"
     class:dragging
-    class:wide={cs.phase !== 'welcome' && cs.phase !== 'done'}
     style="transform: translate(-50%, -50%) translate({dragX}px, {dragY}px);"
     role="dialog"
     aria-label="Guided course"
@@ -192,65 +190,59 @@
       </div>
 
       {#key cs.idx}
-        <div class="lesson-grid" in:fly={{ y: 10, duration: 260 }}>
-          <div class="lesson-content">
-            {#if cs.phase === 'setup'}
-              <p class="body-text">{lesson.intro}</p>
+        <div class="lesson-body" in:fly={{ y: 10, duration: 260 }}>
+          {#if cs.phase === 'setup'}
+            <p class="body-text">{lesson.intro}</p>
+            <div class="cta-row">
+              <button class="next-btn" on:click={beginPredict}>
+                <Eye size={13} strokeWidth={2.4} />
+                <span>Make a prediction</span>
+              </button>
+            </div>
+          {:else}
+            <p class="body-text question">{lesson.question}</p>
+
+            <div class="options">
+              {#each lesson.options as opt, i (i)}
+                <button
+                  class="option"
+                  class:selected={cs.answer === i}
+                  class:correct={cs.phase === 'reveal' && i === lesson.correctIndex}
+                  class:wrong={cs.phase === 'reveal' && cs.answer === i && i !== lesson.correctIndex}
+                  disabled={cs.phase !== 'predict'}
+                  on:click={() => answerLesson(i)}
+                >
+                  <span class="opt-mark">
+                    {cs.phase === 'reveal' && i === lesson.correctIndex ? '✓' : String.fromCharCode(65 + i)}
+                  </span>
+                  <span>{opt}</span>
+                </button>
+              {/each}
+            </div>
+
+            {#if cs.phase === 'predict'}
               <div class="cta-row">
-                <button class="next-btn" on:click={beginPredict}>
-                  <Eye size={13} strokeWidth={2.4} />
-                  <span>Make a prediction</span>
+                <button class="next-btn" disabled={cs.answer === null} on:click={launchLesson}>
+                  <Play size={13} strokeWidth={2.6} />
+                  <span>{cs.answer === null ? 'Pick an answer first' : lesson.kind === 'race' ? 'Start the race' : 'Run it'}</span>
                 </button>
               </div>
-            {:else}
-              <p class="body-text question">{lesson.question}</p>
-
-              <div class="options">
-                {#each lesson.options as opt, i (i)}
-                  <button
-                    class="option"
-                    class:selected={cs.answer === i}
-                    class:correct={cs.phase === 'reveal' && i === lesson.correctIndex}
-                    class:wrong={cs.phase === 'reveal' && cs.answer === i && i !== lesson.correctIndex}
-                    disabled={cs.phase !== 'predict'}
-                    on:click={() => answerLesson(i)}
-                  >
-                    <span class="opt-mark">
-                      {cs.phase === 'reveal' && i === lesson.correctIndex ? '✓' : String.fromCharCode(65 + i)}
-                    </span>
-                    <span>{opt}</span>
-                  </button>
-                {/each}
-              </div>
-
-              {#if cs.phase === 'predict'}
-                <div class="cta-row">
-                  <button class="next-btn" disabled={cs.answer === null} on:click={launchLesson}>
-                    <Play size={13} strokeWidth={2.6} />
-                    <span>{cs.answer === null ? 'Pick an answer first' : lesson.kind === 'race' ? 'Start the race' : 'Run it'}</span>
-                  </button>
-                </div>
-              {/if}
-
-              {#if cs.phase === 'running'}
-                <div class="running-note">
-                  <span class="pulse" aria-hidden="true"></span>
-                  <span>Running — watch the landscape…</span>
-                </div>
-              {/if}
-
-              {#if cs.phase === 'reveal'}
-                <p class="explain" class:explain-correct={isCorrect}>
-                  <strong>{isCorrect ? 'Correct.' : 'Not quite — see the highlighted answer.'}</strong>
-                  {lesson.explain}
-                </p>
-              {/if}
             {/if}
-          </div>
 
-          <aside class="lesson-aside">
-            <LessonDiagram id={lesson.id} />
-          </aside>
+            {#if cs.phase === 'running'}
+              <div class="running-note">
+                <span class="pulse" aria-hidden="true"></span>
+                <span>Running — watch the landscape…</span>
+              </div>
+            {/if}
+
+            {#if cs.phase === 'reveal'}
+              <p class="explain" class:explain-correct={isCorrect}>
+                <strong>{isCorrect ? 'Correct.' : 'Not quite — see the highlighted answer.'}</strong>
+                {lesson.explain}
+              </p>
+            {/if}
+          {/if}
         </div>
       {/key}
 
@@ -303,8 +295,8 @@
     position: fixed;
     top: 50%;
     left: 50%;
-    width: min(94vw, 440px);
-    max-height: min(90vh, 620px);
+    width: min(94vw, 460px);
+    max-height: min(90vh, 600px);
     display: flex;
     flex-direction: column;
     border-radius: 14px;
@@ -314,11 +306,6 @@
     box-shadow: 0 22px 60px rgba(0, 0, 0, 0.45);
     backdrop-filter: blur(12px);
     animation: cardIn 0.25s ease;
-  }
-
-  /* Lessons get the two-column layout, so they're wider */
-  .course-card.wide {
-    width: min(94vw, 720px);
   }
 
   .course-card.dragging {
@@ -446,19 +433,12 @@
     min-width: 8px;
   }
 
-  /* ---------- Two-column lesson body ---------- */
-  .lesson-grid {
-    display: grid;
-    grid-template-columns: 1fr 236px;
-    gap: 1.25rem;
-    align-items: start;
+  /* ---------- Lesson body (single column; the live landscape is the plot) ---------- */
+  .lesson-body {
     overflow: auto;
     min-height: 0;
     flex: 1;
   }
-
-  .lesson-content { min-width: 0; }
-  .lesson-aside { position: sticky; top: 0; }
 
   .body-text {
     margin: 0 0 0.7rem;
@@ -713,10 +693,7 @@
   .next-btn:disabled { opacity: 0.45; cursor: default; }
 
   @media (max-width: 768px) {
-    .course-card,
-    .course-card.wide { width: 94vw; padding: 0.75rem 0.85rem 0.7rem; }
-    .lesson-grid { grid-template-columns: 1fr; gap: 0.85rem; }
-    .lesson-aside { order: -1; max-width: 240px; margin: 0 auto; position: static; }
+    .course-card { width: 94vw; padding: 0.75rem 0.85rem 0.7rem; }
     .loop-step small { display: none; }
     .step-lbl { display: none; }
   }
