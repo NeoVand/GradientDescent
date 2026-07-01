@@ -810,7 +810,13 @@
 
     for (const item of arrows) {
       const { a, b, ga, gb, mag } = item;
-      const norm = maxMag > 0 ? mag / maxMag : 0;
+      // Skip singular samples. A few losses have a non-finite gradient on a
+      // measure-zero set (e.g. Gaussian Peak diverges ∝1/β³ along β=0; the sine
+      // and tiny-net fits blow up on their own seams). There mag is ∞/NaN, which
+      // poisons normGrad·arrowLength into NaN — SVG then reads x2/y2 as 0 and
+      // streaks the arrow to the origin, the rogue line into the top-left corner.
+      if (!Number.isFinite(mag) || mag <= 1e-12) continue;
+      const norm = maxMag > 0 ? Math.min(1, mag / maxMag) : 0;
 
       const x = xScale(a);
       const y = yScale(b);

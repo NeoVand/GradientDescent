@@ -107,8 +107,11 @@ export function fieldArrows(grad: Grad, dom: Domain, map: Mapper, res: number): 
   if (!(maxMag > 0)) return [];
   const out: FieldArrow[] = [];
   for (const r of raw) {
-    if (!(r.mag > 1e-9)) continue;
-    const norm = r.mag / maxMag;
+    // Skip flat AND singular samples: a non-finite mag (∞/NaN) still passes a
+    // bare `> 1e-9` test, then poisons x2/y2 into NaN and streaks a rogue line
+    // to the SVG origin — the same corner-streak the app plot could show.
+    if (!(r.mag > 1e-9) || !Number.isFinite(r.mag)) continue;
+    const norm = Math.min(1, r.mag / maxMag);
     const len = maxLen * (0.3 + 0.7 * norm);
     const dm = Math.hypot(r.dsx, r.dsy) || 1;
     out.push({
