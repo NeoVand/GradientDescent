@@ -445,6 +445,11 @@ import CoursePanel from './components/CoursePanel.svelte';
     /* THE spacing token: every frame, gutter, and card padding uses this
        one thin value, so the whole chrome shares a single rhythm. */
     --gap: calc(10px + 0.25 * var(--air));
+    /* Horizontal gutter BETWEEN the three columns (sidebar | plots | landscape).
+       A single flat constant so the gap never grows relative to the plots as the
+       window narrows — the plots and formulas take all the slack instead. (The
+       old layout stacked --gap ON TOP of a 0.75rem container pad, doubling it.) */
+    --col-gap: 16px;
     /* One height for the whole bottom line of the app: the run deck on
        the left and the loss-chart/formulas row share it, so they align. */
     --bottom-h: clamp(200px, 25vh, 300px);
@@ -526,8 +531,8 @@ import CoursePanel from './components/CoursePanel.svelte';
   
   .help-btn {
     position: relative;
-    width: 36px;
-    height: 36px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     border: 1px solid var(--color-border);
     cursor: pointer;
@@ -537,6 +542,14 @@ import CoursePanel from './components/CoursePanel.svelte';
     transition: all 0.2s;
     padding: 0;
     box-shadow: none;
+  }
+
+  /* Match the plot toolbar's icon weight (its buttons carry a 15px glyph) so
+     the floating deck reads as the same class of control and lets the formulas
+     breathe, instead of five big 36px discs. */
+  .help-btn :global(svg) {
+    width: 15px;
+    height: 15px;
   }
 
   /* Styled tooltip above each tool button (the text is the button's aria-label).
@@ -673,6 +686,7 @@ import CoursePanel from './components/CoursePanel.svelte';
     grid-template-columns: clamp(300px, 19vw, 360px) 1fr;
     height: 100vh;
     gap: var(--gap);
+    column-gap: var(--col-gap);
     padding: var(--gap);
     background-color: var(--color-bg-primary);
     box-sizing: border-box;
@@ -720,6 +734,7 @@ import CoursePanel from './components/CoursePanel.svelte';
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: var(--gap);
+    column-gap: var(--col-gap);
     flex: 1;
     min-height: 0;
   }
@@ -735,6 +750,7 @@ import CoursePanel from './components/CoursePanel.svelte';
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: var(--gap);
+    column-gap: var(--col-gap);
     height: var(--bottom-h);
     flex-shrink: 0;
     position: relative;
@@ -748,7 +764,9 @@ import CoursePanel from './components/CoursePanel.svelte';
     background-color: transparent;
     border-radius: 0;
     box-shadow: none;
-    padding: 0 0 0 0.75rem;
+    /* No inner pad — the single --col-gap gutter is the only spacing between
+       columns, so it can't grow relative to the plots as the window narrows. */
+    padding: 0;
     position: relative;
     overflow: hidden;
     min-height: 0;
