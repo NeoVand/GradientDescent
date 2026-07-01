@@ -6,10 +6,12 @@
  * are generated from it) and a LaTeX update rule (the Formulas panel shows
  * the math for whichever optimizer is selected).
  *
- * State convention — one record fits all seven methods:
+ * State convention — one record fits all fourteen methods:
  *   v: velocity (momentum family) or first-moment estimate (Adam)
  *   s: squared-gradient accumulator (AdaGrad) / EMA (RMSProp, Adam)
  *   t: step count (Adam bias correction)
+ * plus optional Prodigy-only bookkeeping (d, rNum, sDen, x0) documented on
+ * OptimizerState below; every other method leaves those untouched.
  */
 
 import type { ModelParameters } from '../types/types';
@@ -493,9 +495,10 @@ export const radam: Optimizer = {
 //   • cap the whole step to a trust region (a fraction of the domain), so it can
 //     never leap off the map even when γ = 1.
 // Solving the 2×2 system directly (rather than via eigenvectors) also avoids the
-// degenerate-eigenvector case when curvature is isotropic. On a genuine convex
-// bowl τ = 0 and the trust region is slack, so it is exactly −H⁻¹∇ again,
-// reaching the minimum in essentially one step.
+// degenerate-eigenvector case when curvature is isotropic. On a convex bowl whose
+// smallest curvature already exceeds the floor, τ = 0 and (trust region permitting)
+// it is exactly −H⁻¹∇ again, reaching the minimum in essentially one step; on a
+// shallower bowl (λmin below the floor) the shift still damps the jump.
 const NEWTON_CURV_FLOOR = 0.5; // floor on the smallest eigenvalue; 1/floor is the flat-region GD rate
 const NEWTON_COND_CAP = 1e-3; // relative floor, scaled by the steepest curvature, to cap anisotropy
 const NEWTON_TRUST_FRAC = 0.28; // trust-region radius as a fraction of the domain span
