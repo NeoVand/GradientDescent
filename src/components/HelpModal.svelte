@@ -35,6 +35,12 @@
     tintGridURL, contourPathsFor, fieldArrows, colormapStops, cmapStopColors,
     CONTOUR_N, FIELD_RES, GUIDE_VIZ_DEFAULT, type VizState
   } from '../utils/guideViz';
+  import { themeStore } from '../stores/stores';
+
+  // Day/dark for the guide's heatmap figures (ravine + race). The figures were
+  // authored for dark; day flips to "dark basins on light" (see tintGridURL).
+  $: gTheme = $themeStore;
+  $: gDark = gTheme === 'dark';
 
   export let isOpen = false;
   export let onClose: () => void;
@@ -685,7 +691,7 @@
   let raceViz: VizState = { ...GUIDE_VIZ_DEFAULT };
   const raceLogMin = Math.log(raceDemo.visMin + 0.001);
   const raceLogMax = Math.log(raceDemo.visMax + 0.001);
-  $: raceHeat = tintGridURL(raceDemo.vals, raceDemo.gw, raceDemo.gh, raceLogMin, raceLogMax, raceViz.colormap);
+  $: raceHeat = tintGridURL(raceDemo.vals, raceDemo.gw, raceDemo.gh, raceLogMin, raceLogMax, raceViz.colormap, gTheme);
   $: raceCont = raceViz.contours
     ? contourPathsFor(raceDemo.vals, raceDemo.gw, raceDemo.gh, raceLogMin, raceLogMax, CONTOUR_N[raceViz.density])
     : [];
@@ -860,7 +866,7 @@
   let ravineViz: VizState = { ...GUIDE_VIZ_DEFAULT };
   const ravLogMin = Math.log(ravineFig.visMin + 0.001);
   const ravLogMax = Math.log(ravineFig.visMax + 0.001);
-  $: ravHeat = tintGridURL(ravineFig.vals, ravineFig.gw, ravineFig.gh, ravLogMin, ravLogMax, ravineViz.colormap);
+  $: ravHeat = tintGridURL(ravineFig.vals, ravineFig.gw, ravineFig.gh, ravLogMin, ravLogMax, ravineViz.colormap, gTheme);
   $: ravCont = ravineViz.contours
     ? contourPathsFor(ravineFig.vals, ravineFig.gw, ravineFig.gh, ravLogMin, ravLogMax, CONTOUR_N[ravineViz.density])
     : [];
@@ -2036,32 +2042,32 @@
                   <defs>
                     <clipPath id="ravine-clip"><rect x="0" y="0" width={ravineFig.W} height={ravineFig.H} /></clipPath>
                     <clipPath id="ravine-contour-clip"><rect x="1.5" y="1.5" width={ravineFig.W - 3} height={ravineFig.H - 3} /></clipPath>
-                    <marker id="ravine-arrow" viewBox="0 -5 10 10" refX="7" refY="0" markerWidth="3.1" markerHeight="3.1" orient="auto"><path d="M0,-5L10,0L0,5" fill="#cdd9f2" /></marker>
+                    <marker id="ravine-arrow" viewBox="0 -5 10 10" refX="7" refY="0" markerWidth="3.1" markerHeight="3.1" orient="auto"><path d="M0,-5L10,0L0,5" fill={gDark ? '#cdd9f2' : '#475569'} /></marker>
                   </defs>
                   <g clip-path="url(#ravine-clip)">
                     <image href={ravHeat} x="0" y="0" width={ravineFig.W} height={ravineFig.H} preserveAspectRatio="none" />
                     <g clip-path="url(#ravine-contour-clip)">
                       <g transform="scale({ravineFig.W / ravineFig.gw}, {ravineFig.H / ravineFig.gh})">
                         {#each ravCont as cp}
-                          <path d={cp.d} fill="none" stroke="#fff" stroke-opacity={cp.o} stroke-width="1" vector-effect="non-scaling-stroke" />
+                          <path d={cp.d} fill="none" stroke={gDark ? '#fff' : '#334155'} stroke-opacity={cp.o} stroke-width="1" vector-effect="non-scaling-stroke" />
                         {/each}
                       </g>
                     </g>
-                    {#each ravArrows as a}<line x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} stroke="#cdd9f2" stroke-width={a.w} opacity={a.o} marker-end="url(#ravine-arrow)" />{/each}
-                    <circle cx={ravineFig.min.x} cy={ravineFig.min.y} r="5" fill="none" stroke="#34d399" stroke-width="1.8" stroke-dasharray="3,2.5" />
-                    <!-- dark halos so the trajectories read on any colour -->
-                    <path d={ravineFig.gd} fill="none" stroke="#0a1218" stroke-opacity="0.55" stroke-width="3.8" stroke-linejoin="round" stroke-linecap="round" />
-                    <path d={ravineFig.mom} fill="none" stroke="#0a1218" stroke-opacity="0.55" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round" />
-                    <path d={ravineFig.gd} fill="none" stroke="#ffffff" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round" />
-                    <path d={ravineFig.mom} fill="none" stroke="#c084fc" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" />
-                    {#each ravineFig.gdPts as p}<circle cx={p.x} cy={p.y} r="1.7" fill="#ffffff" stroke="#0a1218" stroke-opacity="0.55" stroke-width="0.7" />{/each}
-                    {#each ravineFig.momPts as p}<circle cx={p.x} cy={p.y} r="2" fill="#c084fc" stroke="#0a1218" stroke-opacity="0.55" stroke-width="0.7" />{/each}
-                    <circle cx={ravineFig.start.x} cy={ravineFig.start.y} r="4.2" fill="#f59e0b" stroke="#fff" stroke-width="1.3" />
+                    {#each ravArrows as a}<line x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} stroke={gDark ? '#cdd9f2' : '#475569'} stroke-width={a.w} opacity={a.o} marker-end="url(#ravine-arrow)" />{/each}
+                    <circle cx={ravineFig.min.x} cy={ravineFig.min.y} r="5" fill="none" stroke={gDark ? '#34d399' : '#059669'} stroke-width="1.8" stroke-dasharray="3,2.5" />
+                    <!-- halos (dark on the night heatmap, light on the day one) so the trajectories read over any colour -->
+                    <path d={ravineFig.gd} fill="none" stroke={gDark ? '#0a1218' : '#f8fafc'} stroke-opacity="0.55" stroke-width="3.8" stroke-linejoin="round" stroke-linecap="round" />
+                    <path d={ravineFig.mom} fill="none" stroke={gDark ? '#0a1218' : '#f8fafc'} stroke-opacity="0.55" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round" />
+                    <path d={ravineFig.gd} fill="none" stroke={gDark ? '#ffffff' : '#1e293b'} stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round" />
+                    <path d={ravineFig.mom} fill="none" stroke={gDark ? '#c084fc' : '#7c3aed'} stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" />
+                    {#each ravineFig.gdPts as p}<circle cx={p.x} cy={p.y} r="1.7" fill={gDark ? '#ffffff' : '#1e293b'} stroke={gDark ? '#0a1218' : '#f8fafc'} stroke-opacity="0.55" stroke-width="0.7" />{/each}
+                    {#each ravineFig.momPts as p}<circle cx={p.x} cy={p.y} r="2" fill={gDark ? '#c084fc' : '#7c3aed'} stroke={gDark ? '#0a1218' : '#f8fafc'} stroke-opacity="0.55" stroke-width="0.7" />{/each}
+                    <circle cx={ravineFig.start.x} cy={ravineFig.start.y} r="4.2" fill="#f59e0b" stroke={gDark ? '#fff' : '#1e293b'} stroke-width="1.3" />
                     <g transform="translate(9,9)">
-                      <rect x="-4" y="-7" width="116" height="25" rx="5" fill="#ffffff" fill-opacity="0.86" stroke="#0f172a" stroke-opacity="0.14" stroke-width="0.5" />
-                      <!-- GD swatch keeps its dark halo so the white line reads on the light panel -->
-                      <line x1="1" y1="0" x2="12" y2="0" stroke="#0a1218" stroke-opacity="0.5" stroke-width="2.8" stroke-linecap="round" />
-                      <line x1="1" y1="0" x2="12" y2="0" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" />
+                      <rect x="-4" y="-7" width="116" height="25" rx="5" fill={gDark ? '#ffffff' : '#0f172a'} fill-opacity={gDark ? 0.86 : 0.055} stroke="#0f172a" stroke-opacity="0.14" stroke-width="0.5" />
+                      <!-- GD swatch: white line on a dark halo in the night box; a plain dark line on the day box -->
+                      <line x1="1" y1="0" x2="12" y2="0" stroke="#0a1218" stroke-opacity={gDark ? 0.5 : 0} stroke-width="2.8" stroke-linecap="round" />
+                      <line x1="1" y1="0" x2="12" y2="0" stroke={gDark ? '#ffffff' : '#1e293b'} stroke-width="1.6" stroke-linecap="round" />
                       <text x="16" y="2.4" class="fig-svg-label" style="text-anchor:start;fill:#1e293b;font-size:8.5px">plain GD — zig-zags</text>
                       <line x1="1" y1="11" x2="12" y2="11" stroke="#a855f7" stroke-width="2.1" stroke-linecap="round" />
                       <text x="16" y="13.4" class="fig-svg-label" style="text-anchor:start;fill:#1e293b;font-size:8.5px">momentum — glides</text>
@@ -2072,7 +2078,7 @@
                 <div class="fig-cbar">
                   <span class="fig-cbar-lbl">loss</span>
                   <span class="fig-cbar-val">{ravineFig.visMax.toFixed(2)}</span>
-                  <div class="fig-cbar-bar" style="background: linear-gradient(to bottom, {colormapStops(ravineViz.colormap)});"></div>
+                  <div class="fig-cbar-bar" style="background: linear-gradient(to bottom, {colormapStops(ravineViz.colormap, 8, gTheme)});"></div>
                   <span class="fig-cbar-val">{ravineFig.visMin.toFixed(2)}</span>
                 </div>
                 </div>
@@ -2136,9 +2142,9 @@
                     <!-- Contours close along the grid edge; clip them a hair inside
                          the frame so those boundary segments don't draw a white box. -->
                     <clipPath id="race-contour-clip"><rect x="1.5" y="1.5" width={RACE_W - 3} height={RACE_H - 3} /></clipPath>
-                    <marker id="race-arrow" viewBox="0 -5 10 10" refX="7" refY="0" markerWidth="3.1" markerHeight="3.1" orient="auto"><path d="M0,-5L10,0L0,5" fill="#cdd9f2" /></marker>
+                    <marker id="race-arrow" viewBox="0 -5 10 10" refX="7" refY="0" markerWidth="3.1" markerHeight="3.1" orient="auto"><path d="M0,-5L10,0L0,5" fill={gDark ? '#cdd9f2' : '#475569'} /></marker>
                     <linearGradient id="race-cbar" x1="0" y1="0" x2="0" y2="1">
-                      {#each cmapStopColors(raceViz.colormap) as col, i}<stop offset={i / 8} stop-color={col} />{/each}
+                      {#each cmapStopColors(raceViz.colormap, 8, gTheme) as col, i}<stop offset={i / 8} stop-color={col} />{/each}
                     </linearGradient>
                   </defs>
                   <g clip-path="url(#race-clip)">
@@ -2146,33 +2152,33 @@
                     <g clip-path="url(#race-contour-clip)">
                       <g transform="scale({RACE_W / raceDemo.gw}, {RACE_H / raceDemo.gh})">
                         {#each raceCont as cp}
-                          <path d={cp.d} fill="none" stroke="#fff" stroke-opacity={cp.o} stroke-width="1" vector-effect="non-scaling-stroke" />
+                          <path d={cp.d} fill="none" stroke={gDark ? '#fff' : '#334155'} stroke-opacity={cp.o} stroke-width="1" vector-effect="non-scaling-stroke" />
                         {/each}
                       </g>
                     </g>
-                    {#each raceArrows as a}<line x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} stroke="#cdd9f2" stroke-width={a.w} opacity={a.o} marker-end="url(#race-arrow)" />{/each}
+                    {#each raceArrows as a}<line x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} stroke={gDark ? '#cdd9f2' : '#475569'} stroke-width={a.w} opacity={a.o} marker-end="url(#race-arrow)" />{/each}
                     {#each raceDemo.racers as r (r.id)}
                       {@const hot = raceHover === r.id}
                       {@const dim = raceHover !== null && !hot}
-                      <path d={r.d} fill="none" stroke={r.color} stroke-width={hot ? 3 : 1.7} stroke-linecap="round" stroke-linejoin="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" opacity={hot ? 1 : !raceOn[r.id] ? 0 : dim ? 0.13 : 0.9} style="transition: opacity 0.15s ease, stroke-width 0.15s ease;">
+                      <path d={r.d} fill="none" stroke={r.color} stroke-width={hot ? 3 : 1.7} stroke-linecap="round" stroke-linejoin="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" opacity={hot ? 1 : !raceOn[r.id] ? 0 : dim ? 0.13 : 0.9} style="transition: opacity 0.15s ease, stroke-width 0.15s ease; filter: {gDark ? 'none' : 'drop-shadow(0 0 0.7px rgba(15,23,42,0.85))'};">
                         <animate attributeName="stroke-dashoffset" values="100;0;0" keyTimes="0;{r.frac};1" dur="7s" repeatCount="indefinite" />
                       </path>
                     {/each}
-                    <circle cx={raceDemo.min[0]} cy={raceDemo.min[1]} r="7" fill="none" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3,2.5" />
+                    <circle cx={raceDemo.min[0]} cy={raceDemo.min[1]} r="7" fill="none" stroke={gDark ? '#10b981' : '#059669'} stroke-width="1.5" stroke-dasharray="3,2.5" />
                     <circle cx={raceDemo.start[0]} cy={raceDemo.start[1]} r="8" fill="none" stroke="#f59e0b" stroke-width="1.75" opacity="0.9" />
-                    <circle cx={raceDemo.start[0]} cy={raceDemo.start[1]} r="4.5" fill="#f59e0b" stroke="#fff" stroke-width="1.5" />
+                    <circle cx={raceDemo.start[0]} cy={raceDemo.start[1]} r="4.5" fill="#f59e0b" stroke={gDark ? '#fff' : '#1e293b'} stroke-width="1.5" />
                     {#each raceDemo.racers as r (r.id)}
                       {@const hot = raceHover === r.id}
                       {@const dim = raceHover !== null && !hot}
-                      <circle r={hot ? 4.6 : 3.2} fill={r.color} stroke="#fff" stroke-width="1.25" opacity={hot ? 1 : !raceOn[r.id] ? 0 : dim ? 0.13 : 1} style="transition: opacity 0.15s ease;">
+                      <circle r={hot ? 4.6 : 3.2} fill={r.color} stroke={gDark ? '#fff' : '#0f172a'} stroke-width="1.25" opacity={hot ? 1 : !raceOn[r.id] ? 0 : dim ? 0.13 : 1} style="transition: opacity 0.15s ease;">
                         <animateMotion path={r.d} keyPoints="0;1;1" keyTimes="0;{r.frac};1" calcMode="linear" dur="7s" repeatCount="indefinite" />
                       </circle>
                     {/each}
                     <!-- loss colorbar (bottom-right, in viewBox coords) -->
                     <g>
-                      <rect x="439" y="164" width="7" height="50" rx="2" fill="url(#race-cbar)" stroke="rgba(255,255,255,0.32)" stroke-width="0.5" />
-                      <text x="442.5" y="159" class="fig-svg-label" style="fill:#fff;stroke:#0a1218;stroke-width:2.4;paint-order:stroke;font-size:8px">{raceDemo.visMax.toFixed(0)}</text>
-                      <text x="442.5" y="224" class="fig-svg-label" style="fill:#fff;stroke:#0a1218;stroke-width:2.4;paint-order:stroke;font-size:8px">{raceDemo.visMin.toFixed(1)}</text>
+                      <rect x="439" y="164" width="7" height="50" rx="2" fill="url(#race-cbar)" stroke={gDark ? 'rgba(255,255,255,0.32)' : 'rgba(15,23,42,0.35)'} stroke-width="0.5" />
+                      <text x="442.5" y="159" class="fig-svg-label" style="fill:{gDark ? '#fff' : '#1e293b'};stroke:{gDark ? '#0a1218' : '#fff'};stroke-width:2.4;paint-order:stroke;font-size:8px">{raceDemo.visMax.toFixed(0)}</text>
+                      <text x="442.5" y="224" class="fig-svg-label" style="fill:{gDark ? '#fff' : '#1e293b'};stroke:{gDark ? '#0a1218' : '#fff'};stroke-width:2.4;paint-order:stroke;font-size:8px">{raceDemo.visMin.toFixed(1)}</text>
                     </g>
                   </g>
                 </svg>
@@ -2920,6 +2926,10 @@
   .fig-cbar-lbl { font-size: 8.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #e2e8f0; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7); }
   .fig-cbar-val { font-size: 9px; font-weight: 600; color: #e2e8f0; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7); }
   .fig-cbar-bar { width: 8px; height: 46px; border-radius: 2px; border: 1px solid rgba(255, 255, 255, 0.32); }
+  /* Day: dark labels + a light halo so they read where the bar edge is light. */
+  :global([data-theme='light']) .fig-cbar-lbl,
+  :global([data-theme='light']) .fig-cbar-val { color: #1e293b; text-shadow: 0 1px 2px rgba(255, 255, 255, 0.75); }
+  :global([data-theme='light']) .fig-cbar-bar { border-color: rgba(15, 23, 42, 0.28); }
   .fig-triptych {
     display: grid;
     grid-template-columns: repeat(3, 1fr);

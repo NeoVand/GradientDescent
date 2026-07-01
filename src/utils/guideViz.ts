@@ -22,11 +22,16 @@ export const GUIDE_VIZ_DEFAULT: VizState = { field: 'off', contours: true, color
 const INTERP: Record<Colormap, (t: number) => string> = {
   viridis: interpolateViridis, inferno: interpolateInferno, cubehelix: interpolateCubehelixDefault
 };
-/** Colormap colors low→high as an array (for an in-SVG <linearGradient>). */
-export function cmapStopColors(cmap: Colormap, n = 8): string[] {
+/** Colormap colors as an array (for an in-SVG <linearGradient>). Day mode
+ *  reverses the tone (dark = low loss) to match the day heatmap. */
+export function cmapStopColors(cmap: Colormap, n = 8, theme: 'light' | 'dark' = 'dark'): string[] {
   const interp = INTERP[cmap] ?? interpolateViridis;
+  const light = theme === 'light';
   const out: string[] = [];
-  for (let k = 0; k <= n; k++) out.push(interp(k / n));
+  for (let k = 0; k <= n; k++) {
+    const s = k / n;
+    out.push(interp(light ? 1 - s : s));
+  }
   return out;
 }
 
@@ -36,12 +41,20 @@ export const FIELD_RES: Record<FieldDensity, number> = { sparse: 10, normal: 15,
 
 const EPS = 0.001;
 
-/** Re-tint a value grid to a PNG data URL with the chosen colormap (log loss,
- *  reversed so bright = low loss, faintly translucent like the app). */
+/**
+ * Re-tint a value grid to a PNG data URL with the chosen colormap (log loss).
+ * Matches the app heatmap's two theme tones:
+ *  - dark:  bright = low loss (basin glows), ~0.86 alpha over the dark figure.
+ *  - light: "dark basins on light" — reversed so low-loss basins take the
+ *    colormap's dark/rich end, and the high-loss far field fades toward
+ *    transparent so it blends into the light page.
+ */
 export function tintGridURL(
-  vals: number[], gw: number, gh: number, logMin: number, logMax: number, cmap: Colormap
+  vals: number[], gw: number, gh: number, logMin: number, logMax: number, cmap: Colormap,
+  theme: 'light' | 'dark' = 'dark'
 ): string {
   const interp = INTERP[cmap] ?? interpolateViridis;
+  const light = theme === 'light';
   const canvas = document.createElement('canvas');
   canvas.width = gw; canvas.height = gh;
   const ctx = canvas.getContext('2d')!;
@@ -49,8 +62,9 @@ export function tintGridURL(
   const span = logMax - logMin || 1;
   for (let k = 0; k < vals.length; k++) {
     const t = Math.min(1, Math.max(0, (Math.log(vals[k] + EPS) - logMin) / span));
-    const c = rgb(interp(1 - t));
-    img.data[k * 4] = c.r; img.data[k * 4 + 1] = c.g; img.data[k * 4 + 2] = c.b; img.data[k * 4 + 3] = 220;
+    const c = rgb(interp(light ? t : 1 - t));
+    const a = light ? Math.round(236 - t * 200) : 220;
+    img.data[k * 4] = c.r; img.data[k * 4 + 1] = c.g; img.data[k * 4 + 2] = c.b; img.data[k * 4 + 3] = a;
   }
   ctx.putImageData(img, 0, 0);
   return canvas.toDataURL();
