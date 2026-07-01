@@ -98,12 +98,33 @@
   $: layers = $vizLayersStore;
   // The heatmap is re-tinted from the cached grid whenever the colormap
   // changes — cheap (one 110² canvas), no grid/field recompute.
-  $: heatURL = scene ? gridToImageURL(scene.grid, layers.colormap) : '';
-  $: legendStops = colormapStops(layers.colormap);
+  $: heatURL = scene ? gridToImageURL(scene.grid, layers.colormap, theme) : '';
+  $: legendStops = colormapStops(layers.colormap, 8, theme);
   // Only two settings are exposed (Low → normal, High → dense); 'sparse' is kept
   // for the type/guide but unreachable here. Low = the old medium, High = a touch
   // denser than the old high.
   const DENSITY_RES: Record<FieldDensity, number> = { sparse: 15, normal: 23, dense: 38 };
+
+  // Theme palette for the plot interior. Dark keeps the original values (basins
+  // glow bright on a near-black backdrop); day flips to "dark basins on light" —
+  // a white backdrop with dark contours/arrows so the plot stays bright and the
+  // overlays stay legible. Read from the live data-theme so every draw path
+  // (full redraw and the marker-only updates) always uses the current theme.
+  type LandPalette = {
+    bg: string; contour: string; contourOp: number; field: string; stream: string;
+    lens: string; lensDown: string; lensFill: string; ghost: string; ar2: string; basinRing: string;
+  };
+  const DARK_PAL: LandPalette = {
+    bg: '#060913', contour: '#ffffff', contourOp: 0.5, field: '#cdd9f2', stream: '#dbe7fb',
+    lens: '#e0f2fe', lensDown: '#f87171', lensFill: '#67e8f9', ghost: '#fbbf24', ar2: '#e2e8f0', basinRing: '#ffffff'
+  };
+  const LIGHT_PAL: LandPalette = {
+    bg: '#ffffff', contour: '#334155', contourOp: 0.5, field: '#475569', stream: '#475569',
+    lens: '#0e7490', lensDown: '#dc2626', lensFill: '#0891b2', ghost: '#d97706', ar2: '#475569', basinRing: '#1e293b'
+  };
+  const curPal = (): LandPalette =>
+    document.documentElement.getAttribute('data-theme') === 'dark' ? DARK_PAL : LIGHT_PAL;
+
   let showLayers = false;
   let layersBtn: HTMLButtonElement;
   // The panel header clips its overflow, so the popover is fixed-positioned
@@ -479,15 +500,14 @@
       .style('text-anchor', 'middle')
       .text('β');
 
-    // Dark plot interior in both themes (the heatmap/field read richest on
-    // black; a light canvas washed them out). Only this rect is dark — the
-    // surrounding margins keep the app theme.
+    // Plot interior: near-black in dark mode (basins glow), white in day mode
+    // (the "dark basins on light" heatmap fades its far field into it).
     g.insert('rect', ':first-child')
       .attr('x', 0)
       .attr('y', 0)
       .attr('width', innerWidth)
       .attr('height', innerHeight)
-      .attr('fill', '#060913')
+      .attr('fill', curPal().bg)
       .attr('rx', 4);
 
     // Create clipped group for landscape content
@@ -526,14 +546,14 @@
       plotGroup.append('path')
         .attr('d', `M ${tri.map(([a, b]) => `${xScale(a)},${yScale(b)}`).join(' L ')} Z`)
         .attr('fill', 'none')
-        .attr('stroke', '#e2e8f0')
+        .attr('stroke', curPal().ar2)
         .attr('stroke-width', 1.5)
         .attr('stroke-dasharray', '7,5')
         .style('opacity', 0.75);
       plotGroup.append('text')
         .attr('x', xScale(0))
         .attr('y', yScale(-0.55))
-        .attr('fill', '#e2e8f0')
+        .attr('fill', curPal().ar2)
         .attr('font-size', '11px')
         .attr('font-weight', '600')
         .attr('letter-spacing', '0.08em')
@@ -654,7 +674,7 @@
         .attr('cy', yScale(m.b))
         .attr('r', 4.5)
         .attr('fill', BASIN_COLORS[i % BASIN_COLORS.length])
-        .attr('stroke', '#ffffff')
+        .attr('stroke', curPal().basinRing)
         .attr('stroke-width', 1.8);
     });
   }
@@ -689,6 +709,7 @@
         }
       }));
 
+    const pal = curPal();
     g.selectAll('.contour')
       .data(contourData)
       .enter()
@@ -696,9 +717,9 @@
       .attr('class', 'contour')
       .attr('d', pathGenerator)
       .attr('fill', 'none')
-      .attr('stroke', '#ffffff')
+      .attr('stroke', pal.contour)
       .attr('stroke-width', 1.5)
-      .style('opacity', 0.5);
+      .style('opacity', pal.contourOp);
   }
 
   function drawTrainingPath(
@@ -763,9 +784,9 @@
     });
     if (!arrows.length || !(maxMag > 0)) return;
 
-    // Clean, clearly-visible cool-white lines on the dark canvas (the old muted
-    // slate was nearly invisible). Magnitude still fades the faint ones down.
-    const arrowColor = '#cdd9f2';
+    // Cool-white lines on the dark canvas; a dark slate on the day canvas.
+    // Magnitude still fades the faint ones down.
+    const arrowColor = curPal().field;
     const baseOpacity = 0.42;
     const spanOpacity = 0.5;
 
@@ -846,12 +867,13 @@
     // Clean white lines on the dark canvas — no gray core, no dark halo (the
     // 3D view does the same). The black SVG backdrop gives them all the
     // contrast they need over both the basins and the peaks.
+    const streamColor = curPal().stream;
     for (const line of lines) {
       g.append('path')
         .attr('class', 'streamline')
         .attr('d', lineGen(line))
         .attr('fill', 'none')
-        .attr('stroke', '#dbe7fb')
+        .attr('stroke', streamColor)
         .attr('stroke-width', 1.05)
         .attr('stroke-linecap', 'round')
         .attr('stroke-linejoin', 'round')
@@ -980,10 +1002,11 @@
     // under the marker.
     if (Math.hypot(dx, dy) < 4) return;
 
+    const ghost = curPal().ghost;
     layer.append('line')
       .attr('x1', 0).attr('y1', 0)
       .attr('x2', dx).attr('y2', dy)
-      .attr('stroke', '#fbbf24')
+      .attr('stroke', ghost)
       .attr('stroke-width', 1.5)
       .attr('stroke-dasharray', '3,3')
       .style('opacity', 0.8);
@@ -991,14 +1014,14 @@
       .attr('cx', dx).attr('cy', dy)
       .attr('r', 7)
       .attr('fill', 'rgba(251, 191, 36, 0.15)')
-      .attr('stroke', '#fbbf24')
+      .attr('stroke', ghost)
       .attr('stroke-width', 2)
       .attr('stroke-dasharray', '4,3')
       .style('opacity', 1);
     layer.append('circle')
       .attr('cx', dx).attr('cy', dy)
       .attr('r', 1.8)
-      .attr('fill', '#fbbf24');
+      .attr('fill', ghost);
   }
 
   /** The minibatch noise cloud: faint −∇ℒ_batch rays around the marker. */
@@ -1070,15 +1093,16 @@
     const rShallow = R_MAX; // along v2
     const angOf = (v: [number, number]) => (Math.atan2(v[1], v[0]) * 180) / Math.PI;
 
+    const lensPal = curPal();
     if (type === 'bowl') {
       // Level-set ellipse: long (shallow, v2) axis = R_MAX, short (steep) = rSteep.
       layer.append('ellipse')
         .attr('rx', rShallow)
         .attr('ry', rSteep)
         .attr('transform', `rotate(${angOf(es.v2)})`)
-        .attr('fill', '#67e8f9')
+        .attr('fill', lensPal.lensFill)
         .attr('fill-opacity', 0.06)
-        .attr('stroke', '#e0f2fe')
+        .attr('stroke', lensPal.lens)
         .attr('stroke-width', 1.4)
         .style('opacity', 0.85);
     } else {
@@ -1088,7 +1112,7 @@
         layer.append('line')
           .attr('x1', -r).attr('x2', r).attr('y1', 0).attr('y2', 0)
           .attr('transform', `rotate(${angOf(v)})`)
-          .attr('stroke', down ? '#f87171' : '#e0f2fe')
+          .attr('stroke', down ? lensPal.lensDown : lensPal.lens)
           .attr('stroke-width', 1.7)
           .attr('stroke-dasharray', down ? '6,4' : null)
           .attr('stroke-linecap', 'round')

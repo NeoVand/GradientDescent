@@ -156,22 +156,40 @@ function getLUT(cmap: Colormap = 'viridis'): Uint8ClampedArray {
   return lut;
 }
 
-/** CSS color stops for a colormap, low→high — for the legend bar. */
-export function colormapStops(cmap: Colormap = 'viridis', steps = 8): string {
+/**
+ * CSS color stops for a colormap — for the legend bar. In day mode the tone is
+ * reversed (dark = low loss) to match the "dark basins on light" heatmap, so
+ * the bar reads dark→light in the same direction the heatmap does.
+ */
+export function colormapStops(cmap: Colormap = 'viridis', steps = 8, theme: 'light' | 'dark' = 'dark'): string {
   const interp = INTERPOLATORS[cmap] ?? interpolateViridis;
+  const light = theme === 'light';
   const parts: string[] = [];
-  for (let k = 0; k <= steps; k++) parts.push(interp(k / steps));
+  for (let k = 0; k <= steps; k++) {
+    const s = k / steps;
+    parts.push(interp(light ? 1 - s : s));
+  }
   return parts.join(', ');
 }
 
 /**
  * Render the grid to a PNG data URL — one pixel per cell; the SVG <image>
  * scales it up with smoothing, which reads far better than 3,600 discrete
- * <rect>s and costs a single DOM node. Bright = low loss (viridis reversed),
- * with slight transparency so the theme background tints the surface like
- * the old per-rect opacity did.
+ * <rect>s and costs a single DOM node.
+ *
+ * Two theme-tuned tone curves over the same colormap:
+ *  - dark:  bright = low loss (the basin glows on the near-black backdrop),
+ *    ~0.85 alpha so the dark background tints the surface.
+ *  - light: "dark basins on light" — the LUT is read in reverse so the low-loss
+ *    basin takes the colormap's rich/dark end (it pops against the page), and
+ *    the high-loss far field fades toward transparent so it blends into the
+ *    white backdrop, keeping the plot bright and airy.
  */
-export function gridToImageURL(grid: LossGrid, cmap: Colormap = 'viridis'): string {
+export function gridToImageURL(
+  grid: LossGrid,
+  cmap: Colormap = 'viridis',
+  theme: 'light' | 'dark' = 'dark'
+): string {
   const { res, values, logMin, logMax } = grid;
   const canvas = document.createElement('canvas');
   canvas.width = res;
@@ -180,18 +198,25 @@ export function gridToImageURL(grid: LossGrid, cmap: Colormap = 'viridis'): stri
   const img = ctx.createImageData(res, res);
   const lut = getLUT(cmap);
   const logSpan = logMax - logMin || 1;
+  const light = theme === 'light';
 
   for (let j = 0; j < res; j++) {
     const row = res - 1 - j; // canvas y points down; β points up
     for (let i = 0; i < res; i++) {
       let t = (Math.log(values[j * res + i] + LOG_EPS) - logMin) / logSpan;
       t = t < 0 ? 0 : t > 1 ? 1 : t;
-      const k = Math.round((1 - t) * (LUT_SIZE - 1));
+      // Basin is t→0 (low loss), far field t→1 (high loss).
+      const k = light
+        ? Math.round(t * (LUT_SIZE - 1)) // day: basin → dark/rich end
+        : Math.round((1 - t) * (LUT_SIZE - 1)); // dark: basin → bright end
+      const a = light
+        ? Math.round(236 - t * 200) // ~0.93 at basin → ~0.14 at the far field
+        : 217; // ≈ 0.85
       const o = (row * res + i) * 4;
       img.data[o] = lut[k * 3];
       img.data[o + 1] = lut[k * 3 + 1];
       img.data[o + 2] = lut[k * 3 + 2];
-      img.data[o + 3] = 217; // ≈ 0.85
+      img.data[o + 3] = a;
     }
   }
 
