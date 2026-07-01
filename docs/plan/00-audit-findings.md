@@ -1,0 +1,848 @@
+# Audit findings ledger — 2026-07-01
+
+Produced by a 126-agent review workflow: 18 unit reviewers (one per guide chapter, per optimizer act, and per code area), with every flagged error adversarially fact-checked by two independent verifiers. Confirmed errors were fixed the same day (see `docs/textbook-plan.md` §2). Gaps and suggestions below are the raw material for the textbook upgrade.
+
+## Grades by unit (correctness / pedagogy)
+
+- **ch-bowl** — A- / B+
+- **ch-landscape** — B+ / A-
+- **ch-shapes** — A- / A-
+- **ch-downhill** — A- / A-
+- **ch-step** — A- / B+
+- **ch-gamma** — A- / B+
+- **ch-schedule** — A- / A-
+- **ch-noise** — B+ / A-
+- **ch-generalize** — B+ / A-
+- **ch-opt-narrative** — A- / A-
+- **ch-tail** — B- / A-
+- **act-slope-memory** — B+ / A-
+- **act-perparam** — B+ / A-
+- **act-adam** — A / A-
+- **act-branches** — A- / B+
+- **code-classic** — A / A-
+- **code-modern** — A- / B+
+- **code-problems** — A / A
+
+## Confirmed errors (all fixed 2026-07-01)
+
+### [moderate] ch-landscape — src/components/HelpModal.svelte:1344
+- **Claim:** "Brighter colours are lower (better) loss; dark is high."
+- **Why wrong:** Only true in dark mode. Since the day-mode heatmap landed (gridToImageURL in src/utils/lossGrid.ts, lines 180-214), light theme reverses the tone: the low-loss basin takes the colormap's dark/rich end and high loss fades toward white. A light-theme reader is told to look for exactly the wrong thing. gTheme is already reactive in HelpModal (line 42), so the sentence can be conditional.
+- **Fix applied (or adapted):** Make the sentence theme-aware ({#if gTheme === 'light'} dark pools are low ... {:else} brighter is lower ...{/if}), or go theme-neutral: point to the panel's colour-bar legend, which already flips with the theme.
+
+### [moderate] ch-landscape — src/components/HelpModal.svelte:1345 (also 1382, 1387)
+- **Claim:** "The thin white loops are contour lines" (plus "the bright dimple is where the loss is lowest" at 1382 and 1387).
+- **Why wrong:** In light theme the contours are dark slate (#334155, LossLandscape.svelte pal for light, ~line 122) on a white background, and the basin is the DARK dimple, not bright. Three separate sentences in this chapter break for day-mode users.
+- **Fix applied (or adapted):** Say "thin contour loops" without a colour, and replace "bright dimple" with a theme-conditional or neutral phrase ("the dimple at the centre of the rings").
+
+### [moderate] ch-landscape — src/utils/experiments.ts:251 (chapterPresets['ch-landscape'])
+- **Claim:** Preset coach toast: "Bright and low is a good model, dark and high is a bad one."
+- **Why wrong:** Same theme reversal: in day mode (where the 3D surface also uses the reversed tone) the good basin is dark and the bad far field is pale, so the toast teaches the map backwards for light-theme users.
+- **Fix applied (or adapted):** Reword theme-neutrally ("low is a good model, high is a bad one — the colour bar shows which end is which") or pass the current theme into the coach text.
+
+### [moderate] ch-schedule — src/components/HelpModal.svelte:1874-1876
+- **Claim:** Cosine: "γ eases down the first half of a cosine … quick at first and feather-light by the end."
+- **Why wrong:** The cosine factor's derivative is ∝ sin(πt/T): zero at the start, fastest mid-run, zero at the end. Cosine annealing is gentle at first — holding γ near full strength early is precisely its advertised advantage over exponential decay. "Quick at first" inverts the schedule's defining property; schedules.ts line 47 confirms the standard form.
+- **Fix applied (or adapted):** "gentle at first, fastest through the middle, feather-light by the end" — and note that lingering near full γ early is a feature.
+
+### [minor] ch-schedule — src/components/HelpModal.svelte:1884-1885
+- **Claim:** "these shapes were designed for runs of thousands of steps, so over a short run here the decay can be too gentle to see"
+- **Why wrong:** The implemented factors depend only on relative progress t/T (schedules.ts), so a 100-step run decays at exactly the same visual pace as a 10,000-step run. The real reason the slider helps: at 1× annealing completes only at the final step, so you never see a settled tail. The stated mechanism gives a false mental model.
+- **Fix applied (or adapted):** Explain that at 1× γ reaches its floor only at the very last step, so speeding decay up buys a settled tail to watch.
+
+### [minor] ch-schedule — src/components/HelpModal.svelte:1885-1886
+- **Claim:** "The Decay speed slider … appears whenever a non-constant schedule is active"
+- **Why wrong:** Sidebar.svelte:782 gates it on `schedule !== 'constant' && !continuous`. In continuous (∞) mode the slider is hidden — and per trainer.ts:133-135 the schedule itself is silently disabled. A reader in ∞ mode will look for the slider (and any schedule effect) and find neither; the chapter never mentions this.
+- **Fix applied (or adapted):** "…whenever a non-constant schedule is active on a finite run — in ∞ mode there is no horizon, so schedules (and the slider) switch off."
+
+### [minor] ch-generalize — HelpModal.svelte:2382-2383
+- **Claim:** provably close to an explicit weight penalty (Prechelt, 1998; Goodfellow et al., 2016, §7.8)
+- **Why wrong:** Prechelt 1998 ('Early stopping — but when?') is an empirical study of stopping criteria; it contains no equivalence proof. The quadratic early-stopping ≈ L2 result is Sjöberg & Ljung 1995 / Bishop 1995 (Goodfellow §7.8 is a fine secondary source). Also the proof assumes initialization near zero — unstated.
+- **Fix applied (or adapted):** Cite Bishop 1995 (or drop Prechelt from this clause; keep it as 'when to stop' further reading). Add 'starting near zero' to the claim.
+
+### [minor] ch-opt-narrative — src/components/HelpModal.svelte:356
+- **Claim:** Sophia card: "it trained GPT-class models roughly twice as fast as Adam by step count — second-order thinking that actually ships."
+- **Why wrong:** Stated as established fact, but the 2× is the paper's own GPT-2-scale claim; independent replications and later benchmarks largely failed to reproduce the speedup, and Sophia has not shipped in major production runs. "Actually ships" overstates it.
+- **Fix applied (or adapted):** "its paper reports roughly 2× fewer steps than Adam on GPT-2-scale pretraining — a claim later benchmarks have contested."
+
+### [critical] ch-tail — src/utils/experiments.ts:175-181 (and src/utils/problems.ts:1007)
+- **Claim:** Coach: 'Drag the orange marker on the LEFT plot — it is literally (α, β)' / blurb 'Drag either marker' (marker-is-model experiment; also circle-classifier tagline 'drag it on the left plot too').
+- **Why wrong:** DataVisualization.svelte draws the params-marker (line 494) with no drag handler — grep finds zero d3.drag/pointerdown for it. Worse, circle-classifier is a class-editor problem, so clicking where the marker sits ADDS a data point (handlePlotClick), silently corrupting the dataset while the user tries to follow the instruction.
+- **Fix applied (or adapted):** Either add a d3.drag behavior to the params-marker (suppressing editor clicks on it), or rewrite blurb+coach to 'watch the marker on the left plot move; drag the one on the Loss & Gradient panel.'
+
+### [moderate] ch-tail — src/utils/experiments.ts:138
+- **Claim:** banana-race: trainingStore.update({ totalSteps: 1000, stepsPerSecond: 60 }) with comment 'give the racers room to finish'.
+- **Why wrong:** startRace/stepRace read raceConfigStore (default maxSteps 300, stepsPerSecond 30), never trainingStore — verified in trainer.ts:496-498 and 536. The update is a no-op for the race; racers are capped at 300 steps, and slow GD/Momentum on Rosenbrock (lr 0.0002) won't traverse the valley as the showdown intends.
+- **Fix applied (or adapted):** Update raceConfigStore ({ maxSteps: 1000, stepsPerSecond: 60 }) instead — note it's persisted to localStorage, so consider a transient override.
+
+### [moderate] ch-tail — src/utils/experiments.ts:53-58
+- **Claim:** symmetric-pair coach: 'Hit Reset then Train a few times — the starting point decides the destination.'
+- **Why wrong:** Gaussian Peak's getInitialParameters always returns b = 1.5 + rand() (problems.ts:689-694, comment: 'We always start with β > 0'), so every Reset lands in the +β basin and converges to (0, +1). The promised demonstration — different resets reaching different mirror basins — can never happen; reaching −1 requires dragging.
+- **Fix applied (or adapted):** Coach should say 'drag the marker below the β = 0 line to fall into the mirror basin', or the experiment should alternate a seeded β < 0 start.
+
+### [moderate] ch-tail — src/components/HelpModal.svelte:2479
+- **Claim:** Panels chapter: 'bright = low loss, white contours join equal-loss points' (and ch-downhill preset: 'cut straight across the white contours').
+- **Why wrong:** Stale since the day-mode sprint: gridToImageURL (lossGrid.ts:183-186) reverses the LUT in light theme — low loss is the DARK end on a light page — and light-theme contours are slate #334155 (LossLandscape.svelte:122), not white. The description is wrong for every day-mode reader.
+- **Fix applied (or adapted):** Theme-neutral wording: 'the vivid end of the colormap = low loss (bright in night mode, deep in day mode); thin contour lines join equal-loss points.'
+
+### [moderate] ch-tail — src/utils/experiments.ts:205-209
+- **Claim:** ch-generalize preset coach: 'Driving training loss to zero here means memorizing noise… That gap is overfitting.'
+- **Why wrong:** A 2-parameter line fit to noise-2 data cannot drive training loss anywhere near zero (it floors at ≈ the noise variance), and OLS with 2 params barely overfits. What the demo actually shows is estimation error — the zero-mean noise draw shifts the empirical minimum off the true line by sampling luck. Teaching this as 'overfitting' plants a wrong model of the concept.
+- **Fix applied (or adapted):** Reframe: 'the minimum of the noisy training loss is not the true line — more data pulls it back; a flexible-enough model could also memorize the scatter (overfitting).'
+
+### [moderate] ch-tail — src/utils/experiments.ts:62-78
+- **Claim:** vanishing-gradient (also symmetric-pair, noisy-truth) leaves the optimizer unset — blurb promises 'watch Train barely move'.
+- **Why wrong:** applyProblem keeps any adaptive optimizer (trainer.ts:289-292 only swaps gd↔momentum). Run 'Why Adam exists' first (sets Adam), then this card: Adam normalizes the tiny plateau gradient and the marker moves briskly, directly contradicting the coach's '‖∇ℒ‖ ≈ 0, so steps go nowhere'. The demo only works if the user happened to be on GD.
+- **Fix applied (or adapted):** Add applyOptimizer('gd') to every experiment whose described behavior depends on plain GD.
+
+### [minor] ch-tail — src/components/HelpModal.svelte:2429-2434
+- **Claim:** Zoo intro: 'Every problem has the same two parameters (α, β)… Each ships with a curated default learning rate, momentum, and view.'
+- **Why wrong:** Contradicted three lines later by its own 'Start in 1D' group: Fit a Slope, Double Well, and Bumpy Valley are oneParam problems (β unused, 3D toggle disabled). And roughly half the problems (linear regression, sine, Gaussian peak, the 1D trio…) ship no defaultMomentum.
+- **Fix applied (or adapted):** 'Every problem has at most two parameters — three warm-ups use just one' and drop 'momentum' or say 'and, where it helps, momentum'.
+
+### [minor] ch-tail — src/components/HelpModal.svelte:1231
+- **Claim:** Course banner: 'ten short predict-then-run lessons. Each chapter below also opens its own.'
+- **Why wrong:** Only 6 of the 12 chapters open a lesson (ch-shapes, downhill, step, gamma, noise, optimizers via chLesson); ch-bowl, ch-landscape, ch-schedule, ch-generalize open live demos instead, and the four reference chapters open nothing. 'Each chapter opens its own lesson' over-promises.
+- **Fix applied (or adapted):** 'Most teaching chapters below open a matching lesson or live demo.'
+
+### [moderate] act-perparam — src/components/HelpModal.svelte:280 (AdaDelta card idea)
+- **Claim:** AdaDelta card: "The two memories make the ratio dimensionless, and the learning rate falls out of the math entirely"
+- **Why wrong:** Zeiler's argument is the opposite: RMSProp's g/RMS[g] is already dimensionless, which is exactly why it still needs a γ carrying θ's units. AdaDelta's RMS[Δθ] numerator restores θ's units, making the step dimensionally CORRECT (units of θ, like Newton's H⁻¹g) — not dimensionless.
+- **Fix applied (or adapted):** Say the full step now carries θ's own units (like Newton's H⁻¹∇L does), so no unit-carrying γ is needed — and note the dimensionless g/RMS[g] is precisely RMSProp's residual flaw.
+
+### [minor] code-classic — src/utils/optimizers.ts:9
+- **Claim:** "State convention — one record fits all seven methods" (file header)
+- **Why wrong:** The file now ships 14 optimizers (OptimizerId union, line 18), and the header omits the Prodigy fields d/rNum/sDen/x0 that were bolted onto OptimizerState. Stale as written; misleading for a reveal-the-code feature.
+- **Fix applied (or adapted):** Update the count and mention the Prodigy-only optional fields already documented at lines 24-28.
+
+### [minor] code-modern — src/utils/optimizers.ts:496-498
+- **Claim:** Newton comment: "On a genuine convex bowl τ = 0 and the trust region is slack, so it is exactly −H⁻¹∇ again, reaching the minimum in essentially one step."
+- **Why wrong:** τ = 0 only when the smallest eigenvalue already exceeds NEWTON_CURV_FLOOR = 0.5. A shallow convex bowl (λmin = 0.2, say) gets τ = 0.3, which changes both length and direction of the step — not exact Newton, not one-step. The unit test only checks H=2I, where the claim happens to hold.
+- **Fix applied (or adapted):** Qualify: "on a bowl whose smallest curvature exceeds the floor (0.5), τ = 0 …"; keep the guide's phrasing consistent when this text migrates there.
+
+### [minor] code-problems — src/utils/problems.ts:122,131
+- **Claim:** Bumpy Valley: "global at α ≈ −0.8" and trueParameters: { a: -0.8 }
+- **Why wrong:** f'(α) = 0.3α + 2cos(2α) is −0.30 at α=−0.8, not zero. The actual global minimum is α ≈ −0.731 (verified numerically; f(−0.731)=0.486). Any marker/target derived from trueParameters sits visibly off the true bottom, and a converged run stops at −0.73 while the doc claims −0.8.
+- **Fix applied (or adapted):** Set trueParameters.a = -0.73 and update the comment to "global at α ≈ −0.73".
+
+## Disputed (verifiers split — adjudicated by hand)
+
+### [minor] ch-downhill — src/components/HelpModal.svelte:708-737 and 1552-1554
+- **Claim:** "The gradient is always perpendicular to the contours — which is why the field arrows below cut straight through the white loops", over a figure whose arrows point radially at the center of elliptical contours.
+- **Why flagged:** gradFieldArrows (HelpModal.svelte:708-737) aims every arrow straight at (gradVizCx, gradVizCy), but the white contours are ellipses (rx:ry ≈ 55:40). Radial directions are not normal to ellipses off the axes (≈15-17° off at 45°), so the figure quietly contradicts the perpendicularity claim it illustrates — and reinforces the misconception that −∇ℒ points at the minimum.
+- Vote (isReal=True): Verified in source: gradFieldArrows aims arrows radially at (75,50), but contours are 1.4:1 ellipses. Recomputed: at 45°, radial deviates from the ellipse normal by arctan(0.5·(55²−40²)/2200) ≈ 17.9°, so arrows visibly are not perpendicular where the text says they "cut straight through" — and the figure depicts the point-at-the-minimum misconception the app later debunks.
+- Vote (isReal=False): The flagged sentence is a true theorem, and the figure supports it qualitatively: radial arrows cross the faint 1.4:1 ellipses at worst 72°, still "cutting through, not running along." An ~18° schematic imprecision in a low-opacity decorative backdrop teaches nothing false; a radial field is the correct picture for a near-isotropic bowl. Cosmetic polish at most.
+
+### [moderate] ch-step — src/components/HelpModal.svelte:1711-1712
+- **Claim:** "Take a step of size γ in that direction." (recipe blockquote)
+- **Why flagged:** The step length is γ·‖∇ℒ‖, not γ — γ only scales the gradient. The chapter's own linked lesson ('dead-gradient', lessons.ts:149) hinges on exactly this: near-zero gradient ⇒ near-zero steps regardless of γ. As written, the recipe contradicts the lesson it launches and plants a fixed-step-length misconception.
+- Vote (isReal=True): With the displayed rule θ ← θ − γ∇ℒ, the step length is γ‖∇ℒ‖, not γ. The recipe as written asserts fixed-length steps, which is the exact misconception the chapter's own linked lesson (lessons.ts:149: "Steps are γ × gradient") tests against — a literal reader would fail that quiz.
+- Vote (isReal=False): "Step of size γ" is the field's standard idiom — the optimization literature itself calls γ the "step size/step length" (Nocedal & Wright, Goodfellow) despite the displacement being γ‖∇ℒ‖. The exact rule θ ← θ − γ∇ℒ is displayed in the very next sentence, and the linked dead-gradient lesson explicitly teaches "Steps are γ × gradient," resolving the nuance rather than contradicting it.
+
+### [minor] ch-generalize — src/utils/experiments.ts:207
+- **Claim:** Driving training loss to zero here means memorizing noise, not learning the signal (coach message)
+- **Why flagged:** In this very demo a 2-parameter line through noisy scatter cannot drive training loss anywhere near zero — the model lacks capacity to memorize. The sentence promises something the learner will not see, and conflates memorization (capacity) with the estimation error the demo actually shows.
+- Vote (isReal=False): The sentence is a normative warning ("zero training loss is the wrong goal"), not a prediction the learner will see zero loss. The demo's observable claims — loss falls, basin drifts off the dashed true line — are accurate, and even this 2-param fit genuinely absorbs sample noise (train/test optimism gap σ²·2p/n). "Memorizing noise" is deliberate informal shorthand matching the chapter's own text; the capacity/estimation-error distinction is a pedantic nuance, not a false teaching.
+- Vote (isReal=True): Verified in code: linear-regression adds ±2 uniform noise to ~dozens of points, so the 2-parameter line's minimum training MSE is ~1.3, never near zero. The learner sees loss plateau well above zero, contradicting the text. Full minimization here is the OLS fit (estimation error), not memorization — the sentence teaches a false, directly observable claim.
+
+### [moderate] act-branches — HelpModal.svelte:345 (idea), 2282-2289 (aside); implementation optimizers.ts:499-549
+- **Claim:** Newton card: "away from a convex bowl −H⁻¹∇L can aim uphill, so here it falls back to a gradient step on saddles" (and the aside: "watch it give up the jump and crawl").
+- **Why flagged:** The implementation (optimizers.ts:485-549) never falls back to a gradient step. It always uses damped Newton — lift the smallest Hessian eigenvalue to a floor (τI shift, Levenberg–Marquardt style) plus a trust-region cap of 0.28×domain. Also, the 0.5 curvature floor means shallow convex bowls (λmin<0.5) are damped too, and long jumps are trust-capped, so "nails the minimum in ONE step" is not always literally what the app does.
+- Vote (isReal=True): The core flag is confirmed: optimizers.ts always uses damped Newton −(H+τI)⁻¹∇ plus a trust cap — never a gradient step. On a ±2 saddle the step preconditions ∇ with condition 9, so "falls back to a gradient step" misstates the app's mechanism, contradicting the code's own LM-style comment. The ONE-step claim, however, is textbook-true for Newton on a quadratic bowl.
+- Vote (isReal=False): The code (optimizers.ts:499-549) is LM-damped Newton, and "falls back to a gradient step" is the canonical gloss for that: after the τI shift, the negative-curvature component — exactly where Newton aims uphill — becomes gradient/floor, i.e., a gradient step there. "ONE step" describes pure Newton on a true bowl (mathematically correct; code matches when τ=0), and the aside hedges with "almost at once."
+
+## Gaps — concepts used but never taught, or missing coverage
+
+- **(ch-bowl)** Notation primer: Σ summation, subscript i, and the hat on ŷ
+  - Why: This is chapter 1 and the MSE display is the reader's first formula. A high-school reader may never have seen Σ-notation or the ŷ convention; without a one-line decode ("Σ means add up over all n points; the hat marks a prediction"), the formula is wallpaper.
+  - Where: Just before or beside the lossDefinition formula, HelpModal.svelte:1288
+- **(ch-bowl)** What log does near zero (and which base)
+  - Why: The whole "brutal when confidently wrong" argument rests on −log x → ∞ as x → 0, which is asserted, not shown. A tiny sketch of −log x, plus a note that base doesn't matter for optimization, would let a beginner actually see the cliff.
+  - Where: Cross-entropy paragraph, HelpModal.svelte:1302-1309
+- **(ch-bowl)** Higher-dimensions honesty note: real models have millions of knobs, and their landscapes are not one bowl
+  - Why: The owner explicitly wants these margin notes. Chapter 1 is where the two-knob simplification is introduced, so it's the natural place to say the 2-D picture is a deliberate teaching device and the single-bowl guarantee holds for simple fits, not for deep networks.
+  - Where: Margin note after the "Why a bowl?" concept box, HelpModal.svelte:1265-1280
+- **(ch-bowl)** Where predictions come from: show one concrete model, e.g. ŷ = αx + β
+  - Why: The chapter says "choose α and β and the model makes a prediction" but never shows a single prediction being made. One line — the default line-fit formula and a two-point worked MSE computation — turns the abstract knobs into arithmetic a beginner can redo.
+  - Where: After the parameters paragraph, HelpModal.svelte:1249-1257
+- **(ch-bowl)** "Negative log-likelihood of a Bernoulli model" is used before likelihood is taught
+  - Why: This is exactly the name-drop pattern the owner wants eliminated. "Likelihood," "Bernoulli," and "negative log" are three untaught concepts stacked in one clause; either teach them in a short aside (probability the model assigns to what actually happened; take −log) or defer with a forward reference.
+  - Where: HelpModal.svelte:1305-1308
+- **(ch-landscape)** "In higher dimensions..." honesty note: real models have millions of parameters, so their loss landscape lives in a space nobody can draw; researchers only ever see 2-D slices of it (which is literally what the chapter's own Li et al. 2018 reference does). This chapter coins the landscape metaphor, so the disclaimer belongs here, not first in ch-shapes (line 1475).
+  - Why: The chapter silently implies every loss is a drawable surface. A beginner will carry that picture into reading about real networks. One margin-note sentence keeps the metaphor honest and makes the Further-reading paper meaningful.
+  - Where: src/components/HelpModal.svelte, after the 3D paragraph (~line 1349) or as a margin note before the figure
+- **(ch-landscape)** Bridge to the notation just taught: the surface IS the graph of ℒ(α, β) from the previous chapter (formulas.lossDefinition, HelpModal line 185, rendered at 1288). One sentence: "a function of two inputs has a graph that is a surface, the way a function of one input has a graph that is a curve."
+  - Why: This is the chapter's core calculus concept (graph of a two-variable function) and it is currently only implied. Beginners who just met ℒ(α,β) as symbols need the explicit statement that the landscape is that formula, drawn.
+  - Where: src/components/HelpModal.svelte:1330-1336, first paragraph
+- **(ch-landscape)** Which map axis is which: the text says "the flat plane of every possible α and β" but never states that the panel's horizontal axis is α and vertical is β, and that colour/height is the loss.
+  - Why: The chapter's whole job is teaching a beginner to read this specific panel; naming the axes closes the loop between prose and pixels and costs one clause.
+  - Where: src/components/HelpModal.svelte:1342-1349, the panel-description paragraph
+- **(ch-shapes)** Convexity is never defined, yet the chapter ends on "non-convex optimization" and the whole chapter is about losing convexity
+  - Why: "non-convex" (line 1480, also optimizer cards and a problem tag "convex bowl") is used nowhere-defined jargon for a high-school reader. One sentence — "a convex surface is one bowl: every local dip is the global one" — would name the property the chapter is dismantling.
+  - Where: ch-shapes opening paragraph (or ch-bowl), HelpModal.svelte ~1410-1415
+- **(ch-shapes)** ∇ℒ = 0 notation appears before the gradient is taught (ch-downhill is the NEXT chapter)
+  - Why: Line 1469 shows the nabla symbol with no prior introduction anywhere in the rendered prose; a beginner hits an alien symbol. Needs a forward-pointing gloss: "read it as 'the slope in every direction is zero' — we meet this symbol properly in the next chapter."
+  - Where: src/components/HelpModal.svelte:1469
+- **(ch-shapes)** "critical points" used undefined
+  - Why: Line 1477 pivots the whole high-D argument on "critical points" without saying it means gradient-zero points (minima, maxima, saddles together). One appositive clause fixes it.
+  - Where: src/components/HelpModal.svelte:1477
+- **(ch-shapes)** Why saddles proliferate in high dimensions — the missing intuition
+  - Why: The Dauphin claim is asserted, not explained. The coin-flip argument (a minimum needs ALL N curvature directions to bend up; with millions of directions that is astronomically unlikely, so gradient-zero points are almost always mixed) is one beginner-friendly sentence and makes the claim inevitable rather than magical.
+  - Where: after "overwhelmingly saddles", HelpModal.svelte ~1477
+- **(ch-shapes)** Ravines/ill-conditioned valleys absent from the landscape-shapes taxonomy
+  - Why: The chapter catalogs dips, ridges, saddles, plateaus but never mentions stretched narrow valleys — the shape that motivates momentum and the app's own race demo. A one-line signpost ("one more troublesome shape, the stretched ravine, gets its own chapter") completes the map without duplicating ch-gamma.
+  - Where: closing paragraph, HelpModal.svelte ~1483-1487
+- **(ch-downhill)** The proof's key step — rate of change = ∇ℒ·u ("the shadow") — is asserted, not derived
+  - Why: The steepest-descent proof is only as strong as this lemma, and it is exactly where the calculus lives. It follows in two lines from the chapter's own wiggle picture: a step u splits into an α-wiggle and a β-wiggle, each contributing slope×amount; summing gives u_α·∂ℒ/∂α + u_β·∂ℒ/∂β. Without it the ∎ feels like authority, not proof.
+  - Where: Inside the proof box, before the formula (HelpModal.svelte ~line 1626)
+- **(ch-downhill)** Dot product used before being taught
+  - Why: "their dot product ∇ℒ·u" appears with no definition; the target reader has high-school math. One sentence ("multiply matching entries and add — geometrically, length times the shadow's length") makes the proof self-contained.
+  - Where: Proof box, first paragraph (~line 1627)
+- **(ch-downhill)** Honesty note: −∇ℒ is steepest *locally* but generally does NOT point at the minimum
+  - Why: Only perfectly round bowls send the gradient through the center; on elliptical contours it points off-axis (the whole reason ravines zig-zag, taught later). The concept figure's radial arrows actively plant the opposite intuition. A one-line margin note here prevents the misconception and foreshadows the ravine chapter.
+  - Where: After "they all stream toward the basin" (~line 1561-1565) or as a margin note after the proof
+- **(ch-downhill)** "Steepest" depends on how you measure distance (the metric)
+  - Why: The cosine proof silently assumes Euclidean unit steps. Rescale one knob's units and the "steepest" direction changes — which is precisely what preconditioners and Adam exploit. A two-sentence margin note here gives the optimizer chapters a hook and is the kind of honest fine print the owner wants.
+  - Where: Margin note after the proof box (~line 1677)
+- **(ch-downhill)** Chain rule name-dropped, never taught
+  - Why: The backprop aside says "one backward sweep of the chain rule" — pure jargon to the target reader. Either a one-line intuition ("slopes multiply along a chain: if y is 3× as sensitive to u, and u is 2× as sensitive to α, then y is 6× as sensitive to α") or an explicit "we'll meet it properly in chapter N".
+  - Where: The aside, HelpModal.svelte:1582-1590
+- **(ch-downhill)** ∂ notation and derivative-as-limit not decoded
+  - Why: The formula displays ∂ℒ/∂α but the prose never says how to read ∂ ("partial", the curly d meaning 'others held still') nor that the nudge-and-divide recipe becomes exact only as the nudge shrinks — which is what the closing "only true where you stand" caveat secretly relies on.
+  - Where: Between the finite-difference paragraph and the formula display (~line 1574-1591)
+- **(ch-step)** Component-wise reading of θ ← θ − γ∇ℒ plus a tiny worked numeric example
+  - Why: θ and ∇ℒ as vectors are brand new. A beginner needs to see α ← α − γ ∂ℒ/∂α and β ← β − γ ∂ℒ/∂β spelled out, ideally with one hand-computed step (e.g. γ=0.1, gradient (2, −1)). Right now the formula is displayed and never unpacked.
+  - Where: Right after the formula-display at HelpModal.svelte:1718
+- **(ch-step)** Steps shrink automatically as you descend (step length = γ‖∇ℒ‖)
+  - Why: This is the single most useful consequence of the rule — smooth landing near minima, stalling on plateaus (vanishing gradients). The ch-gamma preset coach even says 'watch the steps grow instead of shrink', assuming the reader knows steps normally shrink. Never taught.
+  - Where: New paragraph after the red/blue-arrow paragraph, before the CTA
+- **(ch-step)** When does 'Repeat' stop? (stopping criteria)
+  - Why: The recipe ends with 'Repeat.' but never says until when — a fixed step budget, ‖∇ℒ‖ ≈ 0, or loss flatlining. The app itself uses totalSteps and reports stalled/descending verdicts (trainer.ts evaluateRun); the text should name the idea in one sentence.
+  - Where: End of the recipe blockquote or the paragraph following it
+- **(ch-step)** Higher-dimensions margin note: same rule, millions of parameters
+  - Why: This is the chapter's honest-note opportunity — and a reassuring one: nothing in θ ← θ − γ∇ℒ is 2-D-specific; GPT-scale training is this exact line with θ holding billions of entries. Also: in high-D nobody 'looks downhill' at a picture — backprop computes ∇ℒ.
+  - Where: Margin note at the end of ch-step, before Further reading
+- **(ch-gamma)** What 'max' in λmax means — curvature varies by direction
+  - Why: λmax appears with no explanation that a bowl can be narrow one way, wide another, and the narrowest direction sets the speed limit while the widest sets progress. That asymmetry (condition number) is the whole motivation for Part III, and the Further-reading list already links Condition number without the text ever introducing it.
+  - Where: Right after the stability formula, HelpModal.svelte:1775
+- **(ch-gamma)** Where the '2' comes from — a 1-D worked example
+  - Why: The threshold is asserted, never shown. One line — on ½λθ² each step multiplies distance by (1−γλ); at γ=2/λ you land on the mirror point at equal height, beyond it you land higher — makes the '2' inevitable instead of magic, at high-school-algebra level.
+  - Where: Between HelpModal.svelte:1774 and 1781, or a collapsible aside
+- **(ch-gamma)** 'In higher dimensions' honesty note: 2/λmax is exact only for quadratics
+  - Why: On real (non-quadratic) surfaces λmax changes from place to place, so the safe γ changes as you descend — and modern deep-net training famously hovers at the 'edge of stability' (γ ≈ 2/λmax, Cohen et al. 2021) without exploding. Without this note the clean threshold oversells the 2-D picture.
+  - Where: Aside after HelpModal.svelte:1781, before the clipping aside
+- **(ch-gamma)** γ has units — rescaling loss or data rescales the safe γ
+  - Why: Explains why every problem 'ships with a sane default' that differs across problems, and why there is no universally good learning rate — a common beginner confusion the chapter sets up but never resolves.
+  - Where: Near the 'sane default' bullet, HelpModal.svelte:1760
+- **(ch-schedule)** Schedules do nothing in continuous (∞) runs
+  - Why: trainer.ts:133 disables the schedule when `continuous` is true. A learner who selects Cosine in ∞ mode sees zero effect and no explanation — the single most likely point of confusion in this chapter, and the reason the Lion demo forces a finite 300-step run.
+  - Where: First or fourth paragraph of ch-schedule, one sentence: a schedule needs a run length T to pace itself against.
+- **(ch-schedule)** Why shrinking γ works at all — the informal Robbins–Monro intuition
+  - Why: The chapter shows the shapes but never states the two-sided condition: shrink too fast and you stall before arriving; keep γ big and you never stop rattling. One friendly sentence (steps must add up to infinity, but their squares must not) is the actual theory behind every decay schedule and costs three lines.
+  - Where: After the schedule-card grid, before the per-schedule tour.
+- **(ch-schedule)** The actual formula for at least one schedule
+  - Why: For lecture-notes/LaTeX-textbook rigor the chapter is pictures-and-prose only. γ_t = γ_min + (γ − γ_min)·(1+cos(πt/T))/2 is short, matches schedules.ts:47 exactly, and teaches the reader to read a schedule as a pure multiplier factor(t,T) ∈ (0,1].
+  - Where: Cosine paragraph, as a display formula or margin note.
+- **(ch-schedule)** Higher-dimensions honesty note on the step-decay cliff
+  - Why: In real stochastic training the famous cliff comes from lowering the gradient-noise floor (plateau height ∝ γ), not from a smaller step "resolving detail". The deterministic framing here is fine for full-batch 2-D but under-sells the mechanism the reader will meet in every real loss curve; a forward-pointer to ch-noise fixes it.
+  - Where: Step-decay paragraph (HelpModal.svelte:1867-1871), margin note.
+- **(ch-schedule)** Why warmup, honestly, in big models
+  - Why: The "random dreadful start, one big step flings you off the map" story is a fair 2-D cartoon, but in practice warmup mainly tames adaptive optimizers' unreliable early variance estimates (RAdam) and sharp early curvature. One "in real networks…" clause keeps the promise of honest margin notes.
+  - Where: Warmup sentences (HelpModal.svelte:1877-1881).
+- **(ch-schedule)** Other classic decay shapes exist
+  - Why: Exponential, linear, and 1/t decay are the textbook schedules a reader will meet in every framework's docs; the guide covers only the four implemented. One sentence acknowledging the wider family (and why the app picked these four) prevents the impression the menu is exhaustive.
+  - Where: End of the schedule-card paragraph.
+- **(ch-noise)** Why averaging shrinks error by √n
+  - Why: The 1/√n law is the chapter's one quantitative claim, asserted with no intuition. A beginner has never met standard error. One sentence (independent errors partly cancel; a dice-average or coin-flip example) turns a magic rule into something ownable — and pre-teaches variance for later chapters.
+  - Where: In the fan paragraph, HelpModal.svelte ~line 1941, before the 4-vs-16 numbers
+- **(ch-noise)** Name the concept: 'unbiased estimator'
+  - Why: 'Points the right way on average' IS unbiasedness (E[ĝ] = ∇L under uniform sampling) — the theorem that licenses all of SGD. Giving it its name and one-line statement costs nothing and pays off in ch-optimizers (Adam's bias correction uses the same word).
+  - Where: Second paragraph, HelpModal.svelte ~line 1931
+- **(ch-noise)** Higher-dimensions honesty note
+  - Why: The 2-D picture misleads twice here: in millions of dimensions the noise 'ball' is a stretched ellipsoid (anisotropic noise), and local-minima dips are rare — saddles dominate (Dauphin et al. 2014), so 'noise rattles you out of dips' is mostly a saddle story. The guide promises margin-notes exactly for this.
+  - Where: After the noise-is-useful paragraph, ~line 1954
+- **(ch-noise)** Why not batch size 1, then? (hardware/parallelism cost model)
+  - Why: The chapter's cost logic ('cheap per step') implies batch 1 is optimal, which no practitioner believes: GPUs process a batch of 32 nearly as fast as 1, so moderate batches win wall-clock. Without this, the diminishing-returns paragraph answers only half of the batch-size choice.
+  - Where: End of the fan paragraph, ~line 1946
+- **(ch-noise)** Sampling scheme: shuffled epochs vs fresh resampling
+  - Why: The prose defines 'epoch' (a full sweep) yet describes batches as 'freshly resampled each step' — with-replacement sampling, under which no clean sweep exists. Real training shuffles then partitions. One footnote reconciles the two and matches what learners will meet in PyTorch.
+  - Where: Vocabulary aside, ~line 1933-1935
+- **(ch-generalize)** Double descent / benign overfitting margin note
+  - Why: The chapter presents the U-shaped test curve as universal ('test loss … bottoms out and then rises'). In modern overparameterized models, test loss often keeps falling, or dips again after the classical rise (Belkin 2019; Nakkiran 2020). One honest margin note prevents the classical picture from hardening into a false law — and explains why huge networks trained long still generalize.
+  - Where: After the figure caption, HelpModal.svelte:~2374
+- **(ch-generalize)** Model capacity / bias-variance as the second axis of overfitting
+  - Why: The chapter attributes overfitting entirely to training too long. Beginners need the other axis: too many knobs relative to data. It also explains why this app's 2-parameter models overfit only mildly — capacity is capped at two, so only the noise-shifted minimum remains.
+  - Where: Second paragraph, HelpModal.svelte:2347-2354
+- **(ch-generalize)** 'In higher dimensions' note on flat/sharp minima
+  - Why: The 2-D basin picture suggests flatness is a single visible width. In millions of dimensions, minima are connected valleys, flat along most directions and sharp along a few, and sharpness measures depend on parametrization (Dinh et al. 2017, 'Sharp minima can generalize'). The Hochreiter–Keskar story deserves this stated caveat since the debate is genuinely unsettled.
+  - Where: Final paragraph, HelpModal.svelte:2398-2408
+- **(ch-generalize)** Why held-out data estimates true risk
+  - Why: The leap from 'true risk over all future data' to 'hold out part of your sample' is unexplained. One sentence — the held-out points were never seen by the optimizer, so their average error is an honest preview of new data — closes the logical gap for a beginner.
+  - Where: HelpModal.svelte:2376-2379
+- **(ch-opt-narrative)** The Hessian and its eigenvalues are used but never taught
+  - Why: The condition-number paragraph drops λ_min/λ_max with no definition of eigenvalue or curvature matrix, and the Newton card says "the Hessian H" in one parenthetical. For a high-school-math reader this is the chapter's missing rung — κ, the √κ speed-up, and Newton's H⁻¹∇ℒ all hang on it.
+  - Where: A short "curvature in two numbers" box before the κ paragraph (HelpModal.svelte:2024), showing the 2×2 second-derivative matrix and its two bend-rates.
+- **(ch-opt-narrative)** Gradient noise is absent from the optimizer story
+  - Why: The chapter frames every optimizer purely as a ravine patch, but the EMAs in Momentum/RMSProp/Adam equally exist to average out mini-batch noise (taught earlier in the guide). The race is deterministic full-batch, so a reader never sees half of why these methods won.
+  - Where: One connecting sentence in the Act II intro and a margin note on the race figure, cross-referencing the mini-batch chapter.
+- **(ch-opt-narrative)** Honest margin note: this 2-D race is not a leaderboard
+  - Why: On this landscape Newton "nearly teleports" and GD looks hopeless; in millions of dimensions Newton is unusable, saddles dominate, and tuned SGD+momentum still trains vision models. Without a disclaimer the race teaches exactly the wrong ranking — the owner's requested "2-D intuition misleads" note.
+  - Where: Race figcaption (HelpModal.svelte:2205-2211) or an aside directly after the figure.
+- **(ch-opt-narrative)** Why real losses are ill-conditioned
+  - Why: The chapter asserts ravines are the nemesis but never says where huge κ comes from (mismatched feature scales, layer-to-layer scale differences). One line grounds Act III's per-parameter rates in something the reader met in the data/feature-scaling material.
+  - Where: End of the condition-number paragraph (HelpModal.svelte:2024-2038).
+- **(ch-opt-narrative)** Adam's known theoretical wart (Reddi et al. 2018 / AMSGrad)
+  - Why: The card says "three later papers each sand down one rough edge," silently skipping the most famous critique — Adam's proof was wrong and it can fail to converge. A one-line margin note keeps the chapter's "honest history" promise and explains why β₂ matters.
+  - Where: Adam card's ✗ footer or the Nadam lead (HelpModal.svelte:294-299).
+- **(ch-opt-narrative)** Weight decay / regularization used before it is taught
+  - Why: The AdamW card leans on "weight decay", "overfitting", and "regularizer" — all first properly introduced in the NEXT chapter (ch-generalize). A beginner reading linearly hits three undefined ideas in the chapter's most important card.
+  - Where: AdamW card (HelpModal.svelte:306-316): add a forward pointer "(next chapter explains overfitting; for now: a gentle pull toward zero)".
+- **(ch-tail)** Custom Regression & Custom Classification are absent from the zoo chapter
+  - Why: problems.ts defines 24 problems; the chapter shows 22 and never mentions the bring-your-own-data pair or the point editor — a headline feature of the recent sprint. Readers can't discover it from the guide, and the '22 landscapes' title goes stale the moment anything is added.
+  - Where: End of ch-problems (HelpModal.svelte ~2453): add a 'Bring your own data' group
+- **(ch-tail)** The Layers control and 3D surface view are never explained in the reference
+  - Why: The Keyboard chapter binds D/A/F/C to 3D, arrow field, streamlines, and contours, but 'Reading the panels' never says what streamlines are, what the colormap/density options do, what the basin-map overlay shows, or how to read/rotate the 3D surface.
+  - Where: ch-panels (HelpModal.svelte:2477-2481), new bullets after 'Loss & Gradient'
+- **(ch-tail)** Race mode is never documented
+  - Why: The banana-race experiment drops the reader into a multi-optimizer race with colored trails, a legend, a finish rule (first into the basin), and a settings modal — none described anywhere in the reference chapters.
+  - Where: ch-panels, one bullet: 'Racing optimizers — …'
+- **(ch-tail)** Pure-surface (noData) problems change what the panels show
+  - Why: For Rosenbrock/Saddle/Himmelblau/the 1D trio there is no data plot content and no test curve in Loss History, yet ch-panels describes train AND test loss unconditionally. A beginner on a pure surface will look for a test curve that doesn't exist.
+  - Where: ch-panels Loss History bullet (HelpModal.svelte:2480)
+- **(ch-tail)** Honest margin-note: local minima in 2D vs high dimensions
+  - Why: The zoo and the local-minimum experiment teach 'local minima trap you' as the central hazard. In high-dimensional networks, isolated bad local minima are rare; saddles and plateaus dominate. The owner explicitly wants these 2D-intuition caveats, and this is the most misleading omission in the closing chapters.
+  - Where: ch-problems intro or the 'Watch a local minimum trap you' card
+- **(ch-tail)** Keyboard chapter caveats
+  - Why: D silently does nothing on 1-parameter problems (App.svelte:240 checks oneParam), and all shortcuts are suspended while the guide, drawer, or tour is open. Without a note, a reader pressing D on Double Well thinks the feature is broken.
+  - Where: ch-keys (HelpModal.svelte:2486-2496), one-line footnote
+- **(act-slope-memory)** Nesterov card has no 'brk' (new flaw) line
+  - Why: The Act I intro promises 'here is the new flaw the fix introduced' for every method, and every other trunk card delivers one. Nesterov's honest flaw — acceleration is fragile under minibatch gradient noise, so practice mostly ships plain momentum — is exactly the bridge to the app's batch-noise chapter.
+  - Where: HelpModal.svelte:243-252, add brk to the Nesterov entry
+- **(act-slope-memory)** High-dimension margin note for momentum/ravines
+  - Why: In 2D there is one ravine; in millions of dimensions the Hessian has a whole spectrum of curvatures, so the marker oscillates in a few stiff directions while crawling in many sloppy ones at once, and momentum's payoff grows like √κ. The 2-D picture undersells why memory matters at scale.
+  - Where: Momentum card (HelpModal.svelte:232-242) or the Act II intro
+- **(act-slope-memory)** Missing Nesterov citations in OPT_CITE
+  - Why: Nesterov is the only trunk optimizer with no paper link — just the same SGD wiki anchor as Momentum. The 1983 Doklady reference (269:543–547) plus Sutskever et al. 2013 (where the constant-μ ML form actually comes from) would also license the historical nuance above.
+  - Where: HelpModal.svelte:395-400 (OPT_CITE.Nesterov)
+- **(act-slope-memory)** Why momentum needs a smaller γ than plain GD
+  - Why: The race silently tunes momentum/nesterov to γ=0.012 vs GD's 0.06 (RACE_LR, HelpModal.svelte:515-524) — a direct consequence of the 1/(1−μ) velocity amplification that is never taught. Readers who switch optimizers with γ fixed will see momentum explode and not know why.
+  - Where: Momentum card, one sentence near the formula or in the μ slider hint
+- **(act-perparam)** Diagonal preconditioning is axis-aligned: a per-parameter rate only fixes ravines aligned with the α/β axes; a 45°-rotated ravine defeats all of Act III. In high-D, curvature is rarely axis-aligned — these methods mostly fix per-layer scale differences, not rotation.
+  - Why: This is the single most misleading 2D intuition in the act: the app's ravines are near axis-aligned, so AdaGrad/RMSProp look more powerful than they are. Exactly the honest margin-note the owner asked for.
+  - Where: Act III intro (HelpModal.svelte:254) or a margin note on the AdaGrad card
+- **(act-perparam)** ε is never explained: it appears in every Act III formula unannounced. What it's for (no divide-by-zero when s≈0), typical value (1e-8), and that in AdaDelta it also sets the very first step's size (u=0 → step ≈ √ε·g/RMS[g]).
+  - Why: An absolute beginner meets √s+ε with no introduction; AdaDelta's ε doing double duty (the app uses 1e-4 vs Zeiler's 1e-6 for exactly this reason, disclosed only in a code comment) is a genuinely teachable fact.
+  - Where: First appearance, AdaGrad card (HelpModal.svelte:259-260)
+- **(act-perparam)** Why squared gradients and a square root — the RMS idea. The act divides by √(Σg²) / √(E[g²]) without saying why not |g| or the raw sum; the connection to "typical recent gradient size" (root-mean-square, hence RMSProp's name, never expanded) is missing.
+  - Why: The √ is the act's central mechanic and its motivation is skipped; expanding the RMSProp acronym also pays off the moving-average prereq card.
+  - Where: AdaGrad card, or extend the Act II moving-average prereq card to squared signals
+- **(act-adam)** Bias correction is asserted, never derived
+  - Why: The card says the averages 'read too low' but a beginner can't see why dividing by 1−β^t is the exact fix. A two-line derivation (unrolling the EMA gives a geometric series summing to 1−β^t, so E[m_t]=(1−β1^t)E[g]) connects directly to the moving-average tool card and makes the correction feel inevitable rather than magic.
+  - Where: Adam card idea text, HelpModal.svelte ~line 291
+- **(act-adam)** Margin note: Adam's preconditioning is diagonal, not rotation-invariant
+  - Why: In this 2-D app ravines are (near) axis-aligned, so per-parameter scaling looks like a full cure. Rotate the ravine 45° (correlated parameters) and Adam's per-axis rescaling does nothing — only curvature methods fix that. This is exactly the '2-D intuition misleads' honesty the owner wants, and it sets up Sophia's 'only the diagonal' caveat.
+  - Where: Adam card, HelpModal.svelte ~line 291 (margin note)
+- **(act-adam)** AdamW punchline missing: for plain SGD, L2 and weight decay coincide
+  - Why: Loshchilov & Hutter's key observation is that L2-in-the-loss and decoupled decay are the SAME update for SGD, and only diverge under adaptive scaling — that is why the bug hid for years. Without this line the reader cannot see why anyone 'trusted the line without a second glance'.
+  - Where: AdamW card idea text, HelpModal.svelte ~line 312
+- **(act-adam)** RAdam formula uses ρ∞ and r_t without defining them
+  - Why: The card LaTeX shows ρ_t = ρ∞ − ... and a factor r_t, but ρ∞ = 2/(1−β2) − 1 and the r_t expression appear only in optimizers.ts code comments. A beginner reading the card cannot evaluate ρ_t or know what r_t is; also worth glossing ρ as an 'effective sample count' of the squared-gradient memory.
+  - Where: RAdam card formula, HelpModal.svelte ~line 324
+- **(act-adam)** Margin note: RAdam's variance story assumes stochastic gradients
+  - Why: The card says early √ŝ is 'pure noise', but the paper's argument is about minibatch sampling variance. With the app's deterministic full-batch gradients, ŝ at t=1 is just g² (step ≈ sign step), not noise. An honest note tying this to the mini-batch chapter prevents the toy from teaching a subtly wrong mechanism.
+  - Where: RAdam card idea text, HelpModal.svelte ~line 323
+- **(act-adam)** Adam's implicit trust region (|step| ≲ γ) never mentioned
+  - Why: Kingma & Ba's own explanation of Adam's robustness: because m̂/√ŝ is roughly a signal-to-noise ratio, the per-coordinate step magnitude is bounded near γ regardless of gradient scale, and shrinks as gradients become inconsistent near a minimum. This is the concrete WHY behind the card's 'robust out of the box' claim.
+  - Where: Adam card, HelpModal.svelte ~line 291 or its fix line 293
+- **(act-branches)** The Hessian is name-dropped, never taught
+  - Why: The Newton card says "fit a quadratic bowl (the Hessian H)" and "H is N×N", but the guide never defines H: the 2×2 matrix of second partials, whose eigenvalues are the two principal curvatures — and whose largest eigenvalue is exactly the λmax the γ-chapter's 2/λmax rule already used. A beginner cannot parse the card without this.
+  - Where: A short primer box just before the Newton card (Use-curvature act intro, HelpModal.svelte ~line 340), linking back to the γ chapter's λmax.
+- **(act-branches)** What H⁻¹∇ means — matrix inverse assumed
+  - Why: The target reader has never seen a matrix inverse. Geometric version: divide each principal direction's slope by that direction's own curvature — the ultimate per-direction learning rate, which turns the ravine into a circle. This also retroactively explains why Act III's per-parameter rates are "cheap diagonal Newton".
+  - Where: Newton card idea text or a margin note beside its formula.
+- **(act-branches)** High-D margin note for sign steps (Lion)
+  - Why: In 2-D the fixed stride reads as a quirky staircase; in N dimensions a sign step has length γ√N and always points at a corner of a hypercube — the per-axis uniformity is the whole point (immunity to gradient-scale imbalance across millions of axes). 2-D intuition undersells why this competes with Adam.
+  - Where: Lion card or the Sign-steps act intro (HelpModal.svelte:329).
+- **(act-branches)** Newton in high-D: saddles dominate, and raw Newton seeks them
+  - Why: Raw Newton converges to the nearest stationary point of ANY kind — it is attracted to saddles and maxima, not just minima — and Dauphin et al. 2014 (already cited in ch-shapes) shows high-D landscapes are saddle-dominated. The card's "stumbles on saddles" understates this; a margin note would connect two chapters honestly.
+  - Where: Newton card brk / margin note, cross-referencing the ch-shapes citation.
+- **(act-branches)** Sophia's diagonal is an estimate in real life
+  - Why: The paper never computes the true diagonal: it uses cheap stochastic estimators (Hutchinson or Gauss–Newton–Bartlett), refreshed only every ~10 steps. The app can afford the exact analytic diagonal because N=2. Untold, a reader thinks the diagonal is free at scale — the very cost problem Sophia exists to dodge.
+  - Where: One sentence in the Sophia card (HelpModal.svelte:356).
+- **(act-branches)** "In this app" deviation notes for Newton and Prodigy
+  - Why: The code adds trust regions (Newton 0.28×span, Prodigy 0.18×span), a curvature floor, and a domain-scaled d seed/cap — all well-justified in code comments (optimizers.ts:485-501, 693-701) but invisible in the cards. AdamW's card already models this honest-caveat pattern; these two cards should match it.
+  - Where: Newton and Prodigy cards, as brk-style or aside notes.
+- **(act-branches)** Prodigy's m and v are not Adam's moments
+  - Why: The Prodigy formula reuses m and √v, but in the paper (and the code, optimizers.ts:744-751) they accumulate d-WEIGHTED gradients and get no bias correction; and γ is conventionally left at 1. A reader fresh off the Adam card will misread the symbols.
+  - Where: Prodigy card, one clause near the formula (HelpModal.svelte:368).
+- **(code-classic)** Momentum uses the PyTorch convention (v ← μv + g, step −γv), not classic Polyak (γ folded into v). Effective steady-state step is γ/(1−μ) — raising μ silently amplifies the learning rate ~10× at μ=0.9.
+  - Why: Beginners moving the μ slider will see explosions they attribute to momentum itself; a margin note on the γ–μ coupling is essential and currently absent from code comments.
+  - Where: src/utils/optimizers.ts:117-132 (momentum) and wherever the guide teaches μ
+- **(code-classic)** Nadam is the simplified Dozat form (no μₜ schedule); its first step has magnitude ≈ (1+β₁)γ ≈ 0.19, nearly double Adam's. The test at optimizers.test.ts:102 celebrates this without naming it as a formulation choice.
+  - Why: Reveal-the-code readers comparing against Dozat (2016) or Keras will find a different warmup; one comment line naming the simplification would prevent confusion.
+  - Where: src/utils/optimizers.ts:325-366
+- **(code-classic)** AdaDelta's E[Δθ²] accumulator tracks the UNSCALED Δθ while the parameter moves by γ·Δθ. Self-consistent only at γ=1; if γ is ever exposed off 1, memory and actual steps diverge from Zeiler's Algorithm 1.
+  - Why: Undocumented deviation; either feed γ·Δθ into the accumulator or comment that γ must stay a pure display gain.
+  - Where: src/utils/optimizers.ts:246-263
+- **(code-classic)** ε placement: this code uses √s + ε (PyTorch style) for AdaGrad/RMSProp/Adam; TensorFlow and some texts use √(s + ε). AdaDelta alone puts ε inside both roots (correctly, per Zeiler).
+  - Why: The two placements give visibly different behavior near s≈0; a one-line comment would arm readers against 'the formula in my textbook differs' confusion.
+  - Where: src/utils/optimizers.ts:86 (EPS) and 161/192/293 LaTeX
+- **(code-classic)** gd, adagrad, and rmsprop stash the raw gradient into state.v (`v: { ...g }`) even though they have no velocity — apparently a UI hook for the arrow overlay, but nothing says so.
+  - Why: For npm extraction this is surprising hidden coupling between optimizer state and visualization; document it or move it to a dedicated field.
+  - Where: src/utils/optimizers.ts:112, 172, 207
+- **(code-modern)** Newton: the LaTeX shown to learners is pure −γH⁻¹∇ℒ, but the running code is regularized (eigenvalue floor + τI shift) trust-region Newton
+  - Why: A learner watching Newton descend a saddle while the formula says −H⁻¹∇ sees behavior the displayed math forbids (pure Newton climbs toward saddles). The excellent justification lives only in source comments; the guide should teach damped/saddle-free Newton explicitly.
+  - Where: optimizers.ts:507 updateRuleLatex + the Newton chapter of the guide
+- **(code-modern)** Sophia paper deviations are undocumented: exact FD-Hessian diagonal every step, vs the paper's Hutchinson/GNB estimator refreshed every k=10 steps; also the clip is reparametrized (paper clips at 1 with γ inside max; app clips at ρ)
+  - Why: The reparametrization is mathematically equivalent (clip(x/γ,1)=clip(x,γ)/γ) but a reader comparing the formulas panel to the paper will think one is wrong. The every-step exact Hessian is a genuine (benign) deviation worth one honest sentence.
+  - Where: optimizers.ts:552-620 comment block / Sophia guide chapter
+- **(code-modern)** RAdam LaTeX uses ρ_∞ without defining it (ρ_∞ = 2/(1−β₂) − 1)
+  - Why: The displayed ρ_t formula is unevaluatable without ρ_∞; the code computes it correctly at line 459 but the learner-facing formula never states it, nor the SMA interpretation that motivates the >4 threshold.
+  - Where: optimizers.ts:438 updateRuleLatex / RAdam guide section
+- **(code-modern)** Prodigy's toy-scale safeguards (d₀ = 1e-4·span instead of 1e-6, hard cap d ≤ 1.5·span, per-step trust region) are disclosed only in source comments
+  - Why: These change qualitative behavior vs real Prodigy — the paper's d is unbounded above and has no step clipping. If the guide claims "this is Prodigy," an honest margin note should list the training wheels, as the source comment already does beautifully.
+  - Where: optimizers.ts:693-701 / Prodigy guide chapter
+- **(code-modern)** Lion's dropped decoupled weight decay
+  - Why: Documented in the code comment (line 629), but the paper's reported wins always pair sign updates with weight decay; the guide should note the omission so learners don't conclude bare sign-momentum is the full published method.
+  - Where: Lion guide chapter / formulas panel
+- **(code-problems)** Teach the Hessian the app already computes
+  - Why: hessian.ts powers a curvature lens (2×2 Hessian, eigenvalues/eigenvectors, κ, Newton ghost) but the guide never teaches second derivatives. A beginner sees an ellipse and a κ readout with no derivation. Two parameters make the 2×2 case fully teachable: h11, h12, h22, eigen-directions as the ellipse axes.
+  - Where: New guide chapter between gradients and learning-rate/ravine material; reference the curvature lens directly
+- **(code-problems)** Why separable classification has no finite minimum
+  - Why: The logistic-regression tagline states "no finite minimum — watch ‖θ‖ keep growing" (problems.ts:242,353) but nothing teaches why: BCE keeps falling as the margin scales up. This is the natural place to motivate regularization/early stopping, and it explains the marker pinning to the frame edge, which otherwise looks like a bug.
+  - Where: Guide's classification/logistic-regression section
+- **(code-problems)** AR(2) rollout: stationarity triangle and exploding gradients
+  - Why: The best lore in the codebase — the triangle β>−1, β<1±α, loss rising like ρ^2k outside it, exact BPTT, Bengio 1994/Pascanu 2013 (problems.ts:1313-1327) — lives only in code comments. It is the app's one honest recurrent-network lesson and deserves guide text with the triangle drawn.
+  - Where: Guide problem gallery, AR(2) Rollout entry
+- **(code-problems)** Margin note: saddles in 2D vs high dimensions
+  - Why: In the 2-parameter view (saddle-point, tiny-net) a saddle looks like a rare, visible landmark that plain GD escapes easily. In high dimensions critical points are overwhelmingly saddles and slow escape dominates training (Dauphin et al. 2014). Exactly the kind of honest "2-D intuition misleads" note the owner asked for.
+  - Where: Saddle Point and Tiny Neural Net guide entries
+- **(code-problems)** Newton-step caveat when curvature lens is on
+  - Why: hessian.ts:93 correctly notes the Newton step walks toward the stationary point at saddles (uphill in loss terms) and is only a minimizer when H is positive-definite — but that caveat exists only as a code comment. Learners watching the ghost on saddle-point will see it point AT the saddle and be misled.
+  - Where: Wherever the guide introduces the Newton ghost / curvature lens
+
+## Suggestions — improvements beyond errors and gaps
+
+- **[small] (ch-bowl)** Fix the ŷ=0.99 sentence to give the finite value (≈4.6) and reserve "infinity" for the limit ŷ→1.
+  - Value: Removes the one checkable falsehood in the chapter; a curious reader with a calculator keeps trusting the book.
+- **[small] (ch-bowl)** Add the (1/n)Σ to the cross-entropy display, matching the MSE convention.
+  - Value: Consistency between the two formulas; matches what the app actually plots.
+- **[small] (ch-bowl)** Add a one-line notation decoder under the MSE formula (Σ, subscript i, hat).
+  - Value: First formula of the book becomes readable to the target audience instead of intimidating.
+- **[small] (ch-bowl)** Add the high-dimensions margin note: two knobs are a teaching device; real models have millions, and their landscapes are not single bowls.
+  - Value: Sets honest expectations for the entire book at the moment the simplification is introduced.
+- **[medium] (ch-bowl)** Add a tiny worked MSE example: three data points, compute (ŷ−y)² each, average.
+  - Value: Converts the formula from symbols to arithmetic; the strongest single pedagogy upgrade available here.
+- **[small] (ch-bowl)** Rewrite the Bernoulli/NLL clause as a friendly aside: "cross-entropy is just −log of the probability the model assigned to what actually happened," deferring the word likelihood.
+  - Value: Keeps the rigor the owner wants without three untaught terms in one breath.
+- **[medium] (ch-bowl)** Pair the "creased tent" line with a micro-SVG comparing |e| (kinked) vs e² (rounded).
+  - Value: The smoothness claim is the setup for all later gradient chapters; one picture makes it land.
+- **[small] (ch-bowl)** Label the bowl SVG's horizontal axis ("knob value →") so the 1-D slice connects to the 2-knob landscape in chapter 2.
+  - Value: Prevents the common confusion between loss-vs-parameter and data-vs-fit plots.
+- **[small] (ch-bowl)** Sharpen "a perfect fit sits near zero" to "exactly zero — though with noisy data the best reachable loss stays a bit above."
+  - Value: Costs four words, plants the noise-floor idea the overfitting preset later relies on.
+- **[medium] (ch-bowl)** Consider a second CTA or coach beat showing cross-entropy on a classifier, since half the chapter is CE but the preset ('Roll into the bowl') only demonstrates MSE regression.
+  - Value: Every claim in the chapter becomes something the reader can press a button and see.
+- **[small] (ch-landscape)** Sweep the whole guide for other unconditional "bright = low" claims (found one at HelpModal.svelte:2479, panels cheat-sheet) and fix them together with this chapter's, since they share one root cause and one fix pattern.
+  - Value: Prevents piecemeal theme bugs resurfacing chapter by chapter.
+- **[small] (ch-landscape)** In the figure's left contour map, space the rings closer together toward the rim (they are currently near-even: radii 8, 20, 34, 48, 62) since a bowl steepens outward.
+  - Value: The figure would then demonstrate the rule taught two sentences earlier — "loops bunched tightly together mean a steep slope" — instead of quietly contradicting it.
+- **[small] (ch-landscape)** Make the left map and right surface use the same ring count and matching radii (left has 5 rings, right has 6 at different radii, landscapeFig at line 891).
+  - Value: The caption claims the two views are "exactly" the same surface; making that literally true rewards careful readers and survives LaTeX export scrutiny.
+- **[small] (ch-landscape)** Name-drop the technical term inline: "mathematicians call each loop a level set."
+  - Value: The Further-reading link is titled "Level set" but the term never appears in the chapter, so the link currently lands cold.
+- **[small] (ch-landscape)** Mention the D keyboard shortcut in the chapter prose where it says "Flip the panel to 3D" (line 1347); it currently lives only in the preset's transient coach toast.
+  - Value: Readers who skip the demo button never learn the toggle; the toast disappears in 15 seconds.
+- **[small] (ch-landscape)** Have the preset's coach (experiments.ts:246-253) say why it switched to polynomial regression, e.g. "a curvier problem, so the hills are worth rotating."
+  - Value: The silent problem swap is the preset's only unexplained action; one clause turns it into a teaching beat.
+- **[small] (ch-landscape)** End the chapter with a one-line hook to ch-shapes: "So far this landscape is one tidy bowl — next, what happens when it isn't."
+  - Value: Every other transition in the guide is teacherly; this chapter currently just stops at the Look prompt.
+- **[small] (ch-landscape)** Add a half-sentence that the marker can be dragged on the map to teleport (currently only in the cheat-sheet at line 2479).
+  - Value: Dragging yourself around the landscape is the single most visceral way to internalize "the marker is you, standing on it" — and this is the chapter that makes that claim.
+- **[medium] (ch-landscape)** For the eventual LaTeX export, note that this figure encodes 'low' as a bright yellow-green radial glow (#fde047/#10b981) — pick a print-safe equivalent and a colour convention that matches whichever heatmap tone the book standardizes on.
+  - Value: Avoids the same dark/light ambiguity being frozen into the printed book.
+- **[small] (ch-landscape)** Consider one sentence on why the app colours by log-loss (the grid maps log(loss) to colour, lossGrid.ts:206) — or at least avoid implying the colour steps are linear in loss.
+  - Value: A curious reader comparing contour spacing to colour bands may notice the mismatch; a footnote-level aside preserves rigor without burdening beginners.
+- **[small] (ch-shapes)** Add a second demo (or extend the coach note) using the existing 'saddle-point' problem (problems.ts:1562, f = α²−β²+β⁴/8+2), so the reader experiences the saddle stall the chapter claims is THE high-D hazard — the current preset only shows the local-minimum trap.
+  - Value: The chapter's headline message (saddles > local minima) is currently read-only; the app already has the perfect problem for it, with a lingering-near-β=0 initializer built in.
+- **[small] (ch-shapes)** Margin-note that with finite steps and momentum, basin boundaries are not clean watersheds — they can be fractal. The app's basin map (see basinMap.test.ts) literally draws this; link the map button.
+  - Value: Honest-limits note the owner explicitly wants, and it turns an existing app feature into a teaching moment.
+- **[small] (ch-shapes)** One clause on local maxima: "the gradient is also zero on hilltops, but descent never stops there — any nudge rolls off." Completes the critical-point taxonomy (min/max/saddle) before ch-optimizers relies on it.
+  - Value: Beginners often ask "what about the top of the hill?"; pre-empting it costs one sentence.
+- **[small] (ch-shapes)** Label the amber/emerald start dots in the SVG (e.g. "start A" / "start B") instead of relying on the caption's color words.
+  - Value: Color-only encoding is fragile (color-blind readers, print/LaTeX export in grayscale).
+- **[small] (ch-shapes)** Hedge "it rolls into whatever valley it is already in and stops" with a footnote that this is the small-step picture — a large γ can vault a barrier (foreshadowing ch-gamma and the noise chapter).
+  - Value: Keeps the clean story while planting the seed for why LR and noise can escape basins — precision without clutter.
+- **[small] (ch-shapes)** For LaTeX export, the Dauphin paragraph deserves a second citation: Choromanska et al. 2015 ("The Loss Surfaces of Multilayer Networks") for the minima-near-global claim, added to chRefs['ch-shapes'].
+  - Value: Attributes each half of the claim to the right paper; textbook-grade citation hygiene.
+- **[medium] (ch-shapes)** The saddle heatmap (shapesFig, HelpModal.svelte:1011-1032) hardcodes the dark-mode cubehelix ramp; check it against the new day-mode reversed-tone convention used elsewhere.
+  - Value: Figure/app consistency: "bright = low" is the convention the caption of ch-landscape teaches; a mismatched guide figure in day mode would contradict it.
+- **[small] (ch-downhill)** Harden the preset: apply() should set landscapeViewStore to '2d' and vizLayersStore.patch({ field: 'arrows', contours: true }) before the coach speaks.
+  - Value: Guarantees the demo shows exactly what the coach narrates, regardless of persisted layer settings or the previous chapter's 3D switch.
+- **[small] (ch-downhill)** Add one worked number to the finite-difference paragraph: "nudge α by 0.01, the loss rises 0.62 → slope ≈ 62; nudge β by 0.01, it falls 0.03 → slope ≈ −3; so ∇ℒ ≈ (62, −3)".
+  - Value: A concrete gradient a beginner can compute by hand is the single highest-leverage addition; it also makes the bmatrix formula land.
+- **[medium] (ch-downhill)** Derive the shadow formula in the proof box from the two-wiggle picture (rate = u_α·slope_α + u_β·slope_β), then introduce 'dot product' as the name for that sum.
+  - Value: Turns the proof from 'assert lemma, prove corollary' into a genuinely closed argument at the reader's level.
+- **[small] (ch-downhill)** Fix the concept-figure geometry: circular contours, or ellipse-normal arrow directions ∝ (dx/rx², dy/ry²).
+  - Value: The illustration then obeys the perpendicularity rule the adjacent sentence teaches.
+- **[small] (ch-downhill)** Add a margin note after the proof: "steepest assumes all knob-directions cost the same; rescale a knob and 'steepest' moves — hold that thought for Adam."
+  - Value: Plants the seed for the entire adaptive-optimizer arc with two sentences.
+- **[small] (ch-downhill)** Note in the field-arrows card that arrows vanish where ∇ℒ = 0 or is undefined (the app already drops arrows at singular points, per recent commits) — tie to 'the marker going still IS the gradient vanishing'.
+  - Value: Preempts 'why is there no arrow here?' and reinforces the stationary-point idea before ch-shapes callbacks.
+- **[small] (ch-downhill)** In the proof prose, say the shadow's *signed* length is ‖∇ℒ‖cosθ (negative means downhill).
+  - Value: Beginners stumble on a 'length' that goes negative half a sentence later; one word fixes it.
+- **[small] (ch-downhill)** Add a 'say it aloud' parenthetical for notation, matching the existing '(say grad L)': ∂ ("partial"), u ("a direction of unit length"), D_u ℒ ("the slope you'd feel walking along u").
+  - Value: The chapter already does this brilliantly for ∇ℒ; extending the habit keeps the formula displays friendly.
+- **[medium] (ch-downhill)** Have the 3D figure also draw the flat 2D gradient arrow on a ground-plane 'map' beneath the bowl, connected by a dashed drop-line to the wall arrow.
+  - Value: Visually resolves the 'is the gradient 2D or 3D?' ambiguity and links the 3D bowl back to the app's 2D heatmap.
+- **[small] (ch-downhill)** Soften the backprop cost claim to 'a couple of forward passes' worth — independent of parameter count' and keep the citations.
+  - Value: Keeps the aside exactly right for the eventual textbook without dulling the punchline.
+- **[small] (ch-step)** Explain WHY red and blue differ slightly even for plain GD: red is the last step Δθ (computed from the previous position), blue is −∇ℒ re-evaluated where you now stand.
+  - Value: Curious readers will notice they never coincide exactly and wonder if something is broken; one sentence turns that into a precision lesson about the gradient changing underfoot.
+- **[small] (ch-step)** Forward-reference γ explicitly: 'γ is the learning rate — the whole next chapter is about choosing it.'
+  - Value: γ appears in the recipe and formula with no name; a beginner shouldn't have to wait a chapter to learn what the symbol is called.
+- **[small] (ch-step)** Add a Cauchy (1847, Comptes Rendus) historical aside and reference — 'the rule the entire field is built on' is 180 years old.
+  - Value: The claim invites the history; also chRefs['ch-step'] has only one link (HelpModal.svelte:1112-1114), noticeably thinner than every neighboring chapter.
+- **[small] (ch-step)** Mention the keyboard shortcuts (S to step, Space to train) in the prose, matching the preset coach message.
+  - Value: The preset coach says 'or the S key' but the chapter only names buttons; consistency, and stepping repeatedly via S is the tactile heart of this chapter.
+- **[small] (ch-step)** Name the three ingredients of the recipe — position (θ), direction (−∇ℒ), size (γ) — as labeled parts.
+  - Value: Sets up Part III cleanly: every fancy optimizer just changes the direction and/or the size. The 'personality' line at 1728 then has scaffolding to land on.
+- **[medium] (ch-step)** Add a small inline SVG of 2-3 successive steps crossing contours (like ch-downhill's proof figure).
+  - Value: This is the only core chapter with zero figures; 'Repeat' is inherently visual and the guide's house style already does beautiful inline SVGs.
+- **[small] (ch-step)** Consider whether 'almost insultingly simple' survives the LaTeX-textbook register; 'disarmingly simple' keeps the warmth.
+  - Value: Tone polish only — the sentiment (the rule's simplicity is the point) is exactly right and should be preserved.
+- **[small] (ch-step)** One clause noting gradient descent is greedy/local: each step uses only the slope underfoot, echoing ch-downhill's 'truth right where you stand' caveat.
+  - Value: Bridges the previous chapter's caveat to the update rule and pre-motivates both the learning-rate chapter and later local-minima discussion.
+- **[small] (ch-gamma)** Merge the duplicated threshold passage: lines 1762-1767 and 1769-1781 both state the 2/λmax limit, and the 'villain the optimizer family tree is built to outwit' sentence appears twice nearly verbatim (1766, 1780).
+  - Value: Removes the most noticeable prose flaw; one tight build-up (informal → exact formula) reads far better.
+- **[small] (ch-gamma)** Label the triptych panels with γ relative to the limit (e.g. 'γ = 0.5× the limit / just under / past it') instead of only 'too small / just right / too big'.
+  - Value: Ties the figure directly to the 2/λmax formula it illustrates; currently the figure and formula never reference each other.
+- **[small] (ch-gamma)** Have the chapter (or the preset coach text) state the demo's actual numbers: this bowl's λmax ≈ 2.7, so the limit is γ ≈ 0.75, and the demo sets 1.3.
+  - Value: Turns the formula from decoration into something the reader can verify live — the strongest pedagogical move available here.
+- **[small] (ch-gamma)** Write the clipping rule as a conditional (only when ‖∇ℒ‖ > c) inside the formula, not just in prose.
+  - Value: As displayed, the formula reads as an unconditional rescale that would also inflate small gradients.
+- **[small] (ch-gamma)** Add the 'mirror point' image for γ = 2/λ: the step lands exactly on the opposite wall at equal height, oscillating forever; beyond it, higher each bounce.
+  - Value: A memorable physical picture of why the boundary is exactly 2, at zero math cost.
+- **[small] (ch-gamma)** Note that practitioners tune γ near the edge, not safely small — 'just right' usually means 'as large as survives' — foreshadowing the scheduling chapter that follows.
+  - Value: Corrects the Goldilocks framing's implicit 'middle is best' message and creates a hook into ch-schedule.
+- **[medium] (ch-gamma)** Add a one-line pointer that λ here is the same eigenvalue-of-the-Hessian idea Newton/Sophia use in Part III (where Hessian is currently name-dropped, HelpModal.svelte:345).
+  - Value: Threads the Hessian concept through the book instead of introducing λmax and H independently.
+- **[small] (ch-gamma)** Since the Further-reading links Condition number, add one sentence defining it (λmax/λmin) when discussing that the narrow direction limits γ.
+  - Value: Currently the reference points at a concept the text never mentions.
+- **[small] (ch-schedule)** Define "annealing" the first time it appears — one clause on the metallurgy metaphor (cool slowly so the material settles into a low-energy state).
+  - Value: The word is used twice ("finishes annealing", "cosine annealing") but never taught; it is exactly the kind of jargon an absolute beginner will trip on, and the metaphor is genuinely illuminating here.
+- **[small] (ch-schedule)** Fix the cosine pacing sentence (slow–fast–slow) and add why staying near full γ early is desirable.
+  - Value: Repairs the chapter's one moderate factual error while adding intuition for cosine's popularity.
+- **[medium] (ch-schedule)** The CTA label "Watch Lion orbit, then land" over-promises: the lion-schedule experiment (experiments.ts:143-169) only runs Constant; landing requires the user to switch to Cosine per the coach message. Either relabel ("Watch Lion orbit — then close the ring") or auto-switch to cosine for a second run.
+  - Value: Keeps demo labels trustworthy; a beginner who just watches will think the demo failed.
+- **[small] (ch-schedule)** Coach text in experiments.ts:166 says "as γ bleeds to zero the ring closes to a point" — cosine floors at 5% (schedules.ts:21). Say "toward its small floor".
+  - Value: The chapter itself is honest about the 5% floor; the coach shouldn't contradict it.
+- **[small] (ch-schedule)** State the schedule as a formula-shaped idea once: effective γ_t = base γ × factor(t, T), with factor ∈ (0,1] — mirroring the schedules.ts docstring.
+  - Value: Gives the reader one crisp mental model that all four cards instantiate, and sets up the LaTeX textbook version.
+- **[small] (ch-schedule)** Rewrite the Decay-speed paragraph's mechanism: at 1× the anneal only completes on the run's last step, so there is no settled tail to observe; the slider compresses the schedule so settling happens mid-run.
+  - Value: Replaces a false mental model (absolute step counts) with the true relative-progress one, which also explains the ×4 = quarter-of-the-run claim.
+- **[medium] (ch-schedule)** In the step-decay paragraph, name the two milestones on the card itself (tiny tick marks at ⅓ and ⅔ on the SVG preview).
+  - Value: The prose numbers (×0.3 at ⅓ and ⅔) become visible in the picture; the cards already sample the real factors so this is cheap and honest.
+- **[small] (ch-schedule)** Add one sentence on how to choose between step and cosine in practice (roughly: they end in similar places; cosine removes two tuning knobs — the milestones and the cut factor).
+  - Value: Turns "cosine is the modern default" from an assertion into a reason, which is the chapter's teacherly standard elsewhere.
+- **[small] (ch-schedule)** Mention that warmup+cosine's ramp starts at 2% (not literally zero), matching schedules.ts:58's 0.02 clamp, or soften "starts near zero" is fine — but the LaTeX version should carry exact constants.
+  - Value: Prose and implementation stay auditable when the guide becomes a textbook with real formulas.
+- **[small] (ch-schedule)** Close the Lion paragraph with the general principle it illustrates: any optimizer's final wobble scales with γ, so decaying γ is the universal 'stop' mechanism — Lion is just the case where the wobble is exactly γ.
+  - Value: Prevents readers from filing the lesson under "Lion quirk" instead of "why schedules exist".
+- **[small] (ch-noise)** Replace 'orbiting' with random-walk language ('jitters', 'staggers around') or add 'not a literal orbit — a drunken walk trapped in a ring'.
+  - Value: Orbiting implies coherent circular motion; constant-step SGD near a minimum is a mean-reverting random walk. Small wording change keeps the lovely 'noise ball' image while staying exact.
+- **[small] (ch-noise)** Note the radius scales like √γ for small γ (stationary std ∝ √γ·σ on a quadratic), or at least soften 'grows with γ' to 'grows with γ (roughly its square root)'.
+  - Value: Keeps the figure caption honest when the guide graduates to a textbook; the √γ fact is also a nice echo of the chapter's other square-root law.
+- **[small] (ch-noise)** Add one further-reading entry on noise and flat/sharp minima or saddle escape (e.g. Ge et al. 2015 or Keskar 2017) to chRefs['ch-noise'].
+  - Value: The chapter makes its boldest claims (noise escapes saddles, prefers wide basins) with only Robbins–Monro 1951 and Wikipedia cited — neither supports those claims.
+- **[small] (ch-noise)** In the preset (experiments.ts ~line 309), set a fixed start via parametersStore.set + resetOptimizerState like the ch-gamma preset does.
+  - Value: Makes the demo reproducible: from a random or already-converged start the 'loss falls, then buzzes' story can be half-missing. Matches the pattern the sibling presets already use.
+- **[medium] (ch-noise)** Extend the preset or coach message to execute the chapter's own 'Watch it' (switch schedule to Cosine after the band forms), or add a second coach beat suggesting it.
+  - Value: The chapter's climax is 'decay is how a stochastic run converges at all', but the demo only shows the problem, never the cure; one extra nudge closes the loop.
+- **[small] (ch-noise)** Acknowledge the toy-app irony: here the full dataset is tiny and 'All' is cheap — the Batch dial exists to simulate the real-world constraint.
+  - Value: A beginner playing along notices full-batch is instant and may wonder why anyone would ever add noise; naming the simulation builds trust.
+- **[medium] (ch-noise)** Tease the batch-size/learning-rate coupling (bigger batch → less noise → can afford larger γ; the 'linear scaling rule'), pointing back at the Goyal et al. warmup reference in ch-schedule.
+  - Value: Connects the two dials the chapter juxtaposes and pre-answers the natural question 'so which knob do I turn?'; the citation is already in the book.
+- **[small] (ch-noise)** Clarify that the on-screen fan shows batch-gradient DIRECTIONS (rays are drawn normalized to fixed length in LossLandscape.svelte drawFan), so its width is the directional scatter; magnitude noise is hidden.
+  - Value: 'The width of the fan is the noise itself' is nearly true but a careful reader comparing ray lengths could be confused; one clause fixes it.
+- **[medium] (ch-generalize)** Verify the preset actually produces a rising amber test curve (fix the seed if needed): with convex 2-param regression, GD may reach the ERM minimum with test loss falling monotonically, contradicting the chapter's figure.
+  - Value: The chapter's central visual promise ('test loss turns and climbs') must be reproducible one click away, or the learner distrusts the figure.
+- **[medium] (ch-generalize)** Extend the preset (or add a second CTA) to demonstrate the cures: switch to AdamW, raise λ, and watch the fitted line stiffen back toward the dashed truth.
+  - Value: The preset shows only the disease; the chapter's second half (early stopping, weight decay) currently has no live demo.
+- **[small] (ch-generalize)** Define 'regularization' before using 'regularizer' ('It is the simplest regularizer there is' precedes the definition by a paragraph).
+  - Value: Removes a use-before-teach for the chapter's key new term.
+- **[small] (ch-generalize)** Add Loshchilov & Hutter 2019 (Decoupled Weight Decay Regularization) to chRefs['ch-generalize'], and consider Krogh & Hertz 1991 too since both are cited inline.
+  - Value: Inline citations without further-reading links dead-end a curious reader.
+- **[small] (ch-generalize)** Name the noise-fitting mechanism concretely for this app: with noise cranked up, the training-set minimum lands at slightly wrong (α, β) — show 'minimum of THIS sample ≠ minimum of the truth' as the two-parameter face of overfitting.
+  - Value: Ties the abstract empirical-vs-true-risk gap to the exact pixel the learner watches, and is honest that memorization needs capacity the app doesn't have.
+- **[small] (ch-generalize)** Label the y-axis dip in the figure with the train-test gap (a small vertical brace at the right edge marked 'generalization gap').
+  - Value: Gives the key quantity a visual anchor and a name before the text uses 'divergence'.
+- **[small] (ch-generalize)** One sentence on choosing λ: too small does nothing, too large underfits — it's a dial between memorizing and ignoring the data, tuned on held-out loss.
+  - Value: λ is introduced but the beginner has no idea what magnitude means or how to pick it; also foreshadows underfitting, currently absent.
+- **[small] (ch-generalize)** Fix duplicate chapter numbers in the toc (ch-shapes and ch-downhill both '3'; ch-generalize and ch-problems both '9').
+  - Value: Numbering errors undermine the textbook feel the owner is building toward.
+- **[small] (ch-opt-narrative)** Nesterov: add one line noting the displayed formula is the rearranged as-implemented form — mathematically equivalent to "measure the gradient at θ − γμv", the look-ahead the prose describes.
+  - Value: Careful beginners will try to find the look-ahead in the formula, fail (it evaluates ∇ℒ at θ), and lose trust in the notes.
+- **[small] (ch-opt-narrative)** Newton card: reconcile "no learning rate to tune / one step" with the formula's γ — say γ=1 is the pure Newton step and the app's γ is a damping safety factor.
+  - Value: Removes a direct prose-vs-formula contradiction inside one card.
+- **[small] (ch-opt-narrative)** Add a note (or dashed edge style) that the Newton branch is conceptual, not chronological — a 1680s node hangs off an 1847 root while the caption says "170 years from Cauchy's root".
+  - Value: Preempts the sharpest reader question about the tree and models honest historiography.
+- **[small] (ch-opt-narrative)** Make (κ−1)/(κ+1) concrete: "κ=100 → each step keeps 98% of the error, ~114 steps per digit of accuracy; momentum's √κ cuts that to ~11."
+  - Value: The contraction-factor abstraction lands only with a worked number; this is the chapter's one quantitative claim a beginner can actually feel.
+- **[medium] (ch-opt-narrative)** In the race legend, tag step-count chips with a tooltip "with its best γ for this valley", and consider a 'same γ for everyone' toggle.
+  - Value: Turns the hidden per-racer tuning into a lesson: adaptive methods shine precisely when you CAN'T tune γ per problem.
+- **[medium] (ch-opt-narrative)** Add an AdaGrad aside in the app-aside style of the Lion/Nesterov/Newton asides: watch its step strangle itself on a long run, then switch to RMSProp.
+  - Value: AdaGrad's self-strangling is the pivotal plot beat of Act III yet the only act turn with no feel-it-yourself moment.
+- **[small] (ch-opt-narrative)** State AdaDelta's s-update (s ← ρs + (1−ρ)(∇ℒ)²) in its formula line — the card's Δθ references s that is never defined on the card.
+  - Value: The engine's own updateRuleLatex already includes it; the guide card is the only place it's implicit.
+- **[small] (ch-opt-narrative)** Nadam/RAdam cards: name what ĥat-free symbols mean on first use in each formula (m, s reappear across cards with shifting hats).
+  - Value: For LaTeX-textbook export, per-card symbol self-containment prevents cross-page symbol hunting.
+- **[small] (ch-opt-narrative)** Frontier box: add one sentence of dates/links (Muon 2024, Shampoo 2018, SOAP 2024) matching the citation discipline of the cards above.
+  - Value: The frontier box is the only part of the chapter with zero citations, right where curious readers most want an exit ramp.
+- **[small] (ch-opt-narrative)** In the Lion card, mention its published update includes decoupled weight decay (θ ← θ − γ(sign(c)+λθ)), omitted here.
+  - Value: Readers comparing against the paper will find an extra term; a parenthetical "(weight decay dropped here)" keeps the notes rigorous.
+- **[small] (ch-tail)** Pin the optimizer (applyOptimizer('gd')) in symmetric-pair, vanishing-gradient, and noisy-truth so every card is reproducible regardless of what ran before.
+  - Value: Experiments become deterministic teaching moments instead of depending on hidden session state.
+- **[small] (ch-tail)** Fix banana-race to configure raceConfigStore (maxSteps, stepsPerSecond) rather than trainingStore; consider a non-persisted override so it doesn't clobber the user's saved race settings.
+  - Value: Makes the flagship showdown actually finish as designed.
+- **[medium] (ch-tail)** Make the data-plot params-marker draggable for 2D-point problems (d3.drag, swallow editor clicks on the marker) — then the marker-is-model text becomes true and delightful.
+  - Value: Repairs a broken promise and adds the guide's best 'parameters ARE the model' aha-moment.
+- **[small] (ch-tail)** Clean up the dead toc 'n' fields — duplicates ('3' twice, '9' twice) are never rendered today but will become wrong chapter numbers the moment the LaTeX export reads them.
+  - Value: Prevents a silent numbering bug in the planned textbook export.
+- **[small] (ch-tail)** Add a saddle-point experiment ('Stall on the mountain pass') — the zoo card advertises 'gradients die at dead center' and the course has a saddle lesson, but Things to try skips it.
+  - Value: Completes coverage of the guide's own advertised failure modes.
+- **[small] (ch-tail)** Loss History bullet: add 'small batches also make the curve fuzz — see the mini-batch chapter' so spikes aren't attributed solely to γ/μ overshoot.
+  - Value: Prevents beginners from lowering γ when the real cause is batch noise.
+- **[small] (ch-tail)** In noisy-truth / ch-generalize, add one sentence: 'the noise here is zero-mean, so the shift is sampling luck — more data pulls the minimum back to the truth.'
+  - Value: Turns a slightly wrong overfitting claim into a correct bias/variance seed for the later textbook.
+- **[medium] (ch-tail)** Give each zoo card a link to the chapter/experiment that uses it (e.g. Rosenbrock → banana race, Gaussian Peak → vanishing gradients).
+  - Value: Converts the zoo from a static gallery into the guide's index, matching its 'reference' role.
+- **[small] (ch-tail)** State the race finish rule somewhere ('first to drive loss into the basin threshold wins; capped at N steps') — currently only readable in trainer.ts.
+  - Value: Race outcomes ('Adam: 74 steps') become interpretable to a beginner.
+- **[small] (ch-tail)** In the panels chapter, note that dragging or arrow-nudging the marker appends a point to Loss History (App.svelte does this deliberately), so teleports show as loss jumps, not glitches.
+  - Value: Explains an otherwise mysterious discontinuity beginners will hit within minutes.
+- **[small] (act-slope-memory)** Refine the GD brk: the deep cause of zig-zag is ill-conditioning — −∇L is perpendicular to the contour, pointing across the valley, not along it; the shared γ is why you can't tune your way out.
+  - Value: The current 'one γ for every parameter, so it zig-zags' slightly misattributes the cause (momentum cures zig-zag without per-parameter rates), and the perpendicular-to-contours fact is the single best beginner insight about GD.
+- **[small] (act-slope-memory)** Tie the μ slider hint to the prereq card's memory rule: 'μ=0.9 ≈ remembers the last 10 gradients' (MU_SPEC hint, optimizers.ts:91-100).
+  - Value: Reuses the 1/(1−β) rule the reader just learned, making the slider a live rehearsal of the Act II tool.
+- **[small] (act-slope-memory)** One margin sentence giving the heavy-ball metaphor rigor: momentum is a discretized ball-with-friction ODE; μ is (1 − friction), which is why μ→1 means orbits that never damp.
+  - Value: Turns the 'give the marker mass' metaphor into something checkable and explains the brk ('orbits before settling') from physics rather than assertion.
+- **[medium] (act-slope-memory)** Add a two-line derivation box showing the lookahead form and the framework form are the same trajectory under θ' = θ + γμv.
+  - Value: This is the exact spot 'many textbooks get subtly wrong'; a five-line change-of-variables is within reach of the target reader and inoculates them for life.
+- **[small] (act-slope-memory)** In the Nesterov card, replace 'it settles without the orbit' with 'it damps the orbit sooner' — NAG still overshoots and oscillates, just less.
+  - Value: The absolute claim is falsified by the app itself: run the ravine with μ=0.9 and the violet racer visibly rings around the minimum.
+- **[small] (act-slope-memory)** Note in the Momentum card that with μ=0 the formula collapses to plain GD — the whole trunk is GD plus attachments.
+  - Value: Cheap unifying insight, and the slider hint already half-says it ('0 = plain gradient descent'); promoting it into the card strengthens the story arc.
+- **[small] (act-slope-memory)** Add a footnote that Polyak's 1964 paper wrote heavy ball as θ_{t+1} = θ_t − γ∇L + μ(θ_t − θ_{t−1}) and show it equals the v-form in two lines.
+  - Value: Models the 'same algorithm, different bookkeeping' skill the reader needs again immediately for Nesterov, and honors the primary source the card already links.
+- **[small] (act-slope-memory)** Mention that Nesterov's advantage lives in the low-noise regime: with full-batch gradients (this app's default) the lookahead genuinely helps, which is why the demo flatters it relative to real SGD practice.
+  - Value: An honest margin note preventing the reader from over-generalizing what they see in the race to stochastic training.
+- **[small] (act-perparam)** Co-credit Tieleman: change the RMSProp cite label from "Hinton, 2012" to "Tieleman & Hinton, 2012 — Lecture 6.5" (HelpModal.svelte:414), matching how the world actually cites the unpublished slide.
+  - Value: The card's whole hook is the odd citation story; getting the canonical citation exactly right strengthens it.
+- **[small] (act-perparam)** Add a one-line rehabilitation of AdaGrad's decay: the shrinking step doubles as a built-in 1/√t schedule and is why AdaGrad carries convex regret guarantees — the flaw is only fatal on long non-convex runs.
+  - Value: Currently the growing sum is framed purely as a bug; the truth (feature in convex/sparse settings, bug in deep learning) is more interesting and more correct.
+- **[small] (act-perparam)** Disclose the app's AdaDelta ε=1e-4 (vs Zeiler's 1e-6) in a margin note, mirroring the honest code comment at optimizers.ts:221-224.
+  - Value: The guide aspires to lecture-note rigor; this deviation visibly changes early-step behavior and is already documented internally.
+- **[small] (act-perparam)** On the AdaDelta card, show the s-update line too (the card formula at line 281 shows only Δθ and the u-update; the sidebar formula in optimizers.ts:241 has all three).
+  - Value: A beginner reading the card alone can't reconstruct the algorithm; s appears undefined.
+- **[small] (act-perparam)** Mention Hinton's suggested defaults (ρ=0.9, γ≈0.001) on the RMSProp card, with a note that the app's toy surfaces use a larger γ.
+  - Value: The textbook version will be read away from the app; real-world defaults anchor it.
+- **[small] (act-perparam)** Add a forward pointer from AdaDelta's "units" argument to the Newton card: Zeiler's paper explicitly models AdaDelta on the fact that H⁻¹∇L has the right units.
+  - Value: It stitches Act III to the curvature branch and makes the units argument feel derived, not clever.
+- **[small] (act-perparam)** Note on the AdaDelta card that its ρ default here is 0.95 (Zeiler's value) while RMSProp's is 0.9 — the sliders differ and a curious reader will wonder why.
+  - Value: Preempts confusion when comparing the two near-twin cards side by side.
+- **[medium] (act-perparam)** Add one sentence to Act III's intro naming what these methods approximate: a diagonal preconditioner (poor-man's diag Hessian) — planting the seed for the Newton/Sophia branch.
+  - Value: Gives the act a unifying frame and pre-teaches the Hessian the guide currently only name-drops.
+- **[small] (act-adam)** Make Nadam's look-ahead precise with one line of algebra: under g_{t+1} ≈ g_t, the blend β1·m̂_t + (1−β1)ĝ_t is exactly the NEXT step's momentum estimate m̂_{t+1} — 'use tomorrow's momentum today'.
+  - Value: Turns 'leans toward where the momentum is heading' from an assertion into a checkable claim, and cleanly connects back to Nesterov's Act II trick.
+- **[small] (act-adam)** Add an AdamW margin note: 'decoupled' means decoupled from the adaptive √ŝ scaling, not from γ — the paper multiplies λθ only by the schedule η_t, while PyTorch (and this app) multiply by γλ; the two differ only by a reparameterization at fixed γ.
+  - Value: Preempts the classic paper-vs-PyTorch confusion the moment readers open a real codebase.
+- **[small] (act-adam)** In the RAdam card, state concretely that with β2 = 0.999 the momentum-only warmup lasts just 4 steps (ρ_t first exceeds 4 at t = 5), and invite the reader to count them in the app.
+  - Value: Converts an abstract threshold into an observable, falsifiable prediction — ideal for a lab guide.
+- **[small] (act-adam)** Soften RAdam's brk line 'past warmup it just is Adam': r_t < 1 for all finite t and only approaches 1 asymptotically, so RAdam remains a slightly damped Adam long after warmup.
+  - Value: Keeps the guide's 'everything verified correct' bar; the current phrasing is a small overstatement.
+- **[small] (act-adam)** Show the else-branch in the RAdam card formula (θ ← θ − γ m̂ when ρ_t ≤ 4), as the optimizers.ts updateRuleLatex already does.
+  - Value: The card formula currently displays only the rectified branch; the defining feature — the momentum fallback — is prose-only.
+- **[small] (act-adam)** Add a margin note on paper defaults vs app scaling: papers use γ ≈ 0.001 for the Adam family; the app fixes γ = 0.1 because the toy surfaces are tiny. Say so, so learners don't carry 0.1 into real training.
+  - Value: Prevents the most likely negative transfer from the playground to practice.
+- **[small] (act-adam)** Cross-link Adam's bias correction to the moving-average tool card: 1−β^t is precisely the fraction of 'mass' the leaky memory has accumulated after t steps.
+  - Value: Reuses the guide's own tool (1/(1−β) memory length) instead of introducing a new idea, reinforcing Act II.
+- **[small] (act-adam)** Add Wilson et al. 2017 ('The Marginal Value of Adaptive Gradient Methods', arXiv:1705.08292) to OPT_CITE or ch-optimizers further reading.
+  - Value: Balances the 'Adam won' narrative — SGD+momentum sometimes generalizes better, which also motivates why AdamW's decay matters.
+- **[small] (act-adam)** Fix the RACE_COLORS comment/legend claim 'rose = Adam family': radam is orange (#fb923c), breaking the stated hue taxonomy (HelpModal.svelte ~line 507).
+  - Value: Either recolor RAdam into the rose family or amend the comment so the taxonomy-at-a-glance claim stays true.
+- **[small] (act-adam)** One sentence in the Adam card on why β2 > β1 (0.999 vs 0.9): step SIZES need a long, steady memory while direction can react quickly; too-short β2 makes the denominator jittery.
+  - Value: The two decays are the card's only knobs, yet their asymmetry is never motivated.
+- **[small] (act-branches)** Hedge Sophia's speed claim: "the paper reports roughly 2× fewer steps on GPT-2 pretraining; later independent benchmarks (Kaddour et al. 2023, 'No Train No Gain') found the gap shrinks under matched tuning."
+  - Value: A textbook stating a contested benchmark as settled fact ages badly; one clause keeps the excitement and the honesty.
+- **[small] (act-branches)** Rewrite the Newton fallback sentence as damped Newton (add τI until convex + trust region), name-dropping Levenberg (1944)/Marquardt (1963).
+  - Value: Fixes the card-vs-code mismatch AND gifts the reader the standard vocabulary they'll meet everywhere Newton-type methods appear.
+- **[small] (act-branches)** Resolve the Newton γ tension: the formula shows γ but the prose says "no learning rate to tune". Note that the natural Newton step is γ=1 (what the app fixes) and γ<1 is called damped Newton.
+  - Value: Removes a formula/prose contradiction a careful beginner will trip on.
+- **[small] (act-branches)** Mention Lion's decoupled weight decay exists in the paper but is dropped here (same reason as the AdamW card's λ caveat).
+  - Value: The code comment (optimizers.ts:629) already says this; surfacing it keeps the card faithful to arXiv:2302.06675 and reuses a caveat pattern the reader has seen.
+- **[medium] (act-branches)** Add a tiny worked 2×2 Hessian example on the polynomial bowl: real numbers, compute −H⁻¹∇ by hand, watch the violet ghost land there.
+  - Value: Turns the branch's only opaque formula into something the reader can verify inside the app — the guide's signature move.
+- **[medium] (act-branches)** Define the condition number κ = λmax/λmin in prose (the "ravine number") and tie it to both the γ-chapter's 2/λmax rule and Newton's un-stretching.
+  - Value: ch-optimizers already links the Condition-number wiki twice but the text never defines it; κ is the single thread stitching the whole family tree together.
+- **[small] (act-branches)** Date Prodigy 2023 (arXiv, matching the AdamW/RAdam arXiv-year convention) or annotate "2023 / ICML 2024".
+  - Value: The tree currently mixes dating conventions; consistency matters once this becomes a citable textbook.
+- **[small] (act-branches)** Prodigy card: say d is a monotone LOWER-BOUND estimate of the start-to-solution distance ‖x₀−x★‖ — it only ratchets up, which is exactly why the brk happens.
+  - Value: One phrase makes the brk a consequence instead of a fact to memorize; also worth adding that D-Adaptation won an ICML 2023 Outstanding Paper award.
+- **[small] (act-branches)** Lion aside: add the paper's practical rule — Lion wants γ about 3–10× smaller than Adam's (and proportionally larger weight decay).
+  - Value: The one takeaway a reader needs before trying Lion outside the sandbox; connects the fixed-stride intuition to a real number.
+- **[small] (act-branches)** Sign-steps act intro: one sentence noting the fixed per-axis stride is itself a ravine cure — sign steps are the limiting case of Act III's per-parameter rates.
+  - Value: Ties the branch back to the trunk's central villain (the ravine), making the fork feel inevitable rather than arbitrary.
+- **[medium] (code-classic)** Add golden-trajectory tests: run 5 steps of Adam/RMSProp/AdaDelta and assert exact values precomputed from PyTorch/Keras reference implementations.
+  - Value: Current tests check behavioral signatures (descends, shrinks, recovers) but would pass many subtly-wrong constants; golden values pin the math bit-for-bit before library extraction.
+- **[small] (code-classic)** Add a test that Nesterov and Momentum diverge for μ>0 (currently both are only tested to collapse to GD at μ=0, where the look-ahead term vanishes).
+  - Value: A regression that deleted the `+ mu * v` look-ahead in nesterov.step would pass every existing test.
+- **[small] (code-classic)** Add a Nadam≡Adam-at-β₁=0 test, mirroring the existing adamw-λ=0 and momentum-μ=0 reduction tests.
+  - Value: Completes the elegant 'every extension reduces to its parent' test pattern already established.
+- **[small] (code-classic)** Test Adam bias correction beyond step 1 — e.g. assert the step-2 magnitude against a hand-computed value.
+  - Value: The scale-invariance test only exercises t=1, where mc1 and mc2 cancel trivially; a wrong Math.pow(b, t) exponent (t vs t+1, an easy off-by-one) would go undetected.
+- **[medium] (code-classic)** Extract per-axis duplication into tiny vector helpers (ema(prev,x,ρ), scaleSub(p,g,k)) — every step function repeats identical a/b lines.
+  - Value: Halves the code readers must scan in reveal-the-code, and eliminates the classic copy-paste bug class (an `a` where a `b` belongs) that the current tests would partially miss.
+- **[medium] (code-classic)** Move the HTML markup out of HyperparamSpec.hint (inline <br/> and style attributes) into a structured {main, sub} shape rendered by the UI.
+  - Value: For npm extraction, presentation-free metadata is the difference between a reusable library and an app-coupled one.
+- **[large] (code-classic)** For the library, split OptimizerState into per-optimizer typed states (discriminated union or generics) instead of one record with field reuse (v = velocity OR first moment OR E[Δθ²]).
+  - Value: The reuse is well-commented but easy to misuse; types would make wrong-field access a compile error.
+- **[small] (code-classic)** Guide margin note: AdaGrad/RMSProp/Adam's fixedLearningRate=0.1 is a playground convenience — real deployments still tune γ (RMSProp's classic suggestion was 0.001).
+  - Value: Prevents the beginner takeaway that adaptive methods make the learning rate a solved problem.
+- **[small] (code-classic)** Comment the (1+β₁)γ Nadam first-step artifact where the test asserts 'larger first step than adam'.
+  - Value: Turns a mysterious inequality assertion into a teachable fact about the Nesterov blend.
+- **[small] (code-classic)** Add a NaN/overflow robustness test: feed a gradient of 1e300 and assert every optimizer returns finite params.
+  - Value: Custom-dataset mode lets users build pathological losses; divergence to NaN would freeze the marker with no error surfaced.
+- **[small] (code-modern)** Add golden-value tests for RAdam's rectified phase: run enough steps that ρ_t > 4 and compare against PyTorch RAdam reference numbers
+  - Value: Current tests only exercise the warmup branch; a typo in the ρ_t or r_t formula (the trickiest expression in the file) would pass the suite today.
+- **[small] (code-modern)** Add a Prodigy convergence test: on a quadratic from x₀, assert d plateaus near ‖x₀ − x*‖ scale and the iterate reaches the minimum
+  - Value: Verifies the numerator/denominator accumulators semantically, not just "steps grow"; would catch a sign flip in ⟨g, x₀−x⟩ that current tests miss.
+- **[small] (code-modern)** Add eigenSym2 degenerate-case tests (isotropic cI, rank-1) asserting v1·v2 ≈ 0
+  - Value: Catches the identical-eigenvector fallback bug and locks in the fix.
+- **[small] (code-modern)** Fix the stale header "one record fits all seven methods" (there are fourteen) and note the Prodigy-only fields there
+  - Value: First thing a reveal-code reader sees; cheap credibility.
+- **[small] (code-modern)** Hedge Sophia's "~2× faster than Adam" with "as reported by the paper; independent replications found smaller gains"
+  - Value: The 2× claim is contested (e.g., 'No Train No Gain', 2023); the guide aims for rigor and this is its one unhedged benchmark claim.
+- **[medium] (code-modern)** For reveal-code, visually separate playground safeguards (NEWTON_TRUST_FRAC, PRODIGY_D_MAX_FRAC, curvature floor) from the paper algorithm — e.g., a marked 'training wheels' block
+  - Value: Learners copying the code as 'the algorithm' would otherwise export toy-domain constants; the honest-margin-note goal applies to code too.
+- **[medium] (code-modern)** Extract a shared updateMoments(b1, b2, g, state) helper — adam, nadam, adamw, radam repeat identical EMA + bias-correction code four times
+  - Value: Shrinks each revealed snippet to its distinctive idea (decay placement, rectification) and eases library extraction.
+- **[medium] (code-modern)** Move the HTML markup out of HyperparamSpec.hint strings into the rendering layer
+  - Value: Specs are otherwise pure data; embedded <br/><span style=...> blocks would leak app styling into an extracted library and into LaTeX export.
+- **[small] (code-modern)** Have the immutability test also pass a ctx with a Hessian
+  - Value: Newton and Sophia's Hessian branches are currently skipped by the state-mutation check.
+- **[small] (code-modern)** Note in the AdamW chapter that the code's form matches PyTorch semantics (θ ← θ − γ(m̂/(√ŝ+ε) + λθ)), i.e., effective decay scales with γ
+  - Value: Learners cross-referencing the paper's schedule-normalized η_t λ form will otherwise see a mismatch; one sentence resolves it.
+- **[small] (code-problems)** Add randomized (seeded) FD gradient checks at 5-10 extra parameter points per problem, biased toward tricky regions (negative β, near the AR(2) cliff, saturated tanh).
+  - Value: problems.test.ts only tests two fixed offsets from trueParameters; my manual adversarial checks passed, but future edits to piecewise guards (gaussianPeak bSafe, powerLaw x≤0 skip) could break regions the current two points never visit.
+- **[small] (code-problems)** Unify gaussianPeak's near-zero-β guards: loss clamps b² at 1e-6 while the gradient uses bSafe = ±1e-3, so loss and gradient describe slightly different surfaces for |β| < 1e-3.
+  - Value: Basin maps, streamlines, and the FD Hessian sample arbitrary grid points; inconsistent loss/gradient in that sliver can produce arrows that don't match the heatmap.
+- **[medium] (code-problems)** For custom typed formulas, compute the Hessian by FD of the loss directly instead of FD of the already-FD gradient (customModel.ts h=1e-4 nested inside hessian.ts h=1e-4).
+  - Value: FD-of-FD amplifies noise; the curvature lens can jitter or misclassify definiteness on user formulas, undermining trust in the lens right when users are exploring.
+- **[large] (code-problems)** Port each problem's code-comment lore into the guide's problem gallery: gaussian-mixture as label-switching/identifiability, mean-shift as KDE mode-finding, gaussianPeak's mirror ±β basins, powerLaw's exponent-driven ill-conditioning.
+  - Value: The docstrings in problems.ts are already textbook-quality margin notes; users never see them. This is the cheapest path to the "lecture notes" goal.
+- **[small] (code-problems)** Align logisticRegression trueParameters (1.2, 0.2) with the actual cluster geometry — centers (±0.8, ±0.5) imply boundary normal ∝ (0.85, 0.53).
+  - Value: generateData ignores trueParameters (centers hardcoded), and predict() renders the boundary as y = −6x from (1.2, 0.2). Currently harmless because no true-boundary overlay is drawn for classification, but it's a latent trap for anyone adding one.
+- **[small] (code-problems)** In the guide, note that for separable data the displayed "true parameters" of logistic regression are only a direction, not a point — any positive multiple gives the same boundary.
+  - Value: Reinforces the no-finite-minimum lesson and preempts "why doesn't the marker stop at the star?" confusion.
+- **[small] (code-problems)** When teaching definiteness from classifyDefiniteness, explicitly cover the semi-definite case (one ≈0 eigenvalue) that the code folds into bowl/ridge, e.g. linear regression's flat valley when all x are equal.
+  - Value: The code's fold-in is a sensible UI choice, but a textbook must name positive semi-definite or the eigenvalue-sign table looks incomplete.
+- **[small] (code-problems)** Add the four Himmelblau minima coordinates ((3,2), (−2.81,3.13), (−3.78,−3.28), (3.58,−1.85)) to the guide card, and mention trueParameters marks only one of them.
+  - Value: Reinforces the basin-of-attraction lesson with checkable numbers; also clarifies why the "target" star sits on just one basin.
+- **[small] (code-problems)** Clarify the Rosenbrock comment "valley-floor curvature is huge" to "curvature ACROSS the valley is huge; along the floor it is tiny" — that contrast is the whole lesson.
+  - Value: As written a careful reader could take "floor curvature huge" to mean progress along the floor is steep, the opposite of the point.
+- **[small] (code-problems)** Guide margin note on the FD-vs-analytic theme: the app trusts analytic gradients because FD tests certify them — a two-line explanation of gradient checking as standard ML practice.
+  - Value: Turns the repo's own test philosophy (problems.test.ts header) into a teachable professional habit; cheap authenticity.
+
+## Strengths to protect during any rewrite
+
+- **(ch-bowl)** The opening framing — "one idea wearing many costumes," knobs → prediction → loss — is warm, exact, and defines parameters/loss in the right order with zero wasted words. Preserve it verbatim.
+- **(ch-bowl)** The MSE prose walk-through (subtract, square so over/undershooting both count, average over n) mirrors the formula term-by-term; the formula itself (formulas.lossDefinition, HelpModal.svelte:185) is correct.
+- **(ch-bowl)** "The squaring is the quiet hero" paragraph teaches the why (smoothness enables rolling downhill; big misses punished more) not just the what — exactly the textbook voice the owner wants.
+- **(ch-bowl)** The cross-entropy intuition "gentle when confidently right, brutal when confidently wrong" is memorable, correct, and the squared-error-for-numbers / cross-entropy-for-categories closing rule is a genuinely useful takeaway.
+- **(ch-bowl)** The preset delivers: chapterPresets['ch-bowl'] (experiments.ts:227) applies linear-regression — applyProblem calls resetRun(), so the marker reliably starts away from the minimum — then trains; the coach line ties the demo back to the chapter's thesis.
+- **(ch-landscape)** The hiking-map analogy is exact and beginner-perfect: "each loop joins points of equal loss, and loops bunched tightly together mean a steep slope" — correct mathematics delivered as pure intuition. Preserve verbatim.
+- **(ch-landscape)** The opening move — loss is "a number for every possible setting of the knobs", swept into a surface — teaches functions-of-two-variables without ever saying the phrase. Excellent scaffolding.
+- **(ch-landscape)** The dual-view figure (flat map vs side-view surface, same orange marker in both) directly mirrors the app's 2D/3D toggle, and the chapter preset then performs that exact lift live. Tight guide-to-app coupling.
+- **(ch-landscape)** "The orange marker is you, standing somewhere on it" plus the "Look at the panel right now" prompt ground every abstraction in the live UI immediately — the guide's signature warm-but-precise voice at its best.
+- **(ch-landscape)** Further-reading picks are apt: Level set (the loops' real name) and Li et al. 2018 (loss-landscape visualization) — the latter becomes even stronger once the high-dimensions honesty note is added.
+- **(ch-shapes)** The high-dimensions paragraph (lines 1474-1481) is exactly the honest 'your 2-D intuition inverts here' margin note the owner wants — correctly summarizing Dauphin et al. with the right arXiv link; preserve it in any rewrite.
+- **(ch-shapes)** Basin-of-attraction and watershed are defined inline, warmly and precisely, and immediately cashed out as 'why initialization is a real design choice' — concept, metaphor, and consequence in one paragraph.
+- **(ch-shapes)** The figure is computed, not sketched: a real tilted double-Gaussian with the ridge found by argmax, and a genuine x²−y² heatmap whose four slope arrows point the mathematically correct way (in along x, out along y).
+- **(ch-shapes)** Preset, lesson ('trap'), and prose all agree and are numerically sound: double-well stationary points (global −2.14, barrier 0.31, local 1.84) check out, and Reset's ±(2.6–3.3) rim initializer genuinely lands in either basin, demonstrating the chapter's central claim.
+- **(ch-shapes)** The closing paragraph frames every Part III technique (momentum, noise, curvature) as an answer to a hazard just taught — motivation-first structure worth keeping.
+- **(ch-downhill)** "Gradient = steepest ascent" is genuinely PROVEN, not asserted: the cosine argument is correct, one paragraph long, and the two-panel proof figure literally plots the claim (rate vs angle as a cosine, with along-∇ℒ / contour / along-−∇ℒ marked). Preserve this structure verbatim in any rewrite.
+- **(ch-downhill)** Partial derivatives are demystified operationally — "nothing mystical: nudge α by a hair, divide the change by the nudge" — exactly the right entry point for a reader who hasn't had calculus.
+- **(ch-downhill)** The contour-perpendicularity argument is real reasoning, not decree: flat directions ARE the contour, so steepest must be square across it. Warm, exact, and it connects straight to what the app draws.
+- **(ch-downhill)** The closing caveat ("the gradient is only the truth right where you stand… the whole reason a step can be too big") is a superb locality/linearization note that sets up the learning-rate chapter perfectly.
+- **(ch-downhill)** The backprop aside is honest about the 2-knob toy vs. billion-parameter reality, correctly attributed (Rumelhart, Hinton & Williams 1986; Baydin et al. 2018), with matching Further-reading links — the 'in the real world…' bridge the owner wants everywhere.
+- **(ch-step)** The recipe blockquote (stand, look downhill, step, repeat) states the algorithm in plain words BEFORE symbols — textbook-grade sequencing; preserve verbatim.
+- **(ch-step)** θ is introduced gently and honestly at first use ('theta, shorthand for the pair (α, β) together') instead of assumed — exactly right for the target reader.
+- **(ch-step)** The blue-vs-red arrow framing ('that gap is the optimizer's personality') is memorable, sets up Part III, and is verified accurate against the app (LossLandscape.svelte:921-928 draws exactly these two arrows).
+- **(ch-step)** The preset genuinely demonstrates the chapter: applyProblem resets γ to a safe curated default (trainer.ts:295-296) so the one-step demo works even after the ch-gamma blow-up preset; the S shortcut it mentions exists (App.svelte:230-233).
+- **(ch-step)** Chapter handoffs are tight: ch-downhill ends by motivating step size, ch-step delivers the rule, ch-gamma picks up γ — the narrative arc needs no reordering.
+- **(ch-gamma)** The stability claim is mathematically correct and complete: γ < 2/λmax stated exactly (formulas.stability), with both sides described accurately (contraction below, compounding overshoot above) — an expert would sign off.
+- **(ch-gamma)** The triptych figure is real simulated gradient descent on an anisotropic quadratic (per-axis factor 1−γλ, HelpModal.svelte:785-802), with γ=2.18 genuinely past 2/λy=2 — the picture is honest, not a hand-drawn cartoon, and the ellipse aspect ratio even matches the eigenvalues.
+- **(ch-gamma)** The preset actually demonstrates the lesson: linear-regression Hessian ≈ diag(2.67, 2) gives limit ≈ 0.75, preset sets γ=1.3, and divergenceStore confirms the app really does catch and explain the blow-up as promised.
+- **(ch-gamma)** The voice is exactly what the owner wants: 'Goldilocks dial', 'the fastest way to feel γ is to break it on purpose', and the reassurance that the app catches divergence invite fearless experimentation.
+- **(ch-gamma)** The clipping aside is precise and correctly cited (Pascanu et al. 2013, arXiv:1211.5063), with the right norm-rescaling formula and the direction-preserved framing.
+- **(ch-schedule)** The schedule preview cards are sampled from the same factor functions the trainer uses (HelpModal.svelte:48-62), so the pictures cannot drift from the implementation — preserve this pattern in any rewrite.
+- **(ch-schedule)** Every verifiable number in the prose matches schedules.ts exactly: ×0.3 cuts at ⅓ and ⅔, ~5% cosine floor, 10% warmup ramp, and the 4× = quarter-of-the-run decay-speed claim (trainer.ts:135). Rare and excellent.
+- **(ch-schedule)** The Lion closer is a genuinely correct, memorable motivation for schedules — sign-of-momentum steps really are fixed-size (optimizers.ts:661-667) so it provably cannot settle on constant γ — with a matching one-click live demo.
+- **(ch-schedule)** Strong narrative spine: opens by resolving the previous chapter's overshoot-vs-crawl tradeoff, closes with a hook to the noise chapter where decay becomes essential; the 'staircase trained nearly every network' and 'cosine is the modern default' history is accurate and well-cited (SGDR 2017, Goyal 2017).
+- **(ch-schedule)** The step-decay 'cliff' fingerprint description teaches readers to read real loss curves — a transferable skill, not just an app feature.
+- **(ch-noise)** The √n law is stated correctly with perfectly chosen concrete numbers (batch 4 ≈ twice as steady as 1; 16 to halve again) — recomputed, exact, and memorable. Preserve verbatim.
+- **(ch-noise)** Prose is anchored to a real, verified app feature: the fan of 12 minibatch-gradient rays exists in LossLandscape.svelte, so 'the width of the fan is the noise itself' is a genuine visual definition, not decoration.
+- **(ch-noise)** The noise-ball → schedule payoff arc is expert-grade Robbins–Monro intuition ('under noise, decay is how a stochastic run converges at all'), correctly links back to ch-schedule, and the two-panel figure matches the text exactly.
+- **(ch-noise)** Vocabulary asides (iteration vs epoch, the S in SGD) land exactly where the concepts first appear, in the warm parenthetical teacherly voice the owner wants.
+- **(ch-noise)** The preset is sound: applyProblem resets learningRate, batchSize and schedule before setting batchSize 1, so the demo reliably produces the fuzzy band the chapter promises regardless of prior state.
+- **(ch-generalize)** Empirical risk vs true risk is named precisely with a warm beginner gloss ('data we haven't seen'), giving the chapter a rigorous spine without a single unexplained formula.
+- **(ch-generalize)** The U-curve SVG with the 'early stop' marker exactly mirrors the app's Loss History panel — figure, prose, and live UI reinforce one another.
+- **(ch-generalize)** The weight-decay derivation is compact and correct: penalty → gradient → the (1−γλ) shrink factor, with γ consistent with every other chapter and an explicit link back to AdamW's λ.
+- **(ch-generalize)** The closing line — 'Optimization gets you down; generalization decides whether down was worth reaching' — is a genuinely excellent capstone; preserve it verbatim in any rewrite.
+- **(ch-generalize)** Citations are real and well-chosen (Krogh & Hertz 1991, Hochreiter & Schmidhuber 1997, Keskar et al. 2017), and hedged claims correctly say 'tend to' rather than overclaiming.
+- **(ch-opt-narrative)** The Act structure (slope → memory → per-param rate → merge → branches) with per-card ✓fix/✗break footers is outstanding pedagogy — every method is motivated by the previous one's documented failure, and the chronology is essentially sound.
+- **(ch-opt-narrative)** The race figure genuinely runs the app's real optimizer engine (simOpt calls optimizers[id].step per racer), so the figure can never drift from the implementation — rare integrity for an educational visualization.
+- **(ch-opt-narrative)** The quantitative core is correct and well-pitched: γ*=2/(λmin+λmax), contraction (κ−1)/(κ+1), momentum's √κ speed-up, Adam bias correction, RAdam's ρ_t and >4 threshold, Prodigy's max-ramp d_t all match the literature.
+- **(ch-opt-narrative)** Honest scoping notes already exist where they matter most: AdamW's "no overfitting here, λ is just a pull to 0" caveat, Newton's saddle fallback, and the frontier box explaining why Muon/Shampoo cannot live in a 2-parameter sandbox.
+- **(ch-opt-narrative)** Citation discipline is excellent — every arXiv ID checks out, Hinton's never-formally-published Coursera-slide provenance is a lovely true detail, and the data-driven tree reflows automatically for future optimizers.
+- **(ch-tail)** Experiments are real code paths, not prose: each pins a scenario and starts training, and the hard quantitative claims check out — e.g. ch-gamma's γ=1.3 really exceeds 2/λmax ≈ 0.74 on the linear-regression Hessian, and the schedule genuinely applies only to finite runs exactly as the Lion card teaches.
+- **(ch-tail)** All 22 zoo cards' formulas and tags match problems.ts exactly, including subtle claims: mirror basins from β², α↔β label-switching in the mixture, zero-init as a dead saddle in β·tanh(αX), and the AR(2) 6-step rollout.
+- **(ch-tail)** The lion-schedule experiment is superbly engineered pedagogy — finite run + constant schedule chosen deliberately so the fixed ±γ orbit is visible, then Cosine closes the ring; the code comments document the design reasoning.
+- **(ch-tail)** The Keyboard chapter matches the actual handler key-for-key, including shift-for-bigger-nudge and the button/input guards.
+- **(ch-tail)** Card tags teach instead of decorate: 'frequency aliasing → many minima', 'errors compound — the stability triangle becomes a cliff', 'inverse-square triangulation' each compress a real insight into one line.
+- **(act-slope-memory)** The failure→fix→new-flaw narrative arc, with 'lead' transitions between cards, is genuinely excellent pedagogy — each method is motivated before it appears.
+- **(act-slope-memory)** Teaching the exponential moving average as a standalone prereq card before Momentum/RMSProp use it is exactly the right sequencing (even if the momentum formula then breaks faith with it).
+- **(act-slope-memory)** Card formulas match the implementations exactly for gd/momentum/nesterov (optimizers.ts:102-155) — no hidden trust regions or floors in this unit, so what the reader learns is what the marker does.
+- **(act-slope-memory)** History checks out: Cauchy 1847, Polyak 1964 with the correct Elsevier DOI, Nesterov 1983; the 'never formally published, the world cites a Coursera slide' honesty for RMSProp sets the right scholarly tone.
+- **(act-slope-memory)** The Nesterov reformulation subtlety is already understood in the codebase — the optimizers.ts comment ('framework-style reformulation, as in PyTorch') is precisely the caveat that just needs surfacing in the card.
+- **(act-perparam)** Failure→fix→new-flaw card structure is excellent: each of the three cards states the exact failure it repairs (shared γ → growing memory → wrong units) and AdaGrad's brk honestly names its self-strangling.
+- **(act-perparam)** AdaGrad and RMSProp update rules, defaults (ρ=0.9, AdaDelta ρ=0.95), years, and attributions all match the published sources exactly, in both card LaTeX and optimizers.ts implementations.
+- **(act-perparam)** AdaDelta implementation correctly uses the PREVIOUS step's accumulator in the numerator (Zeiler eq. 14) — a detail many real libraries get wrong — with a clear code comment explaining the state reuse.
+- **(act-perparam)** The RMSProp attribution story ("never formally published; the world cites a Coursera slide") is accurate, memorable, and links the actual Toronto slide deck.
+- **(act-perparam)** The moving-average prereq card (1/(1−β) memory horizon) set up in Act II makes RMSProp's EMA a one-line delta from AdaGrad — genuinely good sequencing.
+- **(act-adam)** All four update rules match the published algorithms exactly — Adam (Kingma & Ba), Nadam in the standard Ruder/Keras constant-β form, AdamW's γ(m̂/(√ŝ+ε)+λθ), and RAdam's ρ_t, ρ_t>4 gate, r_t rectifier, and momentum fallback — and src/utils/optimizers.ts implements them faithfully with correct defaults (β1=0.9, β2=0.999, ε=1e-8), no hidden floors or trust regions.
+- **(act-adam)** The AdamW distinction is exactly right: L2 folded into the gradient gets warped by √ŝ, decoupled λθ lands on θ outside the scaling; plus honest caveats that toy losses have no overfitting and λ=0 recovers bit-exact Adam (verified in code), and the race zeroes wd to avoid biasing the fit.
+- **(act-adam)** The Adam bias-correction explanation ('start at zero, read too low, divide by 1−β^t') is correct, and the failure→fix→new-flaw narrative arc across the three refinement cards is genuinely excellent teaching structure.
+- **(act-adam)** RAdam's story matches the paper's actual argument — untrustworthy early variance, momentum fallback until ρ_t>4, rectifier easing adaptivity in — rather than the vague 'warmup built in' gloss most sources give.
+- **(act-adam)** Citations and attributions check out: arXiv 1412.6980 / 1711.05101 / 1908.03265, Dozat 2016, correct years, and correct author lists (Kingma+Ba, Loshchilov+Hutter, Liu/Jiang/He) in OPT_CITE.
+- **(act-branches)** The failure→fix narrative arc is genuinely excellent: each Branch act intro states its design axis accurately (drop information / add information / delete the last knob), and every card leads with the flaw it repairs.
+- **(act-branches)** The update-rule LaTeX for Lion, Sophia, and Prodigy matches the published algorithms — including Lion's subtle two-β order of operations (step from c before updating m) and Prodigy's r/‖s‖₁ max-ratchet — rare precision for a popular guide.
+- **(act-branches)** Implementations are honest, superbly commented engineering: damped Newton with an explained curvature floor, Prodigy's domain-scaled seed/cap with the paper's 1e-6 default explicitly contrasted (optimizers.ts:693-701).
+- **(act-branches)** Cards connect to live app affordances the reader can immediately try: the violet Newton ghost in the curvature lens, Lion's fixed-ring orbit closing under the schedule chapter's γ decay.
+- **(act-branches)** Attributions and citations check out: correct arXiv IDs and first authors, the D-Adaptation lineage, and the AlgoPerf 2024 self-tuning-track claim (Schedule-Free, same authors) are all accurate.
+- **(code-classic)** Every classic update rule (gd, momentum, nesterov, adagrad, rmsprop, adadelta, adam, nadam) is mathematically faithful to its canonical/framework-standard form, and each updateRuleLatex matches the code it sits beside exactly — rare and valuable for reveal-the-code.
+- **(code-classic)** Narrative comments are genuinely pedagogical: AdaDelta's units/dimensional-analysis argument, the honest AdamW caveat about no overfitting in the toy, and the documented ε=1e-4 deviation with its rationale.
+- **(code-classic)** Pure step(params, g, state) functions with an explicit immutability test make the engine trivially testable and already npm-extraction-shaped.
+- **(code-classic)** Tests assert behavioral signatures, not just descent: Adam's scale-invariant first step, RMSProp's recovery after a gradient burst, AdaGrad's monotone shrink, and μ=0/λ=0 reductions to parent methods.
+- **(code-classic)** Deliberate deviations (fixedLearningRate on adaptive methods, AdaDelta's γ-as-gain) are mostly flagged in comments rather than silently baked in.
+- **(code-modern)** Implementations are remarkably faithful: RAdam's ρ_t and r_t match the paper exactly (threshold >4 included); Prodigy matches Algorithm 3 term-for-term (√β₂ accumulators, d-weighted moments, ⟨g, x₀−x⟩ numerator, d·ε denominator); Lion's two-beta dance and AdamW's decoupled λθ are textbook-correct.
+- **(code-modern)** Every deliberate paper deviation is candid in source comments — Prodigy's seed/cap rationale, Lion's dropped weight decay, Newton's damping — exactly the honest-margin-note culture the guide wants; it just hasn't migrated to learner-facing text yet.
+- **(code-modern)** Pure, uniformly-signed step functions with an immutability test make the code near-ideal for reveal-code and library extraction.
+- **(code-modern)** Tests target each optimizer's distinctive signature (Adam scale-invariance, Lion's fixed stride, AdamW λ=0 ≡ Adam bit-for-bit, Newton one-step on a bowl + saddle descent + trust region, Prodigy self-ramping rate).
+- **(code-modern)** hessian.ts is clean and correct: symmetrized central differences of the analytic gradient, closed-form eigendecomposition, Sylvester PD check, and a properly caveated pure Newton step — validated against the known Rosenbrock Hessian.
+- **(code-problems)** Every analytic gradient is correct: I re-derived all 22+2 by hand and FD-verified at adversarial points (negative β Gaussian Peak, AR(2) rollout at the stability cliff, saturated tanh) — zero discrepancies; all 97 tests pass.
+- **(code-problems)** ar2-rollout is a small tour de force: exact forward-mode BPTT with correct product rule, correct stationarity-triangle inequalities (β>−1, β<1±α), correct degree-2k polynomial claim, and accurate Bengio-1994/Pascanu-2013 citations.
+- **(code-problems)** hessian.ts is sound end-to-end: symmetrized central FD of analytic gradients, closed-form 2×2 eigendecomposition (test verifies Hv=λv), correct Newton solve, Sylvester PD check, and an honest saddle caveat on the Newton step.
+- **(code-problems)** The GuidePanel LaTeX (model, loss, gradient per problem) matches the code exactly, including subtle coefficients (4/n for gaussian-mixture and source-localization, 2/nτ for the circle, 1/n with no 2 for BCE).
+- **(code-problems)** Problem docstrings are already lecture-notes quality: every surface explains WHY it is shaped that way, why init/γ/μ were chosen (some with simulation-verified convergence stats), and each tagline states the exact pedagogical point.
