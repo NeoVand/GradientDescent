@@ -378,15 +378,17 @@
     const HEAD_LEN = 0.021; // arrowhead length, world units
     const HEAD_W = 0.013; // arrowhead half-width, world units
     const SHAFT_HW = 0.005; // shaft ribbon half-width — the visible tail
-    // Comet shading between a bold HEAD and a TAIL that fades into the backdrop
-    // — inverted per theme. Dark: a dark tail → a bright head that glows on the
-    // black scene. Day: a light tail that dissolves into the white surface → a
-    // near-black head that stays bold on every colormap (the old mid-slate head
-    // washed out to gray on the light peaks — the "light/ugly head" bug).
-    const head: [number, number, number] = dark3d ? c : [0.12, 0.15, 0.21];
+    // Dark mode is a comet: a dim tail brightening to a bright head that glows on
+    // the black scene. Day mode is a flat solid arrow like the 2D field — no
+    // within-arrow gradient — but a near-black slate rather than c's mid-tone:
+    // the lit 3D surface never fades to white the way the 2D heatmap does, so a
+    // mid-slate washes out over the light colormap regions and it has to be
+    // genuinely dark to read. Magnitude still reads through the shaft length.
+    const dayArrow: [number, number, number] = [0.09, 0.11, 0.16];
+    const head: [number, number, number] = dark3d ? c : dayArrow;
     const tail: [number, number, number] = dark3d
       ? [head[0] * 0.5, head[1] * 0.5, head[2] * 0.5]
-      : [head[0] + (1 - head[0]) * 0.66, head[1] + (1 - head[1]) * 0.66, head[2] + (1 - head[2]) * 0.66];
+      : dayArrow;
     const surfY = (x: number, z: number) => {
       const q = fromXZ(x, z);
       return heightAt(q.a, q.b) + LIFT + 0.003;
