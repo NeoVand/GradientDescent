@@ -64,6 +64,14 @@
   let layers3d = get(vizLayersStore);
   let vectorField3d: THREE.LineSegments | THREE.Mesh | null = null;
 
+  // Day/dark for the surface + overlays (mirrors the 2D plot). Day is "dark
+  // basins on light": the colormap is read in reverse so basins take the
+  // rich/dark end, on a white scene. Updated on every theme change.
+  let dark3d = get(themeStore) === 'dark';
+  let ambientLight: THREE.AmbientLight | null = null;
+  let sunLight: THREE.DirectionalLight | null = null;
+  let fillLight: THREE.DirectionalLight | null = null;
+
   // Basins of attraction: when on, the surface is colored by WHICH minimum
   // plain GD reaches from each point (categorical palette) instead of the
   // loss colormap — height still comes from loss, and lighting still shades
@@ -165,7 +173,9 @@
         const id = basinIdAt(basins, a, b);
         [r, g, bb] = id < 0 ? BASIN_UNSETTLED_RGB : BASIN_COLORS_RGB[id % BASIN_COLORS_RGB.length];
       } else {
-        [r, g, bb] = viridisRGB(1 - t, cmap);
+        // Dark: bright = low loss (basins glow). Day: reversed → basins take
+        // the colormap's dark/rich end so they read on the white scene.
+        [r, g, bb] = viridisRGB(dark3d ? 1 - t : t, cmap);
       }
       colors[i * 3] = r;
       colors[i * 3 + 1] = g;
@@ -283,9 +293,9 @@
     // surface read as transparent. Lifted slightly above the surface so the
     // visible (near-face) rings still draw cleanly instead of z-fighting.
     const mat = new THREE.LineBasicMaterial({
-      color: 0xffffff,
+      color: dark3d ? 0xffffff : 0x334155,
       transparent: true,
-      opacity: 0.78,
+      opacity: dark3d ? 0.78 : 0.6,
       depthTest: true,
       depthWrite: false
     });
@@ -316,10 +326,9 @@
     const trainData = get(datasetStore).data.filter(d => d.isTraining);
     const range = currentScene.range;
 
-    // The 3D surface shows the colormap in both themes (dark basins, bright
-    // peaks), so the field is always bright white — the dark day-mode colour
-    // vanished against it. Matches the clean white lines in the 2D view.
-    const c: [number, number, number] = [0.86, 0.91, 1.0];
+    // Pale cool-white on the dark scene; a dark slate on the day scene (where
+    // white would vanish against the light peaks). Matches the 2D field.
+    const c: [number, number, number] = dark3d ? [0.86, 0.91, 1.0] : [0.28, 0.33, 0.42];
     const LIFT = 0.012;
 
     if (layers3d.field === 'streamlines') {
@@ -738,8 +747,19 @@
     scene3.add(markerExtras);
   }
 
+  // Day leans on ambient (even, colour-faithful) and eases the directional
+  // lights so the light peaks don't blow out to white on the white scene; dark
+  // keeps the calmer directional set that keeps the glowing basins rich.
+  function applyLights(dark: boolean) {
+    if (ambientLight) ambientLight.intensity = dark ? 0.5 : 0.85;
+    if (sunLight) sunLight.intensity = dark ? 0.8 : 0.42;
+    if (fillLight) fillLight.intensity = dark ? 0.28 : 0.18;
+  }
+
   function applyTheme(theme: string) {
     const dark = theme === 'dark';
+    dark3d = dark;
+    applyLights(dark);
     if (container) {
       container.style.background = dark ? '#060913' : '#ffffff';
     }
@@ -948,13 +968,15 @@
     // Calmer lights: the old set (0.6 + 1.1 + 0.35) blew the bright basins out
     // to white, washing the surface and swallowing the overlays. Pulled down so
     // the colormap stays rich and the contours/arrows read against it.
-    scene3.add(new THREE.AmbientLight(0xffffff, 0.5));
-    const sun = new THREE.DirectionalLight(0xffffff, 0.8);
-    sun.position.set(1.5, 2.5, 1);
-    scene3.add(sun);
-    const fill = new THREE.DirectionalLight(0xffffff, 0.28);
-    fill.position.set(-1.5, 1.2, -1.5);
-    scene3.add(fill);
+    ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    scene3.add(ambientLight);
+    sunLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    sunLight.position.set(1.5, 2.5, 1);
+    scene3.add(sunLight);
+    fillLight = new THREE.DirectionalLight(0xffffff, 0.28);
+    fillLight.position.set(-1.5, 1.2, -1.5);
+    scene3.add(fillLight);
+    applyLights(dark3d);
 
     // depthTest off + high renderOrder: a converged marker sits inside a
     // basin depression, which the near rim would otherwise hide entirely.
@@ -1027,9 +1049,13 @@
         if (currentScene) updateMarker();
       }),
       themeStore.subscribe(t => {
-        applyTheme(t);
+        applyTheme(t); // sets dark3d + lights + background/grid
         buildLabels(t);
         buildGizmo(t);
+        if (currentScene) {
+          buildSurface(); // re-color: dark basins on light / bright on dark
+          buildContours();
+        }
         buildVectorField3d(); // re-tint the field for the new theme
       }),
       // Mirror the 2D Layers controls: colormap re-tints the surface, the
