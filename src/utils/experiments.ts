@@ -15,7 +15,8 @@ import {
   recordInitialHistory,
   resetOptimizerState,
   showCoach,
-  landscapeViewStore
+  landscapeViewStore,
+  raceConfigStore
 } from '../stores/stores';
 import { applyProblem, applyOptimizer, startTraining, startRace } from './trainer';
 
@@ -50,10 +51,11 @@ export const experiments: Experiment[] = [
       'Gaussian Peak has mirror basins at β = ±1 (width enters as β²). Which one you reach depends only on where you start.',
     apply() {
       applyProblem('gaussian-peak');
+      applyOptimizer('gd');
       startTraining();
       showCoach(
         'info',
-        'Two mirror basins at β = ±1. Hit Reset then Train a few times — the starting point decides the destination.',
+        'Two mirror basins at β = ±1. Fresh starts always land above β = 0, so to see the twin: drag the marker below the β = 0 line, then Train — same loss, mirror answer.',
         14000
       );
     }
@@ -65,6 +67,9 @@ export const experiments: Experiment[] = [
       'Far from a Gaussian peak the model is flat and ∇ℒ ≈ 0. Start out on the dead plateau and watch Train barely move.',
     apply() {
       applyProblem('gaussian-peak');
+      // Plain GD is the point here — an adaptive optimizer left over from a
+      // previous experiment would walk off the plateau and spoil the lesson.
+      applyOptimizer('gd');
       // Drop the marker on the plateau where gradients have died out
       parametersStore.set({ a: 2.7, b: 2.7 });
       resetOptimizerState();
@@ -100,6 +105,7 @@ export const experiments: Experiment[] = [
       'Crank the noise on Linear Regression: the basin shifts away from the true line. No optimizer can undo noisy data.',
     apply() {
       applyProblem('linear-regression');
+      applyOptimizer('gd');
       datasetStore.setNoiseLevel(2);
       datasetStore.regenerateData();
       recordInitialHistory();
@@ -134,8 +140,10 @@ export const experiments: Experiment[] = [
       'Rosenbrock’s curved valley is the optimizer torture test. Race GD, Momentum, RMSProp, and Adam from the same start.',
     apply() {
       applyProblem('rosenbrock');
-      // The valley crawl is slow by design — give the racers room to finish
-      trainingStore.update(s => ({ ...s, totalSteps: 1000, stepsPerSecond: 60 }));
+      // The valley crawl is slow by design — give the racers room to finish.
+      // Races read raceConfigStore (not trainingStore), so configure it there.
+      raceConfigStore.setMaxSteps(1000);
+      raceConfigStore.setSpeed(60);
       startRace();
     }
   },
@@ -172,12 +180,12 @@ export const experiments: Experiment[] = [
     id: 'marker-is-model',
     title: 'The marker IS the parameters',
     blurb:
-      'On Circle Classifier the parameters (α, β) are the circle’s center — the marker appears on the data plot itself. Drag either marker.',
+      'On Circle Classifier the parameters (α, β) are the circle’s center — the marker appears on the data plot itself, mirroring the one on the loss map.',
     apply() {
       applyProblem('circle-classifier');
       showCoach(
         'info',
-        'Drag the orange marker on the LEFT plot — it is literally (α, β), the circle’s center. Both views move together.',
+        'The orange marker on the LEFT plot is literally (α, β) — the circle’s center. Drag the marker on the Loss & Gradient panel and watch the circle follow: they are the same two numbers.',
         14000
       );
     }
@@ -204,7 +212,7 @@ export const chapterPresets: Record<string, Experiment> = {
       startTraining();
       showCoach(
         'info',
-        'With the noise cranked up, training drives the loss down by bending the fit toward the random scatter — but the basin no longer sits on the dashed true line. Driving training loss to zero here means memorizing noise, not learning the signal. That gap is overfitting.',
+        'With the noise cranked up, the basin no longer sits on the dashed true line — training now chases this particular noisy sample, not the truth. That gap between “best on the training data” and “best on reality” is the seed of overfitting; give a model enough knobs and it grows into memorizing the scatter outright.',
         17000
       );
     }
@@ -248,7 +256,7 @@ export const chapterPresets: Record<string, Experiment> = {
       landscapeViewStore.set('3d');
       showCoach(
         'info',
-        'The flat contour map lifts into real hills and valleys — drag to rotate it. Bright and low is a good model, dark and high is a bad one. Press D to flip back to 2D.',
+        'The flat contour map lifts into real hills and valleys — drag to rotate it. Low ground is a good model, high ground a bad one (the colour bar shows which shade means low). Press D to flip back to 2D.',
         15000
       );
     }
@@ -265,7 +273,7 @@ export const chapterPresets: Record<string, Experiment> = {
       recordInitialHistory();
       showCoach(
         'info',
-        'Don’t train yet — read the Loss & Gradient panel. The faint arrows are −∇ℒ everywhere; the blue arrow on the marker is the steepest way down from where you stand. Notice they all cut straight across the white contours.',
+        'Don’t train yet — read the Loss & Gradient panel. The faint arrows are −∇ℒ everywhere; the blue arrow on the marker is the steepest way down from where you stand. Notice they all cut straight across the contour loops.',
         16000
       );
     }

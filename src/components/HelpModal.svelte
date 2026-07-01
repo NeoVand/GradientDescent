@@ -277,7 +277,7 @@
       lead: 'Forgetting kept the steps alive, and for most people that closed the case. But Matthew Zeiler, squinting at the very same update that very same year, caught something nobody else had: the equation was, quite literally, <em>dimensionally wrong.</em>',
       by: 'Matthew Zeiler — same year, same fix, one step further',
       idea:
-        'RMSProp’s twin, born the same year against the same AdaGrad flaw — but Zeiler spotted a deeper oddity: a raw gradient step has the wrong units. AdaDelta divides by $\\mathrm{RMS}[\\nabla\\mathcal{L}]$ like RMSProp, then multiplies by the RMS of its OWN recent steps. The two memories make the ratio dimensionless, and the learning rate falls out of the math entirely — there is nothing left to set but the decay $\\rho$.',
+        'RMSProp’s twin, born the same year against the same AdaGrad flaw — but Zeiler spotted a deeper oddity: a raw gradient step has the wrong units. AdaDelta divides by $\\mathrm{RMS}[\\nabla\\mathcal{L}]$ like RMSProp, then multiplies by the RMS of its OWN recent steps. That second memory hands the step $\\theta$’s own units — the very thing a raw gradient step lacks, and exactly what Newton’s $\\mathbf H^{-1}\\nabla\\mathcal{L}$ buys with curvature — so no unit-carrying $\\gamma$ is needed and the learning rate falls out of the math entirely: there is nothing left to set but the decay $\\rho$.',
       formula: String.raw`\Delta\boldsymbol{\theta} = -\frac{\sqrt{\mathbf{u}+\varepsilon}}{\sqrt{\mathbf{s}+\varepsilon}}\,\nabla \mathcal{L}, \qquad \mathbf{u} \leftarrow \rho\,\mathbf{u} + (1-\rho)\,\Delta\boldsymbol{\theta}^2`,
       fix: 'no learning rate to tune — it sizes its own steps',
       brk: 'one knob fewer, but no $\\gamma$ to crank when you DO want it faster'
@@ -342,7 +342,7 @@
       name: 'Newton',
       by: 'Isaac Newton — the original, three centuries early',
       idea:
-        'The branch that reaches back furthest — and the method every optimizer above is a cheap stand-in for. They all read only the slope $\\nabla\\mathcal{L}$. Newton also reads the CURVATURE: fit a quadratic bowl to the surface right here (the Hessian $\\mathbf H$) and jump straight to that bowl’s bottom, $-\\mathbf H^{-1}\\nabla\\mathcal{L}$. On a real bowl that nails the minimum in ONE step, with no learning rate to tune. This app already draws that jump — it is the violet Newton ghost in the curvature lens. So why isn’t it everywhere? $\\mathbf H$ is $N\\times N$ for $N$ parameters: trivial for our 2, ruinous for a billion. And away from a convex bowl $-\\mathbf H^{-1}\\nabla\\mathcal{L}$ can aim uphill, so here it falls back to a gradient step on saddles.',
+        'The branch that reaches back furthest — and the method every optimizer above is a cheap stand-in for. They all read only the slope $\\nabla\\mathcal{L}$. Newton also reads the CURVATURE: fit a quadratic bowl to the surface right here (the Hessian $\\mathbf H$) and jump straight to that bowl’s bottom, $-\\mathbf H^{-1}\\nabla\\mathcal{L}$. On a real bowl that nails the minimum in ONE step, with no learning rate to tune. This app already draws that jump — it is the violet Newton ghost in the curvature lens. So why isn’t it everywhere? $\\mathbf H$ is $N\\times N$ for $N$ parameters: trivial for our 2, ruinous for a billion. And away from a convex bowl $-\\mathbf H^{-1}\\nabla\\mathcal{L}$ can aim uphill, so this app runs the damped form real implementations use: near saddles and flats the curvature is propped up and the jump reined in toward a plain gradient step. (The $\\gamma$ in the formula is a safety throttle — pure Newton is $\\gamma = 1$, which is what this app keeps.)',
       formula: String.raw`\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \mathbf{H}^{-1}\nabla \mathcal{L}`,
       fix: 'curvature-aware: one step to the bottom of any true bowl',
       brk: 'the $N\\times N$ Hessian is hopeless at scale — and it stumbles on saddles'
@@ -353,7 +353,7 @@
       lead: 'Newton’s method is the king nobody can afford — exact, and ruinously expensive, all because of that one beautiful matrix. So the question for the age of billion-parameter models is blunt: can you keep the <em>idea</em> and throw away the bill?',
       by: 'Liu et al. — Newton, cut down to fit an LLM',
       idea:
-        'Newton’s curvature is unbeatable and unaffordable; Sophia keeps the affordable part. Drop the full Hessian for just its DIAGONAL — one curvature number $\\mathbf h$ per parameter, no matrix to invert — and precondition the momentum by it. Then the safety move: CLIP every coordinate’s step to $\\pm\\rho$. Where the diagonal estimate is tiny or noisy (and $\\mathbf m/\\mathbf h$ would blow up) the clip bounds the move; where it’s solid, the step stays curvature-scaled. Light enough that it trained GPT-class models roughly twice as fast as Adam by step count — second-order thinking that actually ships.',
+        'Newton’s curvature is unbeatable and unaffordable; Sophia keeps the affordable part. Drop the full Hessian for just its DIAGONAL — one curvature number $\\mathbf h$ per parameter, no matrix to invert — and precondition the momentum by it. Then the safety move: CLIP every coordinate’s step to $\\pm\\rho$. Where the diagonal estimate is tiny or noisy (and $\\mathbf m/\\mathbf h$ would blow up) the clip bounds the move; where it’s solid, the step stays curvature-scaled. Its paper reports GPT-2-scale pretraining in roughly half the steps Adam needs — a headline later independent benchmarks have contested — but either way, it is second-order thinking made cheap enough to try.',
       formula: String.raw`\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\,\operatorname{clip}\!\left(\frac{\mathbf{m}}{\max(\mathbf{h},\varepsilon)},\,\rho\right)`,
       fix: 'diagonal curvature + a clip — second-order on a budget',
       brk: 'only the diagonal: blind to the off-axis stretch Newton corrects'
@@ -712,13 +712,19 @@
     const stepY = gradVizH / (rows + 1);
     let maxMag = 0;
     const raw: { gx: number; gy: number; ox: number; oy: number; m: number }[] = [];
+    // Arrows follow −∇ of the elliptical bowl the contours draw (rx:ry = 55:40),
+    // i.e. (dx/rx², dy/ry²) — normal to the rings, not aimed at the centre, so
+    // the figure obeys the perpendicularity rule the chapter teaches.
+    const ky = (55 / 40) ** 2;
     for (let j = 1; j <= rows; j++) {
       for (let i = 1; i <= cols; i++) {
         const ox = i * stepX, oy = j * stepY;
         const dx = gradVizCx - ox, dy = gradVizCy - oy;
         const m = Math.sqrt(dx * dx + dy * dy);
         if (m < 5) { raw.push({ gx: 0, gy: 0, ox, oy, m: 0 }); continue; }
-        raw.push({ gx: dx / m, gy: dy / m, ox, oy, m });
+        const gx = dx, gy = dy * ky;
+        const gm = Math.sqrt(gx * gx + gy * gy);
+        raw.push({ gx: gx / gm, gy: gy / gm, ox, oy, m });
         if (m > maxMag) maxMag = m;
       }
     }
@@ -1223,12 +1229,12 @@
               </div>
             </div>
 
-            <!-- Prefer learning by doing? Launch the guided course. Each
-                 chapter below also opens its own lesson. -->
+            <!-- Prefer learning by doing? Launch the guided course. Most
+                 teaching chapters below open a matching lesson or demo. -->
             <div class="course-banner">
               <div class="course-banner-text">
                 <strong>Prefer to learn by doing?</strong>
-                <span>Take the guided course — ten short predict-then-run lessons. Each chapter below also opens its own.</span>
+                <span>Take the guided course — ten short predict-then-run lessons. Most teaching chapters below open a matching lesson or live demo.</span>
               </div>
               <button class="course-banner-btn" on:click={() => { onClose(); startCourseIntro(); }}>
                 <GraduationCap size={15} strokeWidth={2.3} />
@@ -1341,8 +1347,10 @@
               </p>
               <p>
                 The <strong>Loss &amp; Gradient</strong> panel is a map of that landscape seen from
-                straight above. <strong>Brighter colours are lower</strong> (better) loss; dark is
-                high. The thin white loops are <strong>contour lines</strong> — exactly like a
+                straight above. {#if gDark}<strong>Brighter colours are lower</strong> (better) loss;
+                dark is high.{:else}<strong>Deeper, richer colours are lower</strong> (better) loss;
+                the pale wash is high.{/if} (The panel’s colour bar always shows which end is low.)
+                The thin loops are <strong>contour lines</strong> — exactly like a
                 hiking map: each loop joins points of equal loss, and loops bunched tightly together
                 mean a steep slope. Flip the panel to <strong>3D</strong> and the same map lifts into
                 real hills and valleys you can rotate.
@@ -1384,8 +1392,9 @@
                 </figcaption>
               </figure>
               <p class="look">
-                Look at the Loss &amp; Gradient panel right now: the bright dimple is where the loss
-                is lowest, and the marker is trying to reach it.
+                Look at the Loss &amp; Gradient panel right now: the {gDark ? 'bright' : 'deep-coloured'}
+                dimple at the centre of the rings is where the loss is lowest, and the marker is
+                trying to reach it.
               </p>
               {#if chapterPresets['ch-landscape']}
                 <ChapterCta demo={() => runPreset('ch-landscape')} demoLabel={chapterPresets['ch-landscape'].title} />
@@ -1709,7 +1718,8 @@
               <p>Now we can actually walk. One step of <strong>gradient descent</strong> is almost insultingly simple:</p>
               <blockquote class="recipe">
                 Stand at your current (α, β). Look downhill — that’s <strong>−∇ℒ</strong>. Take a
-                step of size <em class="g">γ</em> in that direction. Repeat.
+                step in that direction — <em class="g">γ</em> times as long as the slope is steep.
+                Repeat.
               </blockquote>
               <p>
                 In symbols, that is the rule the entire field is built on. We write <strong>θ</strong>
@@ -1872,20 +1882,23 @@
               </p>
               <p>
                 <strong>Cosine</strong> does the same work without the jolts — γ eases down the first half
-                of a cosine from full strength to a small floor (about 5%), quick at first and
-                feather-light by the end. With no brutal transition the run simply settles, which is why
-                cosine annealing is the modern default. <strong>Warmup + cosine</strong> bolts a short
+                of a cosine from full strength to a small floor (about 5%): gentle at first, fastest
+                through the middle, feather-light by the end. Lingering near full strength early is
+                the point — the run banks its fast progress before precision matters. With no brutal
+                transition it then simply settles, which is why cosine annealing is the modern default. <strong>Warmup + cosine</strong> bolts a short
                 on-ramp onto the front: γ starts near zero and climbs over the first tenth before the
                 cosine takes over. That protects the opening, where a run <em>begins</em> at a random,
                 often dreadful point and one full-size step could fling the marker off the map — so it is
                 now standard for training large models from scratch.
               </p>
               <p>
-                One practical wrinkle: these shapes were designed for runs of thousands of steps, so over
-                a short run here the decay can be too gentle to see. The <strong>Decay speed</strong>
-                slider — it appears whenever a non-constant schedule is active — compresses the whole
-                schedule into a fraction of the run, so at <em>4×</em> it finishes annealing a quarter of
-                the way in. Turn it up and read the result off the dotted γ(t) line in the loss chart.
+                One practical wrinkle: each shape stretches to fit the run, and at 1× the decay only
+                finishes on the run’s very last step — so you never get to watch the <em>settled</em>
+                tail. The <strong>Decay speed</strong> slider — it appears whenever a non-constant
+                schedule is active on a finite run (in ∞ mode there is no horizon, so schedules switch
+                off) — compresses the whole schedule into a fraction of the run, so at <em>4×</em> it
+                finishes annealing a quarter of the way in and the rest of the run shows you the
+                landing. Turn it up and read the result off the dotted γ(t) line in the loss chart.
               </p>
               <p>
                 Scheduling has a second, deeper payoff that only lands once gradients turn <em>noisy</em>
@@ -2378,9 +2391,9 @@
                 data as a <strong>test</strong> (or validation) set, and watch its loss alongside the
                 training loss — that is the second curve in the <strong>Loss History</strong> panel. The
                 second is <strong>early stopping</strong>: end training at the test-loss minimum rather
-                than the training-loss minimum. It is the simplest regularizer there is, and in the
-                quadratic case it is provably close to an explicit weight penalty (Prechelt, 1998;
-                Goodfellow et al., 2016, §7.8).
+                than the training-loss minimum. It is the simplest regularizer there is, and — for a
+                run started near zero — in the quadratic case it is provably close to an explicit
+                weight penalty (Bishop, 1995; Goodfellow et al., 2016, §7.8).
               </p>
               <p>
                 That penalty is <strong>regularization</strong>: instead of minimizing the loss alone, add
@@ -2427,10 +2440,10 @@
               <div class="part-label">Part IV · The zoo</div>
               <h3><svelte:component this={chIcon['ch-problems']} size={18} strokeWidth={2} /> The 22 landscapes</h3>
               <p>
-                Every problem has the same two parameters (α, β) and a loss surface you can see live —
-                but each surface tells a different story, from a single clean bowl to four-way ties
-                and exploding cliffs. Each ships with a curated default learning rate, momentum, and
-                view.
+                Every problem here has at most two parameters — the three 1D warm-ups use just α —
+                and a loss surface you can see live. Each surface tells a different story, from a
+                single clean bowl to four-way ties and exploding cliffs, and each ships with a
+                curated default learning rate and view (and, where it helps, momentum).
               </p>
 
               {#each Object.entries(problems) as [groupName, list]}
@@ -2476,7 +2489,7 @@
               <h3><svelte:component this={chIcon['ch-panels']} size={18} strokeWidth={2} /> Reading the panels</h3>
               <ul class="viz-list">
                 <li><strong>Data plot</strong> — the data points and the current model. For curve fits, blue solid is the current fit and green dashed is the truth. For 2D problems, the orange marker shows your parameters directly on the plot.</li>
-                <li><strong>Loss &amp; Gradient</strong> — the loss landscape seen from above: bright = low loss, white contours join equal-loss points, and the field arrows are −∇ℒ. On the marker, the <span class="ink-blue">blue arrow</span> is steepest descent and the <span class="ink-red">red arrow</span> is the step actually taken. Drag the marker to teleport.</li>
+                <li><strong>Loss &amp; Gradient</strong> — the loss landscape seen from above: the vivid end of the colour scale marks low loss (bright in night mode, deep in day mode — the colour bar shows which), thin contours join equal-loss points, and the field arrows are −∇ℒ. On the marker, the <span class="ink-blue">blue arrow</span> is steepest descent and the <span class="ink-red">red arrow</span> is the step actually taken. Drag the marker to teleport.</li>
                 <li><strong>Loss History</strong> — train and test loss versus step. A clean decline is healthy; spikes mean you’re overshooting (too much γ or μ); a persistent train/test gap hints at overfitting.</li>
               </ul>
             </section>

@@ -118,8 +118,8 @@ const doubleWell1D: ProblemConfig = {
 
 /**
  * Bumpy Valley — f(α) = 0.15α² + sin(2α) + 1.4. A parabola with ripples:
- * four local minima in view (global at α ≈ −0.8), so most starts get stuck
- * partway down. Momentum can roll through the small bumps.
+ * four local minima in view (global at α ≈ −0.73, where 0.3α + 2cos(2α) = 0),
+ * so most starts get stuck partway down. Momentum can roll through the bumps.
  */
 const bumpyValley1D: ProblemConfig = {
   type: 'bumpy-1d',
@@ -128,7 +128,7 @@ const bumpyValley1D: ProblemConfig = {
   tagline: 'Four dips, one true bottom — most starting points find the wrong one.',
   oneParam: true,
   noData: true,
-  trueParameters: { a: -0.8, b: 0 },
+  trueParameters: { a: -0.73, b: 0 },
   generateData: (_n: number, _r: number, _noise?: number): DataPoint[] => [],
   predict: () => 0,
 
@@ -1004,7 +1004,7 @@ const circleClassifier: ProblemConfig = {
   type: 'circle-classifier',
   name: 'Circle Classifier',
   description: 'Find a circle center to separate inside / outside points',
-  tagline: 'The marker IS the circle\'s center — drag it on the left plot too.',
+  tagline: 'The marker IS the circle\'s center — watch it mirror your moves on the left plot.',
   trueParameters: { a: 0, b: 0 },
 
   generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
