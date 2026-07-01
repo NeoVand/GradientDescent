@@ -159,6 +159,12 @@
     const pos = geo.attributes.position as THREE.BufferAttribute;
     const colors = new Float32Array(pos.count * 3);
     const basins = basinActive() ? basinState.scene : null;
+    // The 2D heatmap isn't the raw colormap: it's drawn with alpha over the
+    // page, so dark mode is tinted toward the near-black backdrop (α≈0.85)
+    // and day mode fades toward white as loss grows (α 0.93 → 0.14) — the
+    // airy look. Reproduce that compositing here so 2D and 3D agree.
+    const bg: [number, number, number] = dark3d ? [6 / 255, 9 / 255, 19 / 255] : [1, 1, 1];
+    const col = new THREE.Color();
 
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
@@ -176,10 +182,20 @@
         // Dark: bright = low loss (basins glow). Day: reversed → basins take
         // the colormap's dark/rich end so they read on the white scene.
         [r, g, bb] = viridisRGB(dark3d ? 1 - t : t, cmap);
+        // Same alpha ramp as gridToImageURL, composited over the backdrop.
+        const alpha = dark3d ? 217 / 255 : (236 - t * 200) / 255;
+        r = r * alpha + bg[0] * (1 - alpha);
+        g = g * alpha + bg[1] * (1 - alpha);
+        bb = bb * alpha + bg[2] * (1 - alpha);
       }
-      colors[i * 3] = r;
-      colors[i * 3 + 1] = g;
-      colors[i * 3 + 2] = bb;
+      // The colormap (and basin palette) are sRGB, but raw vertex-color
+      // attributes bypass three's color management and are read as LINEAR —
+      // fed unconverted, the output transform re-applies the sRGB curve and
+      // every color lifts toward washed-out gray. Convert to working space.
+      col.setRGB(r, g, bb, THREE.SRGBColorSpace);
+      colors[i * 3] = col.r;
+      colors[i * 3 + 1] = col.g;
+      colors[i * 3 + 2] = col.b;
     }
 
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -218,7 +234,8 @@
     basinState.scene.minima.forEach((m, i) => {
       if (m.a < min || m.a > max || m.b < min || m.b > max) return;
       const [r, g, b] = BASIN_COLORS_RGB[i % BASIN_COLORS_RGB.length];
-      const color = new THREE.Color(r, g, b);
+      // sRGB palette → linear working space (numeric Color ctor doesn't convert).
+      const color = new THREE.Color().setRGB(r, g, b, THREE.SRGBColorSpace);
       const dot = new THREE.Mesh(
         new THREE.SphereGeometry(0.02, 16, 12),
         new THREE.MeshStandardMaterial({
@@ -764,10 +781,15 @@
   // Day leans on ambient (even, colour-faithful) and eases the directional
   // lights so the light peaks don't blow out to white on the white scene; dark
   // keeps the calmer directional set that keeps the glowing basins rich.
+  // The weights sum to ≈1.0 incident light on an up-facing area (ambient +
+  // sun·0.81 + fill·0.49) and are scaled by π because three's physical lights
+  // put the Lambert 1/π inside the BRDF — flat regions then show the vertex
+  // colormap at its true value, matching the 2D heatmap, while slopes shade
+  // darker for shape.
   function applyLights(dark: boolean) {
-    if (ambientLight) ambientLight.intensity = dark ? 0.5 : 0.85;
-    if (sunLight) sunLight.intensity = dark ? 0.8 : 0.42;
-    if (fillLight) fillLight.intensity = dark ? 0.28 : 0.18;
+    if (ambientLight) ambientLight.intensity = (dark ? 0.42 : 0.68) * Math.PI;
+    if (sunLight) sunLight.intensity = (dark ? 0.6 : 0.32) * Math.PI;
+    if (fillLight) fillLight.intensity = (dark ? 0.22 : 0.13) * Math.PI;
   }
 
   function applyTheme(theme: string) {
@@ -979,15 +1001,14 @@
     controls.minDistance = 0.6;
     controls.maxDistance = 6;
 
-    // Calmer lights: the old set (0.6 + 1.1 + 0.35) blew the bright basins out
-    // to white, washing the surface and swallowing the overlays. Pulled down so
-    // the colormap stays rich and the contours/arrows read against it.
-    ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    // Intensities are theme-dependent — applyLights sets the real values,
+    // normalized so an up-facing area receives ≈1.0 and shows the colormap true.
+    ambientLight = new THREE.AmbientLight(0xffffff, 0.42);
     scene3.add(ambientLight);
-    sunLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    sunLight = new THREE.DirectionalLight(0xffffff, 0.6);
     sunLight.position.set(1.5, 2.5, 1);
     scene3.add(sunLight);
-    fillLight = new THREE.DirectionalLight(0xffffff, 0.28);
+    fillLight = new THREE.DirectionalLight(0xffffff, 0.22);
     fillLight.position.set(-1.5, 1.2, -1.5);
     scene3.add(fillLight);
     applyLights(dark3d);
