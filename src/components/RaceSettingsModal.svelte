@@ -369,6 +369,14 @@
   .rs-seg button:hover { color: var(--color-text-primary); }
   .rs-seg button.on { background: #10b981; color: #fff; }
 
+  /* Day mode: crisp cool recessed track (the flat neutral grey read muddy on
+     the light modal); the solid emerald active pill still pops. */
+  :global([data-theme='light']) .rs-seg {
+    background: rgba(15, 23, 42, 0.05);
+    box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05);
+  }
+  :global([data-theme='light']) .rs-seg button.on { box-shadow: 0 1px 2px rgba(15, 23, 42, 0.14); }
+
   .rs-note { margin: 0.5rem 0 0; font-size: 0.74rem; font-style: italic; color: var(--color-text-tertiary); }
 
   .rs-foot {

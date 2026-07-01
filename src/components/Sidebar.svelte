@@ -1515,6 +1515,20 @@
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
   }
 
+  /* Day mode: a crisp cool recessed track (the old flat neutral-grey read
+     muddy on the light card) with a white active pill that lifts, accented
+     emerald. Dark mode keeps its translucent track above. */
+  :global([data-theme='light']) .seg-control {
+    background: rgba(15, 23, 42, 0.05);
+    box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05);
+  }
+  :global([data-theme='light']) .seg-control button.active {
+    background: #ffffff;
+    border-color: rgba(16, 185, 129, 0.5);
+    color: #059669;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.16);
+  }
+
   .optimizer-name {
     font-size: 0.875rem;
   }
