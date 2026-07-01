@@ -378,7 +378,15 @@
     const HEAD_LEN = 0.021; // arrowhead length, world units
     const HEAD_W = 0.013; // arrowhead half-width, world units
     const SHAFT_HW = 0.005; // shaft ribbon half-width — the visible tail
-    const dim: [number, number, number] = [c[0] * 0.5, c[1] * 0.5, c[2] * 0.5];
+    // Comet shading between a bold HEAD and a TAIL that fades into the backdrop
+    // — inverted per theme. Dark: a dark tail → a bright head that glows on the
+    // black scene. Day: a light tail that dissolves into the white surface → a
+    // near-black head that stays bold on every colormap (the old mid-slate head
+    // washed out to gray on the light peaks — the "light/ugly head" bug).
+    const head: [number, number, number] = dark3d ? c : [0.12, 0.15, 0.21];
+    const tail: [number, number, number] = dark3d
+      ? [head[0] * 0.5, head[1] * 0.5, head[2] * 0.5]
+      : [head[0] + (1 - head[0]) * 0.66, head[1] + (1 - head[1]) * 0.66, head[2] + (1 - head[2]) * 0.66];
     const surfY = (x: number, z: number) => {
       const q = fromXZ(x, z);
       return heightAt(q.a, q.b) + LIFT + 0.003;
@@ -386,9 +394,13 @@
     const triVerts: number[] = [];
     const triCols: number[] = [];
     for (const ar of arrows) {
+      // Skip singular samples (e.g. Gaussian Peak's ∝1/β³ blow-up on β=0): an
+      // ∞/NaN mag makes dirVec normalize to NaN and len run to ∞, poisoning the
+      // arrow's vertices — the 3D twin of the 2D corner-streak bug.
+      if (!Number.isFinite(ar.mag) || ar.mag <= 1e-12) continue;
       const d = dirVec(-ar.ga, -ar.gb);
       if (!d) continue;
-      const norm = maxMag > 0 ? ar.mag / maxMag : 0;
+      const norm = maxMag > 0 ? Math.min(1, ar.mag / maxMag) : 0;
       const len = LEN * (0.12 + 0.88 * norm); // flat = tiny, steep = bold
       const x0 = toX(ar.a), z0 = toZ(ar.b);
       const xt = x0 + d.x * len, zt = z0 + d.z * len;
@@ -403,14 +415,14 @@
       const eLx = bx + px * SHAFT_HW, eLz = bz + pz * SHAFT_HW;
       const eRx = bx - px * SHAFT_HW, eRz = bz - pz * SHAFT_HW;
       triVerts.push(sLx, surfY(sLx, sLz), sLz, sRx, surfY(sRx, sRz), sRz, eLx, surfY(eLx, eLz), eLz);
-      triCols.push(dim[0], dim[1], dim[2], dim[0], dim[1], dim[2], c[0], c[1], c[2]);
+      triCols.push(tail[0], tail[1], tail[2], tail[0], tail[1], tail[2], head[0], head[1], head[2]);
       triVerts.push(eLx, surfY(eLx, eLz), eLz, sRx, surfY(sRx, sRz), sRz, eRx, surfY(eRx, eRz), eRz);
-      triCols.push(c[0], c[1], c[2], dim[0], dim[1], dim[2], c[0], c[1], c[2]);
+      triCols.push(head[0], head[1], head[2], tail[0], tail[1], tail[2], head[0], head[1], head[2]);
       // Solid triangle head: tip + two base corners, each draped to the surface.
       const lx = bx + px * hw, lz = bz + pz * hw;
       const rx = bx - px * hw, rz = bz - pz * hw;
       triVerts.push(xt, surfY(xt, zt), zt, lx, surfY(lx, lz), lz, rx, surfY(rx, rz), rz);
-      triCols.push(c[0], c[1], c[2], c[0], c[1], c[2], c[0], c[1], c[2]);
+      triCols.push(head[0], head[1], head[2], head[0], head[1], head[2], head[0], head[1], head[2]);
     }
     if (!triVerts.length) return;
     const geo = new THREE.BufferGeometry();
