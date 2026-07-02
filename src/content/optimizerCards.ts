@@ -154,7 +154,7 @@ export const optTree: OptChapter[] = [
     formula: String.raw`\mathbf{c} \leftarrow \beta_1 \mathbf{m} + (1{-}\beta_1)\nabla\mathcal{L}, \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \operatorname{sign}(\mathbf{c}), \;\; \mathbf{m} \leftarrow \beta_2 \mathbf{m} + (1{-}\beta_2)\nabla\mathcal{L}`,
     fix: 'fixed-size steps from one tiny buffer — light and fast',
     brk: 'the step never shrinks, so it orbits the minimum until $\\gamma$ is decayed by a schedule',
-    hd: 'Watch Lion’s red step arrow: with two knobs, $\\operatorname{sign}(\\mathbf c)$ can only point in <em>eight</em> directions — the axes and the four diagonals. That is the whole geometry of a sign step: it moves γ along every axis at once, so in $d$ dimensions its true length is $\\gamma\\sqrt{d}$ no matter how faint the gradient, and it can point far from steepest descent. At a billion parameters that $\\sqrt{d}$ is enormous — which is why Lion runs on a much smaller γ than Adam.'
+    hd: 'Watch Lion’s red step arrow: with two knobs, $\\operatorname{sign}(\\mathbf c)$ can only point in <em>eight</em> directions — the axes and the four diagonals. That is the whole geometry of a sign step: it moves $\\gamma$ along every axis at once, so in $d$ dimensions its true length is $\\gamma\\sqrt{d}$ no matter how faint the gradient, and it can point far from steepest descent. At a billion parameters that $\\sqrt{d}$ is enormous — which is why Lion runs on a much smaller $\\gamma$ than Adam.'
   },
   {
     act: { no: 'Branch', title: 'Use curvature', intro: 'A second fork goes the opposite way: instead of dropping information, it adds some. Every method so far reads only the <em>slope</em>; this branch also reads how the slope is <strong>bending</strong>.' },
@@ -180,7 +180,7 @@ export const optTree: OptChapter[] = [
     brk: 'only the diagonal: blind to the off-axis stretch Newton corrects'
   },
   {
-    act: { no: 'Branch', title: 'Tune itself', intro: 'The last fork aims at the one knob nothing has managed to remove. Even the adaptive methods still made you choose γ; this branch tries to read it straight off the problem.' },
+    act: { no: 'Branch', title: 'Tune itself', intro: 'The last fork aims at the one knob nothing has managed to remove. Even the adaptive methods still made you choose $\\gamma$; this branch tries to read it straight off the problem.' },
     year: '2024',
     name: 'Prodigy',
     by: 'Mishchenko & Defazio — the learning rate, removed',
