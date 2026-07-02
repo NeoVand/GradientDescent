@@ -30,6 +30,7 @@ import CoursePanel from './components/CoursePanel.svelte';
   } from './stores/stores';
   import { startTraining, stopTraining, stepOnce, resetRun, runEndStore, applyProblem } from './utils/trainer';
   import { applyUrlState, encodeStateUrl } from './utils/urlState';
+  import { enterCourseFromChapter, lessons } from './utils/lessons';
   import { Sun, Moon, Compass, Menu, Share2, GraduationCap, Maximize, Minimize, Play, Pause } from 'lucide-svelte';
 
   // The main app orchestrates all our components and manages the overall layout.
@@ -39,6 +40,8 @@ import CoursePanel from './components/CoursePanel.svelte';
   $: isTraining = $trainingStore.isTraining;
 
   let showHelpModal = false;
+  // A ch=<slug> deep link opens the guide scrolled to that chapter.
+  let helpInitialChapter: string | null = null;
   let drawerOpen = false;
 
   function closeDrawer() { drawerOpen = false; }
@@ -93,15 +96,24 @@ import CoursePanel from './components/CoursePanel.svelte';
     document.addEventListener('fullscreenchange', syncFs);
     document.addEventListener('webkitfullscreenchange', syncFs);
 
-    // A shared link restores the full scenario (settings + seed + marker)
+    // A shared link restores the full scenario (settings + seed + marker),
+    // and may carry navigation intents (guide chapter, course lesson, autorun).
     const shared = applyUrlState();
-    if (shared) {
+    if (shared?.lesson && lessons.some(l => l.id === shared.lesson)) {
+      // A lesson link: the lesson stages its own scenario; nothing to restore.
+      enterCourseFromChapter(shared.lesson);
+    } else if (shared?.scenario) {
+      const sc = shared.scenario;
       datasetStore.regenerateData();
-      parametersStore.set(shared.params);
+      parametersStore.set(sc.params);
       recordInitialHistory();
-      if (shared.goal) {
-        challengeStore.set({ target: shared.goal, status: 'open' });
-        showCoach('info', `🎯 Challenge loaded — reach the basin in ≤ ${shared.goal} steps. Tune anything you like, then Train.`, 0);
+      if (sc.goal) {
+        challengeStore.set({ target: sc.goal, status: 'open' });
+        showCoach('info', `🎯 Challenge loaded — reach the basin in ≤ ${sc.goal} steps. Tune anything you like, then Train.`, 0);
+      } else if (shared.run) {
+        // A living-figure link: run the staged scenario immediately. Defer a
+        // frame so every plot has mounted before the first step lands.
+        requestAnimationFrame(() => startTraining());
       } else {
         // Sticky: someone opening a shared link looks around before acting;
         // any training action clears it.
@@ -117,11 +129,19 @@ import CoursePanel from './components/CoursePanel.svelte';
       // First-time visitors get the product tour once, on desktop. The "seen"
       // flag is set when the tour starts (not when it finishes), so closing it
       // early never re-nags. Defer two frames so every plot anchor has mounted.
+      // Skipped when the link is about to open the guide on top of the app.
       let seenTour = true;
       try { seenTour = !!localStorage.getItem('gl-tour-seen'); } catch { /* private mode */ }
-      if (!seenTour && !isMobile()) {
+      if (!seenTour && !isMobile() && !shared?.chapter) {
         requestAnimationFrame(() => requestAnimationFrame(() => startTour()));
       }
+    }
+
+    // A chapter link opens the book right where the sender was reading —
+    // on top of whatever scenario (or fresh default) was just staged.
+    if (shared?.chapter) {
+      helpInitialChapter = shared.chapter;
+      showHelpModal = true;
     }
 
     return () => {
@@ -426,7 +446,11 @@ import CoursePanel from './components/CoursePanel.svelte';
 <CoursePanel />
 
 <!-- Help Modal (outside main) -->
-<HelpModal isOpen={showHelpModal} onClose={() => showHelpModal = false} />
+<HelpModal
+  isOpen={showHelpModal}
+  initialChapter={helpInitialChapter}
+  onClose={() => { showHelpModal = false; helpInitialChapter = null; }}
+/>
 
 <style>
   /* Reset and base styles */

@@ -49,6 +49,8 @@
 
   export let isOpen = false;
   export let onClose: () => void;
+  /** Open scrolled to this chapter slug (deep links); null = top of the book. */
+  export let initialChapter: string | null = null;
 
   // Tiny γ-vs-step previews for the scheduling chapter, sampled from the SAME
   // schedule factors the trainer uses, so the curves are honest.
@@ -144,14 +146,26 @@
     tocScrollTimer = setTimeout(() => { tocScrolling = false; }, 700);
   }
 
-  // Reset to the top whenever the book is opened.
+  // Opening the book: land at the top, or — for a chapter deep link — jump
+  // straight to that chapter (instantly, not smoothly: it's an arrival).
   let prevOpen = false;
   $: if (isOpen !== prevOpen) {
     prevOpen = isOpen;
     if (isOpen) {
-      activeId = 'ch-bowl';
+      const target = initialChapter && chapters.some(c => c.slug === initialChapter)
+        ? initialChapter
+        : chapters[0].slug;
+      activeId = target;
       progress = 0;
-      requestAnimationFrame(() => { if (bodyEl) { bodyEl.scrollTop = 0; onScroll(); } });
+      requestAnimationFrame(() => {
+        if (!bodyEl) return;
+        if (target === chapters[0].slug) {
+          bodyEl.scrollTop = 0;
+        } else {
+          bodyEl.querySelector(`section[data-ch="${target}"]`)?.scrollIntoView({ block: 'start' });
+        }
+        onScroll();
+      });
     }
   }
 
