@@ -1,0 +1,35 @@
+# Compiles the book from the same content the app renders. The PDF lands as
+# a workflow artifact on every push to main that touches content or the
+# emitter — the printed book can never drift from the live guide.
+name: book
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/content/**'
+      - 'scripts/emit-latex.ts'
+      - '.github/workflows/book.yml'
+  workflow_dispatch:
+
+jobs:
+  pdf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Emit LaTeX
+        run: npm run book:tex
+      - uses: wtfjoke/setup-tectonic@v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Compile PDF
+        run: tectonic book/gradient-lab.tex
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gradient-lab-pdf
+          path: book/gradient-lab.pdf
