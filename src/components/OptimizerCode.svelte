@@ -32,9 +32,12 @@
   async function highlight(isDark: boolean) {
     try {
       const { codeToHtml } = await import('shiki');
+      // Dark: vitesse-dark, blended into the card (transparent background).
+      // Day: github-light — crisp, high-contrast tokens on its own clean
+      // white panel, exactly how code reads best on a light page.
       html = await codeToHtml(source, {
         lang: 'typescript',
-        theme: isDark ? 'vitesse-dark' : 'vitesse-light'
+        theme: isDark ? 'vitesse-dark' : 'github-light'
       });
     } catch {
       html = null; // plain <pre> fallback below
@@ -65,7 +68,7 @@
   }
 </script>
 
-<div class="opt-code">
+<div class="opt-code" class:dark>
   <button class="copy-btn" class:copied on:click={copy} aria-label="Copy source">
     {#if copied}<Check size={13} strokeWidth={2.4} />{:else}<Copy size={13} strokeWidth={2} />{/if}
   </button>
@@ -108,18 +111,27 @@
     background: rgba(16, 185, 129, 0.5);
   }
 
-  /* Wrapped lines — no horizontal scrollbar, ever. */
+  /* Wrapped lines — no horizontal scrollbar, ever. The day theme keeps its
+     own white panel (code reads best on white); dark blends into the card. */
   .opt-code :global(pre) {
     margin: 0;
     padding: 0.8rem 2.4rem 0.8rem 1rem;
-    background: transparent !important;
     white-space: pre-wrap;
     word-break: break-word;
+  }
+  .opt-code.dark :global(pre) {
+    background: transparent !important;
   }
   .opt-code :global(code) {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     white-space: pre-wrap;
     word-break: break-word;
+    /* Neutralize the app's inline-code chip style (grey background +
+       padding) — inside a highlighted block it reads as a selection wash. */
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    font-size: inherit;
   }
   .opt-code-plain {
     color: var(--color-text-secondary);
