@@ -17,5 +17,8 @@
     "checkJs": true,
     "moduleDetection": "force"
   },
-  "include": ["src/**/*.ts", "src/**/*.js", "src/**/*.svelte"]
+  "include": ["src/**/*.ts", "src/**/*.js", "src/**/*.svelte"],
+  // Test files may use Node APIs (fs fixtures, process.env gates) that the
+  // browser-typed app config shouldn't see; vitest transforms them itself.
+  "exclude": ["src/**/*.test.ts"]
 }
