@@ -8,6 +8,7 @@
    * highlighter fails — the content is the point, the colours are a bonus.
    */
   import { onMount } from 'svelte';
+  import { Copy, Check } from 'lucide-svelte';
   import { themeStore } from '../stores/stores';
   import { optimizerSource } from '../optim/source';
 
@@ -15,12 +16,15 @@
 
   const source = optimizerSource(id) ?? '// source not found';
   let html: string | null = null;
+  let copied = false;
+  let copyTimer: ReturnType<typeof setTimeout> | undefined;
 
   $: dark = $themeStore === 'dark';
 
   let mounted = false;
   onMount(() => {
     mounted = true;
+    return () => clearTimeout(copyTimer);
   });
 
   $: if (mounted) highlight(dark);
@@ -36,37 +40,117 @@
       html = null; // plain <pre> fallback below
     }
   }
+
+  async function copy() {
+    let ok = false;
+    try {
+      await navigator.clipboard.writeText(source);
+      ok = true;
+    } catch {
+      // Permission-less fallback: a transient textarea + execCommand.
+      const ta = document.createElement('textarea');
+      ta.value = source;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { ok = document.execCommand('copy'); } catch { ok = false; }
+      ta.remove();
+    }
+    if (ok) {
+      copied = true;
+      clearTimeout(copyTimer);
+      copyTimer = setTimeout(() => (copied = false), 1600);
+    }
+  }
 </script>
 
 <div class="opt-code">
-  {#if html}
-    {@html html}
-  {:else}
-    <pre class="opt-code-plain">{source}</pre>
-  {/if}
+  <button class="copy-btn" class:copied on:click={copy} aria-label="Copy source">
+    {#if copied}<Check size={13} strokeWidth={2.4} />{:else}<Copy size={13} strokeWidth={2} />{/if}
+  </button>
+  <div class="opt-code-scroll">
+    {#if html}
+      {@html html}
+    {:else}
+      <pre class="opt-code-plain">{source}</pre>
+    {/if}
+  </div>
 </div>
 
 <style>
   .opt-code {
+    position: relative;
     margin-top: 0.5rem;
     border: 1px solid var(--color-border);
     border-radius: 10px;
-    overflow: auto;
-    max-height: 420px;
     font-size: 0.72rem;
     line-height: 1.55;
   }
+  .opt-code-scroll {
+    overflow-y: auto;
+    max-height: 420px;
+    border-radius: 10px;
+  }
+
+  /* House scrollbar: invisible until the reader hovers, emerald thumb. */
+  .opt-code-scroll::-webkit-scrollbar { width: 6px; }
+  .opt-code-scroll::-webkit-scrollbar-track { background: transparent; }
+  .opt-code-scroll::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 3px;
+    transition: background 0.25s ease;
+  }
+  .opt-code:hover .opt-code-scroll::-webkit-scrollbar-thumb {
+    background: rgba(16, 185, 129, 0.32);
+  }
+  .opt-code:hover .opt-code-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(16, 185, 129, 0.5);
+  }
+
+  /* Wrapped lines — no horizontal scrollbar, ever. */
   .opt-code :global(pre) {
     margin: 0;
-    padding: 0.8rem 1rem;
+    padding: 0.8rem 2.4rem 0.8rem 1rem;
     background: transparent !important;
-    white-space: pre;
+    white-space: pre-wrap;
+    word-break: break-word;
   }
   .opt-code :global(code) {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    white-space: pre-wrap;
+    word-break: break-word;
   }
   .opt-code-plain {
     color: var(--color-text-secondary);
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  .copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    color: var(--color-text-tertiary);
+    background: var(--color-bg-secondary, rgba(15, 23, 42, 0.7));
+    border: 1px solid var(--color-border);
+    border-radius: 7px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s ease, color 0.15s ease;
+  }
+  .opt-code:hover .copy-btn,
+  .copy-btn:focus-visible {
+    opacity: 1;
+  }
+  .copy-btn:hover { color: var(--color-text-primary); }
+  .copy-btn.copied {
+    color: #10b981;
+    opacity: 1;
   }
 </style>
