@@ -48,6 +48,10 @@ export type Block =
   | { kind: 'hd'; text: Rich }
   /** A figure: the id names an app-side (later: computed) visual; the caption lives here. */
   | { kind: 'figure'; id: string; caption: Rich }
+  /** The optimizer story cards for one family-tree chapter (data in optimizerCards.ts). */
+  | { kind: 'optcards'; chapter: string }
+  /** The dashed closing box — the frontier beyond the playground. */
+  | { kind: 'frontier'; title: string; text: Rich }
   /**
    * An interactive island with no print analogue of its own (the schedule
    * gallery, later the race) — the shell supplies it; print will use a

@@ -1026,7 +1026,82 @@
               {/if}
             {/snippet}
             {#snippet chFigure(id: string, cap: string)}
-              {#if id === 'downhill-proof'}
+              {#if id === 'ravine-heat'}
+                <figure class="fig">
+                  <div class="fig-viz">
+                <svg class="fig-heat" viewBox="0 0 {ravineFig.W} {ravineFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                  <defs>
+                    <clipPath id="ravine-clip"><rect x="0" y="0" width={ravineFig.W} height={ravineFig.H} /></clipPath>
+                    <clipPath id="ravine-contour-clip"><rect x="1.5" y="1.5" width={ravineFig.W - 3} height={ravineFig.H - 3} /></clipPath>
+                    <marker id="ravine-arrow" viewBox="0 -5 10 10" refX="7" refY="0" markerWidth="3.1" markerHeight="3.1" orient="auto"><path d="M0,-5L10,0L0,5" fill={gDark ? '#cdd9f2' : '#475569'} /></marker>
+                  </defs>
+                  <g clip-path="url(#ravine-clip)">
+                    <image href={ravHeat} x="0" y="0" width={ravineFig.W} height={ravineFig.H} preserveAspectRatio="none" />
+                    <g clip-path="url(#ravine-contour-clip)">
+                      <g transform="scale({ravineFig.W / ravineFig.gw}, {ravineFig.H / ravineFig.gh})">
+                        {#each ravCont as cp}
+                          <path d={cp.d} fill="none" stroke={gDark ? '#fff' : '#334155'} stroke-opacity={cp.o} stroke-width="1" vector-effect="non-scaling-stroke" />
+                        {/each}
+                      </g>
+                    </g>
+                    {#each ravArrows as a}<line x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} stroke={gDark ? '#cdd9f2' : '#475569'} stroke-width={a.w} opacity={a.o} marker-end="url(#ravine-arrow)" />{/each}
+                    <circle cx={ravineFig.min.x} cy={ravineFig.min.y} r="5" fill="none" stroke={gDark ? '#34d399' : '#059669'} stroke-width="1.8" stroke-dasharray="3,2.5" />
+                    <!-- halos (dark on the night heatmap, light on the day one) so the trajectories read over any colour -->
+                    <path d={ravineFig.gd} fill="none" stroke={gDark ? '#0a1218' : '#f8fafc'} stroke-opacity="0.55" stroke-width="3.8" stroke-linejoin="round" stroke-linecap="round" />
+                    <path d={ravineFig.mom} fill="none" stroke={gDark ? '#0a1218' : '#f8fafc'} stroke-opacity="0.55" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round" />
+                    <path d={ravineFig.gd} fill="none" stroke={gDark ? '#ffffff' : '#1e293b'} stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round" />
+                    <path d={ravineFig.mom} fill="none" stroke={gDark ? '#c084fc' : '#7c3aed'} stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" />
+                    {#each ravineFig.gdPts as p}<circle cx={p.x} cy={p.y} r="1.7" fill={gDark ? '#ffffff' : '#1e293b'} stroke={gDark ? '#0a1218' : '#f8fafc'} stroke-opacity="0.55" stroke-width="0.7" />{/each}
+                    {#each ravineFig.momPts as p}<circle cx={p.x} cy={p.y} r="2" fill={gDark ? '#c084fc' : '#7c3aed'} stroke={gDark ? '#0a1218' : '#f8fafc'} stroke-opacity="0.55" stroke-width="0.7" />{/each}
+                    <circle cx={ravineFig.start.x} cy={ravineFig.start.y} r="4.2" fill="#f59e0b" stroke={gDark ? '#fff' : '#1e293b'} stroke-width="1.3" />
+                    <g transform="translate(9,9)">
+                      <rect x="-4" y="-7" width="116" height="25" rx="5" fill={gDark ? '#ffffff' : '#0f172a'} fill-opacity={gDark ? 0.86 : 0.055} stroke="#0f172a" stroke-opacity="0.14" stroke-width="0.5" />
+                      <!-- GD swatch: white line on a dark halo in the night box; a plain dark line on the day box -->
+                      <line x1="1" y1="0" x2="12" y2="0" stroke="#0a1218" stroke-opacity={gDark ? 0.5 : 0} stroke-width="2.8" stroke-linecap="round" />
+                      <line x1="1" y1="0" x2="12" y2="0" stroke={gDark ? '#ffffff' : '#1e293b'} stroke-width="1.6" stroke-linecap="round" />
+                      <text x="16" y="2.4" class="fig-svg-label" style="text-anchor:start;fill:#1e293b;font-size:8.5px">plain GD — zig-zags</text>
+                      <line x1="1" y1="11" x2="12" y2="11" stroke="#a855f7" stroke-width="2.1" stroke-linecap="round" />
+                      <text x="16" y="13.4" class="fig-svg-label" style="text-anchor:start;fill:#1e293b;font-size:8.5px">momentum — glides</text>
+                    </g>
+                  </g>
+                </svg>
+                <GuideVizLayers state={ravineViz} onpatch={(p) => (ravineViz = { ...ravineViz, ...p })} />
+                <div class="fig-cbar">
+                  <span class="fig-cbar-lbl">loss</span>
+                  <span class="fig-cbar-val">{ravineFig.visMax.toFixed(2)}</span>
+                  <div class="fig-cbar-bar" style="background: linear-gradient(to bottom, {colormapStops(ravineViz.colormap, 8, gTheme)});"></div>
+                  <span class="fig-cbar-val">{ravineFig.visMin.toFixed(2)}</span>
+                </div>
+                </div>
+                  <figcaption class="fig-cap">{@html cap}</figcaption>
+                </figure>
+              {:else if id === 'family-tree'}
+                <figure class="fig fig-tree">
+                  <svg viewBox="0 0 {familyTree.W} {familyTree.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                  <defs>
+                    {#each familyTree.edges as e, i}
+                      <linearGradient id="tree-edge-{i}" gradientUnits="userSpaceOnUse" x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2}>
+                        <stop offset="0%" stop-color={e.c0} />
+                        <stop offset="100%" stop-color={e.c1} />
+                      </linearGradient>
+                    {/each}
+                  </defs>
+                  {#each familyTree.merges as m}
+                    <path d={m.d} class="tree-merge" />
+                  {/each}
+                  {#each familyTree.edges as e, i}
+                    <path d={e.d} class="tree-branch" stroke="url(#tree-edge-{i})" stroke-width={e.w} />
+                  {/each}
+                  {#each familyTree.nodes as n (n.id)}
+                    <g transform="translate({n.x.toFixed(1)},{n.y.toFixed(1)})">
+                      <circle r={n.root ? 6.5 : 5} fill={n.color} stroke="#fff" stroke-width="1.4" />
+                      <text class="tree-label" x="0" y="-10">{n.name}</text>
+                    </g>
+                  {/each}
+                </svg>
+                  <figcaption class="fig-cap">{@html cap}</figcaption>
+                </figure>
+              {:else if id === 'downhill-proof'}
                 <figure class="proof-fig">
                   <svg viewBox="0 0 420 156" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
                     <defs>
@@ -1084,7 +1159,36 @@
                 </figure>
               {:else}
               <figure class="fig">
-                {#if id === 'derivative-secant'}
+                {#if id === 'noise-ball'}
+                  <svg viewBox="0 0 460 150" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                  {#each [62, 42, 24] as rr, i}
+                    <ellipse cx="112" cy="74" rx={rr} ry={rr * 0.8} class="fig-contour" style="stroke-opacity:{0.1 + i * 0.05}" />
+                  {/each}
+                  {#each noiseBall.big as d}<circle cx={d.x} cy={d.y} r={d.r} fill="#f59e0b" opacity="0.5" />{/each}
+                  <circle cx="112" cy="74" r="3.5" fill="#10b981" stroke="#fff" stroke-width="1" />
+                  {#each [62, 42, 24] as rr, i}
+                    <ellipse cx="348" cy="74" rx={rr} ry={rr * 0.8} class="fig-contour" style="stroke-opacity:{0.1 + i * 0.05}" />
+                  {/each}
+                  {#each noiseBall.small as d}<circle cx={d.x} cy={d.y} r={d.r} fill="#10b981" opacity="0.55" />{/each}
+                  <circle cx="348" cy="74" r="3.5" fill="#10b981" stroke="#fff" stroke-width="1" />
+                  <text x="112" y="142" class="fig-svg-label">large γ — wide noise ball</text>
+                  <text x="348" y="142" class="fig-svg-label">γ → 0 — the ring closes in</text>
+                </svg>
+                {:else if id === 'generalize-curves'}
+                  <svg viewBox="0 0 {genFig.W} {genFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                  <line x1={genFig.padL} y1={genFig.yBase} x2={genFig.x1} y2={genFig.yBase} class="fig-contour" style="stroke-opacity:0.35" />
+                  <line x1={genFig.padL} y1={genFig.padT} x2={genFig.padL} y2={genFig.yBase} class="fig-contour" style="stroke-opacity:0.35" />
+                  <line x1={genFig.stop.x} y1={genFig.stop.yTop} x2={genFig.stop.x} y2={genFig.yBase} stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="3,3" stroke-opacity="0.65" />
+                  <path d={genFig.testD} fill="none" stroke="#f59e0b" stroke-width="2.3" stroke-linecap="round" />
+                  <path d={genFig.trainD} fill="none" stroke="#10b981" stroke-width="2.3" stroke-linecap="round" />
+                  <circle cx={genFig.stop.x} cy={genFig.stop.y} r="3.6" fill="#f59e0b" stroke="#fff" stroke-width="1.2" />
+                  <text x={genFig.testEnd.x - 4} y={genFig.testEnd.y + 2} class="fig-svg-label" style="text-anchor:end;fill:#f59e0b">test loss</text>
+                  <text x={genFig.trainEnd.x - 4} y={genFig.trainEnd.y - 7} class="fig-svg-label" style="text-anchor:end;fill:#10b981">training loss</text>
+                  <text x={genFig.stop.x} y={genFig.stop.yTop - 3} class="fig-svg-label" style="fill:var(--color-text-tertiary)">early stop</text>
+                  <text x={genFig.padL - 6} y={genFig.padT + 4} class="fig-svg-label" style="text-anchor:end;fill:var(--color-text-tertiary)">loss</text>
+                  <text x={genFig.x1} y={genFig.yBase + 18} class="fig-svg-label" style="text-anchor:end;fill:var(--color-text-tertiary)">training time →</text>
+                </svg>
+                {:else if id === 'derivative-secant'}
                   <svg viewBox="0 0 {secantFig.W} {secantFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
                   <defs>
                     <marker id="sweep-head" viewBox="0 -4 8 8" refX="6.5" refY="0" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,-2.8 L6.5,0 L0,2.8" fill="none" stroke="var(--color-text-tertiary)" stroke-width="1.1" /></marker>
@@ -1225,7 +1329,91 @@
               {/if}
             {/snippet}
             {#snippet chWidget(id: string)}
-              {#if id === 'schedule-grid'}
+              {#if id === 'ravine-race'}
+                <figure class="race-demo">
+                <div class="race-player">
+                  <button type="button" class="race-pbtn" on:click={toggleRacePlay} aria-label={racePlaying ? 'Pause race' : 'Play race'} title={racePlaying ? 'Pause' : 'Play'}>
+                    {#if racePlaying}<Pause size={14} strokeWidth={2.5} />{:else}<Play size={14} strokeWidth={2.5} />{/if}
+                  </button>
+                  <button type="button" class="race-pbtn" on:click={resetRace} aria-label="Restart race" title="Restart">
+                    <RotateCcw size={14} strokeWidth={2.5} />
+                  </button>
+                </div>
+                <svg bind:this={raceSvg} viewBox="0 0 {RACE_W} {RACE_H}" preserveAspectRatio="xMidYMid meet">
+                  <defs>
+                    <clipPath id="race-clip"><rect x="0" y="0" width={RACE_W} height={RACE_H} /></clipPath>
+                    <!-- Contours close along the grid edge; clip them a hair inside
+                         the frame so those boundary segments don't draw a white box. -->
+                    <clipPath id="race-contour-clip"><rect x="1.5" y="1.5" width={RACE_W - 3} height={RACE_H - 3} /></clipPath>
+                    <marker id="race-arrow" viewBox="0 -5 10 10" refX="7" refY="0" markerWidth="3.1" markerHeight="3.1" orient="auto"><path d="M0,-5L10,0L0,5" fill={gDark ? '#cdd9f2' : '#475569'} /></marker>
+                    <linearGradient id="race-cbar" x1="0" y1="0" x2="0" y2="1">
+                      {#each cmapStopColors(raceViz.colormap, 8, gTheme) as col, i}<stop offset={i / 8} stop-color={col} />{/each}
+                    </linearGradient>
+                  </defs>
+                  <g clip-path="url(#race-clip)">
+                    <image href={raceHeat} x="0" y="0" width={RACE_W} height={RACE_H} preserveAspectRatio="none" />
+                    <g clip-path="url(#race-contour-clip)">
+                      <g transform="scale({RACE_W / raceDemo.gw}, {RACE_H / raceDemo.gh})">
+                        {#each raceCont as cp}
+                          <path d={cp.d} fill="none" stroke={gDark ? '#fff' : '#334155'} stroke-opacity={cp.o} stroke-width="1" vector-effect="non-scaling-stroke" />
+                        {/each}
+                      </g>
+                    </g>
+                    {#each raceArrows as a}<line x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} stroke={gDark ? '#cdd9f2' : '#475569'} stroke-width={a.w} opacity={a.o} marker-end="url(#race-arrow)" />{/each}
+                    {#each raceDemo.racers as r (r.id)}
+                      {@const hot = raceHover === r.id}
+                      {@const dim = raceHover !== null && !hot}
+                      <path d={r.d} fill="none" stroke={r.color} stroke-width={hot ? 3 : 1.7} stroke-linecap="round" stroke-linejoin="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" opacity={hot ? 1 : !raceOn[r.id] ? 0 : dim ? 0.13 : 0.9} style="transition: opacity 0.15s ease, stroke-width 0.15s ease; filter: {gDark ? 'none' : 'drop-shadow(0 0 0.7px rgba(15,23,42,0.85))'};">
+                        <animate attributeName="stroke-dashoffset" values="100;0;0" keyTimes="0;{r.frac};1" dur="7s" repeatCount="indefinite" />
+                      </path>
+                    {/each}
+                    <circle cx={raceDemo.min[0]} cy={raceDemo.min[1]} r="7" fill="none" stroke={gDark ? '#10b981' : '#059669'} stroke-width="1.5" stroke-dasharray="3,2.5" />
+                    <circle cx={raceDemo.start[0]} cy={raceDemo.start[1]} r="8" fill="none" stroke="#f59e0b" stroke-width="1.75" opacity="0.9" />
+                    <circle cx={raceDemo.start[0]} cy={raceDemo.start[1]} r="4.5" fill="#f59e0b" stroke={gDark ? '#fff' : '#1e293b'} stroke-width="1.5" />
+                    {#each raceDemo.racers as r (r.id)}
+                      {@const hot = raceHover === r.id}
+                      {@const dim = raceHover !== null && !hot}
+                      <circle r={hot ? 4.6 : 3.2} fill={r.color} stroke={gDark ? '#fff' : '#0f172a'} stroke-width="1.25" opacity={hot ? 1 : !raceOn[r.id] ? 0 : dim ? 0.13 : 1} style="transition: opacity 0.15s ease;">
+                        <animateMotion path={r.d} keyPoints="0;1;1" keyTimes="0;{r.frac};1" calcMode="linear" dur="7s" repeatCount="indefinite" />
+                      </circle>
+                    {/each}
+                    <!-- loss colorbar (bottom-right, in viewBox coords) -->
+                    <g>
+                      <rect x="439" y="164" width="7" height="50" rx="2" fill="url(#race-cbar)" stroke={gDark ? 'rgba(255,255,255,0.32)' : 'rgba(15,23,42,0.35)'} stroke-width="0.5" />
+                      <text x="442.5" y="159" class="fig-svg-label" style="fill:{gDark ? '#fff' : '#1e293b'};stroke:{gDark ? '#0a1218' : '#fff'};stroke-width:2.4;paint-order:stroke;font-size:8px">{raceDemo.visMax.toFixed(0)}</text>
+                      <text x="442.5" y="224" class="fig-svg-label" style="fill:{gDark ? '#fff' : '#1e293b'};stroke:{gDark ? '#0a1218' : '#fff'};stroke-width:2.4;paint-order:stroke;font-size:8px">{raceDemo.visMin.toFixed(1)}</text>
+                    </g>
+                  </g>
+                </svg>
+                <GuideVizLayers state={raceViz} onpatch={(p) => (raceViz = { ...raceViz, ...p })} />
+                <div class="race-legend">
+                  {#each raceDemo.racers as r (r.id)}
+                    <button
+                      type="button"
+                      class="race-chip"
+                      class:off={!raceOn[r.id]}
+                      class:hot={raceHover === r.id}
+                      on:click={() => toggleRacer(r.id)}
+                      on:mouseenter={() => (raceHover = r.id)}
+                      on:mouseleave={() => (raceHover = null)}
+                      on:focus={() => (raceHover = r.id)}
+                      on:blur={() => (raceHover = null)}
+                    >
+                      <span class="race-swatch" style="--sw:{r.color}"></span>
+                      <span class="race-cname">{r.name}</span>
+                      <span class="race-steps">{r.steps}{r.converged ? '' : '+'}</span>
+                    </button>
+                  {/each}
+                </div>
+                <figcaption class="race-caption">
+                  All {raceDemo.racers.length} optimizers, same start, same ravine — each running its real
+                  update rule, the dots arriving in their true step counts. Click a name to toggle it,
+                  hover to spotlight one. Watch the contrasts: Newton nearly teleports, GD rattles wall to
+                  wall, Momentum glides past it, and RAdam’s self-warmup keeps it cautious to the end. Use
+                  the play / restart controls to watch it again.
+                </figcaption>
+              </figure>
+              {:else if id === 'schedule-grid'}
                 <div class="schedule-grid">
                 {#each scheduleCurves as s (s.id)}
                   <div class="schedule-card">
@@ -1301,227 +1489,14 @@
             <section data-ch="ch-noise" id="ch-noise">
               <div class="part-label">Part III · Descent in the real world</div>
               <h3><svelte:component this={chIcon['ch-noise']} size={18} strokeWidth={2} /> Mini-batches &amp; the S in SGD</h3>
-              <p>
-                Every gradient so far has been the <strong>true</strong> one — measured on all your
-                data at once. That is <strong>full-batch</strong> descent: the <strong>Batch
-                size</strong> dial set to <em>All</em>. It gives the cleanest possible arrow, and it
-                is the most expensive thing you can do, because every single step has to read every
-                single data point.
-              </p>
-              <p>
-                Real datasets are far too large for that, so instead you <em>estimate</em> the
-                gradient from a small random <strong>batch</strong> — a handful of points, freshly
-                resampled each step. The arrow you get back is <strong>noisy</strong>: it jitters
-                around the true downhill, because a different handful would have pulled in a slightly
-                different direction. But it is cheap, and — this is the quiet miracle that makes modern
-                training possible — it still points the right way <em>on average</em>. Averaging your
-                way downhill through that noise is the <strong>S</strong> (stochastic) in
-                <strong>SGD</strong>, stochastic gradient descent. (Two words of vocabulary while we are
-                here: one batch update is an <strong>iteration</strong> or step; one full sweep through
-                the whole dataset is an <strong>epoch</strong>.)
-              </p>
-              <p>
-                Slide the <strong>Batch size</strong> down from <em>All</em> toward <em>1</em> and a
-                faint <strong>fan</strong> of arrows opens at the marker: each ray is the gradient a
-                different random batch would have handed you, so the <em>width of the fan is the noise
-                itself.</em> The fewer points in the batch, the wider it spreads — and it spreads in a
-                very specific way — the same law that steadies dice: average four rolls and the
-                result wobbles about half as much as a single roll. The error of an average
-                shrinks only with the <em>square root</em>
-                of how many samples go into it, so a batch of 4 is roughly twice as steady as a batch
-                of 1, and you need 16 to halve the noise again. That is the law of diminishing returns
-                behind every batch-size choice: a batch of 32 already looks almost as calm as the full
-                dataset, for a fraction of the cost.
-              </p>
-              <aside class="hd-note">
-                <span class="hd-note-tag">In a billion dimensions</span>
-                <p>
-                  At scale this √n law becomes an economic one. The useful ratio is noise to
-                  signal: below a problem-specific <em>critical batch size</em>, doubling the batch
-                  lets you (roughly) double {@html tex(String.raw`\gamma`)} for the same trajectory — the linear-scaling rule
-                  behind giant training runs; above it, extra data per step buys calm the run no
-                  longer needs (Goyal et al., 2017; McCandlish et al., 2018). Bigger is not better —
-                  bigger is <em>quieter</em>, and quiet has a price and a ceiling.
-                </p>
-              </aside>
-              <p>
-                And the noise is not pure cost. A little jitter is genuinely <strong>useful</strong>: a
-                noisy step can rattle the marker out of a shallow dip or a flat saddle that a perfectly
-                smooth step would have settled into and never left, and the constant restlessness tends
-                to steer a run toward <em>wide, gentle</em> basins — the forgiving kind that generalize
-                to new data — rather than narrow, brittle cracks. This is why a touch of stochasticity
-                is often kept on purpose, even when the full gradient is affordable.
-              </p>
-              <aside class="hd-note">
-                <span class="hd-note-tag">In a billion dimensions</span>
-                <p>
-                  The fan tells the truth in 2-D, but up there it would look strange: two random
-                  directions among a million axes are almost always nearly <em>perpendicular</em> —
-                  there are countless ways to be orthogonal and only one way to agree. So gradient
-                  noise mostly pushes <em>sideways</em>, at right angles to the true downhill,
-                  rather than backwards against it. A noisy run drifts and wanders far more than it
-                  backtracks — one reason SGD keeps making progress even when individual arrows
-                  look hopeless.
-                </p>
-              </aside>
-              <p>
-                The bill comes due at the <em>end</em>. Because the gradient never goes quiet, SGD never
-                fully stops: near the bottom it stops descending and starts <strong>orbiting</strong>,
-                buzzing around the minimum inside a small <strong>noise ball</strong> whose radius grows
-                with both the step size {@html tex(String.raw`\gamma`)} and the width of the fan. On the loss curve it shows up as a
-                fuzzy <em>band</em> rather than a clean line that flatlines — the run has arrived, but it
-                can’t hold still. This is where the <strong>schedule</strong> from the last chapter earns
-                its keep: a {@html tex(String.raw`\gamma`)} bled toward zero draws that ball in tight, turning the restless buzz into a
-                soft landing. Under noise, decay isn’t a luxury — it is <em>how a stochastic run converges
-                at all.</em>
-              </p>
-              <figure class="fig">
-                <svg viewBox="0 0 460 150" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                  {#each [62, 42, 24] as rr, i}
-                    <ellipse cx="112" cy="74" rx={rr} ry={rr * 0.8} class="fig-contour" style="stroke-opacity:{0.1 + i * 0.05}" />
-                  {/each}
-                  {#each noiseBall.big as d}<circle cx={d.x} cy={d.y} r={d.r} fill="#f59e0b" opacity="0.5" />{/each}
-                  <circle cx="112" cy="74" r="3.5" fill="#10b981" stroke="#fff" stroke-width="1" />
-                  {#each [62, 42, 24] as rr, i}
-                    <ellipse cx="348" cy="74" rx={rr} ry={rr * 0.8} class="fig-contour" style="stroke-opacity:{0.1 + i * 0.05}" />
-                  {/each}
-                  {#each noiseBall.small as d}<circle cx={d.x} cy={d.y} r={d.r} fill="#10b981" opacity="0.55" />{/each}
-                  <circle cx="348" cy="74" r="3.5" fill="#10b981" stroke="#fff" stroke-width="1" />
-                  <text x="112" y="142" class="fig-svg-label">large γ — wide noise ball</text>
-                  <text x="348" y="142" class="fig-svg-label">γ → 0 — the ring closes in</text>
-                </svg>
-                <figcaption class="fig-cap">
-                  Under noisy gradients the run never quite stops — it orbits the minimum in a cloud whose
-                  radius grows with {@html tex(String.raw`\gamma`)} (left). Bleed {@html tex(String.raw`\gamma`)} toward zero and the cloud draws in to a point (right):
-                  the schedule, doing its quiet job.
-                </figcaption>
-              </figure>
-              <p class="look">
-                Watch it: set a small <strong>Batch size</strong> so the loss settles into a fuzzy band on
-                <strong>Const</strong>, then switch the schedule to <strong>Cosine</strong> and see the
-                band pinch shut over the final steps.
-              </p>
-              <ChapterCta
-                lessonId={chLesson['ch-noise']}
-                onLesson={() => startLessonFromChapter('ch-noise')}
-                demo={chapterPresets['ch-noise'] ? () => runPreset('ch-noise') : null}
-              />
-              {#if chRefs['ch-noise']}
-                <div class="ch-refs">
-                  <span class="ch-refs-label">Further reading</span>
-                  {#each chRefs['ch-noise'] as r}
-                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
-                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
-                      {r.label}
-                    </a>
-                  {/each}
-                </div>
-              {/if}
+              <GuideBlocks slug="ch-noise" blocks={chapterBlocks['ch-noise']} figure={chFigure} {conceptFig} widget={chWidget} cards={chCards} onPreset={runPreset} onLesson={startLessonFromChapter} />
             </section>
 
             <!-- ============== 8 · THE OPTIMIZER STORY ============== -->
             <!-- ============== TRAINING LOSS ISN'T THE GOAL ============== -->
             <section data-ch="ch-generalize" id="ch-generalize">
               <h3><svelte:component this={chIcon['ch-generalize']} size={18} strokeWidth={2} /> Training loss isn’t the goal</h3>
-
-              <p>
-                Every chapter so far has worked to drive the <em>training</em> loss down. But that number
-                is only a stand-in for what we actually want. We don’t care about fitting the data we
-                already have — we care about predicting data we <strong>haven’t seen</strong>. Doing well
-                on new data is <strong>generalization</strong>, and it is the whole point.
-              </p>
-              <p>
-                The loss we minimize is the average error over the training set — the <strong>empirical
-                risk</strong> — but the real target is the average error over <em>all</em> future data,
-                the <strong>true risk</strong>. With limited or noisy data the two come apart. Push the
-                training loss too low and the model starts memorizing the quirks and noise of <em>this</em>
-                sample: training loss keeps falling while error on held-out data turns and climbs. That
-                divergence is <strong>overfitting</strong>.
-              </p>
-
-              <figure class="fig">
-                <svg viewBox="0 0 {genFig.W} {genFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                  <line x1={genFig.padL} y1={genFig.yBase} x2={genFig.x1} y2={genFig.yBase} class="fig-contour" style="stroke-opacity:0.35" />
-                  <line x1={genFig.padL} y1={genFig.padT} x2={genFig.padL} y2={genFig.yBase} class="fig-contour" style="stroke-opacity:0.35" />
-                  <line x1={genFig.stop.x} y1={genFig.stop.yTop} x2={genFig.stop.x} y2={genFig.yBase} stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="3,3" stroke-opacity="0.65" />
-                  <path d={genFig.testD} fill="none" stroke="#f59e0b" stroke-width="2.3" stroke-linecap="round" />
-                  <path d={genFig.trainD} fill="none" stroke="#10b981" stroke-width="2.3" stroke-linecap="round" />
-                  <circle cx={genFig.stop.x} cy={genFig.stop.y} r="3.6" fill="#f59e0b" stroke="#fff" stroke-width="1.2" />
-                  <text x={genFig.testEnd.x - 4} y={genFig.testEnd.y + 2} class="fig-svg-label" style="text-anchor:end;fill:#f59e0b">test loss</text>
-                  <text x={genFig.trainEnd.x - 4} y={genFig.trainEnd.y - 7} class="fig-svg-label" style="text-anchor:end;fill:#10b981">training loss</text>
-                  <text x={genFig.stop.x} y={genFig.stop.yTop - 3} class="fig-svg-label" style="fill:var(--color-text-tertiary)">early stop</text>
-                  <text x={genFig.padL - 6} y={genFig.padT + 4} class="fig-svg-label" style="text-anchor:end;fill:var(--color-text-tertiary)">loss</text>
-                  <text x={genFig.x1} y={genFig.yBase + 18} class="fig-svg-label" style="text-anchor:end;fill:var(--color-text-tertiary)">training time →</text>
-                </svg>
-                <figcaption class="fig-cap">
-                  Training loss (green) keeps falling; test loss (amber), measured on held-out data, bottoms
-                  out and then rises as the model begins fitting noise. The dip is where you’d want to stop.
-                </figcaption>
-              </figure>
-
-              <p>
-                Two fixes follow directly. The first is to <em>measure</em> the gap: hold out part of the
-                data as a <strong>test</strong> (or validation) set, and watch its loss alongside the
-                training loss — that is the second curve in the <strong>Loss History</strong> panel. The
-                second is <strong>early stopping</strong>: end training at the test-loss minimum rather
-                than the training-loss minimum. It is the simplest regularizer there is, and — for a
-                run started near zero — in the quadratic case it is provably close to an explicit
-                weight penalty (Bishop, 1995; Goodfellow et al., 2016, §7.8).
-              </p>
-              <p>
-                That penalty is <strong>regularization</strong>: instead of minimizing the loss alone, add
-                a term that prefers smaller, simpler parameters,
-              </p>
-              <div class="formula-display center">{@html texD(String.raw`\min_{\boldsymbol{\theta}}\;\; \mathcal{L}(\boldsymbol{\theta}) \;+\; \tfrac{\lambda}{2}\,\lVert \boldsymbol{\theta}\rVert^2`)}</div>
-              <p>
-                where {@html tex(String.raw`\lambda`)} sets how hard to pull toward zero. (An unrelated
-                {@html tex(String.raw`\lambda`)}, by the way — not the curvature
-                {@html tex(String.raw`\lambda_{\max}`)} from the learning-rate chapter. The alphabet is
-                small and the field is greedy.) For plain SGD the
-                gradient of that penalty is exactly <strong>weight decay</strong> —
-                {@html tex(String.raw`\boldsymbol{\theta} \leftarrow (1-\gamma\lambda)\,\boldsymbol{\theta} - \gamma\nabla\mathcal{L}`)}
-                — shrinking every weight a touch each step (Krogh &amp; Hertz, 1991). Keep this
-                {@html tex(String.raw`\lambda`)} in mind: you will meet it again on
-                <strong>AdamW</strong> in the family tree, which decouples the decay from the
-                adaptive scaling so it behaves like a true penalty again.
-              </p>
-              <p>
-                Geometry has the last word, and it loops back to the noise chapter. Not all minima
-                generalize equally: a <em>wide, flat</em> basin is forgiving — small shifts in the data
-                barely move the loss — while a <em>sharp</em> one is brittle. Flat minima tend to
-                generalize better (Hochreiter &amp; Schmidhuber, 1997), the restless noise of small-batch
-                SGD tends to settle into them, and very large batches tend to find sharper minima with a
-                measurable generalization gap (Keskar et al., 2017). So the real target was never the exact
-                bottom of the training bowl — it is a low, <em>wide</em> region that also sits low on data
-                you will never see. Optimization gets you down; generalization decides whether down was
-                worth reaching.
-              </p>
-              <aside class="hd-note">
-                <span class="hd-note-tag">In a billion dimensions</span>
-                <p>
-                  Two honest asterisks on this tidy story. First, “flat” is slippery: a network can
-                  be rescaled — same function, same predictions — while its measured sharpness
-                  changes arbitrarily, so naive flatness can’t be the whole answer (Dinh et al.,
-                  2017). Second, at scale good minima aren’t isolated dips like the ones drawn
-                  here: they connect into long low-loss valleys you can walk between without
-                  climbing (Garipov et al., 2018). The intuition survives — restless SGD prefers
-                  forgiving regions — but hold it as a compass, not a theorem.
-                </p>
-              </aside>
-              {#if chapterPresets['ch-generalize']}
-                <ChapterCta demo={() => runPreset('ch-generalize')} demoLabel={chapterPresets['ch-generalize'].title} />
-              {/if}
-              {#if chRefs['ch-generalize']}
-                <div class="ch-refs">
-                  <span class="ch-refs-label">Further reading</span>
-                  {#each chRefs['ch-generalize'] as r}
-                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
-                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
-                      {r.label}
-                    </a>
-                  {/each}
-                </div>
-              {/if}
+              <GuideBlocks slug="ch-generalize" blocks={chapterBlocks['ch-generalize']} figure={chFigure} {conceptFig} widget={chWidget} cards={chCards} onPreset={runPreset} onLesson={startLessonFromChapter} />
             </section>
 
             <!-- One optimizer story card (+ its act header, lead and asides).
@@ -1632,318 +1607,42 @@
                 {/if}
             {/snippet}
 
+            {#snippet chCards(chapter: string)}
+              {#each optTree.filter((o) => o.chapter === chapter) as c (c.name)}
+                {@render optCard(c)}
+              {/each}
+            {/snippet}
+
             <!-- ============== PART IV · THE OPTIMIZER FAMILY TREE ============== -->
             <section data-ch="ch-ravine" id="ch-ravine">
               <div class="part-label">Part IV · The optimizer family tree</div>
               <h3><svelte:component this={chIcon['ch-ravine']} size={18} strokeWidth={2} /> The ravine, and the race</h3>
-              <p>
-                Plain gradient descent has one recurring nemesis: the <strong>ravine</strong> — a
-                valley far steeper across than along. The {@html tex(String.raw`\gamma`)} that’s safe on the steep walls is
-                hopeless along the gentle floor, so the marker rattles wall to wall. Every optimizer
-                in the picker is a patch for that pain (or the new pain the last patch created) —
-                170 years of <em>fix what just broke</em>: a single trunk of fixes that, once it
-                reaches Adam, finally splits into the branches still being explored today. The
-                picker is grouped to match.
-              </p>
-              <p>
-                That ravine has a precise name: <strong>ill-conditioning</strong>. A smooth bowl curves
-                at two rates — gently along its floor ({@html tex(String.raw`\lambda_{\min}`)}) and
-                steeply across it ({@html tex(String.raw`\lambda_{\max}`)}) — and their ratio is the
-                <strong>condition number</strong> {@html tex(String.raw`\kappa = \lambda_{\max}/\lambda_{\min}`)}.
-                A round bowl has {@html tex(String.raw`\kappa = 1`)} and one good step reaches the bottom;
-                a long, thin ravine has a huge {@html tex(String.raw`\kappa`)}, and that one number sets
-                how slowly you converge. Even with the best fixed step,
-                {@html tex(String.raw`\gamma = 2/(\lambda_{\min}+\lambda_{\max})`)}, each move closes the
-                gap to the minimum by only a factor {@html tex(String.raw`(\kappa-1)/(\kappa+1)`)} — which
-                creeps toward 1 as {@html tex(String.raw`\kappa`)} grows, so a stretched valley crawls no
-                matter how you tune {@html tex(String.raw`\gamma`)}. Momentum sharpens that to roughly
-                {@html tex(String.raw`(\sqrt{\kappa}-1)/(\sqrt{\kappa}+1)`)}, a
-                {@html tex(String.raw`\sqrt{\kappa}`)} speed-up — the first hint of why the whole family
-                below exists.
-              </p>
-              <figure class="fig">
-                <div class="fig-viz">
-                <svg class="fig-heat" viewBox="0 0 {ravineFig.W} {ravineFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                  <defs>
-                    <clipPath id="ravine-clip"><rect x="0" y="0" width={ravineFig.W} height={ravineFig.H} /></clipPath>
-                    <clipPath id="ravine-contour-clip"><rect x="1.5" y="1.5" width={ravineFig.W - 3} height={ravineFig.H - 3} /></clipPath>
-                    <marker id="ravine-arrow" viewBox="0 -5 10 10" refX="7" refY="0" markerWidth="3.1" markerHeight="3.1" orient="auto"><path d="M0,-5L10,0L0,5" fill={gDark ? '#cdd9f2' : '#475569'} /></marker>
-                  </defs>
-                  <g clip-path="url(#ravine-clip)">
-                    <image href={ravHeat} x="0" y="0" width={ravineFig.W} height={ravineFig.H} preserveAspectRatio="none" />
-                    <g clip-path="url(#ravine-contour-clip)">
-                      <g transform="scale({ravineFig.W / ravineFig.gw}, {ravineFig.H / ravineFig.gh})">
-                        {#each ravCont as cp}
-                          <path d={cp.d} fill="none" stroke={gDark ? '#fff' : '#334155'} stroke-opacity={cp.o} stroke-width="1" vector-effect="non-scaling-stroke" />
-                        {/each}
-                      </g>
-                    </g>
-                    {#each ravArrows as a}<line x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} stroke={gDark ? '#cdd9f2' : '#475569'} stroke-width={a.w} opacity={a.o} marker-end="url(#ravine-arrow)" />{/each}
-                    <circle cx={ravineFig.min.x} cy={ravineFig.min.y} r="5" fill="none" stroke={gDark ? '#34d399' : '#059669'} stroke-width="1.8" stroke-dasharray="3,2.5" />
-                    <!-- halos (dark on the night heatmap, light on the day one) so the trajectories read over any colour -->
-                    <path d={ravineFig.gd} fill="none" stroke={gDark ? '#0a1218' : '#f8fafc'} stroke-opacity="0.55" stroke-width="3.8" stroke-linejoin="round" stroke-linecap="round" />
-                    <path d={ravineFig.mom} fill="none" stroke={gDark ? '#0a1218' : '#f8fafc'} stroke-opacity="0.55" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round" />
-                    <path d={ravineFig.gd} fill="none" stroke={gDark ? '#ffffff' : '#1e293b'} stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round" />
-                    <path d={ravineFig.mom} fill="none" stroke={gDark ? '#c084fc' : '#7c3aed'} stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" />
-                    {#each ravineFig.gdPts as p}<circle cx={p.x} cy={p.y} r="1.7" fill={gDark ? '#ffffff' : '#1e293b'} stroke={gDark ? '#0a1218' : '#f8fafc'} stroke-opacity="0.55" stroke-width="0.7" />{/each}
-                    {#each ravineFig.momPts as p}<circle cx={p.x} cy={p.y} r="2" fill={gDark ? '#c084fc' : '#7c3aed'} stroke={gDark ? '#0a1218' : '#f8fafc'} stroke-opacity="0.55" stroke-width="0.7" />{/each}
-                    <circle cx={ravineFig.start.x} cy={ravineFig.start.y} r="4.2" fill="#f59e0b" stroke={gDark ? '#fff' : '#1e293b'} stroke-width="1.3" />
-                    <g transform="translate(9,9)">
-                      <rect x="-4" y="-7" width="116" height="25" rx="5" fill={gDark ? '#ffffff' : '#0f172a'} fill-opacity={gDark ? 0.86 : 0.055} stroke="#0f172a" stroke-opacity="0.14" stroke-width="0.5" />
-                      <!-- GD swatch: white line on a dark halo in the night box; a plain dark line on the day box -->
-                      <line x1="1" y1="0" x2="12" y2="0" stroke="#0a1218" stroke-opacity={gDark ? 0.5 : 0} stroke-width="2.8" stroke-linecap="round" />
-                      <line x1="1" y1="0" x2="12" y2="0" stroke={gDark ? '#ffffff' : '#1e293b'} stroke-width="1.6" stroke-linecap="round" />
-                      <text x="16" y="2.4" class="fig-svg-label" style="text-anchor:start;fill:#1e293b;font-size:8.5px">plain GD — zig-zags</text>
-                      <line x1="1" y1="11" x2="12" y2="11" stroke="#a855f7" stroke-width="2.1" stroke-linecap="round" />
-                      <text x="16" y="13.4" class="fig-svg-label" style="text-anchor:start;fill:#1e293b;font-size:8.5px">momentum — glides</text>
-                    </g>
-                  </g>
-                </svg>
-                <GuideVizLayers state={ravineViz} onpatch={(p) => (ravineViz = { ...ravineViz, ...p })} />
-                <div class="fig-cbar">
-                  <span class="fig-cbar-lbl">loss</span>
-                  <span class="fig-cbar-val">{ravineFig.visMax.toFixed(2)}</span>
-                  <div class="fig-cbar-bar" style="background: linear-gradient(to bottom, {colormapStops(ravineViz.colormap, 8, gTheme)});"></div>
-                  <span class="fig-cbar-val">{ravineFig.visMin.toFixed(2)}</span>
-                </div>
-                </div>
-                <figcaption class="fig-cap">
-                  The ravine: a valley far steeper across than along. One safe step size makes plain GD
-                  (white) rattle wall to wall while it crawls along the floor; momentum (violet) builds
-                  speed down the valley and glides to the minimum.
-                </figcaption>
-              </figure>
-              <p>
-                Every fix that follows is a leaf on one tree. Here is the whole lineage at a glance —
-                170 years from Cauchy’s root to today’s canopy, each branch running parent → child:
-              </p>
-              <figure class="fig fig-tree">
-                <svg viewBox="0 0 {familyTree.W} {familyTree.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                  <defs>
-                    {#each familyTree.edges as e, i}
-                      <linearGradient id="tree-edge-{i}" gradientUnits="userSpaceOnUse" x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2}>
-                        <stop offset="0%" stop-color={e.c0} />
-                        <stop offset="100%" stop-color={e.c1} />
-                      </linearGradient>
-                    {/each}
-                  </defs>
-                  {#each familyTree.merges as m}
-                    <path d={m.d} class="tree-merge" />
-                  {/each}
-                  {#each familyTree.edges as e, i}
-                    <path d={e.d} class="tree-branch" stroke="url(#tree-edge-{i})" stroke-width={e.w} />
-                  {/each}
-                  {#each familyTree.nodes as n (n.id)}
-                    <g transform="translate({n.x.toFixed(1)},{n.y.toFixed(1)})">
-                      <circle r={n.root ? 6.5 : 5} fill={n.color} stroke="#fff" stroke-width="1.4" />
-                      <text class="tree-label" x="0" y="-10">{n.name}</text>
-                    </g>
-                  {/each}
-                </svg>
-                <figcaption class="fig-cap">
-                  Every leaf is an optimizer in the picker; branches run parent → child, and the dashed
-                  violet strand marks where momentum and the adaptive line merge into Adam. Colours match
-                  the race below, and new methods join the canopy as the field grows.
-                </figcaption>
-              </figure>
-              <p>
-                Here they are racing on the same ravine from the same start — every one running its
-                real update rule, the dots arriving in their true step counts. Click a name to add or
-                remove it; hover one to pick it out of the pack:
-              </p>
-
-              <figure class="race-demo">
-                <div class="race-player">
-                  <button type="button" class="race-pbtn" on:click={toggleRacePlay} aria-label={racePlaying ? 'Pause race' : 'Play race'} title={racePlaying ? 'Pause' : 'Play'}>
-                    {#if racePlaying}<Pause size={14} strokeWidth={2.5} />{:else}<Play size={14} strokeWidth={2.5} />{/if}
-                  </button>
-                  <button type="button" class="race-pbtn" on:click={resetRace} aria-label="Restart race" title="Restart">
-                    <RotateCcw size={14} strokeWidth={2.5} />
-                  </button>
-                </div>
-                <svg bind:this={raceSvg} viewBox="0 0 {RACE_W} {RACE_H}" preserveAspectRatio="xMidYMid meet">
-                  <defs>
-                    <clipPath id="race-clip"><rect x="0" y="0" width={RACE_W} height={RACE_H} /></clipPath>
-                    <!-- Contours close along the grid edge; clip them a hair inside
-                         the frame so those boundary segments don't draw a white box. -->
-                    <clipPath id="race-contour-clip"><rect x="1.5" y="1.5" width={RACE_W - 3} height={RACE_H - 3} /></clipPath>
-                    <marker id="race-arrow" viewBox="0 -5 10 10" refX="7" refY="0" markerWidth="3.1" markerHeight="3.1" orient="auto"><path d="M0,-5L10,0L0,5" fill={gDark ? '#cdd9f2' : '#475569'} /></marker>
-                    <linearGradient id="race-cbar" x1="0" y1="0" x2="0" y2="1">
-                      {#each cmapStopColors(raceViz.colormap, 8, gTheme) as col, i}<stop offset={i / 8} stop-color={col} />{/each}
-                    </linearGradient>
-                  </defs>
-                  <g clip-path="url(#race-clip)">
-                    <image href={raceHeat} x="0" y="0" width={RACE_W} height={RACE_H} preserveAspectRatio="none" />
-                    <g clip-path="url(#race-contour-clip)">
-                      <g transform="scale({RACE_W / raceDemo.gw}, {RACE_H / raceDemo.gh})">
-                        {#each raceCont as cp}
-                          <path d={cp.d} fill="none" stroke={gDark ? '#fff' : '#334155'} stroke-opacity={cp.o} stroke-width="1" vector-effect="non-scaling-stroke" />
-                        {/each}
-                      </g>
-                    </g>
-                    {#each raceArrows as a}<line x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} stroke={gDark ? '#cdd9f2' : '#475569'} stroke-width={a.w} opacity={a.o} marker-end="url(#race-arrow)" />{/each}
-                    {#each raceDemo.racers as r (r.id)}
-                      {@const hot = raceHover === r.id}
-                      {@const dim = raceHover !== null && !hot}
-                      <path d={r.d} fill="none" stroke={r.color} stroke-width={hot ? 3 : 1.7} stroke-linecap="round" stroke-linejoin="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" opacity={hot ? 1 : !raceOn[r.id] ? 0 : dim ? 0.13 : 0.9} style="transition: opacity 0.15s ease, stroke-width 0.15s ease; filter: {gDark ? 'none' : 'drop-shadow(0 0 0.7px rgba(15,23,42,0.85))'};">
-                        <animate attributeName="stroke-dashoffset" values="100;0;0" keyTimes="0;{r.frac};1" dur="7s" repeatCount="indefinite" />
-                      </path>
-                    {/each}
-                    <circle cx={raceDemo.min[0]} cy={raceDemo.min[1]} r="7" fill="none" stroke={gDark ? '#10b981' : '#059669'} stroke-width="1.5" stroke-dasharray="3,2.5" />
-                    <circle cx={raceDemo.start[0]} cy={raceDemo.start[1]} r="8" fill="none" stroke="#f59e0b" stroke-width="1.75" opacity="0.9" />
-                    <circle cx={raceDemo.start[0]} cy={raceDemo.start[1]} r="4.5" fill="#f59e0b" stroke={gDark ? '#fff' : '#1e293b'} stroke-width="1.5" />
-                    {#each raceDemo.racers as r (r.id)}
-                      {@const hot = raceHover === r.id}
-                      {@const dim = raceHover !== null && !hot}
-                      <circle r={hot ? 4.6 : 3.2} fill={r.color} stroke={gDark ? '#fff' : '#0f172a'} stroke-width="1.25" opacity={hot ? 1 : !raceOn[r.id] ? 0 : dim ? 0.13 : 1} style="transition: opacity 0.15s ease;">
-                        <animateMotion path={r.d} keyPoints="0;1;1" keyTimes="0;{r.frac};1" calcMode="linear" dur="7s" repeatCount="indefinite" />
-                      </circle>
-                    {/each}
-                    <!-- loss colorbar (bottom-right, in viewBox coords) -->
-                    <g>
-                      <rect x="439" y="164" width="7" height="50" rx="2" fill="url(#race-cbar)" stroke={gDark ? 'rgba(255,255,255,0.32)' : 'rgba(15,23,42,0.35)'} stroke-width="0.5" />
-                      <text x="442.5" y="159" class="fig-svg-label" style="fill:{gDark ? '#fff' : '#1e293b'};stroke:{gDark ? '#0a1218' : '#fff'};stroke-width:2.4;paint-order:stroke;font-size:8px">{raceDemo.visMax.toFixed(0)}</text>
-                      <text x="442.5" y="224" class="fig-svg-label" style="fill:{gDark ? '#fff' : '#1e293b'};stroke:{gDark ? '#0a1218' : '#fff'};stroke-width:2.4;paint-order:stroke;font-size:8px">{raceDemo.visMin.toFixed(1)}</text>
-                    </g>
-                  </g>
-                </svg>
-                <GuideVizLayers state={raceViz} onpatch={(p) => (raceViz = { ...raceViz, ...p })} />
-                <div class="race-legend">
-                  {#each raceDemo.racers as r (r.id)}
-                    <button
-                      type="button"
-                      class="race-chip"
-                      class:off={!raceOn[r.id]}
-                      class:hot={raceHover === r.id}
-                      on:click={() => toggleRacer(r.id)}
-                      on:mouseenter={() => (raceHover = r.id)}
-                      on:mouseleave={() => (raceHover = null)}
-                      on:focus={() => (raceHover = r.id)}
-                      on:blur={() => (raceHover = null)}
-                    >
-                      <span class="race-swatch" style="--sw:{r.color}"></span>
-                      <span class="race-cname">{r.name}</span>
-                      <span class="race-steps">{r.steps}{r.converged ? '' : '+'}</span>
-                    </button>
-                  {/each}
-                </div>
-                <figcaption class="race-caption">
-                  All {raceDemo.racers.length} optimizers, same start, same ravine — each running its real
-                  update rule, the dots arriving in their true step counts. Click a name to toggle it,
-                  hover to spotlight one. Watch the contrasts: Newton nearly teleports, GD rattles wall to
-                  wall, Momentum glides past it, and RAdam’s self-warmup keeps it cautious to the end. Use
-                  the play / restart controls to watch it again.
-                </figcaption>
-              </figure>
-
-              {#each optTree.filter((o) => o.chapter === 'ch-ravine') as c (c.name)}
-                {@render optCard(c)}
-              {/each}
-
-              <ChapterCta
-                lessonId={chLesson['ch-ravine']}
-                onLesson={() => startLessonFromChapter('ch-ravine')}
-                demo={raceExperiment ? () => runExperiment(raceExperiment) : null}
-              />
-              {#if chRefs['ch-ravine']}
-                <div class="ch-refs">
-                  <span class="ch-refs-label">Further reading</span>
-                  {#each chRefs['ch-ravine'] as r}
-                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
-                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
-                      {r.label}
-                    </a>
-                  {/each}
-                </div>
-              {/if}
+              <GuideBlocks slug="ch-ravine" blocks={chapterBlocks['ch-ravine']} figure={chFigure} {conceptFig} widget={chWidget} cards={chCards} demo={raceExperiment ? { label: raceExperiment.title, run: () => runExperiment(raceExperiment) } : undefined} onPreset={runPreset} onLesson={startLessonFromChapter} />
             </section>
 
             <section data-ch="ch-momentum" id="ch-momentum">
               <h3><svelte:component this={chIcon['ch-momentum']} size={18} strokeWidth={2} /> Momentum &amp; Nesterov</h3>
-              {#each optTree.filter((o) => o.chapter === 'ch-momentum') as c (c.name)}
-                {@render optCard(c)}
-              {/each}
-
-              <ChapterCta
-                lessonId={chLesson['ch-momentum']}
-                onLesson={() => startLessonFromChapter('ch-momentum')}
-                demo={narrowValleyExperiment ? () => runExperiment(narrowValleyExperiment) : null}
-              />
-              {#if chRefs['ch-momentum']}
-                <div class="ch-refs">
-                  <span class="ch-refs-label">Further reading</span>
-                  {#each chRefs['ch-momentum'] as r}
-                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
-                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
-                      {r.label}
-                    </a>
-                  {/each}
-                </div>
-              {/if}
+              <GuideBlocks slug="ch-momentum" blocks={chapterBlocks['ch-momentum']} figure={chFigure} {conceptFig} widget={chWidget} cards={chCards} demo={narrowValleyExperiment ? { label: narrowValleyExperiment.title, run: () => runExperiment(narrowValleyExperiment) } : undefined} onPreset={runPreset} onLesson={startLessonFromChapter} />
             </section>
 
             <section data-ch="ch-adaptive" id="ch-adaptive">
               <h3><svelte:component this={chIcon['ch-adaptive']} size={18} strokeWidth={2} /> A learning rate per parameter</h3>
-              {#each optTree.filter((o) => o.chapter === 'ch-adaptive') as c (c.name)}
-                {@render optCard(c)}
-              {/each}
-
-              <ChapterCta
-                lessonId={chLesson['ch-adaptive']}
-                onLesson={() => startLessonFromChapter('ch-adaptive')}
-                demo={adagradFreezeExperiment ? () => runExperiment(adagradFreezeExperiment) : null}
-              />
+              <GuideBlocks slug="ch-adaptive" blocks={chapterBlocks['ch-adaptive']} figure={chFigure} {conceptFig} widget={chWidget} cards={chCards} demo={adagradFreezeExperiment ? { label: adagradFreezeExperiment.title, run: () => runExperiment(adagradFreezeExperiment) } : undefined} onPreset={runPreset} onLesson={startLessonFromChapter} />
             </section>
 
             <section data-ch="ch-adam" id="ch-adam">
               <h3><svelte:component this={chIcon['ch-adam']} size={18} strokeWidth={2} /> Adam — and the fork</h3>
-              {#each optTree.filter((o) => o.chapter === 'ch-adam') as c (c.name)}
-                {@render optCard(c)}
-              {/each}
-
-              {#if rotatedRavineExperiment}
-                <ChapterCta demo={() => runExperiment(rotatedRavineExperiment)} demoLabel="Rotate the ravine 45°" />
-              {/if}
+              <GuideBlocks slug="ch-adam" blocks={chapterBlocks['ch-adam']} figure={chFigure} {conceptFig} widget={chWidget} cards={chCards} demo={rotatedRavineExperiment ? { label: 'Rotate the ravine 45°', run: () => runExperiment(rotatedRavineExperiment) } : undefined} onPreset={runPreset} onLesson={startLessonFromChapter} />
             </section>
 
             <section data-ch="ch-second-order" id="ch-second-order">
               <h3><svelte:component this={chIcon['ch-second-order']} size={18} strokeWidth={2} /> Second order: Newton &amp; Sophia</h3>
-              {#each optTree.filter((o) => o.chapter === 'ch-second-order') as c (c.name)}
-                {@render optCard(c)}
-              {/each}
-
-              {#if chapterPresets['ch-second-order']}
-                <ChapterCta demo={() => runPreset('ch-second-order')} demoLabel={chapterPresets['ch-second-order'].title} />
-              {/if}
+              <GuideBlocks slug="ch-second-order" blocks={chapterBlocks['ch-second-order']} figure={chFigure} {conceptFig} widget={chWidget} cards={chCards} onPreset={runPreset} onLesson={startLessonFromChapter} />
             </section>
 
             <section data-ch="ch-self-tuning" id="ch-self-tuning">
               <h3><svelte:component this={chIcon['ch-self-tuning']} size={18} strokeWidth={2} /> The last knob</h3>
-              {#each optTree.filter((o) => o.chapter === 'ch-self-tuning') as c (c.name)}
-                {@render optCard(c)}
-              {/each}
-
-
-              <div class="opt-frontier">
-                <div class="opt-frontier-title">The frontier — and why it isn’t in the picker</div>
-                <p>
-                  The optimizers winning 2025’s biggest training runs — <strong>Muon</strong> (used
-                  to train Kimi K2 and GLM), <strong>Shampoo</strong>, and <strong>SOAP</strong> —
-                  share a trick this playground can’t show. They treat a layer’s weights as a
-                  <em>matrix</em> and precondition <em>across</em> it: Muon (<em>momentum
-                  orthogonalized by Newton–Schulz</em>) straightens the momentum matrix, Shampoo and
-                  SOAP whiten it. With only two independent numbers,
-                  {@html tex(String.raw`\alpha`)} and {@html tex(String.raw`\beta`)}, there is no matrix to exploit — strip the structure away and they collapse
-                  to methods already in the list. That matrix structure is exactly why they scale to
-                  billions of parameters, and exactly why a two-parameter sandbox is the wrong stage
-                  for them. To meet them you have to leave the playground — which is a fair note to
-                  end the tree on.
-                </p>
-              </div>
-
-              {#if chapterPresets['ch-self-tuning']}
-                <ChapterCta demo={() => runPreset('ch-self-tuning')} demoLabel={chapterPresets['ch-self-tuning'].title} />
-              {/if}
+              <GuideBlocks slug="ch-self-tuning" blocks={chapterBlocks['ch-self-tuning']} figure={chFigure} {conceptFig} widget={chWidget} cards={chCards} onPreset={runPreset} onLesson={startLessonFromChapter} />
             </section>
 
 
@@ -2565,11 +2264,11 @@
 
   /* Wide formulas may scroll sideways; keep the scrollbar thin and themed,
      and never let overflow-x:auto spawn a stray vertical scrollbar. */
-  .formula-display::-webkit-scrollbar,
+  .reading-column :global(.formula-display::-webkit-scrollbar),
   .opt-formula::-webkit-scrollbar { height: 5px; }
-  .formula-display::-webkit-scrollbar-thumb,
+  .reading-column :global(.formula-display::-webkit-scrollbar-thumb),
   .opt-formula::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
-  .formula-display::-webkit-scrollbar-track,
+  .reading-column :global(.formula-display::-webkit-scrollbar-track),
   .opt-formula::-webkit-scrollbar-track { background: transparent; }
 
   /* ---------- Knob bullets ---------- */
@@ -2846,20 +2545,20 @@
   .opt-lead :global(strong) { color: var(--color-text-primary); font-weight: 650; }
 
   /* The 2025 matrix-optimizer note: real, relevant, deliberately not runnable. */
-  .opt-frontier {
+  .reading-column :global(.opt-frontier) {
     margin-top: 1.2rem;
     border: 1px dashed var(--color-border);
     border-radius: 10px;
     background: var(--color-bg-primary);
     padding: 0.8rem 0.95rem;
   }
-  .opt-frontier-title {
+  .reading-column :global(.opt-frontier-title) {
     font-weight: 700;
     font-size: 0.9rem;
     color: var(--color-text-primary);
     margin-bottom: 0.35rem;
   }
-  .opt-frontier p {
+  .reading-column :global(.opt-frontier p) {
     font-size: 0.85rem;
     line-height: 1.6;
     color: var(--color-text-secondary);
