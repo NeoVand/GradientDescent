@@ -205,6 +205,7 @@
       label: 'Classic surfaces',
       items: [
         { type: 'stretched-bowl', name: 'Stretched Bowl', icon: null, customIcon: 'κ' },
+        { type: 'rotated-valley', name: 'Rotated Valley', icon: null, customIcon: '∡' },
         { type: 'rosenbrock', name: 'Rosenbrock Valley', icon: null, customIcon: '∪' },
         { type: 'saddle-point', name: 'Saddle Point', icon: null, customIcon: '±' },
         { type: 'himmelblau', name: 'Himmelblau', icon: null, customIcon: '∷' }

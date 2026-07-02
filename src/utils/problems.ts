@@ -1549,6 +1549,43 @@ const stretchedBowl: ProblemConfig = {
 };
 
 /**
+ * Rotated Valley: f = 1.1α² + 1.8αβ + 1.1β² — the Stretched Bowl's evil
+ * twin. Same eigenvalues (λ = 4 across, 0.4 along; κ = 10 everywhere), but
+ * the valley runs at 45° to the axes. Per-parameter methods (AdaGrad,
+ * RMSProp, Adam, Sophia) can only stretch the α and β AXES, so their whole
+ * advantage evaporates here: a diagonal preconditioner cannot un-rotate a
+ * valley. Compare any of them on this surface vs Stretched Bowl — same κ,
+ * wildly different outcome. (H = R(45°)·diag(4, 0.4)·R(−45°).)
+ */
+const rotatedValley: ProblemConfig = {
+  type: 'rotated-valley',
+  name: 'Rotated Valley',
+  description: 'The Stretched Bowl turned 45° — κ = 10, but off-axis',
+  tagline: 'Same κ = 10 as Stretched Bowl, rotated 45° — watch the adaptive methods lose their superpower.',
+  trueParameters: { a: 0, b: 0 },
+  noData: true,
+  generateData: NO_DATA,
+  predict: () => 0,
+
+  computeLoss: (_data: DataPoint[], p: ModelParameters): number => {
+    return 1.1 * p.a * p.a + 1.8 * p.a * p.b + 1.1 * p.b * p.b;
+  },
+
+  computeGradient: (_data: DataPoint[], p: ModelParameters): ModelParameters => {
+    return { a: 2.2 * p.a + 1.8 * p.b, b: 1.8 * p.a + 2.2 * p.b };
+  },
+
+  // Start far out along the gentle (1, −1) diagonal, slightly off the floor.
+  getInitialParameters: () => ({
+    a: -4.4 + Math.random() * 0.6,
+    b: 3.6 + Math.random() * 0.6
+  }),
+
+  defaultLearningRate: 0.3,
+  parameterRange: { min: -6, max: 6 }
+};
+
+/**
  * Rosenbrock banana: f = (1−α)² + 100(β−α²)².
  * The minimum hides at the end of a curved, nearly-flat valley — easy to
  * reach the valley, brutal to traverse it. THE optimizer benchmark.
@@ -1739,6 +1776,7 @@ export const problemConfigs: Record<string, ProblemConfig> = {
   'ar2-rollout': ar2Rollout,
   'tiny-net': tinyNet,
   'stretched-bowl': stretchedBowl,
+  'rotated-valley': rotatedValley,
   'rosenbrock': rosenbrock,
   'saddle-point': saddlePoint,
   'himmelblau': himmelblau,

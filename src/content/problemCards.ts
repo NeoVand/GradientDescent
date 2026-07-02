@@ -40,6 +40,7 @@ export const problemCards: Record<string, ProblemCard[]> = {
   ],
   'Pure surfaces (no data)': [
     { name: 'Stretched Bowl', customIcon: 'κ', formula: '0.2α² + 2β²', tag: 'exact quadratic; κ = 10, edge at γ = 0.5' },
+    { name: 'Rotated Valley', customIcon: '∡', formula: '1.1α² + 1.8αβ + 1.1β²', tag: 'the same κ = 10, turned 45° — adaptive methods lose their edge' },
     { name: 'Rosenbrock Valley', customIcon: '∪', formula: '(1−α)² + 100(β−α²)²', tag: 'the classic banana benchmark' },
     { name: 'Saddle Point', customIcon: '±', formula: 'α² − β² + β⁴/8 + 2', tag: 'gradients die at dead center' },
     { name: 'Himmelblau', customIcon: '∷', formula: '(α²+β−11)² + (α+β²−7)²', tag: 'four equally deep minima' }

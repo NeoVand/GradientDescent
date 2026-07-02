@@ -118,6 +118,50 @@ export const experiments: Experiment[] = [
       ttl: 14000
     }
   }),
+  scenarioExperiment({
+    id: 'rotated-ravine',
+    title: 'Rotate the ravine 45° — Adam loses its superpower',
+    blurb:
+      'Rotated Valley has exactly Stretched Bowl’s curvatures (κ = 10), but the valley runs diagonally. A per-parameter rate can only stretch the axes — it cannot un-rotate a valley.',
+    state: { problem: 'rotated-valley', optimizer: 'adam', lens: true, run: true },
+    coach: {
+      kind: 'info',
+      text: 'Adam zig-zags here almost like plain GD — its per-parameter scaling is powerless against an off-axis valley. Now switch Problem → Stretched Bowl (same κ = 10, axis-aligned) and Train: night and day. That difference is the honest limit of every diagonal method.',
+      ttl: 18000
+    }
+  }),
+  scenarioExperiment({
+    id: 'adagrad-freeze',
+    title: 'Watch AdaGrad strangle itself',
+    blurb:
+      'AdaGrad’s memory of squared gradients only ever grows, so its steps only ever shrink. On a long run it freezes mid-descent — the exact flaw RMSProp fixed by forgetting.',
+    state: { problem: 'exponential-decay', optimizer: 'adagrad', totalSteps: 600, stepsPerSecond: 60, run: true },
+    coach: {
+      kind: 'info',
+      text: 'Watch the steps shorten as the gradient history piles up — AdaGrad slows to a crawl well before the basin. When it stalls, switch Optimizer → RMSProp and Train from the same spot: forgetting keeps the rate alive.',
+      ttl: 16000
+    }
+  }),
+  scenarioExperiment({
+    id: 'cosine-pinch',
+    title: 'Pinch the noise ball shut',
+    blurb:
+      'Batch size 1 leaves the loss buzzing in a fuzzy band forever — unless the schedule bleeds γ away. Cosine pinches the band to a point.',
+    state: {
+      problem: 'linear-regression',
+      optimizer: 'gd',
+      batchSize: 1,
+      schedule: 'cosine',
+      totalSteps: 300,
+      stepsPerSecond: 40,
+      run: true
+    },
+    coach: {
+      kind: 'info',
+      text: 'Same noisy batch-of-1 as the noise-ball demo, but on a Cosine schedule: as γ decays, the wobble it feeds shrinks with it, and the band pinches shut. Switch Schedule → Constant and Train again to see the band that never closes.',
+      ttl: 16000
+    }
+  }),
   {
     id: 'banana-race',
     title: 'The banana-valley showdown',
