@@ -11,7 +11,8 @@ export const chRefs: Record<string, ChRef[]> = {
   'ch-shapes': [
     { kind: 'wiki', label: 'Maxima and minima', href: 'https://en.wikipedia.org/wiki/Maxima_and_minima' },
     { kind: 'wiki', label: 'Saddle point', href: 'https://en.wikipedia.org/wiki/Saddle_point' },
-    { kind: 'paper', label: 'Saddle points in high dimensions — Dauphin et al., 2014', href: 'https://arxiv.org/abs/1406.2572' }
+    { kind: 'paper', label: 'Saddle points in high dimensions — Dauphin et al., 2014', href: 'https://arxiv.org/abs/1406.2572' },
+    { kind: 'paper', label: 'The loss surfaces of multilayer networks — Choromanska et al., 2015', href: 'https://arxiv.org/abs/1412.0233' }
   ],
   'ch-landscape': [
     { kind: 'wiki', label: 'Level set', href: 'https://en.wikipedia.org/wiki/Level_set' },
@@ -52,10 +53,12 @@ export const chRefs: Record<string, ChRef[]> = {
     { kind: 'paper', label: 'Stochastic approximation — Robbins & Monro, 1951', href: 'https://doi.org/10.1214/aoms/1177729586' },
     { kind: 'paper', label: 'Critical batch sizes — McCandlish et al., 2018', href: 'https://arxiv.org/abs/1812.06162' }
   ],
-  'ch-optimizers': [
+  'ch-ravine': [
     { kind: 'wiki', label: 'Condition number', href: 'https://en.wikipedia.org/wiki/Condition_number' },
-    { kind: 'paper', label: 'Why momentum really works — Goh, Distill 2017', href: 'https://distill.pub/2017/momentum/' },
     { kind: 'paper', label: 'An overview of gradient-descent optimizers — Ruder, 2016', href: 'https://arxiv.org/abs/1609.04747' }
+  ],
+  'ch-momentum': [
+    { kind: 'paper', label: 'Why momentum really works — Goh, Distill 2017', href: 'https://distill.pub/2017/momentum/' }
   ],
   'ch-generalize': [
     { kind: 'wiki', label: 'Overfitting', href: 'https://en.wikipedia.org/wiki/Overfitting' },

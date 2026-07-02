@@ -64,7 +64,7 @@ export const experiments: Experiment[] = [
     state: { problem: 'gaussian-peak', optimizer: 'gd', run: true },
     coach: {
       kind: 'info',
-      text: 'Two mirror basins at β = ±1. Fresh starts always land above β = 0, so to see the twin: drag the marker below the β = 0 line, then Train — same loss, mirror answer.',
+      text: 'Two mirror basins at $\\beta = \\pm 1$. Fresh starts always land above $\\beta = 0$, so to see the twin: drag the marker below the $\\beta = 0$ line, then Train — same loss, mirror answer.',
       ttl: 14000
     }
   }),
@@ -78,7 +78,7 @@ export const experiments: Experiment[] = [
     state: { problem: 'gaussian-peak', optimizer: 'gd', marker: { a: 2.7, b: 2.7 }, run: true },
     coach: {
       kind: 'warn',
-      text: 'You start on the dead plateau: ‖∇ℒ‖ ≈ 0, so steps go nowhere — the vanishing-gradient problem. Drag the marker inward or crank momentum.',
+      text: 'You start on the dead plateau: $\\lVert\\nabla\\mathcal{L}\\rVert \\approx 0$, so steps go nowhere — the vanishing-gradient problem. Drag the marker inward or crank momentum.',
       ttl: 14000
     }
   }),
@@ -114,7 +114,7 @@ export const experiments: Experiment[] = [
     state: { problem: 'exponential-decay', optimizer: 'adam', run: true },
     coach: {
       kind: 'info',
-      text: 'Adam normalizes each parameter’s step by its gradient history. Compare: Optimizer → Gradient Descent on this surface needs a microscopic γ.',
+      text: 'Adam normalizes each parameter’s step by its gradient history. Compare: Optimizer → Gradient Descent on this surface needs a microscopic $\\gamma$.',
       ttl: 14000
     }
   }),
@@ -126,7 +126,7 @@ export const experiments: Experiment[] = [
     state: { problem: 'rotated-valley', optimizer: 'adam', lens: true, run: true },
     coach: {
       kind: 'info',
-      text: 'Adam zig-zags here almost like plain GD — its per-parameter scaling is powerless against an off-axis valley. Now switch Problem → Stretched Bowl (same κ = 10, axis-aligned) and Train: night and day. That difference is the honest limit of every diagonal method.',
+      text: 'Adam zig-zags here almost like plain GD — its per-parameter scaling is powerless against an off-axis valley. Now switch Problem → Stretched Bowl (same $\\kappa = 10$, axis-aligned) and Train: night and day. That difference is the honest limit of every diagonal method.',
       ttl: 18000
     }
   }),
@@ -158,7 +158,7 @@ export const experiments: Experiment[] = [
     },
     coach: {
       kind: 'info',
-      text: 'Same noisy batch-of-1 as the noise-ball demo, but on a Cosine schedule: as γ decays, the wobble it feeds shrinks with it, and the band pinches shut. Switch Schedule → Constant and Train again to see the band that never closes.',
+      text: 'Same noisy batch-of-1 as the noise-ball demo, but on a Cosine schedule: as $\\gamma$ decays, the wobble it feeds shrinks with it, and the band pinches shut. Switch Schedule → Constant and Train again to see the band that never closes.',
       ttl: 16000
     }
   }),
@@ -197,7 +197,7 @@ export const experiments: Experiment[] = [
     },
     coach: {
       kind: 'info',
-      text: 'Lion’s step is always ±γ — it can’t get smaller near the bottom, so it buzzes around the minimum in a fixed ring. Open Schedule → Cosine and Train again: as γ bleeds to zero the ring closes to a point. That’s what a schedule is for.',
+      text: 'Lion’s step is always $\\pm\\gamma$ — it can’t get smaller near the bottom, so it buzzes around the minimum in a fixed ring. Open Schedule → Cosine and Train again: as $\\gamma$ bleeds to zero the ring closes to a point. That’s what a schedule is for.',
       ttl: 16000
     }
   }),
@@ -209,7 +209,7 @@ export const experiments: Experiment[] = [
     state: { problem: 'circle-classifier' },
     coach: {
       kind: 'info',
-      text: 'The orange marker on the LEFT plot is literally (α, β) — the circle’s center. Drag the marker on the Loss & Gradient panel and watch the circle follow: they are the same two numbers.',
+      text: 'The orange marker on the LEFT plot is literally $(\\alpha, \\beta)$ — the circle’s center. Drag the marker on the Loss & Gradient panel and watch the circle follow: they are the same two numbers.',
       ttl: 14000
     }
   })
@@ -274,7 +274,7 @@ export const chapterPresets: Record<string, Experiment> = {
     state: { problem: 'slope-1d', optimizer: 'gd', marker: { a: 2.0, b: 0 } },
     coach: {
       kind: 'info',
-      text: 'Don’t train yet — read the curve. The dashed line under the marker is the tangent: the derivative made visible. Nudge α with the ← → keys and watch the slope change; walk toward the bottom and it flattens toward zero.',
+      text: 'Don’t train yet — read the curve. The dashed line under the marker is the tangent: the derivative made visible. Nudge $\\alpha$ with the ← → keys and watch the slope change; walk toward the bottom and it flattens toward zero.',
       ttl: 16000
     }
   }),
@@ -285,7 +285,7 @@ export const chapterPresets: Record<string, Experiment> = {
     state: { problem: 'stretched-bowl', optimizer: 'gd', lens: true, run: true },
     coach: {
       kind: 'info',
-      text: 'The lens ellipse IS the local bowl: long axis the gentle bend (λ = 0.4), short axis the sharp one (λ = 4), so κ = 10. Watch β snap to the floor while α crawls. Then find the edge: γ = 0.45 bounces in, γ = 0.55 blows up — the theory says the line is at exactly 0.5.',
+      text: 'The lens ellipse IS the local bowl: long axis the gentle bend ($\\lambda = 0.4$), short axis the sharp one ($\\lambda = 4$), so $\\kappa = 10$. Watch $\\beta$ snap to the floor while $\\alpha$ crawls. Then find the edge: $\\gamma = 0.45$ bounces in, $\\gamma = 0.55$ blows up — the theory says the line is at exactly $0.5$.',
       ttl: 18000
     }
   }),
@@ -296,7 +296,7 @@ export const chapterPresets: Record<string, Experiment> = {
     state: { problem: 'linear-regression', optimizer: 'gd', marker: { a: -4, b: 3.5 } },
     coach: {
       kind: 'info',
-      text: 'Don’t train yet — read the Loss & Gradient panel. The faint arrows are −∇ℒ everywhere; the blue arrow on the marker is the steepest way down from where you stand. Notice they all cut straight across the contour loops.',
+      text: 'Don’t train yet — read the Loss & Gradient panel. The faint arrows are $-\\nabla\\mathcal{L}$ everywhere; the blue arrow on the marker is the steepest way down from where you stand. Notice they all cut straight across the contour loops.',
       ttl: 16000
     }
   }),
@@ -307,7 +307,7 @@ export const chapterPresets: Record<string, Experiment> = {
     state: { problem: 'linear-regression', optimizer: 'gd', marker: { a: -3.5, b: 3 } },
     coach: {
       kind: 'info',
-      text: 'Press Step (or the S key) to take exactly one −γ∇ℒ move, and watch the marker hop. The red arrow is the step actually taken; the blue arrow is pure downhill — early on they nearly agree.',
+      text: 'Press Step (or the S key) to take exactly one $-\\gamma\\nabla\\mathcal{L}$ move, and watch the marker hop. The red arrow is the step actually taken; the blue arrow is pure downhill — early on they nearly agree.',
       ttl: 16000
     }
   }),
@@ -325,7 +325,29 @@ export const chapterPresets: Record<string, Experiment> = {
     },
     coach: {
       kind: 'warn',
-      text: 'γ is cranked past the stable 2/λmax limit — watch the steps grow instead of shrink until the run blows up. Drop γ back down and Train again for a smooth glide.',
+      text: '$\\gamma$ is cranked past the stable $2/\\lambda_{\\max}$ limit — watch the steps grow instead of shrink until the run blows up. Drop $\\gamma$ back down and Train again for a smooth glide.',
+      ttl: 16000
+    }
+  }),
+  'ch-second-order': scenarioExperiment({
+    id: 'preset-second-order',
+    title: 'Watch Newton jump',
+    blurb: '',
+    state: { problem: 'linear-regression', optimizer: 'newton', lens: true, run: true },
+    coach: {
+      kind: 'info',
+      text: 'On a true bowl Newton is exact: the violet ghost arrow in the lens is the jump it takes, and it lands at the bottom almost at once. Drag the marker anywhere and Train again — one hop, no $\\gamma$ to tune. Then try a Classic saddle and watch it hesitate.',
+      ttl: 16000
+    }
+  }),
+  'ch-self-tuning': scenarioExperiment({
+    id: 'preset-self-tuning',
+    title: 'Let Prodigy tune itself',
+    blurb: '',
+    state: { problem: 'linear-regression', optimizer: 'prodigy', run: true },
+    coach: {
+      kind: 'info',
+      text: 'Nothing to set: Prodigy starts from a microscopic seed, so the marker barely creeps — then its distance estimate $d$ finds its level and the steps open up. The learning rate, discovered live rather than tuned.',
       ttl: 16000
     }
   }),
