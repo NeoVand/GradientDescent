@@ -56,7 +56,8 @@
     Timer,
     Shapes,
     ClipboardPaste,
-    PanelLeftClose
+    PanelLeftClose,
+    ChartLine
   } from 'lucide-svelte';
   import RaceSettingsModal from './RaceSettingsModal.svelte';
   import { hyperMeta } from '../utils/hyperMeta';
@@ -65,6 +66,7 @@
   export let onClose: (() => void) | null = null;
 
   let showRaceSettings = false;
+  let showSweep = false;
 
   // Compact labels for the schedule segmented control
   const SCHEDULE_LABELS: Record<ScheduleId, string> = {
@@ -763,6 +765,17 @@
       <div class="row">
         <span class="icon"><Zap size={16} strokeWidth={2} /></span>
         <span class="row-label">Learn Rate <span class="greek-label">(γ)</span></span>
+        <button
+          class="action-btn"
+          class:active={showSweep}
+          aria-label="Sweep the learning rate"
+          aria-pressed={showSweep}
+          use:tooltip={'Sweep γ — run this scenario across every learning rate and chart steps-to-basin<br/><span style="opacity:0.8;font-size:0.7rem">The measured U-curve, with the theoretical 2/λ<sub>max</sub> edge drawn on top</span>'}
+          on:click={() => (showSweep = true)}
+        >
+          <ChartLine size={12} strokeWidth={2.2} />
+          <span>Sweep</span>
+        </button>
         <button class="info-btn" aria-label="About learning rate" use:tooltip={'Step size for gradient descent updates (log scale, 10⁻⁴ … 1)<br/><span style="opacity:0.8;font-size:0.7rem">Higher = faster but less stable</span>'}>
           <Info size={13} strokeWidth={2} />
         </button>
@@ -992,6 +1005,12 @@
 
 {#if showRaceSettings}
   <RaceSettingsModal onClose={() => (showRaceSettings = false)} />
+{/if}
+
+{#if showSweep}
+  {#await import('./SweepModal.svelte') then m}
+    <svelte:component this={m.default} onClose={() => (showSweep = false)} />
+  {/await}
 {/if}
 
 <style>
@@ -1625,6 +1644,30 @@
         var(--slider-color, #10b981) var(--fill, 0%),
         rgba(127, 127, 127, 0.25) var(--fill, 0%),
         rgba(127, 127, 127, 0.25) 100%);
+  }
+
+  /* A small labelled action chip (vs the passive info glyph): clearly
+     clickable, lit while its panel is open. */
+  .action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 6px;
+    padding: 0.14rem 0.45rem;
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--color-text-tertiary);
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .action-btn:hover,
+  .action-btn.active {
+    color: var(--color-text-primary);
+    border-color: var(--color-text-tertiary);
   }
 
   /* The 2/λmax stability tick on the γ slider: a small caret under the

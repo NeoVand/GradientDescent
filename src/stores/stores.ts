@@ -19,6 +19,18 @@ import type {
 import { problemConfigs } from '../utils/problems';
 import { setSeed, newSeed, shuffle } from '../utils/rng';
 import { optimizers, defaultHyper, optimizerOrder, type OptimizerId, type OptimizerState } from '../utils/optimizers';
+
+// ========== Pinned trail (compare-two-runs ghost) ==========
+// One pinned descent path, drawn faded under the live trail so the reader
+// can change a knob and compare against the run they just saw. Defined
+// before the dataset store so data regeneration can clear it (a new dataset
+// is a new landscape — a stale ghost would lie).
+export interface PinnedTrail {
+  pts: { a: number; b: number }[];
+  /** What produced it, e.g. "Adam · γ 0.10" — shown in the pin tooltip. */
+  label: string;
+}
+export const pinnedTrailStore = writable<PinnedTrail | null>(null);
 import { customModel, type RegressionModel, type ClassificationModel } from '../utils/customModel';
 import {
   computeLossGrid,
@@ -84,10 +96,15 @@ function createDatasetStore() {
     setRandomSplit: (randomSplit: boolean) => update(state => ({ ...state, randomSplit })),
     setNoiseLevel: (noiseLevel: number) => update(state => ({ ...state, noiseLevel })),
     /** Rebuild the dataset from the current seed and settings. */
-    regenerateData: () => update(state => ({ ...state, data: buildData(state) })),
+    regenerateData: () =>
+      update(state => {
+        pinnedTrailStore.set(null); // new data = new landscape; drop the ghost
+        return { ...state, data: buildData(state) };
+      }),
     /** Draw a fresh seed and rebuild — the "give me new data" action. */
     reroll: () =>
       update(state => {
+        pinnedTrailStore.set(null);
         const next = { ...state, seed: newSeed() };
         return { ...next, data: buildData(next) };
       }),

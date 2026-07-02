@@ -33,6 +33,7 @@ import {
   courseStore,
   challengeStore,
   markerDragging,
+  pinnedTrailStore,
   type Racer
 } from '../stores/stores';
 import { problemConfigs } from './problems';
@@ -48,7 +49,7 @@ import type { DataPoint, ProblemType } from '../types/types';
  * 3%-of-linear-span would count half of Rosenbrock as converged because
  * its corners tower five orders of magnitude over the valley.
  */
-const BASIN_LOG_THRESHOLD = 0.05;
+export const BASIN_LOG_THRESHOLD = 0.05; // shared with the γ-sweep instrument
 
 /** History step the current run started from — drives the progress fill. */
 export const runStartStep = writable(0);
@@ -283,8 +284,10 @@ export function hyperForProblem(optimizerId: OptimizerId, problemType: ProblemTy
  */
 export function applyProblem(type: ProblemType) {
   selectedProblem.set(type);
-  // A challenge is bound to its exact scenario; switching problems ends it.
+  // A challenge is bound to its exact scenario; switching problems ends it,
+  // and a pinned ghost trail from another landscape would only mislead.
   challengeStore.set(null);
+  pinnedTrailStore.set(null);
   const cfg = problemConfigs[type];
   let optimizerId = get(optimizerStore).id;
   if (optimizerId === 'gd' || optimizerId === 'momentum') {

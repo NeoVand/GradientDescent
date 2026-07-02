@@ -22,6 +22,7 @@
     currentProblemConfig,
     themeStore,
     resetOptimizerState,
+    recordInitialHistory,
     lossSceneStore,
     divergenceStore,
     coachStore,
@@ -37,6 +38,8 @@
     vizLayersStore,
     basinsEnabledStore,
     lensStore,
+    pinnedTrailStore,
+    showCoach,
     COLORMAPS,
     type FieldDensity
   } from '../stores/stores';
@@ -59,7 +62,7 @@
   } from '../utils/hessian';
   import { canExportVideo, exportRunWebM } from '../utils/replay';
   import type { ModelParameters } from '../types/types';
-  import { Mountain, Orbit, Map as MapIcon, Video, Layers } from 'lucide-svelte';
+  import { Mountain, Orbit, Map as MapIcon, Video, Layers, Pin } from 'lucide-svelte';
   import { tooltip } from '../utils/tooltip';
   import LossCurve1D from './LossCurve1D.svelte';
 
@@ -157,6 +160,42 @@
 
   function toggleLens() {
     lensStore.toggle(); // lensOn → lensInfo → updateTrail, all reactive
+  }
+
+  // ---------- Pinned ghost trail ----------
+  // Freeze the current run's path for comparison: change a knob, run again,
+  // and read the difference directly off the landscape.
+  $: pinned = $pinnedTrailStore;
+  $: if (svgElement && pinned !== undefined && !isDragging) {
+    updateTrail();
+  }
+
+  function togglePin() {
+    if (pinned) {
+      pinnedTrailStore.set(null);
+      return;
+    }
+    if (history.length < 2) {
+      showCoach('warn', 'Nothing to pin yet — run a few steps first.', 5000);
+      return;
+    }
+    const lr = $trainingStore.learningRate;
+    const lrStr = lr >= 0.0995 ? lr.toFixed(2) : lr >= 0.001 ? lr.toFixed(3) : lr.toFixed(4);
+    const pts = history.map((h) => ({ ...h.parameters }));
+    pinnedTrailStore.set({
+      pts,
+      label: `${optimizers[$optimizerStore.id].name} · γ ${lrStr}`
+    });
+    // A comparison only means something from the SAME start — put the marker
+    // back where the pinned run began, so the very next Train is the compare.
+    parametersStore.set({ ...pts[0] });
+    resetOptimizerState();
+    recordInitialHistory();
+    showCoach(
+      'info',
+      'Run pinned as a ghost, and the marker is back at its starting point. Change a knob and press Train to compare. (Unpin with the same button; it also clears when the problem or data changes.)',
+      9000
+    );
   }
 
   interface LensInfo {
@@ -722,11 +761,42 @@
       .style('opacity', pal.contourOp);
   }
 
+  /**
+   * The pinned ghost: one earlier run, frozen for comparison. Drawn as a
+   * quiet dashed polyline UNDER the live trail (2-D view only for now),
+   * in a neutral theme colour so the red live path always reads as "now".
+   */
+  function drawPinnedTrail(
+    g: d3.Selection<SVGGElement, unknown, null, undefined>,
+    xScale: d3.ScaleLinear<number, number>,
+    yScale: d3.ScaleLinear<number, number>
+  ) {
+    if (!pinned || pinned.pts.length < 2) return;
+    const d =
+      'M ' + pinned.pts.map((p) => `${xScale(p.a).toFixed(1)},${yScale(p.b).toFixed(1)}`).join(' L ');
+    g.append('path')
+      .attr('d', d)
+      .attr('fill', 'none')
+      .attr('stroke-width', 1.8)
+      .attr('stroke-dasharray', '5,4')
+      .attr('stroke-linecap', 'round')
+      .style('stroke', 'var(--color-text-tertiary)')
+      .style('opacity', 0.6);
+    const end = pinned.pts[pinned.pts.length - 1];
+    g.append('circle')
+      .attr('cx', xScale(end.a))
+      .attr('cy', yScale(end.b))
+      .attr('r', 3)
+      .style('fill', 'var(--color-text-tertiary)')
+      .style('opacity', 0.7);
+  }
+
   function drawTrainingPath(
     g: d3.Selection<SVGGElement, unknown, null, undefined>,
     xScale: d3.ScaleLinear<number, number>,
     yScale: d3.ScaleLinear<number, number>
   ) {
+    drawPinnedTrail(g, xScale, yScale);
     if (history.length < 2) return;
 
     // Get last 100 points
@@ -1421,6 +1491,18 @@
         <!-- Curvature lens: a 2D-only overlay (the Hessian ellipse is drawn on
              the SVG plot), so it stays gated to the 2D view. -->
         {#if view === '2d' && !oneParam}
+          <button
+            class="tool-btn"
+            class:active={!!pinned}
+            use:tooltip={pinned
+              ? `Pinned: ${pinned.label} — click to unpin`
+              : 'Pin this run as a ghost — change a knob, Train again, and compare paths'}
+            aria-label="Pin run for comparison"
+            aria-pressed={!!pinned}
+            on:click={togglePin}
+          >
+            <Pin size={15} strokeWidth={2.2} />
+          </button>
           <button
             class="tool-btn"
             class:active={lensOn}
