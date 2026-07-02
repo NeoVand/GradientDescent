@@ -54,7 +54,7 @@ export const sophia: CoreOptimizer<SophiaState> = {
   id: 'sophia',
   name: 'Sophia',
   description: 'Diagonal curvature, with clipped steps',
-  updateRuleLatex: String.raw`\mathbf{m} \leftarrow \beta_1\mathbf{m} + (1{-}\beta_1)\nabla \mathcal{L}, \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\,\operatorname{clip}\!\left(\frac{\mathbf{m}}{\max(\mathbf{h},\varepsilon)},\,\rho\right)`,
+  updateRuleLatex: String.raw`\mathbf{m} \leftarrow \beta_1 \mathbf{m} + (1-\beta_1)\,\nabla \mathcal{L}, \;\; \mathbf{h} \leftarrow \beta_2 \mathbf{h} + (1-\beta_2)\,\operatorname{diag}(\mathbf{H}), \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\,\operatorname{clip}\!\left(\frac{\mathbf{m}}{\max(\mathbf{h},\varepsilon)},\,\rho\right)`,
   hyperparams: [SOPHIA_BETA1, SOPHIA_RHO],
   fixedLearningRate: 0.1,
   usesHessian: true,

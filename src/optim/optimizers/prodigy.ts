@@ -64,7 +64,7 @@ export const prodigy: CoreOptimizer<ProdigyState> = {
   id: 'prodigy',
   name: 'Prodigy',
   description: 'Parameter-free: estimates its own learning rate',
-  updateRuleLatex: String.raw`d_{t+1} = \max\!\left(d_t,\, \frac{r_{t+1}}{\lVert \mathbf{s}_{t+1}\rVert_1}\right), \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, d_t\,\frac{\mathbf{m}}{\sqrt{\mathbf{v}} + d_t\varepsilon}`,
+  updateRuleLatex: String.raw`\mathbf{m} \leftarrow \beta_1 \mathbf{m} + (1-\beta_1)\, d\,\nabla \mathcal{L}, \;\; \mathbf{s} \leftarrow \beta_2 \mathbf{s} + (1-\beta_2)\, d^2 (\nabla \mathcal{L})^2, \;\; d \leftarrow \max\!\left(d,\, \frac{r}{\lVert \mathbf{w}\rVert_1}\right), \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, d\,\frac{\mathbf{m}}{\sqrt{\mathbf{s}} + d\,\varepsilon}`,
   hyperparams: [PRODIGY_BETA1, PRODIGY_BETA2],
   fixedLearningRate: 1.0,
   init: (d) => ({ m: zeros(d), v: zeros(d), t: 0, dEst: NaN, rNum: 0, sDen: zeros(d), x0: null }),

@@ -26,7 +26,7 @@ export const radam: CoreOptimizer<RadamState> = {
   id: 'radam',
   name: 'RAdam',
   description: 'Adam with a built-in, automatic warmup',
-  updateRuleLatex: String.raw`\rho_t = \rho_\infty - \frac{2t\,\beta_2^{t}}{1-\beta_2^{t}}, \quad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, r_t\,\frac{\hat{\mathbf{m}}}{\sqrt{\hat{\mathbf{s}}} + \varepsilon}\;\;(\rho_t > 4),\;\; \text{else}\; -\gamma\,\hat{\mathbf{m}}`,
+  updateRuleLatex: String.raw`\mathbf{m} \leftarrow \beta_1 \mathbf{m} + (1-\beta_1)\,\nabla \mathcal{L}, \;\; \mathbf{s} \leftarrow \beta_2 \mathbf{s} + (1-\beta_2)(\nabla \mathcal{L})^2, \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, r_t\,\frac{\hat{\mathbf{m}}}{\sqrt{\hat{\mathbf{s}}} + \varepsilon}`,
   hyperparams: [BETA1_SPEC, BETA2_SPEC],
   fixedLearningRate: 0.1,
   init: (d) => ({ m: zeros(d), v: zeros(d), t: 0 }),
