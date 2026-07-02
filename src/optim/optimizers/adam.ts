@@ -23,7 +23,7 @@ export const adam: CoreOptimizer<AdamState> = {
   id: 'adam',
   name: 'Adam',
   description: 'Momentum + per-parameter scaling, bias-corrected',
-  updateRuleLatex: String.raw`\mathbf{m} \leftarrow \beta_1 \mathbf{m} + (1-\beta_1)\,\nabla \mathcal{L}, \;\; \mathbf{s} \leftarrow \beta_2 \mathbf{s} + (1-\beta_2)(\nabla \mathcal{L})^2, \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \frac{\hat{\mathbf{m}}}{\sqrt{\hat{\mathbf{s}}} + \varepsilon}`,
+  updateRuleLatex: String.raw`\begin{aligned}&\mathbf{m} \leftarrow \beta_1 \mathbf{m} + (1-\beta_1)\,\nabla \mathcal{L} \\[2pt] &\mathbf{s} \leftarrow \beta_2 \mathbf{s} + (1-\beta_2)(\nabla \mathcal{L})^2 \\[2pt] &\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \frac{\hat{\mathbf{m}}}{\sqrt{\hat{\mathbf{s}}} + \varepsilon}\end{aligned}`,
   hyperparams: [BETA1_SPEC, BETA2_SPEC],
   fixedLearningRate: 0.1,
   init: (d) => ({ m: zeros(d), v: zeros(d), t: 0 }),

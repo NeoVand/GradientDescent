@@ -47,7 +47,7 @@ export const lion: CoreOptimizer<LionState> = {
   id: 'lion',
   name: 'Lion',
   description: 'Sign of momentum: fixed-size steps, very light',
-  updateRuleLatex: String.raw`\mathbf{c} \leftarrow \beta_1 \mathbf{m} + (1-\beta_1)\nabla\mathcal{L}, \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\,\operatorname{sign}(\mathbf{c}), \;\; \mathbf{m} \leftarrow \beta_2 \mathbf{m} + (1-\beta_2)\nabla\mathcal{L}`,
+  updateRuleLatex: String.raw`\begin{aligned}&\mathbf{c} \leftarrow \beta_1 \mathbf{m} + (1-\beta_1)\nabla\mathcal{L} \\[2pt] &\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \operatorname{sign}(\mathbf{c}) \\[2pt] &\mathbf{m} \leftarrow \beta_2 \mathbf{m} + (1-\beta_2)\nabla\mathcal{L}\end{aligned}`,
   hyperparams: [LION_BETA1, LION_BETA2],
   fixedLearningRate: 0.05,
   init: (d) => ({ m: zeros(d), t: 0 }),
