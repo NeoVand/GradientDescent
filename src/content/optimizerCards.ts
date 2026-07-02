@@ -42,7 +42,7 @@ export const optTree: OptChapter[] = [
     name: 'The moving average',
     by: 'the one tool Acts II and III are built from',
     idea:
-      'Before the next two fixes, one small tool. An exponential moving average is a leaky memory: keep a fraction $\\beta$ of what you already believed, and mix in a fraction $1-\\beta$ of what you just saw. It smooths a jittery signal into a steady one. Roughly, it remembers the last $1/(1-\\beta)$ values — $\\beta = 0.9$ is about the last ten. Momentum averages gradients with it; RMSProp and Adam average squared gradients.',
+      'Before the next two fixes, one small tool. An exponential moving average is a leaky memory: keep a fraction $\\beta$ of what you already believed, and mix in a fraction $1-\\beta$ of what you just saw. (A heads-up: this $\\beta$ is a dial <em>inside the optimizer</em> — no relation to your knob $\\beta$ on the landscape. The alphabet is small and the field is greedy.) It smooths a jittery signal into a steady one. Roughly, it remembers the last $1/(1-\\beta)$ values — $\\beta = 0.9$ is about the last ten. Momentum averages gradients with it; RMSProp and Adam average squared gradients.',
     formula: String.raw`v \;\leftarrow\; \beta\, v + (1-\beta)\, x`
   },
   {
@@ -51,7 +51,7 @@ export const optTree: OptChapter[] = [
     lead: 'Armed with that one little tool, the first cure almost designs itself. If a single gradient is a gust of wind, a moving average of them is the <em>prevailing</em> wind — exactly what a marker rattling across a ravine is missing: a memory of which way is consistently downhill.',
     by: 'Boris Polyak — the "heavy ball"',
     idea:
-      'The failure to fix: plain descent bounces wall to wall in a ravine. The cure: give the marker mass. Keep a velocity — a moving average of past gradients — and let each new gradient nudge it. The side-to-side wobble averages out while the steady downhill push compounds into a tailwind, so it glides along the valley floor instead of rattling across it.',
+      'The failure to fix: plain descent bounces wall to wall in a ravine. The cure: give the marker mass. Keep a velocity — a moving average of past gradients — and let each new gradient nudge it. The side-to-side wobble averages out while the steady downhill push compounds into a tailwind, so it glides along the valley floor instead of rattling across it. (Check the formula against the last card and you’ll spot a missing $(1-\\mu)$: momentum’s memory deliberately <em>adds up</em> rather than averages — about $1/(1-\\mu)$ gradients’ worth of push — and $\\mu$ is this decay’s traditional name.)',
     formula: String.raw`\mathbf{v} \leftarrow \mu \mathbf{v} + \nabla \mathcal{L}, \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \mathbf{v}`,
     fix: 'damps the zig-zag, powers through plateaus',
     brk: 'all that inertia overshoots — it orbits the minimum before settling'

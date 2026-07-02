@@ -10,5 +10,7 @@ export const formulas = {
   gradientDefinition: String.raw`\nabla \mathcal{L} = \begin{bmatrix} \partial \mathcal{L}/\partial \alpha \\[2pt] \partial \mathcal{L}/\partial \beta \end{bmatrix}`,
   stepRule: String.raw`\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \nabla \mathcal{L}`,
   stability: String.raw`\gamma < \frac{2}{\lambda_{\max}}`,
-  directional: String.raw`D_{\mathbf{u}}\,\mathcal{L} \;=\; \nabla \mathcal{L}\cdot\mathbf{u} \;=\; \lVert \nabla \mathcal{L}\rVert\,\cos\theta`
+  // φ, not θ: the proof's angle must not collide with θ = the parameter pair,
+  // which the very next chapter introduces and the rest of the book keeps.
+  directional: String.raw`D_{\mathbf{u}}\,\mathcal{L} \;=\; \nabla \mathcal{L}\cdot\mathbf{u} \;=\; \lVert \nabla \mathcal{L}\rVert\,\cos\varphi`
 };

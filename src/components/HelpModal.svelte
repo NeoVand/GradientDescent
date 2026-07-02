@@ -553,9 +553,9 @@
 
   // (The gradient chapter's 3-D bowl is a real WebGL scene — see GuideGradient3D.svelte.)
 
-  // Proof figure, right panel: the rate of change ‖∇ℒ‖cosθ as the direction u
-  // sweeps from along ∇ℒ (θ=0, max) through a contour (θ=90°, zero) to −∇ℒ
-  // (θ=180°, min). A plain cosine — the claim, plotted.
+  // Proof figure, right panel: the rate of change ‖∇ℒ‖cosφ as the direction u
+  // sweeps from along ∇ℒ (φ=0, max) through a contour (φ=90°, zero) to −∇ℒ
+  // (φ=180°, min). A plain cosine — the claim, plotted.
   const proofCurve = (() => {
     const x0 = 252, x1 = 378, yc = 80, amp = 46, N = 60;
     const asc: string[] = [], desc: string[] = [];
@@ -1235,9 +1235,9 @@
                 <p class="proof-p">
                   Take a unit step in some direction {@html tex(String.raw`\mathbf{u}`)}. The loss changes
                   at a rate equal to the gradient’s <em>shadow</em> on that direction — their dot product
-                  {@html tex(String.raw`\nabla\mathcal{L}\cdot\mathbf{u}`)}. Writing {@html tex(String.raw`\theta`)}
-                  for the angle between {@html tex(String.raw`\mathbf{u}`)} and {@html tex(String.raw`\nabla\mathcal{L}`)},
-                  that shadow has length {@html tex(String.raw`\lVert\nabla\mathcal{L}\rVert\cos\theta`)}:
+                  {@html tex(String.raw`\nabla\mathcal{L}\cdot\mathbf{u}`)}. Writing {@html tex(String.raw`\varphi`)}
+                  (“phi”) for the angle between {@html tex(String.raw`\mathbf{u}`)} and {@html tex(String.raw`\nabla\mathcal{L}`)},
+                  that shadow has length {@html tex(String.raw`\lVert\nabla\mathcal{L}\rVert\cos\varphi`)}:
                 </p>
                 <div class="formula-display center">{@html texD(formulas.directional)}</div>
                 <figure class="proof-fig">
@@ -1257,8 +1257,8 @@
                     <circle cx="36" cy="112" r="2.8" fill="var(--color-text-primary)" />
                     <text x="134" y="46" class="proof-lbl" style="text-anchor:start;fill:#f59e0b">∇ℒ</text>
                     <text x="178" y="116" class="proof-lbl" style="text-anchor:start;fill:var(--color-text-secondary)">u</text>
-                    <text x="72" y="105" class="proof-lbl" style="fill:var(--color-text-tertiary)">θ</text>
-                    <text x="83" y="128" class="proof-lbl" style="fill:#3b82f6">‖∇ℒ‖ cos θ</text>
+                    <text x="72" y="105" class="proof-lbl" style="fill:var(--color-text-tertiary)">φ</text>
+                    <text x="83" y="128" class="proof-lbl" style="fill:#3b82f6">‖∇ℒ‖ cos φ</text>
                     <!-- Panel B · rate vs angle is a cosine -->
                     <line x1={proofCurve.x0 - 8} y1={proofCurve.yc} x2={proofCurve.x1 + 8} y2={proofCurve.yc} stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="3,3" stroke-opacity="0.45" />
                     <path d={proofCurve.ascD} fill="none" stroke="#f59e0b" stroke-width="2.4" stroke-linecap="round" />
@@ -1277,7 +1277,7 @@
                   </figcaption>
                 </figure>
                 <p class="proof-p">
-                  Because {@html tex(String.raw`\cos\theta`)} only ever runs from +1 to −1, that rate is
+                  Because {@html tex(String.raw`\cos\varphi`)} only ever runs from +1 to −1, that rate is
                   largest when {@html tex(String.raw`\mathbf{u}`)} lines up with {@html tex(String.raw`\nabla\mathcal{L}`)}
                   (the fastest <em>rise</em>), exactly zero at a right angle (walking a contour — the loss
                   holds still), and most negative along {@html tex(String.raw`-\nabla\mathcal{L}`)} (the
@@ -2001,7 +2001,10 @@
               </p>
               <div class="formula-display center">{@html texD(String.raw`\min_{\boldsymbol{\theta}}\;\; \mathcal{L}(\boldsymbol{\theta}) \;+\; \tfrac{\lambda}{2}\,\lVert \boldsymbol{\theta}\rVert^2`)}</div>
               <p>
-                where {@html tex(String.raw`\lambda`)} sets how hard to pull toward zero. For plain SGD the
+                where {@html tex(String.raw`\lambda`)} sets how hard to pull toward zero. (An unrelated
+                {@html tex(String.raw`\lambda`)}, by the way — not the curvature
+                {@html tex(String.raw`\lambda_{\max}`)} from the learning-rate chapter. The alphabet is
+                small and the field is greedy.) For plain SGD the
                 gradient of that penalty is exactly <strong>weight decay</strong> —
                 {@html tex(String.raw`\boldsymbol{\theta} \leftarrow (1-\gamma\lambda)\,\boldsymbol{\theta} - \gamma\nabla\mathcal{L}`)}
                 — shrinking every weight a touch each step (Krogh &amp; Hertz, 1991). This is the same
