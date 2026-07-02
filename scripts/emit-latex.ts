@@ -23,6 +23,7 @@ import { chRefs } from '../src/content/chapterRefs';
 import { optTree, OPT_CITE } from '../src/content/optimizerCards';
 import { problemCards } from '../src/content/problemCards';
 import { richToTex, escapeTex } from '../src/content/rich';
+import { figureSvgs } from '../src/figures';
 
 const SITE = 'https://gradientlab.ai';
 
@@ -116,11 +117,17 @@ function emitBlocks(blocks: Block[], slug: string): string {
 }
 
 function emitFigure(id: string, caption: Rich, opts?: { inBox?: boolean }): string {
+  // Figures whose compute/render split has landed print for real; the rest
+  // keep their labelled placeholder.
+  const body =
+    id in figureSvgs
+      ? `\\includegraphics[width=0.9\\linewidth]{figures/${id}.pdf}`
+      : `\\figplaceholder{${id}}`;
   if (opts?.inBox) {
     // Floats can't live inside a box; memoir's \legend gives the caption.
     return [
       '\\begin{center}',
-      `\\figplaceholder{${id}}`,
+      body,
       `\\legend{${richToTex(caption)}}`,
       '\\end{center}'
     ].join('\n');
@@ -128,7 +135,7 @@ function emitFigure(id: string, caption: Rich, opts?: { inBox?: boolean }): stri
   return [
     '\\begin{figure}[htbp]',
     '\\centering',
-    `\\figplaceholder{${id}}`,
+    body,
     `\\caption{${richToTex(caption)}}`,
     `\\label{fig:${id}}`,
     '\\end{figure}'

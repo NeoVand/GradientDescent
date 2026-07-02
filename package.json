@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
     "test": "vitest run",
-    "book:tex": "vite-node scripts/emit-latex.ts",
+    "book:tex": "vite-node scripts/emit-figures.ts && vite-node scripts/emit-latex.ts",
     "book": "npm run book:tex && tectonic book/gradient-lab.tex"
   },
   "devDependencies": {

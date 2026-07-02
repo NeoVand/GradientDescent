@@ -33,6 +33,7 @@
   import { optimizers, optimizerOrder, defaultHyper, type OptimizerId } from '../utils/optimizers';
   import GuideVizLayers from './GuideVizLayers.svelte';
   import GuideBlocks from './GuideBlocks.svelte';
+  import { figureSvgs } from '../figures';
   import ChapterCta from './ChapterCta.svelte';
   import { enterCourseFromChapter, startCourseIntro } from '../utils/lessons';
   import {
@@ -593,110 +594,6 @@
   // tangent — the limit, drawn. Real y = x² geometry, not a sketch. Chords
   // run point-to-point on the curve (no stray line ends); only the tangent
   // extends, gently, past the anchor.
-  const secantFig = (() => {
-    const W = 300, H = 140, a = 1.0;
-    const xMin = -0.3, xMax = 3.2, yMax = xMax * xMax;
-    const px = (x: number) => 14 + ((x - xMin) / (xMax - xMin)) * (W - 28);
-    const py = (y: number) => H - 20 - (y / yMax) * (H - 40);
-    const N = 48;
-    const curve = 'M ' + Array.from({ length: N + 1 }, (_, i) => {
-      const x = xMin + (i / N) * (xMax - xMin);
-      return `${px(x).toFixed(1)},${py(x * x).toFixed(1)}`;
-    }).join(' L ');
-    const at = (x: number) => ({ x: px(x), y: py(x * x) });
-    const chords = [1.9, 1.15, 0.6].map((h, i) => ({
-      x1: at(a).x, y1: at(a).y, x2: at(a + h).x, y2: at(a + h).y,
-      end: at(a + h), o: 0.3 + i * 0.18
-    }));
-    // The tangent (slope 2a), drawn a touch past the point on both sides.
-    const tan = (x: number) => a * a + 2 * a * (x - a);
-    const tangent = { x1: px(a - 0.75), y1: py(tan(a - 0.75)), x2: px(a + 1.15), y2: py(tan(a + 1.15)) };
-    // The sweep: a quiet curved arrow from the outermost chord down onto the
-    // tangent — the direction "h → 0" travels, so the reader doesn't have to
-    // infer that top-to-bottom means the nudge shrinking.
-    const lerp = (A: { x: number; y: number }, B: { x: number; y: number }, t: number) =>
-      ({ x: A.x + (B.x - A.x) * t, y: A.y + (B.y - A.y) * t });
-    const s0 = lerp({ x: chords[0].x1, y: chords[0].y1 }, chords[0].end, 0.62);
-    const s1 = { x: px(a + 0.92), y: py(tan(a + 0.92)) - 5 };
-    const mid = lerp(s0, s1, 0.5);
-    const nx = s1.y - s0.y, ny = -(s1.x - s0.x);
-    const nm = Math.hypot(nx, ny);
-    const ctrl = { x: mid.x + (nx / nm) * 16, y: mid.y + (ny / nm) * 16 };
-    const sweep = `M ${s0.x.toFixed(1)},${s0.y.toFixed(1)} Q ${ctrl.x.toFixed(1)},${ctrl.y.toFixed(1)} ${s1.x.toFixed(1)},${s1.y.toFixed(1)}`;
-    return { W, H, curve, chords, tangent, p: at(a), pEnd: at(a + 1.9), sweep, ctrl };
-  })();
-
-  // Curvature figure A: same slope underfoot, two different futures — a tight
-  // curve and a relaxed one sharing one tangent at the marked point. Curve
-  // ends are where the labels live, clear of all three lines.
-  const bendFig = (() => {
-    // Screen y grows DOWNWARD, so a loss curve that bends UP (positive λ)
-    // needs its quadratic term SUBTRACTED. Staged as a descent to the right:
-    // the sharp curve bottoms out and curls back up; the gentle one keeps
-    // rolling — same tangent at the marker.
-    const W = 300, H = 126, x0 = 104, y0 = 82, m = 0.35;
-    const mk = (c: number, lo: number, hi: number) => {
-      const f = (dx: number) => y0 + m * dx - c * dx * dx;
-      const pts: string[] = [];
-      for (let dx = lo; dx <= hi; dx += 4) pts.push(`${(x0 + dx).toFixed(1)},${f(dx).toFixed(1)}`);
-      return { d: 'M ' + pts.join(' L '), end: { x: x0 + hi, y: f(hi) } };
-    };
-    const sharp = mk(0.0075, -78, 88);
-    const gentle = mk(0.0015, -92, 118);
-    return { W, H, x0, y0, sharp, gentle,
-      tan: { x1: x0 - 86, y1: y0 + m * -86, x2: x0 + 100, y2: y0 + m * 100 } };
-  })();
-
-  // Curvature figure B: the (1 − γλ) multiplier, run honestly. Four regimes of
-  // real gradient descent on y = x², dots at α_k = (1−γλ)^k · α₀.
-  const regimeFig = (() => {
-    const PW = 110, H = 128, pad = 14;
-    const panel = (gl: number, a0: number, latex: string, word: string, i: number) => {
-      const ox = i * PW;
-      const px = (x: number) => ox + PW / 2 + x * (PW / 2 - pad);
-      const py = (y: number) => H - 34 - y * (H - 62);
-      const N = 30;
-      const curve = 'M ' + Array.from({ length: N + 1 }, (_, k) => {
-        const x = -1.12 + (2.24 * k) / N;
-        return `${px(x).toFixed(1)},${py(x * x).toFixed(1)}`;
-      }).join(' L ');
-      const dots: { x: number; y: number }[] = [];
-      let aK = a0;
-      for (let k = 0; k <= 6 && Math.abs(aK) <= 1.12; k++) {
-        dots.push({ x: px(aK), y: py(aK * aK) });
-        aK = (1 - gl) * aK;
-      }
-      const hops = 'M ' + dots.map(d => `${d.x.toFixed(1)},${d.y.toFixed(1)}`).join(' L ');
-      return { ox, curve, dots, hops, latex, word, lx: ox + PW / 2 };
-    };
-    // The diverging run starts closer in, so its growing bounces stay on
-    // stage long enough to be seen growing.
-    return { W: PW * 4, H, PW, panels: [
-      panel(0.35, -1, String.raw`\gamma\lambda = 0.35`, 'glide', 0),
-      panel(1.0, -1, String.raw`\gamma\lambda = 1`, 'one hop', 1),
-      panel(1.75, -1, String.raw`\gamma\lambda = 1.75`, 'bounce in', 2),
-      panel(2.2, -0.5, String.raw`\gamma\lambda = 2.2`, 'diverge', 3)
-    ] };
-  })();
-
-  // Proof figure, right panel: the rate of change ‖∇ℒ‖cosφ as the direction u
-  // sweeps from along ∇ℒ (φ=0, max) through a contour (φ=90°, zero) to −∇ℒ
-  // (φ=180°, min). A plain cosine — the claim, plotted.
-  const proofCurve = (() => {
-    const x0 = 252, x1 = 378, yc = 80, amp = 46, N = 60;
-    const asc: string[] = [], desc: string[] = [];
-    for (let i = 0; i <= N; i++) {
-      const th = Math.PI * (i / N);
-      const x = x0 + (i / N) * (x1 - x0), y = yc - Math.cos(th) * amp;
-      const pt = `${x.toFixed(1)},${y.toFixed(1)}`;
-      if (th <= Math.PI / 2 + 1e-9) asc.push(pt);
-      if (th >= Math.PI / 2 - 1e-9) desc.push(pt);
-    }
-    return { x0, x1, yc, amp,
-      ascD: 'M ' + asc.join(' L '), descD: 'M ' + desc.join(' L '),
-      p0: { x: x0, y: yc - amp }, p90: { x: (x0 + x1) / 2, y: yc }, p180: { x: x1, y: yc + amp } };
-  })();
-
   // 6) The optimizer family tree, drawn as an actual tree. DATA-DRIVEN: each
   // node lists a parent (and reuses RACE_COLORS); the tidy left→right layout
   // (x = lineage depth, y = leaf order, parents centred on their children)
@@ -1103,35 +1000,7 @@
                 </figure>
               {:else if id === 'downhill-proof'}
                 <figure class="proof-fig">
-                  <svg viewBox="0 0 420 156" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                    <defs>
-                      <marker id="pf-grad" viewBox="0 -5 10 10" refX="8" refY="0" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,-5L10,0L0,5" fill="#f59e0b" /></marker>
-                      <marker id="pf-u" viewBox="0 -5 10 10" refX="8" refY="0" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,-5L10,0L0,5" fill="var(--color-text-tertiary)" /></marker>
-                    </defs>
-                    <line x1="210" y1="16" x2="210" y2="146" class="fig-contour" style="stroke-opacity:0.16" />
-                    <!-- Panel A · the shadow (projection of ∇ℒ onto u) — centred in the left half -->
-                    <line x1="36" y1="112" x2="174" y2="112" stroke="var(--color-text-tertiary)" stroke-width="1.2" stroke-dasharray="3,3" stroke-opacity="0.6" marker-end="url(#pf-u)" />
-                    <line x1="36" y1="112" x2="130.5" y2="112" stroke="#3b82f6" stroke-width="4.5" stroke-linecap="round" />
-                    <line x1="130.5" y1="48.3" x2="130.5" y2="112" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="2.5,2.5" stroke-opacity="0.75" />
-                    <path d="M 123.5,112 L 123.5,105 L 130.5,105" fill="none" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-opacity="0.75" />
-                    <line x1="36" y1="112" x2="128.6" y2="49.5" stroke="#f59e0b" stroke-width="2.6" marker-end="url(#pf-grad)" />
-                    <path d="M 64,112 A 28,28 0 0 0 60.4,97.6" fill="none" stroke="var(--color-text-tertiary)" stroke-width="1.2" />
-                    <circle cx="36" cy="112" r="2.8" fill="var(--color-text-primary)" />
-                    <text x="134" y="46" class="proof-lbl" style="text-anchor:start;fill:#f59e0b">∇ℒ</text>
-                    <text x="178" y="116" class="proof-lbl" style="text-anchor:start;fill:var(--color-text-secondary)">u</text>
-                    <text x="72" y="105" class="proof-lbl" style="fill:var(--color-text-tertiary)">φ</text>
-                    <text x="83" y="128" class="proof-lbl" style="fill:#3b82f6">‖∇ℒ‖ cos φ</text>
-                    <!-- Panel B · rate vs angle is a cosine -->
-                    <line x1={proofCurve.x0 - 8} y1={proofCurve.yc} x2={proofCurve.x1 + 8} y2={proofCurve.yc} stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="3,3" stroke-opacity="0.45" />
-                    <path d={proofCurve.ascD} fill="none" stroke="#f59e0b" stroke-width="2.4" stroke-linecap="round" />
-                    <path d={proofCurve.descD} fill="none" stroke="#10b981" stroke-width="2.4" stroke-linecap="round" />
-                    <circle cx={proofCurve.p0.x} cy={proofCurve.p0.y} r="3.1" fill="#f59e0b" />
-                    <circle cx={proofCurve.p90.x} cy={proofCurve.p90.y} r="3.1" fill="var(--color-text-tertiary)" />
-                    <circle cx={proofCurve.p180.x} cy={proofCurve.p180.y} r="3.1" fill="#10b981" />
-                    <text x={proofCurve.p0.x - 3} y={proofCurve.p0.y - 8} class="proof-lbl" style="text-anchor:start;fill:#f59e0b">along ∇ℒ</text>
-                    <text x={proofCurve.p90.x} y={proofCurve.p90.y - 9} class="proof-lbl" style="fill:var(--color-text-tertiary)">contour · flat</text>
-                    <text x={proofCurve.p180.x + 3} y={proofCurve.p180.y + 13} class="proof-lbl" style="text-anchor:end;fill:#10b981">along −∇ℒ</text>
-                  </svg>
+                  {@html figureSvgs['downhill-proof']('app')}
                   <figcaption class="proof-figcap">{@html cap}</figcaption>
                 </figure>
               {:else if id === 'gamma-regimes'}
@@ -1189,28 +1058,7 @@
                   <text x={genFig.x1} y={genFig.yBase + 18} class="fig-svg-label" style="text-anchor:end;fill:var(--color-text-tertiary)">training time →</text>
                 </svg>
                 {:else if id === 'derivative-secant'}
-                  <svg viewBox="0 0 {secantFig.W} {secantFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                  <defs>
-                    <marker id="sweep-head" viewBox="0 -4 8 8" refX="6.5" refY="0" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,-2.8 L6.5,0 L0,2.8" fill="none" stroke="var(--color-text-tertiary)" stroke-width="1.1" /></marker>
-                  </defs>
-                  <path d={secantFig.curve} fill="none" stroke="#10b981" stroke-width="1.6" stroke-opacity="0.65" />
-                  {#each secantFig.chords as s}
-                    <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke="var(--color-text-tertiary)" stroke-width="1" stroke-opacity={s.o} />
-                    <circle cx={s.end.x} cy={s.end.y} r="1.8" fill="var(--color-text-tertiary)" fill-opacity={s.o + 0.2} />
-                  {/each}
-                  <line x1={secantFig.tangent.x1} y1={secantFig.tangent.y1} x2={secantFig.tangent.x2} y2={secantFig.tangent.y2} stroke="#3b82f6" stroke-width="1.7" stroke-opacity="0.95" />
-                  <path d={secantFig.sweep} fill="none" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-opacity="0.75" marker-end="url(#sweep-head)" />
-                  <circle cx={secantFig.p.x} cy={secantFig.p.y} r="3" fill="#f59e0b" stroke="#fff" stroke-width="1.2" />
-                  <foreignObject x={secantFig.p.x - 10} y={secantFig.p.y + 8} width="24" height="22">
-                    <span class="fig-tex">{@html tex(String.raw`\alpha`)}</span>
-                  </foreignObject>
-                  <foreignObject x={secantFig.pEnd.x - 16} y={secantFig.pEnd.y - 24} width="44" height="22">
-                    <span class="fig-tex dim">{@html tex(String.raw`\alpha + h`)}</span>
-                  </foreignObject>
-                  <foreignObject x={secantFig.ctrl.x + 4} y={secantFig.ctrl.y - 8} width="46" height="22">
-                    <span class="fig-tex dim">{@html tex(String.raw`h \to 0`)}</span>
-                  </foreignObject>
-                </svg>
+                  {@html figureSvgs['derivative-secant']('app')}
                 {:else if id === 'derivative-slices-3d'}
                   <div class="fig-3d">
                   {#await import('./GuideGradient3D.svelte') then m}
@@ -1234,35 +1082,9 @@
                   <div class="fig-3d-hint">drag to orbit</div>
                 </div>
                 {:else if id === 'curvature-bend'}
-                  <svg viewBox="0 0 {bendFig.W} {bendFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                  <line x1={bendFig.tan.x1} y1={bendFig.tan.y1} x2={bendFig.tan.x2} y2={bendFig.tan.y2} stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="3,3.5" stroke-opacity="0.55" />
-                  <path d={bendFig.sharp.d} fill="none" stroke="#f87171" stroke-width="1.6" stroke-opacity="0.9" />
-                  <path d={bendFig.gentle.d} fill="none" stroke="#34d399" stroke-width="1.6" stroke-opacity="0.9" />
-                  <circle cx={bendFig.x0} cy={bendFig.y0} r="3" fill="#f59e0b" stroke="#fff" stroke-width="1.2" />
-                  <foreignObject x={bendFig.sharp.end.x + 5} y={bendFig.sharp.end.y - 8} width="70" height="18">
-                    <span class="fig-tex" style="color:#f87171">{@html tex(String.raw`\lambda`)} large</span>
-                  </foreignObject>
-                  <foreignObject x={bendFig.gentle.end.x + 5} y={bendFig.gentle.end.y - 8} width="70" height="18">
-                    <span class="fig-tex" style="color:#34d399">{@html tex(String.raw`\lambda`)} small</span>
-                  </foreignObject>
-                </svg>
+                  {@html figureSvgs['curvature-bend']('app')}
                 {:else if id === 'curvature-regimes'}
-                  <svg viewBox="0 0 {regimeFig.W} {regimeFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                  {#each regimeFig.panels as pn, i}
-                    {#if i > 0}
-                      <line x1={pn.ox} y1="10" x2={pn.ox} y2={regimeFig.H - 30} stroke="var(--color-border)" stroke-width="1" stroke-opacity="0.5" />
-                    {/if}
-                    <path d={pn.curve} fill="none" stroke="#10b981" stroke-width="1.4" stroke-opacity="0.6" />
-                    <path d={pn.hops} fill="none" stroke="#f59e0b" stroke-width="1" stroke-opacity="0.55" />
-                    {#each pn.dots as dt, k}
-                      <circle cx={dt.x} cy={dt.y} r={k === 0 ? 2.8 : 2} fill="#f59e0b" fill-opacity={k === 0 ? 1 : 0.8} stroke={k === 0 ? '#fff' : 'none'} stroke-width="1" />
-                    {/each}
-                    <foreignObject x={pn.ox + 4} y={regimeFig.H - 27} width={regimeFig.PW - 8} height="27">
-                      <span class="fig-tex" style="display:block;text-align:center">{@html tex(pn.latex)}</span>
-                      <span class="fig-word" style="text-align:center;margin-top:2px">{pn.word}</span>
-                    </foreignObject>
-                  {/each}
-                </svg>
+                  {@html figureSvgs['curvature-regimes']('app')}
                 {:else if id === 'landscape-two-views'}
                   <svg viewBox="0 0 460 150" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
                   <defs>
@@ -2126,7 +1948,7 @@
     border: 1px solid var(--color-border);
     border-radius: 12px;
   }
-  .fig > svg { padding: 0.4rem; }
+  .fig > :global(svg) { padding: 0.4rem; }
   /* Layered landscape figures (ravine, race): a relative frame holding the SVG,
      the Layers popover, and the loss colorbar. */
   .fig-viz {
@@ -2238,8 +2060,6 @@
   .reading-column :global(.proof-p) { font-size: 0.88rem; line-height: 1.65; margin: 0 0 0.7rem; }
   .reading-column :global(.proof .formula-display) { margin: 0.6rem 0; }
   .proof-fig { margin: 0.7rem 0 0.5rem; }
-  .proof-fig svg { display: block; width: 100%; height: auto; }
-  .proof-lbl { font-size: 10.5px; font-weight: 600; font-family: inherit; text-anchor: middle; }
   .proof-figcap { font-size: 0.76rem; line-height: 1.5; text-align: left; color: var(--color-text-tertiary); margin-top: 0.5rem; }
   .reading-column :global(.proof-qed) { color: #10b981; font-weight: 700; margin-left: 0.15rem; }
 
