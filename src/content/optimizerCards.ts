@@ -76,7 +76,7 @@ export const optTree: OptChapter[] = [
     by: 'Yurii Nesterov — accelerated gradient',
     idea:
       'The failure to fix: momentum overshoots because it looks where it stands. The cure: look ahead. Measure the gradient where the velocity is about to carry you, not where you are — like braking into a corner instead of after it. The same heavy ball, now with foresight; it settles without the orbit. On a smooth convex bowl this look-ahead provably converges as fast as any method using only gradients ever can — you cannot do better with the slope alone.',
-    formula: String.raw`\mathbf{v} \leftarrow \mu \mathbf{v} + \nabla \mathcal{L}(\boldsymbol{\theta}), \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\,(\nabla \mathcal{L} + \mu \mathbf{v})`,
+    formula: String.raw`\mathbf{v} \leftarrow \mu \mathbf{v} + \nabla \mathcal{L}, \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\,(\nabla \mathcal{L} + \mu \mathbf{v})`,
     fix: 'corrects the overshoot before it happens'
   },
   {
@@ -87,8 +87,8 @@ export const optTree: OptChapter[] = [
     code: 'adagrad',
     by: 'Duchi, Hazan & Singer',
     idea:
-      'A different failure: one shared $\\gamma$ is wrong when the two parameters need very different step sizes. The cure: give each its own. Divide a parameter’s step by the running size of its own past gradients — so a parameter that rarely moves takes bold steps while a busy one calms down. The running size is a sum of past squared gradients $s$, and the step becomes $\\gamma\\,\\nabla\\mathcal{L}/(\\sqrt{s}+\\varepsilon)$. This made it the workhorse of sparse problems like word embeddings.',
-    formula: String.raw`s \leftarrow s + (\nabla \mathcal{L})^2, \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \frac{\nabla \mathcal{L}}{\sqrt{s} + \varepsilon}`,
+      'A different failure: one shared $\\gamma$ is wrong when the two parameters need very different step sizes. The cure: give each its own. Divide a parameter’s step by the running size of its own past gradients — so a parameter that rarely moves takes bold steps while a busy one calms down. The running size is a sum of past squared gradients $\\mathbf{s}$, and the step becomes $\\gamma\\,\\nabla\\mathcal{L}/(\\sqrt{\\mathbf{s}}+\\varepsilon)$. This made it the workhorse of sparse problems like word embeddings.',
+    formula: String.raw`\mathbf{s} \leftarrow \mathbf{s} + (\nabla \mathcal{L})^2, \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \frac{\nabla \mathcal{L}}{\sqrt{\mathbf{s}} + \varepsilon}`,
     fix: 'every parameter gets its own learning rate',
     brk: 'that history only grows, so the step shrinks toward zero — it strangles itself',
     hd: 'A learning rate per parameter is really a bargain struck with Newton (two chapters ahead): the full curvature table has $d^2$ entries, but its <em>diagonal</em> has just $d$ — same cost as the gradient itself. AdaGrad, RMSProp, Adam and Sophia all live on that diagonal. The fine print: a diagonal can only stretch the <em>axes</em>, so it fixes a ravine aligned with the knobs and does nothing for one running diagonally — rotate the valley 45° and Adam zig-zags like plain GD.'
@@ -102,7 +102,7 @@ export const optTree: OptChapter[] = [
     by: 'Geoffrey Hinton — never formally published; the world cites a Coursera slide',
     idea:
       'The failure to fix: AdaGrad’s ever-growing memory chokes long runs. The cure: let it forget. Swap the growing sum for a moving average of squared gradients (the tool from Act II). Old gradients fade, so the per-parameter step size stays alive even on long, winding, non-convex problems.',
-    formula: String.raw`s \leftarrow \rho\, s + (1-\rho)(\nabla \mathcal{L})^2, \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \frac{\nabla \mathcal{L}}{\sqrt{s} + \varepsilon}`,
+    formula: String.raw`\mathbf{s} \leftarrow \rho\, \mathbf{s} + (1-\rho)(\nabla \mathcal{L})^2, \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \frac{\nabla \mathcal{L}}{\sqrt{\mathbf{s}} + \varepsilon}`,
     fix: 'forgetting keeps the step size alive'
   },
   {
@@ -126,8 +126,8 @@ export const optTree: OptChapter[] = [
     code: 'adam',
     by: 'Kingma & Ba — "adaptive moments"',
     idea:
-      'The merger the whole trunk builds to: take Momentum’s moving average of gradients (decay $\\beta_1$) AND RMSProp’s moving average of squared gradients (decay $\\beta_2$), and use them together. One honest detail: both averages start at zero and read too low at first, so each is divided by $1-\\beta^t$ to correct that early bias — giving the bias-corrected $\\hat{\\mathbf m}$ and $\\hat s$ that the update below pits against each other. The result became the workhorse of modern deep learning — its paper is now one of the most-cited in all of science — and the launch point for every branch that follows.',
-    formula: String.raw`\hat{\mathbf{m}} = \frac{\mathbf{m}}{1-\beta_1^t}, \quad \hat{s} = \frac{s}{1-\beta_2^t}, \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \frac{\hat{\mathbf{m}}}{\sqrt{\hat{s}} + \varepsilon}`,
+      'The merger the whole trunk builds to: take Momentum’s moving average of gradients (decay $\\beta_1$) AND RMSProp’s moving average of squared gradients (decay $\\beta_2$), and use them together. One honest detail: both averages start at zero and read too low at first, so each is divided by $1-\\beta^t$ to correct that early bias — giving the bias-corrected $\\hat{\\mathbf{m}}$ and $\\hat{\\mathbf{s}}$ that the update below pits against each other. The result became the workhorse of modern deep learning — its paper is now one of the most-cited in all of science — and the launch point for every branch that follows.',
+    formula: String.raw`\hat{\mathbf{m}} = \frac{\mathbf{m}}{1-\beta_1^t}, \quad \hat{\mathbf{s}} = \frac{\mathbf{s}}{1-\beta_2^t}, \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \frac{\hat{\mathbf{m}}}{\sqrt{\hat{\mathbf{s}}} + \varepsilon}`,
     fix: 'robust out of the box almost everywhere',
     brk: 'not perfect — three later papers each sand down one rough edge'
   },
@@ -139,8 +139,8 @@ export const optTree: OptChapter[] = [
     lead: 'Adam looked like the end of the road — robust, popular, everywhere at once. It wasn’t. Within a couple of years three different people each tugged on a single loose thread, and one careful refinement at a time, sanded it smoother. The first of them had been paying very close attention back in Act II.',
     by: 'Timothy Dozat — Nesterov-accelerated Adam',
     idea:
-      'The first refinement. Remember Act II, where Nesterov beat plain momentum by measuring the gradient a step ahead? Nadam plays that exact trick inside Adam: swap the bias-corrected momentum $\\hat{\\mathbf m}$ for a blend that leans toward where the momentum is heading, then divide by the same adaptive $\\sqrt{\\hat s}$. A small change bought for a little less overshoot and a slightly quicker settle.',
-    formula: String.raw`\bar{\mathbf{m}} = \beta_1 \hat{\mathbf{m}} + \frac{(1{-}\beta_1)\nabla \mathcal{L}}{1-\beta_1^t}, \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\,\frac{\bar{\mathbf{m}}}{\sqrt{\hat{\mathbf{s}}}+\varepsilon}`,
+      'The first refinement. Remember Act II, where Nesterov beat plain momentum by measuring the gradient a step ahead? Nadam plays that exact trick inside Adam: swap the bias-corrected momentum $\\hat{\\mathbf{m}}$ for a blend that leans toward where the momentum is heading, then divide by the same adaptive $\\sqrt{\\hat{\\mathbf{s}}}$. A small change bought for a little less overshoot and a slightly quicker settle.',
+    formula: String.raw`\bar{\mathbf{m}} = \beta_1 \hat{\mathbf{m}} + \frac{(1-\beta_1)\nabla \mathcal{L}}{1-\beta_1^t}, \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\,\frac{\bar{\mathbf{m}}}{\sqrt{\hat{\mathbf{s}}}+\varepsilon}`,
     fix: 'Nesterov foresight on Adam’s momentum'
   },
   {
@@ -151,7 +151,7 @@ export const optTree: OptChapter[] = [
     lead: 'The second thread was the one that mattered most in practice — and it had been hiding in plain sight inside nearly every training run on Earth. The culprit was a line everyone trusted without a second glance: <em>weight decay.</em>',
     by: 'Loshchilov & Hutter — the actual default today',
     idea:
-      'The refinement that matters most: nearly every large model — GPT, BERT, the lot — trains with AdamW, not plain Adam. Weight decay gently pulls every parameter toward zero to curb overfitting; Adam folded that pull into the gradient, where its adaptive $\\sqrt{\\hat s}$ scaling then distorted it. AdamW decouples them — the $\\lambda\\boldsymbol\\theta$ decay lands straight on $\\boldsymbol\\theta$, outside the scaling. One honest caveat here: these toy losses carry no overfitting to regularize, so $\\lambda$ shows up as a literal, visible pull of the marker toward the origin. Crank it and watch the fit drift inward; set $\\lambda$ to 0 and you are back to exact Adam.',
+      'The refinement that matters most: nearly every large model — GPT, BERT, the lot — trains with AdamW, not plain Adam. Weight decay gently pulls every parameter toward zero to curb overfitting; Adam folded that pull into the gradient, where its adaptive $\\sqrt{\\hat{\\mathbf{s}}}$ scaling then distorted it. AdamW decouples them — the $\\lambda\\boldsymbol\\theta$ decay lands straight on $\\boldsymbol\\theta$, outside the scaling. One honest caveat here: these toy losses carry no overfitting to regularize, so $\\lambda$ shows up as a literal, visible pull of the marker toward the origin. Crank it and watch the fit drift inward; set $\\lambda$ to 0 and you are back to exact Adam.',
     formula: String.raw`\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\left(\frac{\hat{\mathbf{m}}}{\sqrt{\hat{\mathbf{s}}} + \varepsilon} + \lambda\,\boldsymbol{\theta}\right)`,
     fix: 'decoupled decay — why it’s the real-world default',
     brk: 'with no overfitting to fight here, $\\lambda$ is a pull toward 0 more than a regularizer'
@@ -164,7 +164,7 @@ export const optTree: OptChapter[] = [
     lead: 'The third thread was the quietest of all. For years practitioners had patched a rough spot in Adam’s opening steps with a hand-tuned <em>warmup</em>, half-superstition — runs just blew up without it, and nobody could say exactly why. What if that warmup could be <em>derived</em> instead of guessed?',
     by: 'Liu et al. — Adam’s warmup, automated',
     idea:
-      'The third refinement closes a quieter Adam wart. In the first handful of steps Adam has barely any squared-gradient history, so its $\\sqrt{\\hat s}$ scaling is pure noise — the practitioner’s fix was a hand-tuned warmup that crept the rate up by hand. RAdam computes how trustworthy that variance actually is (a number $\\rho_t$) and, until it can be trusted, just skips the scaling and takes a plain momentum step. A rectification factor then eases the adaptive part in. Warmup, but derived rather than guessed — nothing to tune.',
+      'The third refinement closes a quieter Adam wart. In the first handful of steps Adam has barely any squared-gradient history, so its $\\sqrt{\\hat{\\mathbf{s}}}$ scaling is pure noise — the practitioner’s fix was a hand-tuned warmup that crept the rate up by hand. RAdam computes how trustworthy that variance actually is (a number $\\rho_t$) and, until it can be trusted, just skips the scaling and takes a plain momentum step. A rectification factor then eases the adaptive part in. Warmup, but derived rather than guessed — nothing to tune.',
     formula: String.raw`\rho_t = \rho_\infty - \frac{2t\,\beta_2^{t}}{1-\beta_2^{t}}, \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, r_t\,\frac{\hat{\mathbf{m}}}{\sqrt{\hat{\mathbf{s}}}+\varepsilon}\;\;(\rho_t > 4)`,
     fix: 'an automatic warmup — no schedule to hand-tune',
     brk: 'only smooths the opening steps; past warmup it just is Adam'
@@ -178,7 +178,7 @@ export const optTree: OptChapter[] = [
     by: 'Chen et al. (Google) — found by program search, not designed',
     idea:
       'Adam scaled the step by gradient history. Lion throws that out and takes a different shape — and it wasn’t invented by a person: a program searched the space of optimizers and this fell out. The name is a fitting backronym — EvoLved Sign Momentum. Keep one momentum buffer, blend it with the fresh gradient, and step by the $\\operatorname{sign}$ of the result — so every step is the same size $\\gamma$ on each axis, no matter how steep or flat. That makes it light (one buffer, no squared-gradient term) and competitive with Adam on big vision and language models. The catch is the very thing that makes it clean: a step that never shrinks can’t settle by itself.',
-    formula: String.raw`\mathbf{c} \leftarrow \beta_1 \mathbf{m} + (1{-}\beta_1)\nabla\mathcal{L}, \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \operatorname{sign}(\mathbf{c}), \;\; \mathbf{m} \leftarrow \beta_2 \mathbf{m} + (1{-}\beta_2)\nabla\mathcal{L}`,
+    formula: String.raw`\mathbf{c} \leftarrow \beta_1 \mathbf{m} + (1-\beta_1)\nabla\mathcal{L}, \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \operatorname{sign}(\mathbf{c}), \;\; \mathbf{m} \leftarrow \beta_2 \mathbf{m} + (1-\beta_2)\nabla\mathcal{L}`,
     fix: 'fixed-size steps from one tiny buffer — light and fast',
     brk: 'the step never shrinks, so it orbits the minimum until $\\gamma$ is decayed by a schedule',
     hd: 'Watch Lion’s red step arrow: with two knobs, $\\operatorname{sign}(\\mathbf c)$ can only point in <em>eight</em> directions — the axes and the four diagonals. That is the whole geometry of a sign step: it moves $\\gamma$ along every axis at once, so in $d$ dimensions its true length is $\\gamma\\sqrt{d}$ no matter how faint the gradient, and it can point far from steepest descent. At a billion parameters that $\\sqrt{d}$ is enormous — which is why Lion runs on a much smaller $\\gamma$ than Adam.'
@@ -205,7 +205,7 @@ export const optTree: OptChapter[] = [
     lead: 'Newton’s method is the king nobody can afford — exact, and ruinously expensive, all because of that one beautiful matrix. So the question for the age of billion-parameter models is blunt: can you keep the <em>idea</em> and throw away the bill?',
     by: 'Liu et al. — Newton, cut down to fit an LLM',
     idea:
-      'Newton’s curvature is unbeatable and unaffordable; Sophia keeps the affordable part. Drop the full Hessian for just its DIAGONAL — one curvature number $\\mathbf h$ per parameter, no matrix to invert — and precondition the momentum by it. Then the safety move: CLIP every coordinate’s step to $\\pm\\rho$. Where the diagonal estimate is tiny or noisy (and $\\mathbf m/\\mathbf h$ would blow up) the clip bounds the move; where it’s solid, the step stays curvature-scaled. Its paper reports GPT-2-scale pretraining in roughly half the steps Adam needs — a headline later independent benchmarks have contested — but either way, it is second-order thinking made cheap enough to try.',
+      'Newton’s curvature is unbeatable and unaffordable; Sophia keeps the affordable part. Drop the full Hessian for just its DIAGONAL — one curvature number $\\mathbf h$ per parameter, no matrix to invert — and precondition the momentum by it. Then the safety move: CLIP every coordinate’s step to $\\pm\\rho$ (Sophia’s own $\\rho$, a clip radius — no relation to RMSProp’s decay; the alphabet is small and the field is greedy). Where the diagonal estimate is tiny or noisy (and $\\mathbf m/\\mathbf h$ would blow up) the clip bounds the move; where it’s solid, the step stays curvature-scaled. Its paper reports GPT-2-scale pretraining in roughly half the steps Adam needs — a headline later independent benchmarks have contested — but either way, it is second-order thinking made cheap enough to try.',
     formula: String.raw`\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\,\operatorname{clip}\!\left(\frac{\mathbf{m}}{\max(\mathbf{h},\varepsilon)},\,\rho\right)`,
     fix: 'diagonal curvature + a clip — second-order on a budget',
     brk: 'only the diagonal: blind to the off-axis stretch Newton corrects'
@@ -218,8 +218,8 @@ export const optTree: OptChapter[] = [
     code: 'prodigy',
     by: 'Mishchenko & Defazio — the learning rate, removed',
     idea:
-      'Every method so far still made you pick $\\gamma$. This branch deletes that last knob. The insight: the ideal step size is set by how far the start is from the solution — a distance $d$. You don’t know $d$, so Prodigy estimates it live, ramping a tiny seed upward from how the gradients line up with how far you’ve already travelled ($\\langle g,\\, x_0 - x\\rangle$), and scales an Adam step by it. Set nothing and watch the marker creep, then accelerate as $d$ finds its level — the learning rate, discovered rather than tuned. Prodigy sharpens the same lab’s earlier D-Adaptation, and the parameter-free idea is taken seriously: a sibling schedule-free method from these authors won the self-tuning track of MLCommons’ 2024 AlgoPerf benchmark.',
-    formula: String.raw`d_{t+1} = \max\!\left(d_t,\, \frac{r_{t+1}}{\lVert \mathbf{s}_{t+1}\rVert_1}\right), \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, d_t\,\frac{\mathbf{m}}{\sqrt{\mathbf{v}} + d_t\varepsilon}`,
+      'Every method so far still made you pick $\\gamma$. This branch deletes that last knob. The insight: the ideal step size is set by how far the start is from the solution — a distance $d$. You don’t know $d$, so Prodigy estimates it live, ramping a tiny seed upward from how the gradients line up with how far you’ve already travelled ($\\langle g,\\, x_0 - x\\rangle$ — in the formula, $r$ and $\\mathbf{w}$ are two running tallies of exactly that alignment), and scales an Adam step by it. Set nothing and watch the marker creep, then accelerate as $d$ finds its level — the learning rate, discovered rather than tuned. Prodigy sharpens the same lab’s earlier D-Adaptation, and the parameter-free idea is taken seriously: a sibling schedule-free method from these authors won the self-tuning track of MLCommons’ 2024 AlgoPerf benchmark.',
+    formula: String.raw`d \leftarrow \max\!\left(d,\, \frac{r}{\lVert \mathbf{w}\rVert_1}\right), \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, d\,\frac{\mathbf{m}}{\sqrt{\mathbf{s}} + d\,\varepsilon}`,
     fix: 'no learning rate to choose — it finds its own',
     brk: 'the estimate only climbs, so a bad early ramp can overshoot'
   }

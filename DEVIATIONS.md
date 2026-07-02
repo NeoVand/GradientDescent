@@ -38,6 +38,29 @@ Two kinds of deviation appear below:
 | Newton | Damped (Levenberg–Marquardt-style) Newton: lift the smallest Hessian eigenvalue to a floor via a +τI shift, then cap the step to a trust region | floor 0.5 (relative cap 1e-3·λmax), trust radius 0.28 × domain span | Pure `−γH⁻¹∇ℒ` by dense solve: explodes on plateaus, walks uphill into saddles — exactly what the textbooks warn about, on demand. |
 | Prodigy | Domain-scaled seed and cap for the distance estimate d, plus a per-step trust region | d₀ = 1e-4 × span, d ≤ 1.5 × span, trust radius 0.18 × span | The paper's absolute seed d₀ = 1e-6, no cap, no clip. d only ever grows; on small non-convex surfaces a bad ramp then never recovers. |
 
+## Card notation (the guide's symbol conventions)
+
+The optimizer cards keep one symbol vocabulary across the whole family tree,
+even where individual papers picked different letters — a reader should never
+wonder whether a letter changed meaning between cards:
+
+- **Bold** for per-parameter state vectors (**θ**, **m**, **v**, **s**, **u**,
+  **h**, **c**, **w**); plain italics for scalars (γ, μ, ρ, β, λ, ε, t, d, r).
+- **One meaning per letter:** **m** gradient memory, **v** velocity (the
+  momentum act only), **s** squared-gradient memory, **u** AdaDelta's step
+  memory, **h** Sophia's curvature diagonal, **c** Lion's blend, **w**
+  Prodigy's alignment tally. Notably, Adam's paper calls the squared-gradient
+  buffer *v* — the cards say **s** so it can't be mistaken for velocity, and
+  Prodigy's card follows suit (its paper-internal *s* becomes **w**).
+- **← for updates, = for one-shot definitions** (bias corrections, Δθ); no
+  time subscripts except where a quantity genuinely indexes time (β^t, ρₜ).
+- Gradients are always at the current point; ∇ℒ never carries an argument.
+- Letter collisions that survive because the papers own them (RMSProp's decay
+  ρ vs. Sophia's clip ρ vs. RAdam's ρₜ) are defused in the card prose instead.
+
+The reveal-the-code files keep each paper's own variable names — the card is
+the classroom, the code is the primary source.
+
 ## Not deviations (but worth knowing)
 
 - **The UI's gradient-in-v convention.** For methods with no velocity of
