@@ -86,6 +86,9 @@
   // mapping lives in the registry so every surface shares one spine.
   const chLesson = chapterLesson;
 
+  // Which optimizer cards have their source panel open (reveal-the-code).
+  let codeOpen: Record<string, boolean> = {};
+
   // Close the book and drop the reader into the lesson for this chapter.
   function startLessonFromChapter(chId: string) {
     const lessonId = chLesson[chId];
@@ -2393,6 +2396,18 @@
                       <p>{@html mathText(c.hd)}</p>
                     </aside>
                   {/if}
+                  {#if c.code}
+                    {@const cid = c.code}
+                    <button class="code-btn" on:click={() => (codeOpen[cid] = !codeOpen[cid])} aria-expanded={!!codeOpen[cid]}>
+                      <span class="code-btn-glyph">&lt;/&gt;</span>
+                      {codeOpen[cid] ? 'Hide the code' : 'The actual, running code'}
+                    </button>
+                    {#if codeOpen[cid]}
+                      {#await import('./OptimizerCode.svelte') then mod}
+                        <svelte:component this={mod.default} id={cid} />
+                      {/await}
+                    {/if}
+                  {/if}
                   {#if cite?.wiki || cite?.paper}
                     <div class="opt-cite">
                       {#if authors.length}<span class="opt-cite-who">{authors.map(a => a.name).join(', ')}</span>{/if}
@@ -3126,6 +3141,31 @@
   .leg-amber { background: #f59e0b; }
   .leg-emerald { background: #34d399; }
   .leg-blue { background: #3b82f6; }
+
+  /* Reveal-the-code toggle on the optimizer cards. */
+  .code-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 0.55rem;
+    padding: 0.3rem 0.7rem;
+    font-size: 0.74rem;
+    color: var(--color-text-secondary);
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .code-btn:hover {
+    color: var(--color-text-primary);
+    border-color: var(--color-text-tertiary);
+  }
+  .code-btn-glyph {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.68rem;
+    color: #10b981;
+  }
   .fig-3d-hint {
     position: absolute; bottom: 9px; right: 13px;
     font-size: 0.7rem; color: var(--color-text-tertiary);
