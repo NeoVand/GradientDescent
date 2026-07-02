@@ -21,6 +21,8 @@ export type OptChapter = {
   prereq?: boolean;
   lead?: string; // story transition rendered just before the card
   act?: { no: string; title: string; intro?: string };
+  /** "In a billion dimensions…" honesty note — where the 2-D picture misleads. */
+  hd?: string;
 };
 
 export const optTree: OptChapter[] = [
@@ -75,7 +77,8 @@ export const optTree: OptChapter[] = [
       'A different failure: one shared $\\gamma$ is wrong when the two parameters need very different step sizes. The cure: give each its own. Divide a parameter’s step by the running size of its own past gradients — so a parameter that rarely moves takes bold steps while a busy one calms down. The running size is a sum of past squared gradients $s$, and the step becomes $\\gamma\\,\\nabla\\mathcal{L}/(\\sqrt{s}+\\varepsilon)$. This made it the workhorse of sparse problems like word embeddings.',
     formula: String.raw`s \leftarrow s + (\nabla \mathcal{L})^2, \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \frac{\nabla \mathcal{L}}{\sqrt{s} + \varepsilon}`,
     fix: 'every parameter gets its own learning rate',
-    brk: 'that history only grows, so the step shrinks toward zero — it strangles itself'
+    brk: 'that history only grows, so the step shrinks toward zero — it strangles itself',
+    hd: 'A learning rate per parameter is really a bargain struck with Newton (end of this chapter): the full curvature table has $d^2$ entries, but its <em>diagonal</em> has just $d$ — same cost as the gradient itself. AdaGrad, RMSProp, Adam and Sophia all live on that diagonal. The fine print: a diagonal can only stretch the <em>axes</em>, so it fixes a ravine aligned with the knobs and does nothing for one running diagonally — rotate the valley 45° and Adam zig-zags like plain GD.'
   },
   {
     year: '2012',
@@ -150,7 +153,8 @@ export const optTree: OptChapter[] = [
       'Adam scaled the step by gradient history. Lion throws that out and takes a different shape — and it wasn’t invented by a person: a program searched the space of optimizers and this fell out. The name is a fitting backronym — EvoLved Sign Momentum. Keep one momentum buffer, blend it with the fresh gradient, and step by the $\\operatorname{sign}$ of the result — so every step is the same size $\\gamma$ on each axis, no matter how steep or flat. That makes it light (one buffer, no squared-gradient term) and competitive with Adam on big vision and language models. The catch is the very thing that makes it clean: a step that never shrinks can’t settle by itself.',
     formula: String.raw`\mathbf{c} \leftarrow \beta_1 \mathbf{m} + (1{-}\beta_1)\nabla\mathcal{L}, \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \operatorname{sign}(\mathbf{c}), \;\; \mathbf{m} \leftarrow \beta_2 \mathbf{m} + (1{-}\beta_2)\nabla\mathcal{L}`,
     fix: 'fixed-size steps from one tiny buffer — light and fast',
-    brk: 'the step never shrinks, so it orbits the minimum until $\\gamma$ is decayed by a schedule'
+    brk: 'the step never shrinks, so it orbits the minimum until $\\gamma$ is decayed by a schedule',
+    hd: 'Watch Lion’s red step arrow: with two knobs, $\\operatorname{sign}(\\mathbf c)$ can only point in <em>eight</em> directions — the axes and the four diagonals. That is the whole geometry of a sign step: it moves γ along every axis at once, so in $d$ dimensions its true length is $\\gamma\\sqrt{d}$ no matter how faint the gradient, and it can point far from steepest descent. At a billion parameters that $\\sqrt{d}$ is enormous — which is why Lion runs on a much smaller γ than Adam.'
   },
   {
     act: { no: 'Branch', title: 'Use curvature', intro: 'A second fork goes the opposite way: instead of dropping information, it adds some. Every method so far reads only the <em>slope</em>; this branch also reads how the slope is <strong>bending</strong>.' },
@@ -161,7 +165,8 @@ export const optTree: OptChapter[] = [
       'The branch that reaches back furthest — and the method every optimizer above is a cheap stand-in for. They all read only the slope $\\nabla\\mathcal{L}$. Newton also reads the CURVATURE: fit a quadratic bowl to the surface right here (the Hessian $\\mathbf H$) and jump straight to that bowl’s bottom, $-\\mathbf H^{-1}\\nabla\\mathcal{L}$. On a real bowl that nails the minimum in ONE step, with no learning rate to tune. This app already draws that jump — it is the violet Newton ghost in the curvature lens. So why isn’t it everywhere? $\\mathbf H$ is $N\\times N$ for $N$ parameters: trivial for our 2, ruinous for a billion. And away from a convex bowl $-\\mathbf H^{-1}\\nabla\\mathcal{L}$ can aim uphill, so this app runs the damped form real implementations use: near saddles and flats the curvature is propped up and the jump reined in toward a plain gradient step. (The $\\gamma$ in the formula is a safety throttle — pure Newton is $\\gamma = 1$, which is what this app keeps.)',
     formula: String.raw`\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \mathbf{H}^{-1}\nabla \mathcal{L}`,
     fix: 'curvature-aware: one step to the bottom of any true bowl',
-    brk: 'the $N\\times N$ Hessian is hopeless at scale — and it stumbles on saddles'
+    brk: 'the $N\\times N$ Hessian is hopeless at scale — and it stumbles on saddles',
+    hd: 'Put numbers on “hopeless”. The Hessian holds one bending per <em>pair</em> of parameters — $d^2$ numbers — and using it means solving a $d \\times d$ system, whose cost grows like $d^3$. For our two knobs: four numbers, instant. For a billion-parameter model: $10^{18}$ numbers — millions of times more memory than the model itself — before the solve even starts. Newton isn’t wrong at scale; it’s unaffordable by a factor with eighteen zeros. You are watching the one place on Earth where Newton is free.'
   },
   {
     year: '2023',

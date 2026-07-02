@@ -157,7 +157,7 @@
         : chapters[0].slug;
       activeId = target;
       progress = 0;
-      requestAnimationFrame(() => {
+      const jump = () => {
         if (!bodyEl) return;
         if (target === chapters[0].slug) {
           bodyEl.scrollTop = 0;
@@ -165,7 +165,12 @@
           bodyEl.querySelector(`section[data-ch="${target}"]`)?.scrollIntoView({ block: 'start' });
         }
         onScroll();
-      });
+      };
+      requestAnimationFrame(jump);
+      // Figures settle (and the browser's scroll restoration fires) a beat
+      // after mount, either of which can shove a deep-linked chapter off
+      // target — re-assert once things quiet down.
+      if (initialChapter) setTimeout(jump, 450);
     }
   }
 
@@ -970,6 +975,19 @@
                 mean a steep slope. Flip the panel to <strong>3D</strong> and the same map lifts into
                 real hills and valleys you can rotate.
               </p>
+              <aside class="hd-note">
+                <span class="hd-note-tag">In a billion dimensions</span>
+                <p>
+                  One luxury to savor while you have it: this app draws the <em>entire, exact</em>
+                  loss surface, because two knobs are all there are. A real network’s surface lives
+                  in a billion dimensions, so every landscape picture you will ever see of one is a
+                  two-dimensional <em>slice</em> — pick two directions, sweep them, plot. And raw
+                  slices lie: scaling tricks inside networks stretch some directions and shrink
+                  others, so honest pictures need careful normalization (that is the “filter
+                  normalization” of Li et al., 2018, in the reading list below). Here, and almost
+                  nowhere else, what you see is the whole truth.
+                </p>
+              </aside>
               <figure class="fig">
                 <svg viewBox="0 0 460 150" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
                   <defs>
@@ -1103,6 +1121,17 @@
                 not dodging bad valleys — a finding (Dauphin et al., 2014) that reshaped how the field
                 thinks about non-convex optimization.
               </p>
+              <aside class="hd-note">
+                <span class="hd-note-tag">In a billion dimensions</span>
+                <p>
+                  Here is <em>why</em> saddles take over up there. At a flat spot the surface
+                  curves independently along each of the <em>d</em> directions, and a minimum needs
+                  every single one to curve <em>up</em>. With two knobs that’s two coin flips; with
+                  a million it’s a million — so a random flat spot is all but certain to curve down
+                  somewhere, and “somewhere down” is exactly a saddle. The mountain pass isn’t the
+                  rare case at scale; it’s nearly the only case.
+                </p>
+              </aside>
               <p>
                 This is the backdrop for Part III. Plain descent stalls on saddles, crawls across
                 plateaus, and settles in the first basin it finds. The momentum, noise, and curvature
@@ -1774,6 +1803,17 @@
                 behind every batch-size choice: a batch of 32 already looks almost as calm as the full
                 dataset, for a fraction of the cost.
               </p>
+              <aside class="hd-note">
+                <span class="hd-note-tag">In a billion dimensions</span>
+                <p>
+                  At scale this √n law becomes an economic one. The useful ratio is noise to
+                  signal: below a problem-specific <em>critical batch size</em>, doubling the batch
+                  lets you (roughly) double γ for the same trajectory — the linear-scaling rule
+                  behind giant training runs; above it, extra data per step buys calm the run no
+                  longer needs (Goyal et al., 2017; McCandlish et al., 2018). Bigger is not better —
+                  bigger is <em>quieter</em>, and quiet has a price and a ceiling.
+                </p>
+              </aside>
               <p>
                 And the noise is not pure cost. A little jitter is genuinely <strong>useful</strong>: a
                 noisy step can rattle the marker out of a shallow dip or a flat saddle that a perfectly
@@ -2084,6 +2124,12 @@
                       {#if c.brk}<span class="opt-break">✗ {@html mathText(c.brk)}</span>{/if}
                     </div>
                   {/if}
+                  {#if c.hd}
+                    <aside class="hd-note">
+                      <span class="hd-note-tag">In a billion dimensions</span>
+                      <p>{@html mathText(c.hd)}</p>
+                    </aside>
+                  {/if}
                   {#if cite?.wiki || cite?.paper}
                     <div class="opt-cite">
                       {#if authors.length}<span class="opt-cite-who">{authors.map(a => a.name).join(', ')}</span>{/if}
@@ -2238,6 +2284,18 @@
                 you will never see. Optimization gets you down; generalization decides whether down was
                 worth reaching.
               </p>
+              <aside class="hd-note">
+                <span class="hd-note-tag">In a billion dimensions</span>
+                <p>
+                  Two honest asterisks on this tidy story. First, “flat” is slippery: a network can
+                  be rescaled — same function, same predictions — while its measured sharpness
+                  changes arbitrarily, so naive flatness can’t be the whole answer (Dinh et al.,
+                  2017). Second, at scale good minima aren’t isolated dips like the ones drawn
+                  here: they connect into long low-loss valleys you can walk between without
+                  climbing (Garipov et al., 2018). The intuition survives — restless SGD prefers
+                  forgiving regions — but hold it as a compass, not a theorem.
+                </p>
+              </aside>
               {#if chapterPresets['ch-generalize']}
                 <ChapterCta demo={() => runPreset('ch-generalize')} demoLabel={chapterPresets['ch-generalize'].title} />
               {/if}
