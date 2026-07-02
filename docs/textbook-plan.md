@@ -234,16 +234,19 @@ marker, view) — printed links are viable for all built-ins today. Gaps, in lev
 
 **New teaching instruments (the book's chapters want these):**
 7. **Condition-number dial** — an anisotropic quadratic ½(λ₁α² + λ₂β²) with a κ slider; makes
-   ill-conditioning continuous instead of anecdotal.
-8. **Edge-of-stability tick on the γ slider** — mark 2/λ_max for the current problem
-   (`hessian.ts` can already compute it); pairs with the γ-bisection exercise.
-9. **γ-sweep tool** — headless runs plotting steps-to-basin vs γ: THE canonical U-curve figure.
-10. **Same-optimizer A/B races with a shared noise seed** (key racers by instance, not
-    `OptimizerId`) — "GD at γ=0.01 vs γ=0.1" is the most-wanted comparison the app can't stage.
-11. **Trajectory pinning** — keep the last trail as a ghost when a knob changes; amplifies every
-    predict-run-reflect exercise.
-12. Make the data-plot parameter marker actually **draggable** for 2D-point problems (repairs the
-    `marker-is-model` promise properly).
+   ill-conditioning continuous instead of anecdotal. (Stretched Bowl κ = 10 and Rotated Valley
+   now cover the anecdotes; the dial is optional polish.)
+8. **Edge-of-stability tick on the γ slider** — **done**: the slider quietly marks 2/λ_max for
+   the current problem.
+9. Make the data-plot parameter marker actually **draggable** for 2D-point problems (repairs the
+   `marker-is-model` promise properly).
+
+**Struck by owner decision (2026-07-01):** the γ-sweep tool, trajectory pinning, and
+same-optimizer A/B races. γ-sweep + pinning were built, reviewed and rejected: stateful
+comparison instruments and persistent overlays make the UI busy and fight the app's directness —
+re-running an experiment is cheap, and re-running it yourself IS the pedagogy. The book's U-curve
+and A/B figures will come from headless simulation in the LaTeX pipeline (§7), not from in-app
+instruments. Do not reintroduce this class of feature.
 
 ## 9. Sequencing
 
@@ -262,7 +265,8 @@ Each phase leaves the app shippable; order chosen so nothing is written twice:
   reveal-the-code with Shiki; golden-trajectory tests vs PyTorch/optax fixtures.
 - **Phase 4 — optimizer part split + exercises (~1 week).** ch-optimizers → Part IV chapters;
   lessons renumbered as canonical exercises; new presets (rotated ravine, batch↔γ, AdaGrad-freeze,
-  cosine-pinch); γ-sweep, A/B races, trajectory pinning as they're needed by exercises.
+  cosine-pinch). (The instrument wishlist that was here — γ-sweep, A/B races, pinning — was
+  struck; see §8.)
 - **Phase 5 — block schema + LaTeX emitter (~2 weeks).** Migrate chapters to blocks one at a
   time; figure compute/render split with `print` theme; emitter + kaobook + QR shortlinks; CI PDF.
 - **Phase 6 — publish (~2–3 weeks).** `@gradientlab/optimizers` 0.1.0 (CPU core) with the docs
