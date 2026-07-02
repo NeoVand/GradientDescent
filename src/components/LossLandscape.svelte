@@ -36,6 +36,7 @@
     markerDragging,
     vizLayersStore,
     basinsEnabledStore,
+    lensStore,
     COLORMAPS,
     type FieldDensity
   } from '../stores/stores';
@@ -150,13 +151,12 @@
 
   // ---------- Curvature lens ----------
   // Local Hessian at the marker: principal-axis ellipse, condition number,
-  // and the Newton ghost step. Off by default; persisted per visitor.
-  let lensOn = typeof window !== 'undefined' && localStorage.getItem('gd-lens') === '1';
+  // and the Newton ghost step. Off by default; state lives in lensStore
+  // (persisted, and hydratable from shared links).
+  $: lensOn = $lensStore;
 
   function toggleLens() {
-    lensOn = !lensOn;
-    if (typeof window !== 'undefined') localStorage.setItem('gd-lens', lensOn ? '1' : '0');
-    updateTrail(); // repaint the marker layer with/without the lens
+    lensStore.toggle(); // lensOn → lensInfo → updateTrail, all reactive
   }
 
   interface LensInfo {

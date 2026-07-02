@@ -605,7 +605,10 @@ function createVizLayersStore() {
         const next = { ...v, ...p };
         persist(next);
         return next;
-      })
+      }),
+    /** Apply link-carried state WITHOUT persisting — a shared link shows the
+     *  sender's layers but must not overwrite the visitor's saved prefs. */
+    hydrate: (p: Partial<VizLayers>) => store.update(v => ({ ...v, ...p }))
   };
 }
 
@@ -620,7 +623,7 @@ function createBasinsEnabledStore() {
   const initial = () =>
     typeof window !== 'undefined' && localStorage.getItem(KEY) === '1';
 
-  const { subscribe, update } = writable<boolean>(initial());
+  const { subscribe, update, set } = writable<boolean>(initial());
 
   return {
     subscribe,
@@ -631,11 +634,41 @@ function createBasinsEnabledStore() {
           localStorage.setItem(KEY, next ? '1' : '0');
         }
         return next;
-      })
+      }),
+    /** Link-carried state; not persisted (see vizLayersStore.hydrate). */
+    hydrate: (v: boolean) => set(v)
   };
 }
 
 export const basinsEnabledStore = createBasinsEnabledStore();
+
+// ========== Curvature lens toggle ==========
+// Whether the curvature lens (Hessian ellipse, κ readout, Newton ghost)
+// draws at the marker. Lifted out of the 2D view so shared links and guide
+// presets can switch it on. Persisted under the key the view always used.
+function createLensStore() {
+  const KEY = 'gd-lens';
+  const initial = () =>
+    typeof window !== 'undefined' && localStorage.getItem(KEY) === '1';
+
+  const { subscribe, update, set } = writable<boolean>(initial());
+
+  return {
+    subscribe,
+    toggle: () =>
+      update(v => {
+        const next = !v;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(KEY, next ? '1' : '0');
+        }
+        return next;
+      }),
+    /** Link-carried state; not persisted (see vizLayersStore.hydrate). */
+    hydrate: (v: boolean) => set(v)
+  };
+}
+
+export const lensStore = createLensStore();
 
 // ========== Challenge Store ==========
 // A shared link can carry a goal: "reach the basin in ≤ N steps". The
@@ -710,6 +743,15 @@ function createThemeStore() {
     set: (theme: Theme) => {
       if (typeof window !== 'undefined') {
         localStorage.setItem('theme', theme);
+        document.documentElement.setAttribute('data-theme', theme);
+      }
+      set(theme);
+    },
+    /** Apply a link-carried theme for this visit WITHOUT saving it as the
+     *  visitor's preference (a shared figure link shouldn't re-theme them
+     *  forever). */
+    hydrate: (theme: Theme) => {
+      if (typeof window !== 'undefined') {
         document.documentElement.setAttribute('data-theme', theme);
       }
       set(theme);
