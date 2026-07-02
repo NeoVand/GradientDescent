@@ -16,6 +16,7 @@ import { chCurvature } from './ch-curvature';
 import { chSchedule } from './ch-schedule';
 import { chNoise } from './ch-noise';
 import { chGeneralize } from './ch-generalize';
+import { chProblems, chExperiments, chPanels, chKeys } from './reference';
 import {
   chRavine,
   chMomentum,
@@ -42,5 +43,9 @@ export const chapterBlocks: Record<string, Block[]> = {
   'ch-adaptive': chAdaptive,
   'ch-adam': chAdam,
   'ch-second-order': chSecondOrder,
-  'ch-self-tuning': chSelfTuning
+  'ch-self-tuning': chSelfTuning,
+  'ch-problems': chProblems,
+  'ch-experiments': chExperiments,
+  'ch-panels': chPanels,
+  'ch-keys': chKeys
 };

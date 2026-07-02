@@ -1329,7 +1329,49 @@
               {/if}
             {/snippet}
             {#snippet chWidget(id: string)}
-              {#if id === 'ravine-race'}
+              {#if id === 'problem-grid'}
+                {#each Object.entries(problemCards) as [groupName, list]}
+                <div class="problem-group-label">{groupName}</div>
+                <div class="problem-grid">
+                  {#each list as p}
+                    <div class="problem-card">
+                      <div class="problem-icon">
+                        {#if p.customIcon}<span class="custom-icon">{p.customIcon}</span>
+                        {:else if p.icon}<svelte:component this={probIcon[p.icon]} size={18} strokeWidth={2} />{/if}
+                      </div>
+                      <div class="problem-text">
+                        <div class="problem-name">{p.name}</div>
+                        <div class="problem-formula">{p.formula}</div>
+                        <div class="problem-tag">{p.tag}</div>
+                      </div>
+                    </div>
+                  {/each}
+                </div>
+              {/each}
+              {:else if id === 'experiments-list'}
+                {#each experiments as exp (exp.id)}
+                <div class="experiment">
+                  <div class="experiment-text">
+                    <h4>{exp.title}</h4>
+                    <p>{exp.blurb}</p>
+                  </div>
+                  <button class="try-btn" on:click={() => runExperiment(exp)}>
+                    <Play size={13} strokeWidth={2.5} /><span>Try it</span>
+                  </button>
+                </div>
+              {/each}
+              {:else if id === 'keyboard'}
+                <div class="kbd-row">
+                <span class="kbd-item"><kbd>Space</kbd> Train / Pause</span>
+                <span class="kbd-item"><kbd>S</kbd> Step</span>
+                <span class="kbd-item"><kbd>R</kbd> Reset</span>
+                <span class="kbd-item"><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> Nudge marker <span class="kbd-note">(⇧ = bigger)</span></span>
+                <span class="kbd-item"><kbd>D</kbd> 2D / 3D</span>
+                <span class="kbd-item"><kbd>A</kbd> Arrows</span>
+                <span class="kbd-item"><kbd>F</kbd> Flow</span>
+                <span class="kbd-item"><kbd>C</kbd> Contours</span>
+              </div>
+              {:else if id === 'ravine-race'}
                 <figure class="race-demo">
                 <div class="race-player">
                   <button type="button" class="race-pbtn" on:click={toggleRacePlay} aria-label={racePlaying ? 'Pause race' : 'Play race'} title={racePlaying ? 'Pause' : 'Play'}>
@@ -1650,74 +1692,26 @@
             <section data-ch="ch-problems" id="ch-problems">
               <div class="part-label">Part V · The zoo</div>
               <h3><svelte:component this={chIcon['ch-problems']} size={18} strokeWidth={2} /> The landscape zoo</h3>
-              <p>
-                Every problem here has at most two parameters — the three 1D warm-ups use just {@html tex(String.raw`\alpha`)} —
-                and a loss surface you can see live. Each surface tells a different story, from a
-                single clean bowl to four-way ties and exploding cliffs, and each ships with a
-                curated default learning rate and view (and, where it helps, momentum).
-              </p>
-
-              {#each Object.entries(problemCards) as [groupName, list]}
-                <div class="problem-group-label">{groupName}</div>
-                <div class="problem-grid">
-                  {#each list as p}
-                    <div class="problem-card">
-                      <div class="problem-icon">
-                        {#if p.customIcon}<span class="custom-icon">{p.customIcon}</span>
-                        {:else if p.icon}<svelte:component this={probIcon[p.icon]} size={18} strokeWidth={2} />{/if}
-                      </div>
-                      <div class="problem-text">
-                        <div class="problem-name">{p.name}</div>
-                        <div class="problem-formula">{p.formula}</div>
-                        <div class="problem-tag">{p.tag}</div>
-                      </div>
-                    </div>
-                  {/each}
-                </div>
-              {/each}
+              <GuideBlocks slug="ch-problems" blocks={chapterBlocks['ch-problems']} figure={chFigure} {conceptFig} widget={chWidget} cards={chCards} onPreset={runPreset} onLesson={startLessonFromChapter} />
             </section>
 
             <!-- ============== 10 · EXPERIMENTS ============== -->
             <section data-ch="ch-experiments" id="ch-experiments">
               <h3><svelte:component this={chIcon['ch-experiments']} size={18} strokeWidth={2} /> Things to try</h3>
-              <p>Each card is a ready-made scenario — one click sets everything up, starts training, and tells you what to watch for.</p>
-              {#each experiments as exp (exp.id)}
-                <div class="experiment">
-                  <div class="experiment-text">
-                    <h4>{exp.title}</h4>
-                    <p>{exp.blurb}</p>
-                  </div>
-                  <button class="try-btn" on:click={() => runExperiment(exp)}>
-                    <Play size={13} strokeWidth={2.5} /><span>Try it</span>
-                  </button>
-                </div>
-              {/each}
+              <GuideBlocks slug="ch-experiments" blocks={chapterBlocks['ch-experiments']} figure={chFigure} {conceptFig} widget={chWidget} cards={chCards} onPreset={runPreset} onLesson={startLessonFromChapter} />
             </section>
 
             <!-- ============== 11 · READING THE PANELS ============== -->
             <section data-ch="ch-panels" id="ch-panels">
               <div class="part-label">Reference</div>
               <h3><svelte:component this={chIcon['ch-panels']} size={18} strokeWidth={2} /> Reading the panels</h3>
-              <ul class="viz-list">
-                <li><strong>Data plot</strong> — the data points and the current model. For curve fits, blue solid is the current fit and green dashed is the truth. For 2D problems, the orange marker shows your parameters directly on the plot.</li>
-                <li><strong>Loss &amp; Gradient</strong> — the loss landscape seen from above: the vivid end of the colour scale marks low loss (bright in night mode, deep in day mode — the colour bar shows which), thin contours join equal-loss points, and the field arrows are {@html tex(String.raw`-\nabla\mathcal{L}`)}. On the marker, the <span class="ink-blue">blue arrow</span> is steepest descent and the <span class="ink-red">red arrow</span> is the step actually taken. Drag the marker to teleport.</li>
-                <li><strong>Loss History</strong> — train and test loss versus step. A clean decline is healthy; spikes mean you’re overshooting (too much {@html tex(String.raw`\gamma`)} or {@html tex(String.raw`\mu`)}); a persistent train/test gap hints at overfitting.</li>
-              </ul>
+              <GuideBlocks slug="ch-panels" blocks={chapterBlocks['ch-panels']} figure={chFigure} {conceptFig} widget={chWidget} cards={chCards} onPreset={runPreset} onLesson={startLessonFromChapter} />
             </section>
 
             <!-- ============== 12 · KEYBOARD ============== -->
             <section data-ch="ch-keys" id="ch-keys">
               <h3><svelte:component this={chIcon['ch-keys']} size={18} strokeWidth={2} /> Keyboard</h3>
-              <div class="kbd-row">
-                <span class="kbd-item"><kbd>Space</kbd> Train / Pause</span>
-                <span class="kbd-item"><kbd>S</kbd> Step</span>
-                <span class="kbd-item"><kbd>R</kbd> Reset</span>
-                <span class="kbd-item"><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> Nudge marker <span class="kbd-note">(⇧ = bigger)</span></span>
-                <span class="kbd-item"><kbd>D</kbd> 2D / 3D</span>
-                <span class="kbd-item"><kbd>A</kbd> Arrows</span>
-                <span class="kbd-item"><kbd>F</kbd> Flow</span>
-                <span class="kbd-item"><kbd>C</kbd> Contours</span>
-              </div>
+              <GuideBlocks slug="ch-keys" blocks={chapterBlocks['ch-keys']} figure={chFigure} {conceptFig} widget={chWidget} cards={chCards} onPreset={runPreset} onLesson={startLessonFromChapter} />
               <div class="end-mark">∂</div>
             </section>
           </div>
@@ -2654,8 +2648,8 @@
   .experiment p { margin-bottom: 0; font-size: 0.875rem; }
 
   /* ---------- Viz list ---------- */
-  .viz-list { padding-left: 1.2rem; }
-  .viz-list li { margin-bottom: 0.6rem; }
+  .reading-column :global(.viz-list) { padding-left: 1.2rem; }
+  .reading-column :global(.viz-list li) { margin-bottom: 0.6rem; }
 
   /* ---------- Keyboard ---------- */
   .kbd-row { display: flex; flex-wrap: wrap; gap: 0.625rem 1.25rem; align-items: center; }
