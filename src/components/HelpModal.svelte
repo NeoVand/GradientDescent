@@ -2398,9 +2398,8 @@
                   {/if}
                   {#if c.code}
                     {@const cid = c.code}
-                    <button class="code-btn" on:click={() => (codeOpen[cid] = !codeOpen[cid])} aria-expanded={!!codeOpen[cid]}>
-                      <span class="code-btn-glyph">&lt;/&gt;</span>
-                      {codeOpen[cid] ? 'Hide the code' : 'The actual, running code'}
+                    <button class="code-btn" class:open={!!codeOpen[cid]} on:click={() => (codeOpen[cid] = !codeOpen[cid])} aria-expanded={!!codeOpen[cid]}>
+                      <span class="code-btn-glyph">&lt;/&gt;</span> Code
                     </button>
                     {#if codeOpen[cid]}
                       {#await import('./OptimizerCode.svelte') then mod}
@@ -3142,28 +3141,29 @@
   .leg-emerald { background: #34d399; }
   .leg-blue { background: #3b82f6; }
 
-  /* Reveal-the-code toggle on the optimizer cards. */
+  /* Reveal-the-code toggle on the optimizer cards: quiet, compact. */
   .code-btn {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
-    margin-top: 0.55rem;
-    padding: 0.3rem 0.7rem;
-    font-size: 0.74rem;
-    color: var(--color-text-secondary);
+    gap: 5px;
+    margin-top: 0.5rem;
+    padding: 0.22rem 0.55rem;
+    font-size: 0.7rem;
+    color: var(--color-text-tertiary);
     background: transparent;
     border: 1px solid var(--color-border);
-    border-radius: 8px;
+    border-radius: 7px;
     cursor: pointer;
     transition: color 0.15s, border-color 0.15s;
   }
-  .code-btn:hover {
-    color: var(--color-text-primary);
+  .code-btn:hover,
+  .code-btn.open {
+    color: var(--color-text-secondary);
     border-color: var(--color-text-tertiary);
   }
   .code-btn-glyph {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.68rem;
+    font-size: 0.64rem;
     color: #10b981;
   }
   .fig-3d-hint {
