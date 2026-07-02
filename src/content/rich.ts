@@ -173,12 +173,120 @@ function tokensToHtml(tokens: RichToken[], dark: boolean): string {
 // only the (cheap) serialization re-runs when the theme flips.
 const parseCache = new Map<string, RichToken[]>();
 
-/** Render a Rich string to HTML for the given theme. */
-export function richToHtml(src: string, dark: boolean): string {
+function parsedCached(src: string): RichToken[] {
   let tokens = parseCache.get(src);
   if (!tokens) {
     tokens = parseRich(src);
     parseCache.set(src, tokens);
   }
-  return tokensToHtml(tokens, dark);
+  return tokens;
+}
+
+/** Render a Rich string to HTML for the given theme. */
+export function richToHtml(src: string, dark: boolean): string {
+  return tokensToHtml(parsedCached(src), dark);
+}
+
+// ---------- The print serializer ----------
+// Same token AST, emitted as LaTeX. Print always takes the light branch of
+// theme spans. Text is escaped for TeX; a few symbols the app writes as
+// Unicode map to robust TeX commands so no font gamble is needed.
+
+// One escaping pass over the raw text, character by character, so no rule
+// can mangle another rule's output. TeX specials are escaped; the Unicode
+// symbols the app's prose uses map to robust commands (no font gamble).
+const TEX_CHAR: Record<string, string> = {
+  '\\': '\\textbackslash{}',
+  '%': '\\%',
+  '#': '\\#',
+  '&': '\\&',
+  _: '\\_',
+  $: '\\$',
+  '~': '\\textasciitilde{}',
+  '^': '\\textasciicircum{}',
+  '{': '\\{',
+  '}': '\\}',
+  '✓': '\\checkmark{}',
+  '✗': '\\(\\times\\)',
+  '∞': '\\(\\infty\\)',
+  '½': '\\(\\tfrac{1}{2}\\)',
+  '√': '\\(\\surd\\)',
+  '×': '\\(\\times\\)',
+  '→': '\\(\\to\\)',
+  '←': '\\(\\leftarrow\\)',
+  '∇': '\\(\\nabla\\)',
+  ℒ: '\\(\\mathcal{L}\\)',
+  '‖': '\\(\\Vert\\)',
+  γ: '\\(\\gamma\\)',
+  κ: '\\(\\kappa\\)',
+  λ: '\\(\\lambda\\)',
+  μ: '\\(\\mu\\)',
+  α: '\\(\\alpha\\)',
+  β: '\\(\\beta\\)',
+  θ: '\\(\\theta\\)',
+  '∂': '\\(\\partial\\)',
+  '▸': '\\(\\triangleright\\)',
+  '⇧': 'Shift',
+  // the zoo cards' tiny formulas are Unicode prose; keep them printable
+  '−': '\\(-\\)',
+  '²': '\\(^2\\)',
+  '³': '\\(^3\\)',
+  ⁿ: '\\(^n\\)',
+  '±': '\\(\\pm\\)',
+  σ: '\\(\\sigma\\)',
+  τ: '\\(\\tau\\)',
+  Λ: '\\(\\Lambda\\)',
+  '↔': '\\(\\leftrightarrow\\)',
+  '∿': '\\(\\sim\\)',
+  '╱': '/',
+  '≈': '\\(\\approx\\)',
+  '≤': '\\(\\le\\)',
+  '∈': '\\(\\in\\)'
+};
+
+const TEX_CHAR_RE = new RegExp(
+  `[${Object.keys(TEX_CHAR)
+    .map(c => c.replace(/[\\^\]\[-]/g, m => '\\' + m))
+    .join('')}]`,
+  'g'
+);
+
+export function escapeTex(s: string): string {
+  return s.replace(TEX_CHAR_RE, ch => TEX_CHAR[ch]);
+}
+
+function tokensToTex(tokens: RichToken[]): string {
+  let tex = '';
+  for (const tk of tokens) {
+    switch (tk.t) {
+      case 'text':
+        tex += escapeTex(tk.s);
+        break;
+      case 'math':
+        tex += `\\(${tk.tex}\\)`;
+        break;
+      case 'strong':
+        tex += `\\textbf{${tokensToTex(tk.children)}}`;
+        break;
+      case 'em':
+        tex += `\\emph{${tokensToTex(tk.children)}}`;
+        break;
+      case 'g':
+        // The green knob accent has no print channel; italics carry it.
+        tex += `\\emph{${tokensToTex(tk.children)}}`;
+        break;
+      case 'ink':
+        tex += `\\textbf{${tokensToTex(tk.children)}}`;
+        break;
+      case 'theme':
+        if (tk.mode === 'light') tex += tokensToTex(tk.children);
+        break;
+    }
+  }
+  return tex;
+}
+
+/** Render a Rich string as LaTeX (print takes the light theme branch). */
+export function richToTex(src: string): string {
+  return tokensToTex(parsedCached(src));
 }

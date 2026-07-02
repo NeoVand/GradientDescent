@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseRich, richToHtml } from './rich';
+import { parseRich, richToHtml, richToTex, escapeTex } from './rich';
 
 describe('parseRich', () => {
   it('parses plain text as one token', () => {
@@ -93,5 +93,34 @@ describe('richToHtml', () => {
     const src = 'the {dark:bright}{light:deep-coloured} dimple';
     expect(richToHtml(src, true)).toBe('the bright dimple');
     expect(richToHtml(src, false)).toBe('the deep-coloured dimple');
+  });
+});
+
+describe('richToTex', () => {
+  it('passes math through and marks up prose', () => {
+    expect(richToTex('the knob $\\gamma$ is **big** and *fast*')).toBe(
+      'the knob \\(\\gamma\\) is \\textbf{big} and \\emph{fast}'
+    );
+  });
+
+  it('takes the light branch of theme spans', () => {
+    expect(richToTex('{dark:bright}{light:deep-coloured} dimple')).toBe('deep-coloured dimple');
+  });
+
+  it('escapes TeX specials exactly once', () => {
+    expect(escapeTex('50% of A & B _under_ #1')).toBe('50\\% of A \\& B \\_under\\_ \\#1');
+    expect(escapeTex('a {plain} brace')).toBe('a \\{plain\\} brace');
+  });
+
+  it('maps the prose Unicode symbols to commands', () => {
+    expect(escapeTex('✓ done, κ = 10, ∇ℒ fades')).toBe(
+      '\\checkmark{} done, \\(\\kappa\\) = 10, \\(\\nabla\\)\\(\\mathcal{L}\\) fades'
+    );
+  });
+
+  it('renders knob and ink spans in the print register', () => {
+    expect(richToTex('{g:$\\gamma$} and the {blue:blue arrow}')).toBe(
+      '\\emph{\\(\\gamma\\)} and the \\textbf{blue arrow}'
+    );
   });
 });
