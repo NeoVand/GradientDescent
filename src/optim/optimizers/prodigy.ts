@@ -64,7 +64,7 @@ export const prodigy: CoreOptimizer<ProdigyState> = {
   id: 'prodigy',
   name: 'Prodigy',
   description: 'Parameter-free: estimates its own learning rate',
-  updateRuleLatex: String.raw`\mathbf{m} \leftarrow \beta_1 \mathbf{m} + (1-\beta_1)\, d\,\nabla \mathcal{L}, \;\; \mathbf{s} \leftarrow \beta_2 \mathbf{s} + (1-\beta_2)\, d^2 (\nabla \mathcal{L})^2, \;\; d \leftarrow \max\!\left(d,\, \frac{r}{\lVert \mathbf{w}\rVert_1}\right), \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, d\,\frac{\mathbf{m}}{\sqrt{\mathbf{s}} + d\,\varepsilon}`,
+  updateRuleLatex: String.raw`\begin{aligned}&\mathbf{m} \leftarrow \beta_1 \mathbf{m} + (1-\beta_1)\, d\,\nabla \mathcal{L} \\[2pt] &\mathbf{s} \leftarrow \beta_2 \mathbf{s} + (1-\beta_2)\, d^2 (\nabla \mathcal{L})^2 \\[2pt] &d \leftarrow \max\!\left(d,\, \frac{r}{\lVert \mathbf{w}\rVert_1}\right) \\[2pt] &\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, d\,\frac{\mathbf{m}}{\sqrt{\mathbf{s}} + d\,\varepsilon}\end{aligned}`,
   hyperparams: [PRODIGY_BETA1, PRODIGY_BETA2],
   fixedLearningRate: 1.0,
   init: (d) => ({ m: zeros(d), v: zeros(d), t: 0, dEst: NaN, rNum: 0, sDen: zeros(d), x0: null }),

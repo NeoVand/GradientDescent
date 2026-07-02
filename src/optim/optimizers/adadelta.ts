@@ -42,7 +42,7 @@ export const adadelta: CoreOptimizer<AdadeltaState> = {
   id: 'adadelta',
   name: 'AdaDelta',
   description: 'RMSProp with no learning rate — the units fix themselves',
-  updateRuleLatex: String.raw`\mathbf{s} \leftarrow \rho \mathbf{s} + (1-\rho)(\nabla \mathcal{L})^2, \;\; \Delta\boldsymbol{\theta} = -\frac{\sqrt{\mathbf{u} + \varepsilon}}{\sqrt{\mathbf{s} + \varepsilon}}\,\nabla \mathcal{L}, \;\; \mathbf{u} \leftarrow \rho \mathbf{u} + (1-\rho)\,\Delta\boldsymbol{\theta}^2, \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} + \gamma\,\Delta\boldsymbol{\theta}`,
+  updateRuleLatex: String.raw`\begin{aligned}&\mathbf{s} \leftarrow \rho\,\mathbf{s} + (1-\rho)(\nabla \mathcal{L})^2 \\[2pt] &\Delta\boldsymbol{\theta} = -\frac{\sqrt{\mathbf{u}+\varepsilon}}{\sqrt{\mathbf{s}+\varepsilon}}\,\nabla \mathcal{L} \\[2pt] &\mathbf{u} \leftarrow \rho\,\mathbf{u} + (1-\rho)\,\Delta\boldsymbol{\theta}^2, \quad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} + \gamma\,\Delta\boldsymbol{\theta}\end{aligned}`,
   hyperparams: [ADADELTA_RHO],
   fixedLearningRate: 1.0,
   init: (d) => ({ sG: zeros(d), sX: zeros(d), t: 0 }),
