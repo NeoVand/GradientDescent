@@ -47,6 +47,7 @@
   import { optimizers } from '../utils/optimizers';
   import { runStartStep } from '../utils/trainer';
   import { previewNextStep } from '../utils/preview';
+  import { inlineMath } from '../utils/inlineMath';
   import {
     computeHessian,
     eigenSym2,
@@ -1599,14 +1600,14 @@
       <div class="divergence-banner" role="alert">
         <span>
           <strong>Diverged at step {$divergenceStore.step}!</strong>
-          The learning rate γ is too large — each step overshoots the minimum
-          and the overshoot compounds. Lower γ (or μ) and train again.
+          The learning rate {@html inlineMath('$\\gamma$')} is too large — each step overshoots the minimum
+          and the overshoot compounds. Lower {@html inlineMath('$\\gamma$ (or $\\mu$)')} and train again.
         </span>
         <button class="banner-dismiss" on:click={() => divergenceStore.set(null)} aria-label="Dismiss">×</button>
       </div>
     {:else if $coachStore}
       <div class="divergence-banner coach-{$coachStore.kind}" role="status">
-        <span>{$coachStore.text}</span>
+        <span>{@html inlineMath($coachStore.text)}</span>
         <button class="banner-dismiss" on:click={clearCoach} aria-label="Dismiss">×</button>
       </div>
     {/if}
@@ -2119,6 +2120,10 @@
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
     animation: bannerIn 0.25s ease;
     z-index: 5;
+  }
+  /* Inline KaTeX in coach text at prose size, not KaTeX's default 1.21em. */
+  .divergence-banner :global(.katex) {
+    font-size: 1em;
   }
 
   @keyframes bannerIn {

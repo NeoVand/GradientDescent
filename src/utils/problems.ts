@@ -31,7 +31,7 @@ const slopeFit: ProblemConfig = {
   type: 'slope-1d',
   name: 'Fit a Slope',
   description: 'One parameter: the slope of a line through the origin',
-  tagline: 'One parameter, one parabola — each step is literally −γ × slope.',
+  tagline: 'One parameter, one parabola — each step is literally $-\\gamma \\times$ slope.',
   oneParam: true,
   trueParameters: { a: 1.8, b: 0 },
 
@@ -239,7 +239,7 @@ const logisticRegression: ProblemConfig = {
   type: 'logistic-regression',
   name: 'Logistic Regression',
   description: 'Classify points into two categories',
-  tagline: 'Separable classes mean no finite minimum — watch ‖θ‖ keep growing.',
+  tagline: 'Separable classes mean no finite minimum — watch $\\lVert\\boldsymbol{\\theta}\\rVert$ keep growing.',
   trueParameters: { a: 1.2, b: 0.2 },
   
   // Generate linearly separable data with clear clusters
@@ -450,7 +450,7 @@ const sineWave: ProblemConfig = {
   type: 'sine-wave',
   name: 'Sine Wave',
   description: 'Fit a sine wave: amplitude and frequency',
-  tagline: 'Frequency aliasing carves many local minima along β.',
+  tagline: 'Frequency aliasing carves many local minima along $\\beta$.',
   trueParameters: { a: 1.5, b: 3 },
 
   generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
@@ -523,7 +523,7 @@ const gaussianPeak: ProblemConfig = {
   type: 'gaussian-peak',
   name: 'Gaussian Peak',
   description: 'Fit a Gaussian: center and width',
-  tagline: 'Gradients vanish far from the peak — and two mirror basins at ±β.',
+  tagline: 'Gradients vanish far from the peak — and two mirror basins at $\\pm\\beta$.',
   trueParameters: { a: 0, b: 1 },
 
   generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
@@ -694,7 +694,7 @@ const dampedOscillator: ProblemConfig = {
   type: 'damped-oscillator',
   name: 'Damped Oscillator',
   description: 'Fit y = e^(−α·t)·cos(β·t): damping and frequency',
-  tagline: 'Multimodal in β, with a symmetric twin at −β.',
+  tagline: 'Multimodal in $\\beta$, with a symmetric twin at $-\\beta$.',
   trueParameters: { a: 0.5, b: 3 },
 
   generateData: (numPoints: number, trainRatio: number, noiseLevel: number = 0.3): DataPoint[] => {
@@ -1522,7 +1522,7 @@ const stretchedBowl: ProblemConfig = {
   type: 'stretched-bowl',
   name: 'Stretched Bowl',
   description: 'An exact quadratic with κ = 10 — the cleanest view of curvature',
-  tagline: 'Ten times steeper across than along. The stability edge is at exactly γ = 0.5 — find it.',
+  tagline: 'Ten times steeper across than along. The stability edge is at exactly $\\gamma = 0.5$ — find it.',
   trueParameters: { a: 0, b: 0 },
   noData: true,
   generateData: NO_DATA,
@@ -1561,7 +1561,7 @@ const rotatedValley: ProblemConfig = {
   type: 'rotated-valley',
   name: 'Rotated Valley',
   description: 'The Stretched Bowl turned 45° — κ = 10, but off-axis',
-  tagline: 'Same κ = 10 as Stretched Bowl, rotated 45° — watch the adaptive methods lose their superpower.',
+  tagline: 'Same $\\kappa = 10$ as Stretched Bowl, rotated 45° — watch the adaptive methods lose their superpower.',
   trueParameters: { a: 0, b: 0 },
   noData: true,
   generateData: NO_DATA,
