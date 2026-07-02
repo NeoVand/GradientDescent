@@ -126,20 +126,18 @@
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
 
+  /* Just the icon — no container. Theme colors come from the app's own
+     text variables, so it reads correctly on both day and night. */
   .copy-btn {
     position: absolute;
-    top: 8px;
-    right: 8px;
+    top: 9px;
+    right: 10px;
     z-index: 1;
     display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
+    padding: 2px;
     color: var(--color-text-tertiary);
-    background: var(--color-bg-secondary, rgba(15, 23, 42, 0.7));
-    border: 1px solid var(--color-border);
-    border-radius: 7px;
+    background: none;
+    border: none;
     cursor: pointer;
     opacity: 0;
     transition: opacity 0.15s ease, color 0.15s ease;
