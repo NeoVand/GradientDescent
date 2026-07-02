@@ -17,6 +17,11 @@ export const chRefs: Record<string, ChRef[]> = {
     { kind: 'wiki', label: 'Level set', href: 'https://en.wikipedia.org/wiki/Level_set' },
     { kind: 'paper', label: 'Visualizing loss landscapes — Li et al., 2018', href: 'https://arxiv.org/abs/1712.09913' }
   ],
+  'ch-derivative': [
+    { kind: 'wiki', label: 'Derivative', href: 'https://en.wikipedia.org/wiki/Derivative' },
+    { kind: 'wiki', label: 'Partial derivative', href: 'https://en.wikipedia.org/wiki/Partial_derivative' },
+    { kind: 'paper', label: 'Essence of calculus — 3Blue1Brown', href: 'https://www.youtube.com/playlist?list=PLZHQObOWTQDMsr9K-rj53DwVRMYO3t5Yr' }
+  ],
   'ch-downhill': [
     { kind: 'wiki', label: 'Gradient', href: 'https://en.wikipedia.org/wiki/Gradient' },
     { kind: 'wiki', label: 'Directional derivative', href: 'https://en.wikipedia.org/wiki/Directional_derivative' },
@@ -28,8 +33,14 @@ export const chRefs: Record<string, ChRef[]> = {
   ],
   'ch-gamma': [
     { kind: 'wiki', label: 'Learning rate', href: 'https://en.wikipedia.org/wiki/Learning_rate' },
+    { kind: 'paper', label: 'Gradient clipping (exploding gradients) — Pascanu et al., 2013', href: 'https://arxiv.org/abs/1211.5063' },
+    { kind: 'paper', label: 'The edge of stability — Cohen et al., 2021', href: 'https://arxiv.org/abs/2103.00065' }
+  ],
+  'ch-curvature': [
+    { kind: 'wiki', label: 'Second derivative', href: 'https://en.wikipedia.org/wiki/Second_derivative' },
+    { kind: 'wiki', label: 'Hessian matrix', href: 'https://en.wikipedia.org/wiki/Hessian_matrix' },
     { kind: 'wiki', label: 'Condition number', href: 'https://en.wikipedia.org/wiki/Condition_number' },
-    { kind: 'paper', label: 'Gradient clipping (exploding gradients) — Pascanu et al., 2013', href: 'https://arxiv.org/abs/1211.5063' }
+    { kind: 'paper', label: 'Why momentum really works — Goh, Distill 2017', href: 'https://distill.pub/2017/momentum/' }
   ],
   'ch-schedule': [
     { kind: 'wiki', label: 'Learning-rate schedule', href: 'https://en.wikipedia.org/wiki/Learning_rate#Learning_rate_schedule' },
@@ -38,7 +49,8 @@ export const chRefs: Record<string, ChRef[]> = {
   ],
   'ch-noise': [
     { kind: 'wiki', label: 'Stochastic gradient descent', href: 'https://en.wikipedia.org/wiki/Stochastic_gradient_descent' },
-    { kind: 'paper', label: 'Stochastic approximation — Robbins & Monro, 1951', href: 'https://doi.org/10.1214/aoms/1177729586' }
+    { kind: 'paper', label: 'Stochastic approximation — Robbins & Monro, 1951', href: 'https://doi.org/10.1214/aoms/1177729586' },
+    { kind: 'paper', label: 'Critical batch sizes — McCandlish et al., 2018', href: 'https://arxiv.org/abs/1812.06162' }
   ],
   'ch-optimizers': [
     { kind: 'wiki', label: 'Condition number', href: 'https://en.wikipedia.org/wiki/Condition_number' },
@@ -48,6 +60,8 @@ export const chRefs: Record<string, ChRef[]> = {
   'ch-generalize': [
     { kind: 'wiki', label: 'Overfitting', href: 'https://en.wikipedia.org/wiki/Overfitting' },
     { kind: 'paper', label: 'Sharp minima & the generalization gap — Keskar et al., 2017', href: 'https://arxiv.org/abs/1609.04836' },
-    { kind: 'paper', label: 'Early stopping (Deep Learning, §7.8) — Goodfellow et al., 2016', href: 'https://www.deeplearningbook.org/contents/regularization.html' }
+    { kind: 'paper', label: 'Early stopping (Deep Learning, §7.8) — Goodfellow et al., 2016', href: 'https://www.deeplearningbook.org/contents/regularization.html' },
+    { kind: 'paper', label: 'Sharp minima can generalize — Dinh et al., 2017', href: 'https://arxiv.org/abs/1703.04933' },
+    { kind: 'paper', label: 'Mode connectivity — Garipov et al., 2018', href: 'https://arxiv.org/abs/1802.10026' }
   ]
 };

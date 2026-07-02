@@ -1511,6 +1511,44 @@ const tinyNet: ProblemConfig = {
 const NO_DATA = (_numPoints: number, _trainRatio: number, _noiseLevel?: number): DataPoint[] => [];
 
 /**
+ * Stretched Bowl: f = 0.2α² + 2β² — an EXACT quadratic, the curvature
+ * chapter's laboratory. The Hessian is constant: λ = 0.4 along α, 4.0
+ * along β, so κ = 10 everywhere and the gradient-descent stability edge
+ * sits at exactly γ = 2/λmax = 0.5 — a number the reader can find by
+ * bisection and then verify against the formula. Below the edge, β snaps
+ * in while α crawls (the ravine in miniature); past it, β grows each hop.
+ */
+const stretchedBowl: ProblemConfig = {
+  type: 'stretched-bowl',
+  name: 'Stretched Bowl',
+  description: 'An exact quadratic with κ = 10 — the cleanest view of curvature',
+  tagline: 'Ten times steeper across than along. The stability edge is at exactly γ = 0.5 — find it.',
+  trueParameters: { a: 0, b: 0 },
+  noData: true,
+  generateData: NO_DATA,
+  predict: () => 0,
+
+  computeLoss: (_data: DataPoint[], p: ModelParameters): number => {
+    return 0.2 * p.a * p.a + 2 * p.b * p.b;
+  },
+
+  computeGradient: (_data: DataPoint[], p: ModelParameters): ModelParameters => {
+    return { a: 0.4 * p.a, b: 4 * p.b };
+  },
+
+  // Start far out along the gentle axis with some height in β, so a run
+  // shows both phases: β snaps to the floor fast, then α crawls home.
+  getInitialParameters: () => ({
+    a: -5.2 + Math.random() * 0.8,
+    b: 1.6 + Math.random() * 0.6
+  }),
+
+  // Comfortably under the γ = 0.5 edge: β contracts hard, α at 0.88/step.
+  defaultLearningRate: 0.3,
+  parameterRange: { min: -6, max: 6 }
+};
+
+/**
  * Rosenbrock banana: f = (1−α)² + 100(β−α²)².
  * The minimum hides at the end of a curved, nearly-flat valley — easy to
  * reach the valley, brutal to traverse it. THE optimizer benchmark.
@@ -1700,6 +1738,7 @@ export const problemConfigs: Record<string, ProblemConfig> = {
   'ar2': ar2,
   'ar2-rollout': ar2Rollout,
   'tiny-net': tinyNet,
+  'stretched-bowl': stretchedBowl,
   'rosenbrock': rosenbrock,
   'saddle-point': saddlePoint,
   'himmelblau': himmelblau,

@@ -28,9 +28,11 @@ export const guideParts: GuidePart[] = [
   {
     title: 'Part II · Walking downhill',
     chapters: [
+      { slug: 'ch-derivative', title: 'How steep, exactly?' },
       { slug: 'ch-downhill', title: 'Which way is downhill?' },
       { slug: 'ch-step', title: 'One step of descent' },
       { slug: 'ch-gamma', title: 'The learning rate γ' },
+      { slug: 'ch-curvature', title: 'The bend of the bowl' },
       { slug: 'ch-schedule', title: 'Scheduling the learning rate' }
     ]
   },
@@ -45,7 +47,7 @@ export const guideParts: GuidePart[] = [
   {
     title: 'Part IV · The zoo',
     chapters: [
-      { slug: 'ch-problems', title: 'The 22 landscapes' },
+      { slug: 'ch-problems', title: 'The landscape zoo' },
       { slug: 'ch-experiments', title: 'Things to try' }
     ]
   },

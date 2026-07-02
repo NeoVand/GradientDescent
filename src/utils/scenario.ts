@@ -19,6 +19,7 @@ import {
   trainingStore,
   optimizerStore,
   landscapeViewStore,
+  lensStore,
   recordInitialHistory,
   resetOptimizerState
 } from '../stores/stores';
@@ -44,6 +45,8 @@ export interface ScenarioState {
   /** Starting marker; omitted = the problem's own initial point. */
   marker?: ModelParameters;
   view?: '2d' | '3d';
+  /** Switch the curvature lens on (hydrated, not persisted). */
+  lens?: boolean;
   /** Start training the moment the scenario is staged. */
   run?: boolean;
 }
@@ -76,6 +79,7 @@ export function applyScenario(s: ScenarioState): void {
   }));
 
   if (s.view) landscapeViewStore.set(s.view);
+  if (s.lens !== undefined) lensStore.hydrate(s.lens);
 
   resetOptimizerState();
   recordInitialHistory();
@@ -108,6 +112,7 @@ export function scenarioUrl(s: ScenarioState, origin?: string): string {
     q.set('b', s.marker.b.toFixed(4));
   }
   if (s.view) q.set('v', s.view);
+  if (s.lens) q.set('lens', '1');
   if (s.run) q.set('run', '1');
 
   const base = origin ?? (typeof location !== 'undefined' ? location.origin + location.pathname : 'https://gradientlab.ai/');
