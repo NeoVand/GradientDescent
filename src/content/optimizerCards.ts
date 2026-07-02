@@ -11,6 +11,8 @@
 // chapters land — second-order and self-tuning). Each card leads with the
 // failure it exists to fix.
 export type OptChapter = {
+  /** Guide chapter (registry slug) this card belongs to — the family-tree part is split across six. */
+  chapter: string;
   year: string;
   name: string;
   by: string;
@@ -31,6 +33,7 @@ export const optTree: OptChapter[] = [
   {
     act: { no: 'Act I', title: 'Follow the slope', intro: 'The whole story starts with a single move — and then spends 170 years repairing it. It helps to read what follows as a conversation between methods: <em>here is the flaw, here is the fix, here is the new flaw the fix introduced.</em>' },
     year: '1847',
+    chapter: 'ch-ravine',
     name: 'Gradient Descent',
     code: 'gd',
     by: 'Augustin-Louis Cauchy',
@@ -44,6 +47,7 @@ export const optTree: OptChapter[] = [
     act: { no: 'Act II', title: 'Add memory', intro: 'Plain descent is forgetful: every step is decided by the slope underfoot and nothing else. The next two fixes both come from giving the marker a <strong>memory</strong> of the steps before — starting with the small averaging tool they are both built from.' },
     prereq: true,
     year: 'tool',
+    chapter: 'ch-momentum',
     name: 'The moving average',
     by: 'the one tool Acts II and III are built from',
     idea:
@@ -52,6 +56,7 @@ export const optTree: OptChapter[] = [
   },
   {
     year: '1964',
+    chapter: 'ch-momentum',
     name: 'Momentum',
     code: 'momentum',
     lead: 'Armed with that one little tool, the first cure almost designs itself. If a single gradient is a gust of wind, a moving average of them is the <em>prevailing</em> wind — exactly what a marker rattling across a ravine is missing: a memory of which way is consistently downhill.',
@@ -64,6 +69,7 @@ export const optTree: OptChapter[] = [
   },
   {
     year: '1983',
+    chapter: 'ch-momentum',
     name: 'Nesterov',
     code: 'nesterov',
     lead: 'But a heavy ball has a temper. The very inertia that carries it along the valley floor also carries it clean past the bottom, so it has to double back and climb — momentum’s gift and its flaw are the same thing. The next fix is almost philosophical: <em>look before you leap.</em>',
@@ -76,6 +82,7 @@ export const optTree: OptChapter[] = [
   {
     act: { no: 'Act III', title: 'A learning rate per parameter', intro: 'Momentum fought the ravine by smoothing across <em>time</em>. Here is a different attack on the same wall: leave time alone and give every <em>parameter</em> its own step size, so the cramped direction and the roomy one stop having to share a single learning rate.' },
     year: '2011',
+    chapter: 'ch-adaptive',
     name: 'AdaGrad',
     code: 'adagrad',
     by: 'Duchi, Hazan & Singer',
@@ -84,10 +91,11 @@ export const optTree: OptChapter[] = [
     formula: String.raw`s \leftarrow s + (\nabla \mathcal{L})^2, \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \frac{\nabla \mathcal{L}}{\sqrt{s} + \varepsilon}`,
     fix: 'every parameter gets its own learning rate',
     brk: 'that history only grows, so the step shrinks toward zero — it strangles itself',
-    hd: 'A learning rate per parameter is really a bargain struck with Newton (end of this chapter): the full curvature table has $d^2$ entries, but its <em>diagonal</em> has just $d$ — same cost as the gradient itself. AdaGrad, RMSProp, Adam and Sophia all live on that diagonal. The fine print: a diagonal can only stretch the <em>axes</em>, so it fixes a ravine aligned with the knobs and does nothing for one running diagonally — rotate the valley 45° and Adam zig-zags like plain GD.'
+    hd: 'A learning rate per parameter is really a bargain struck with Newton (two chapters ahead): the full curvature table has $d^2$ entries, but its <em>diagonal</em> has just $d$ — same cost as the gradient itself. AdaGrad, RMSProp, Adam and Sophia all live on that diagonal. The fine print: a diagonal can only stretch the <em>axes</em>, so it fixes a ravine aligned with the knobs and does nothing for one running diagonally — rotate the valley 45° and Adam zig-zags like plain GD.'
   },
   {
     year: '2012',
+    chapter: 'ch-adaptive',
     name: 'RMSProp',
     code: 'rmsprop',
     lead: 'AdaGrad’s generosity was also its undoing. Because it never forgets a single past gradient, its memory only ever grows — and a step divided by a forever-growing number can only shrink, until the marker freezes mid-journey. What if it could <em>forget?</em>',
@@ -99,6 +107,7 @@ export const optTree: OptChapter[] = [
   },
   {
     year: '2012',
+    chapter: 'ch-adaptive',
     name: 'AdaDelta',
     code: 'adadelta',
     lead: 'Forgetting kept the steps alive, and for most people that closed the case. But Matthew Zeiler, squinting at the very same update that very same year, caught something nobody else had: the equation was, quite literally, <em>dimensionally wrong.</em>',
@@ -112,6 +121,7 @@ export const optTree: OptChapter[] = [
   {
     act: { no: 'Act IV', title: 'Put the two together', intro: 'Two good ideas are now on the table — momentum’s smoothing of the gradient, and a per-parameter step size. They mend different halves of the ravine and they do not get in each other’s way, so the obvious move is to use <strong>both at once</strong>. That move became the most widely used optimizer in deep learning.' },
     year: '2014',
+    chapter: 'ch-adam',
     name: 'Adam',
     code: 'adam',
     by: 'Kingma & Ba — "adaptive moments"',
@@ -123,6 +133,7 @@ export const optTree: OptChapter[] = [
   },
   {
     year: '2016',
+    chapter: 'ch-adam',
     name: 'Nadam',
     code: 'nadam',
     lead: 'Adam looked like the end of the road — robust, popular, everywhere at once. It wasn’t. Within a couple of years three different people each tugged on a single loose thread, and one careful refinement at a time, sanded it smoother. The first of them had been paying very close attention back in Act II.',
@@ -134,6 +145,7 @@ export const optTree: OptChapter[] = [
   },
   {
     year: '2017',
+    chapter: 'ch-adam',
     name: 'AdamW',
     code: 'adamw',
     lead: 'The second thread was the one that mattered most in practice — and it had been hiding in plain sight inside nearly every training run on Earth. The culprit was a line everyone trusted without a second glance: <em>weight decay.</em>',
@@ -146,6 +158,7 @@ export const optTree: OptChapter[] = [
   },
   {
     year: '2019',
+    chapter: 'ch-adam',
     name: 'RAdam',
     code: 'radam',
     lead: 'The third thread was the quietest of all. For years practitioners had patched a rough spot in Adam’s opening steps with a hand-tuned <em>warmup</em>, half-superstition — runs just blew up without it, and nobody could say exactly why. What if that warmup could be <em>derived</em> instead of guessed?',
@@ -159,6 +172,7 @@ export const optTree: OptChapter[] = [
   {
     act: { no: 'Branch', title: 'Sign steps', intro: 'The first fork throws away the piece everyone had been copying — the adaptive square-root rescaling — and asks what is left when a step is nothing but a direction and a single fixed size.' },
     year: '2023',
+    chapter: 'ch-adam',
     name: 'Lion',
     code: 'lion',
     by: 'Chen et al. (Google) — found by program search, not designed',
@@ -172,6 +186,7 @@ export const optTree: OptChapter[] = [
   {
     act: { no: 'Branch', title: 'Use curvature', intro: 'A second fork goes the opposite way: instead of dropping information, it adds some. Every method so far reads only the <em>slope</em>; this branch also reads how the slope is <strong>bending</strong>.' },
     year: '1680s',
+    chapter: 'ch-second-order',
     name: 'Newton',
     code: 'newton',
     by: 'Isaac Newton — the original, three centuries early',
@@ -184,6 +199,7 @@ export const optTree: OptChapter[] = [
   },
   {
     year: '2023',
+    chapter: 'ch-second-order',
     name: 'Sophia',
     code: 'sophia',
     lead: 'Newton’s method is the king nobody can afford — exact, and ruinously expensive, all because of that one beautiful matrix. So the question for the age of billion-parameter models is blunt: can you keep the <em>idea</em> and throw away the bill?',
@@ -197,6 +213,7 @@ export const optTree: OptChapter[] = [
   {
     act: { no: 'Branch', title: 'Tune itself', intro: 'The last fork aims at the one knob nothing has managed to remove. Even the adaptive methods still made you choose $\\gamma$; this branch tries to read it straight off the problem.' },
     year: '2024',
+    chapter: 'ch-self-tuning',
     name: 'Prodigy',
     code: 'prodigy',
     by: 'Mishchenko & Defazio — the learning rate, removed',

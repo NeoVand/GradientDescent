@@ -37,7 +37,7 @@ import {
 } from '../stores/stores';
 import { problemConfigs } from './problems';
 import { defaultHyper, optimizers, type OptimizerId } from './optimizers';
-import { isChapterSlug } from '../content/registry';
+import { isChapterSlug, resolveChapterSlug } from '../content/registry';
 import type { ModelParameters, ProblemType, ScheduleId } from '../types/types';
 
 export function encodeStateUrl(goalSteps?: number): string {
@@ -101,7 +101,8 @@ export function applyUrlState(): UrlStateResult | null {
   if (!hash) return null;
   const q = new URLSearchParams(hash);
 
-  const chRaw = q.get('ch');
+  // Old slugs from shared links resolve to their new homes (chapter splits).
+  const chRaw = q.get('ch') && resolveChapterSlug(q.get('ch')!);
   const chapter = chRaw && isChapterSlug(chRaw) ? chRaw : null;
   const lesson = q.get('lesson');
   const run = q.get('run') === '1';

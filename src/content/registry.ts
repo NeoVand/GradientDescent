@@ -41,12 +41,22 @@ export const guideParts: GuidePart[] = [
     title: 'Part III · Descent in the real world',
     chapters: [
       { slug: 'ch-noise', title: 'Mini-batches & the S in SGD' },
-      { slug: 'ch-optimizers', title: 'The optimizer family tree' },
       { slug: 'ch-generalize', title: 'Training loss isn’t the goal' }
     ]
   },
   {
-    title: 'Part IV · The zoo',
+    title: 'Part IV · The optimizer family tree',
+    chapters: [
+      { slug: 'ch-ravine', title: 'The ravine, and the race' },
+      { slug: 'ch-momentum', title: 'Momentum & Nesterov' },
+      { slug: 'ch-adaptive', title: 'A learning rate per parameter' },
+      { slug: 'ch-adam', title: 'Adam — and the fork' },
+      { slug: 'ch-second-order', title: 'Second order: Newton & Sophia' },
+      { slug: 'ch-self-tuning', title: 'The last knob' }
+    ]
+  },
+  {
+    title: 'Part V · The zoo',
     chapters: [
       { slug: 'ch-problems', title: 'The landscape zoo' },
       { slug: 'ch-experiments', title: 'Things to try' }
@@ -82,6 +92,18 @@ export const chapterBySlug = (slug: string): ChapterEntry | undefined =>
 export const isChapterSlug = (slug: string): boolean => !!chapterBySlug(slug);
 
 /**
+ * Old slugs that still arrive via shared deep links, mapped to their new
+ * homes. The optimizer mega-chapter became a whole part; its old slug lands
+ * on the part opener.
+ */
+export const chapterAliases: Record<string, string> = {
+  'ch-optimizers': 'ch-ravine'
+};
+
+/** Resolve a possibly-stale chapter slug to its current one (or itself). */
+export const resolveChapterSlug = (slug: string): string => chapterAliases[slug] ?? slug;
+
+/**
  * Chapters whose concept has a hands-on lesson in the guided course — the
  * chapter CTA jumps straight to that lesson. (Lesson ids live in lessons.ts;
  * a vitest cross-checks that every id here exists there.)
@@ -92,7 +114,9 @@ export const chapterLesson: Record<string, string> = {
   'ch-step': 'dead-gradient',
   'ch-gamma': 'step-size',
   'ch-noise': 'sgd-noise',
-  'ch-optimizers': 'momentum-race'
+  'ch-ravine': 'narrow-valley',
+  'ch-momentum': 'momentum-race',
+  'ch-adaptive': 'adam'
 };
 
 /**
@@ -106,7 +130,9 @@ const chapterExercises: Record<string, string[]> = {
   'ch-step': ['dead-gradient'],
   'ch-gamma': ['step-size'],
   'ch-noise': ['sgd-noise'],
-  'ch-optimizers': ['momentum-race', 'narrow-valley', 'adam'],
+  'ch-ravine': ['narrow-valley'],
+  'ch-momentum': ['momentum-race'],
+  'ch-adaptive': ['adam'],
   'ch-problems': ['tiny-net']
 };
 

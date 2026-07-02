@@ -6,10 +6,12 @@
    * scroll-spy + a reading-progress bar) beside a calm, measured reading
    * column. The book climbs a gentle ladder — Part I the landscape, Part II
    * walking downhill (the gradient, one step, the learning rate and its
-   * schedule), Part III descent in the real world (noisy mini-batches, then
-   * the optimizer family tree with its real simulated race), Part IV the zoo
-   * of problems, then a short reference. Each chapter can launch a matching
-   * preset in the live app; every term is defined where it is first used.
+   * schedule), Part III descent in the real world (noisy mini-batches,
+   * generalization), Part IV the optimizer family tree (six chapters: the
+   * ravine and its real simulated race, then the fixes act by act), Part V
+   * the zoo of problems, then a short reference. Each chapter can launch a
+   * matching preset in the live app; every term is defined where it is first
+   * used.
    */
 
   import {
@@ -18,7 +20,8 @@
     Target, Radio, ScatterChart, Brain,
     Compass, Rocket, Zap, GraduationCap,
     BookOpen, FlaskConical, Layers, Map, Play, Pause, RotateCcw, Keyboard,
-    FileText, MountainSnow, TrendingUpDown, Ruler, Gauge
+    FileText, MountainSnow, TrendingUpDown, Ruler, Gauge,
+    Wind, SlidersHorizontal, GitMerge, Hexagon, Wand2
   } from 'lucide-svelte';
   import katex from 'katex';
   import 'katex/dist/katex.min.css';
@@ -37,10 +40,10 @@
   } from '../utils/guideViz';
   import { themeStore } from '../stores/stores';
   import { formulas } from '../content/formulas';
-  import { optTree, OPT_CITE } from '../content/optimizerCards';
+  import { optTree, OPT_CITE, type OptChapter } from '../content/optimizerCards';
   import { problemCards } from '../content/problemCards';
   import { chRefs } from '../content/chapterRefs';
-  import { guideParts, guideChapters, chapterLesson } from '../content/registry';
+  import { guideParts, guideChapters, chapterLesson, resolveChapterSlug } from '../content/registry';
 
   // Day/dark for the guide's heatmap figures (ravine + race). The figures were
   // authored for dark; day flips to "dark basins on light" (see tintGridURL).
@@ -159,8 +162,10 @@
   $: if (isOpen !== prevOpen) {
     prevOpen = isOpen;
     if (isOpen) {
-      const target = initialChapter && chapters.some(c => c.slug === initialChapter)
-        ? initialChapter
+      // Resolve old slugs from shared links (the mega-chapter split renamed some).
+      const wanted = initialChapter ? resolveChapterSlug(initialChapter) : null;
+      const target = wanted && chapters.some(c => c.slug === wanted)
+        ? wanted
         : chapters[0].slug;
       activeId = target;
       progress = 0;
@@ -198,6 +203,9 @@
 
   const raceExperiment = experiments.find(e => e.id === 'banana-race');
   const scheduleExperiment = experiments.find(e => e.id === 'lion-schedule');
+  const narrowValleyExperiment = experiments.find(e => e.id === 'narrow-valley');
+  const adagradFreezeExperiment = experiments.find(e => e.id === 'adagrad-freeze');
+  const rotatedRavineExperiment = experiments.find(e => e.id === 'rotated-ravine');
 
   // ---------- Race palette, tuned rates, and on/off state ----------
   // One colour per optimizer; cousins share a hue family so the taxonomy reads
@@ -847,8 +855,10 @@
     'ch-bowl': BookOpen, 'ch-landscape': Mountain, 'ch-shapes': MountainSnow,
     'ch-derivative': Ruler, 'ch-curvature': Gauge,
     'ch-downhill': TrendingDown,
-    'ch-step': Compass, 'ch-gamma': Zap, 'ch-optimizers': Rocket, 'ch-noise': Waves,
+    'ch-step': Compass, 'ch-gamma': Zap, 'ch-noise': Waves,
     'ch-schedule': Activity, 'ch-generalize': TrendingUpDown,
+    'ch-ravine': Rocket, 'ch-momentum': Wind, 'ch-adaptive': SlidersHorizontal,
+    'ch-adam': GitMerge, 'ch-second-order': Hexagon, 'ch-self-tuning': Wand2,
     'ch-problems': Layers, 'ch-experiments': FlaskConical, 'ch-panels': Map, 'ch-keys': Keyboard
   };
 
@@ -1180,6 +1190,17 @@
                 as much as how you step: move the first guess across a ridge and the run ends somewhere
                 else entirely, which is what makes <strong>initialization</strong> a real design choice.
               </p>
+              <aside class="hd-note">
+                <span class="hd-note-tag">In a billion dimensions</span>
+                <p>
+                  Up there, “where you start” changes meaning. Set a million knobs to small random
+                  numbers and every start lands on a thin shell, almost exactly the same distance
+                  from the origin — and any two random starts are nearly perpendicular to each
+                  other. So real initialization science is not about picking the right basin; it is
+                  about picking the right <em>scale</em> (the Xavier and He rules), so the first
+                  gradients come out neither vanishing nor explosive.
+                </p>
+              </aside>
 
               <figure class="fig">
                 <svg viewBox="0 0 460 188" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
@@ -1233,8 +1254,12 @@
                 dimensions a real model lives in, the reverse holds: critical points are
                 <em>overwhelmingly</em> saddles, and almost every true minimum sits close to the global
                 one in value. The hard part of training a large network is escaping saddles and plateaus,
-                not dodging bad valleys — a finding (Dauphin et al., 2014) that reshaped how the field
-                thinks about non-convex optimization.
+                not dodging bad valleys — a finding (Dauphin et al., 2014; Choromanska et al., 2015)
+                that reshaped how the field thinks about non-convex optimization. A confession about
+                this playground, then: with two knobs, dodging the wrong valley really <em>is</em> the
+                game, and several landscapes in the zoo are built to punish a bad start. Keep the
+                basin picture — just know that at scale the enemy is the long flat crawl, not the
+                wrong valley.
               </p>
               <p class="aside">
                 <strong>“Convex”?</strong> A surface is <strong>convex</strong> when it is one bowl
@@ -1256,10 +1281,10 @@
                 </p>
               </aside>
               <p>
-                This is the backdrop for Part III. Plain descent stalls on saddles, crawls across
-                plateaus, and settles in the first basin it finds. The momentum, noise, and curvature
-                tricks ahead are, in large part, ways to keep moving when the slope alone is no longer
-                enough to go on.
+                This is the backdrop for Parts III and IV. Plain descent stalls on saddles, crawls
+                across plateaus, and settles in the first basin it finds. The momentum, noise, and
+                curvature tricks ahead are, in large part, ways to keep moving when the slope alone
+                is no longer enough to go on.
               </p>
               <ChapterCta
                 lessonId={chLesson['ch-shapes']}
@@ -1472,6 +1497,18 @@
                 </div>
               </div>
 
+              <aside class="hd-note">
+                <span class="hd-note-tag">In a billion dimensions</span>
+                <p>
+                  A quiet upgrade for later. With two knobs a contour is a loop — one thin line of
+                  “no change”. With {@html tex(String.raw`d`)} knobs it is a whole
+                  {@html tex(String.raw`(d-1)`)}-dimensional sheet: at any point there is a single
+                  steepest way up, and a vast flat wall of sideways directions that change nothing at
+                  all. The gradient’s job gets lonelier as {@html tex(String.raw`d`)} grows — one
+                  needle of change in a haystack of directions that don’t.
+                </p>
+              </aside>
+
               <p>
                 Formally, the gradient is a column of <strong>partial derivatives</strong> — one
                 slope per parameter. Each entry answers a single, narrow question: <em>if I wiggle
@@ -1664,7 +1701,7 @@
                 You’ll now notice a <span class="ink-red">red arrow</span> on the marker beside the
                 blue one. The blue arrow is the pure downhill direction; the
                 <strong>red arrow is the step the optimizer actually took</strong>. Early on they
-                almost agree. Once you add the tricks in Part III, they’ll split apart — and
+                almost agree. Once you add the tricks in Part IV, they’ll split apart — and
                 <em>that gap is the optimizer’s personality.</em>
               </p>
               <ChapterCta
@@ -1914,7 +1951,7 @@
                 lands you in a few hops. {@html tex(String.raw`\kappa = 10`)} means the sharp direction forces a {@html tex(String.raw`\gamma`)} so timid that
                 the gentle direction keeps about 80% of its remaining distance <em>every step</em>.
                 Ravines, trenches, the long crawl — they are all this one number wearing different
-                landscapes, and Part III’s entire optimizer family tree is organised around
+                landscapes, and Part IV’s entire optimizer family tree is organised around
                 outwitting it.
               </p>
               <p class="look">
@@ -1933,7 +1970,7 @@
                   canyon system with a few sheer walls and endless soft floor. Condition numbers in
                   the wild reach 10⁵ and beyond, so the crawl this chapter proved isn’t a corner
                   case — it is the default condition of deep learning. That is why every method in
-                  Part III ships in every deep-learning library.
+                  Part IV ships in every deep-learning library.
                 </p>
               </aside>
               {#if chapterPresets['ch-curvature']}
@@ -2088,6 +2125,18 @@
                 to new data — rather than narrow, brittle cracks. This is why a touch of stochasticity
                 is often kept on purpose, even when the full gradient is affordable.
               </p>
+              <aside class="hd-note">
+                <span class="hd-note-tag">In a billion dimensions</span>
+                <p>
+                  The fan tells the truth in 2-D, but up there it would look strange: two random
+                  directions among a million axes are almost always nearly <em>perpendicular</em> —
+                  there are countless ways to be orthogonal and only one way to agree. So gradient
+                  noise mostly pushes <em>sideways</em>, at right angles to the true downhill,
+                  rather than backwards against it. A noisy run drifts and wanders far more than it
+                  backtracks — one reason SGD keeps making progress even when individual arrows
+                  look hopeless.
+                </p>
+              </aside>
               <p>
                 The bill comes due at the <em>end</em>. Because the gradient never goes quiet, SGD never
                 fully stops: near the bottom it stops descending and starts <strong>orbiting</strong>,
@@ -2144,8 +2193,222 @@
             </section>
 
             <!-- ============== 8 · THE OPTIMIZER STORY ============== -->
-            <section data-ch="ch-optimizers" id="ch-optimizers">
-              <h3><svelte:component this={chIcon['ch-optimizers']} size={18} strokeWidth={2} /> The optimizer family tree</h3>
+            <!-- ============== TRAINING LOSS ISN'T THE GOAL ============== -->
+            <section data-ch="ch-generalize" id="ch-generalize">
+              <h3><svelte:component this={chIcon['ch-generalize']} size={18} strokeWidth={2} /> Training loss isn’t the goal</h3>
+
+              <p>
+                Every chapter so far has worked to drive the <em>training</em> loss down. But that number
+                is only a stand-in for what we actually want. We don’t care about fitting the data we
+                already have — we care about predicting data we <strong>haven’t seen</strong>. Doing well
+                on new data is <strong>generalization</strong>, and it is the whole point.
+              </p>
+              <p>
+                The loss we minimize is the average error over the training set — the <strong>empirical
+                risk</strong> — but the real target is the average error over <em>all</em> future data,
+                the <strong>true risk</strong>. With limited or noisy data the two come apart. Push the
+                training loss too low and the model starts memorizing the quirks and noise of <em>this</em>
+                sample: training loss keeps falling while error on held-out data turns and climbs. That
+                divergence is <strong>overfitting</strong>.
+              </p>
+
+              <figure class="fig">
+                <svg viewBox="0 0 {genFig.W} {genFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                  <line x1={genFig.padL} y1={genFig.yBase} x2={genFig.x1} y2={genFig.yBase} class="fig-contour" style="stroke-opacity:0.35" />
+                  <line x1={genFig.padL} y1={genFig.padT} x2={genFig.padL} y2={genFig.yBase} class="fig-contour" style="stroke-opacity:0.35" />
+                  <line x1={genFig.stop.x} y1={genFig.stop.yTop} x2={genFig.stop.x} y2={genFig.yBase} stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="3,3" stroke-opacity="0.65" />
+                  <path d={genFig.testD} fill="none" stroke="#f59e0b" stroke-width="2.3" stroke-linecap="round" />
+                  <path d={genFig.trainD} fill="none" stroke="#10b981" stroke-width="2.3" stroke-linecap="round" />
+                  <circle cx={genFig.stop.x} cy={genFig.stop.y} r="3.6" fill="#f59e0b" stroke="#fff" stroke-width="1.2" />
+                  <text x={genFig.testEnd.x - 4} y={genFig.testEnd.y + 2} class="fig-svg-label" style="text-anchor:end;fill:#f59e0b">test loss</text>
+                  <text x={genFig.trainEnd.x - 4} y={genFig.trainEnd.y - 7} class="fig-svg-label" style="text-anchor:end;fill:#10b981">training loss</text>
+                  <text x={genFig.stop.x} y={genFig.stop.yTop - 3} class="fig-svg-label" style="fill:var(--color-text-tertiary)">early stop</text>
+                  <text x={genFig.padL - 6} y={genFig.padT + 4} class="fig-svg-label" style="text-anchor:end;fill:var(--color-text-tertiary)">loss</text>
+                  <text x={genFig.x1} y={genFig.yBase + 18} class="fig-svg-label" style="text-anchor:end;fill:var(--color-text-tertiary)">training time →</text>
+                </svg>
+                <figcaption class="fig-cap">
+                  Training loss (green) keeps falling; test loss (amber), measured on held-out data, bottoms
+                  out and then rises as the model begins fitting noise. The dip is where you’d want to stop.
+                </figcaption>
+              </figure>
+
+              <p>
+                Two fixes follow directly. The first is to <em>measure</em> the gap: hold out part of the
+                data as a <strong>test</strong> (or validation) set, and watch its loss alongside the
+                training loss — that is the second curve in the <strong>Loss History</strong> panel. The
+                second is <strong>early stopping</strong>: end training at the test-loss minimum rather
+                than the training-loss minimum. It is the simplest regularizer there is, and — for a
+                run started near zero — in the quadratic case it is provably close to an explicit
+                weight penalty (Bishop, 1995; Goodfellow et al., 2016, §7.8).
+              </p>
+              <p>
+                That penalty is <strong>regularization</strong>: instead of minimizing the loss alone, add
+                a term that prefers smaller, simpler parameters,
+              </p>
+              <div class="formula-display center">{@html texD(String.raw`\min_{\boldsymbol{\theta}}\;\; \mathcal{L}(\boldsymbol{\theta}) \;+\; \tfrac{\lambda}{2}\,\lVert \boldsymbol{\theta}\rVert^2`)}</div>
+              <p>
+                where {@html tex(String.raw`\lambda`)} sets how hard to pull toward zero. (An unrelated
+                {@html tex(String.raw`\lambda`)}, by the way — not the curvature
+                {@html tex(String.raw`\lambda_{\max}`)} from the learning-rate chapter. The alphabet is
+                small and the field is greedy.) For plain SGD the
+                gradient of that penalty is exactly <strong>weight decay</strong> —
+                {@html tex(String.raw`\boldsymbol{\theta} \leftarrow (1-\gamma\lambda)\,\boldsymbol{\theta} - \gamma\nabla\mathcal{L}`)}
+                — shrinking every weight a touch each step (Krogh &amp; Hertz, 1991). Keep this
+                {@html tex(String.raw`\lambda`)} in mind: you will meet it again on
+                <strong>AdamW</strong> in the family tree, which decouples the decay from the
+                adaptive scaling so it behaves like a true penalty again.
+              </p>
+              <p>
+                Geometry has the last word, and it loops back to the noise chapter. Not all minima
+                generalize equally: a <em>wide, flat</em> basin is forgiving — small shifts in the data
+                barely move the loss — while a <em>sharp</em> one is brittle. Flat minima tend to
+                generalize better (Hochreiter &amp; Schmidhuber, 1997), the restless noise of small-batch
+                SGD tends to settle into them, and very large batches tend to find sharper minima with a
+                measurable generalization gap (Keskar et al., 2017). So the real target was never the exact
+                bottom of the training bowl — it is a low, <em>wide</em> region that also sits low on data
+                you will never see. Optimization gets you down; generalization decides whether down was
+                worth reaching.
+              </p>
+              <aside class="hd-note">
+                <span class="hd-note-tag">In a billion dimensions</span>
+                <p>
+                  Two honest asterisks on this tidy story. First, “flat” is slippery: a network can
+                  be rescaled — same function, same predictions — while its measured sharpness
+                  changes arbitrarily, so naive flatness can’t be the whole answer (Dinh et al.,
+                  2017). Second, at scale good minima aren’t isolated dips like the ones drawn
+                  here: they connect into long low-loss valleys you can walk between without
+                  climbing (Garipov et al., 2018). The intuition survives — restless SGD prefers
+                  forgiving regions — but hold it as a compass, not a theorem.
+                </p>
+              </aside>
+              {#if chapterPresets['ch-generalize']}
+                <ChapterCta demo={() => runPreset('ch-generalize')} demoLabel={chapterPresets['ch-generalize'].title} />
+              {/if}
+              {#if chRefs['ch-generalize']}
+                <div class="ch-refs">
+                  <span class="ch-refs-label">Further reading</span>
+                  {#each chRefs['ch-generalize'] as r}
+                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
+                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
+                      {r.label}
+                    </a>
+                  {/each}
+                </div>
+              {/if}
+            </section>
+
+            <!-- One optimizer story card (+ its act header, lead and asides).
+                 Declared once; each family-tree chapter renders its own slice. -->
+            {#snippet optCard(c: OptChapter)}
+                {#if c.name === 'Lion'}
+                  <p class="opt-lead">
+                    Adam looked like the destination. It wasn’t — past it the trunk
+                    <strong>forks</strong>, and each later method keeps most of Adam (or throws it
+                    out) to rethink one piece. The first branch is right here; the other two get the
+                    next two chapters.
+                  </p>
+                {/if}
+                {#if c.act}
+                  <div class="opt-act"><span class="act-no">{c.act.no}</span><span class="act-title">{c.act.title}</span></div>
+                  {#if c.act.intro}<p class="opt-act-intro">{@html mathHtml(c.act.intro)}</p>{/if}
+                {/if}
+                {#if c.lead}<p class="opt-lead">{@html mathHtml(c.lead)}</p>{/if}
+                {@const cite = OPT_CITE[c.name]}
+                {@const authors = cite?.people ?? (cite?.person ? [{ name: cite.person, img: cite.img, credit: cite.credit }] : [])}
+                <div class="opt-card" class:prereq-card={c.prereq}>
+                  <div class="opt-top">
+                    <div class="opt-head">
+                      <span class="opt-year">{c.year}</span>
+                      <span class="opt-name">{c.name}</span>
+                      <span class="opt-by">{c.by}</span>
+                    </div>
+                    {#if authors.length}
+                      <div class="opt-portraits" class:multi={authors.length > 1}>
+                        {#each authors as a (a.name)}
+                          <div class="opt-portrait" title={a.credit ? `${a.name} · ${a.credit}` : a.name}>
+                            <span class="opt-portrait-ph" aria-hidden="true">{initials(a.name)}</span>
+                            {#if a.img}
+                              <img class="opt-portrait-img" src={a.img} alt={a.name} loading="lazy" on:error={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')} />
+                            {/if}
+                          </div>
+                        {/each}
+                      </div>
+                    {/if}
+                  </div>
+                  <p class="opt-idea">{@html mathHtml(c.idea)}</p>
+                  <div class="opt-formula-tag">{c.prereq ? 'the tool, in symbols' : 'the same idea, in symbols'}</div>
+                  <div class="opt-formula">{@html tex(c.formula)}</div>
+                  {#if c.fix || c.brk}
+                    <div class="opt-foot">
+                      {#if c.fix}<span class="opt-fix">✓ {@html mathText(c.fix)}</span>{/if}
+                      {#if c.brk}<span class="opt-break">✗ {@html mathText(c.brk)}</span>{/if}
+                    </div>
+                  {/if}
+                  {#if c.hd}
+                    <aside class="hd-note">
+                      <span class="hd-note-tag">In a billion dimensions</span>
+                      <p>{@html mathHtml(c.hd)}</p>
+                    </aside>
+                  {/if}
+                  {#if c.code}
+                    {@const cid = c.code}
+                    <button class="code-btn" class:open={!!codeOpen[cid]} on:click={() => (codeOpen[cid] = !codeOpen[cid])} aria-expanded={!!codeOpen[cid]}>
+                      <span class="code-btn-glyph">&lt;/&gt;</span> Code
+                    </button>
+                    {#if codeOpen[cid]}
+                      {#await import('./OptimizerCode.svelte') then mod}
+                        <svelte:component this={mod.default} id={cid} />
+                      {/await}
+                    {/if}
+                  {/if}
+                  {#if cite?.wiki || cite?.paper}
+                    <div class="opt-cite">
+                      {#if authors.length}<span class="opt-cite-who">{authors.map(a => a.name).join(', ')}</span>{/if}
+                      {#if cite.wiki}
+                        <a class="opt-cite-link" href={cite.wiki} target="_blank" rel="noopener noreferrer">
+                          <BookOpen size={11} strokeWidth={2.2} /> Wikipedia
+                        </a>
+                      {/if}
+                      {#if cite.paper}
+                        <a class="opt-cite-link" href={cite.paper} target="_blank" rel="noopener noreferrer">
+                          <FileText size={11} strokeWidth={2.2} /> {cite.cite ?? 'Paper'}
+                        </a>
+                      {/if}
+                    </div>
+                  {/if}
+                </div>
+                {#if c.name === 'Nesterov'}
+                  <p class="aside">
+                    Feel Act II yourself: pick <strong>Gaussian Peak</strong> with {@html tex(String.raw`\mu = 0`)} — far from
+                    the peak the gradient is so faint the marker stalls. Crank {@html tex(String.raw`\mu`)} to 0.9 and watch it
+                    power through. Remember the marker arrows from Part II: blue is raw steepest
+                    descent, red is the step actually taken — here the gap is momentum at work.
+                  </p>
+                {/if}
+                {#if c.name === 'Newton'}
+                  <p class="aside">
+                    Turn on the <strong>curvature lens</strong> (the hexagon button on the Loss &amp;
+                    Gradient panel) to see Newton’s violet ghost arrow — that is exactly the step it
+                    takes. Pick a clean bowl like <strong>Linear Regression</strong>, drop the marker
+                    anywhere, and Newton snaps to the bottom almost at once; then try a saddle from
+                    the Classic surfaces and watch it give up the jump and crawl.
+                  </p>
+                {/if}
+                {#if c.name === 'Lion'}
+                  <p class="aside">
+                    Pick <strong>Lion</strong> and watch the marker move in equal-size hops, the
+                    same stride on a cliff or a flat — every other method takes smaller steps as it
+                    nears the bottom; Lion can’t. So it circles the minimum in a fixed ring instead
+                    of homing in — exactly the case the scheduling chapter built on: bleed {@html tex(String.raw`\gamma`)} to zero
+                    and the ring closes to a point.
+                  </p>
+                {/if}
+            {/snippet}
+
+            <!-- ============== PART IV · THE OPTIMIZER FAMILY TREE ============== -->
+            <section data-ch="ch-ravine" id="ch-ravine">
+              <div class="part-label">Part IV · The optimizer family tree</div>
+              <h3><svelte:component this={chIcon['ch-ravine']} size={18} strokeWidth={2} /> The ravine, and the race</h3>
               <p>
                 Plain gradient descent has one recurring nemesis: the <strong>ravine</strong> — a
                 valley far steeper across than along. The {@html tex(String.raw`\gamma`)} that’s safe on the steep walls is
@@ -2346,110 +2609,93 @@
                 </figcaption>
               </figure>
 
-              {#each optTree as c (c.name)}
-                {#if c.name === 'Lion'}
-                  <p class="opt-lead">
-                    Adam looked like the destination. It wasn’t — past it the trunk
-                    <strong>forks</strong>, and each later method keeps most of Adam (or throws it
-                    out) to rethink one piece. These are the branches the field is still walking.
-                  </p>
-                {/if}
-                {#if c.act}
-                  <div class="opt-act"><span class="act-no">{c.act.no}</span><span class="act-title">{c.act.title}</span></div>
-                  {#if c.act.intro}<p class="opt-act-intro">{@html mathHtml(c.act.intro)}</p>{/if}
-                {/if}
-                {#if c.lead}<p class="opt-lead">{@html mathHtml(c.lead)}</p>{/if}
-                {@const cite = OPT_CITE[c.name]}
-                {@const authors = cite?.people ?? (cite?.person ? [{ name: cite.person, img: cite.img, credit: cite.credit }] : [])}
-                <div class="opt-card" class:prereq-card={c.prereq}>
-                  <div class="opt-top">
-                    <div class="opt-head">
-                      <span class="opt-year">{c.year}</span>
-                      <span class="opt-name">{c.name}</span>
-                      <span class="opt-by">{c.by}</span>
-                    </div>
-                    {#if authors.length}
-                      <div class="opt-portraits" class:multi={authors.length > 1}>
-                        {#each authors as a (a.name)}
-                          <div class="opt-portrait" title={a.credit ? `${a.name} · ${a.credit}` : a.name}>
-                            <span class="opt-portrait-ph" aria-hidden="true">{initials(a.name)}</span>
-                            {#if a.img}
-                              <img class="opt-portrait-img" src={a.img} alt={a.name} loading="lazy" on:error={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')} />
-                            {/if}
-                          </div>
-                        {/each}
-                      </div>
-                    {/if}
-                  </div>
-                  <p class="opt-idea">{@html mathText(c.idea)}</p>
-                  <div class="opt-formula-tag">{c.prereq ? 'the tool, in symbols' : 'the same idea, in symbols'}</div>
-                  <div class="opt-formula">{@html tex(c.formula)}</div>
-                  {#if c.fix || c.brk}
-                    <div class="opt-foot">
-                      {#if c.fix}<span class="opt-fix">✓ {@html mathText(c.fix)}</span>{/if}
-                      {#if c.brk}<span class="opt-break">✗ {@html mathText(c.brk)}</span>{/if}
-                    </div>
-                  {/if}
-                  {#if c.hd}
-                    <aside class="hd-note">
-                      <span class="hd-note-tag">In a billion dimensions</span>
-                      <p>{@html mathText(c.hd)}</p>
-                    </aside>
-                  {/if}
-                  {#if c.code}
-                    {@const cid = c.code}
-                    <button class="code-btn" class:open={!!codeOpen[cid]} on:click={() => (codeOpen[cid] = !codeOpen[cid])} aria-expanded={!!codeOpen[cid]}>
-                      <span class="code-btn-glyph">&lt;/&gt;</span> Code
-                    </button>
-                    {#if codeOpen[cid]}
-                      {#await import('./OptimizerCode.svelte') then mod}
-                        <svelte:component this={mod.default} id={cid} />
-                      {/await}
-                    {/if}
-                  {/if}
-                  {#if cite?.wiki || cite?.paper}
-                    <div class="opt-cite">
-                      {#if authors.length}<span class="opt-cite-who">{authors.map(a => a.name).join(', ')}</span>{/if}
-                      {#if cite.wiki}
-                        <a class="opt-cite-link" href={cite.wiki} target="_blank" rel="noopener noreferrer">
-                          <BookOpen size={11} strokeWidth={2.2} /> Wikipedia
-                        </a>
-                      {/if}
-                      {#if cite.paper}
-                        <a class="opt-cite-link" href={cite.paper} target="_blank" rel="noopener noreferrer">
-                          <FileText size={11} strokeWidth={2.2} /> {cite.cite ?? 'Paper'}
-                        </a>
-                      {/if}
-                    </div>
-                  {/if}
-                </div>
-                {#if c.name === 'Nesterov'}
-                  <p class="aside">
-                    Feel Act II yourself: pick <strong>Gaussian Peak</strong> with {@html tex(String.raw`\mu = 0`)} — far from
-                    the peak the gradient is so faint the marker stalls. Crank {@html tex(String.raw`\mu`)} to 0.9 and watch it
-                    power through. Remember the marker arrows from Part II: blue is raw steepest
-                    descent, red is the step actually taken — here the gap is momentum at work.
-                  </p>
-                {/if}
-                {#if c.name === 'Newton'}
-                  <p class="aside">
-                    Turn on the <strong>curvature lens</strong> (the hexagon button on the Loss &amp;
-                    Gradient panel) to see Newton’s violet ghost arrow — that is exactly the step it
-                    takes. Pick a clean bowl like <strong>Linear Regression</strong>, drop the marker
-                    anywhere, and Newton snaps to the bottom almost at once; then try a saddle from
-                    the Classic surfaces and watch it give up the jump and crawl.
-                  </p>
-                {/if}
-                {#if c.name === 'Lion'}
-                  <p class="aside">
-                    Pick <strong>Lion</strong> and watch the marker move in equal-size hops, the
-                    same stride on a cliff or a flat — every other method takes smaller steps as it
-                    nears the bottom; Lion can’t. So it circles the minimum in a fixed ring instead
-                    of homing in — exactly the case the scheduling chapter built on: bleed {@html tex(String.raw`\gamma`)} to zero
-                    and the ring closes to a point.
-                  </p>
-                {/if}
+              {#each optTree.filter((o) => o.chapter === 'ch-ravine') as c (c.name)}
+                {@render optCard(c)}
               {/each}
+
+              <ChapterCta
+                lessonId={chLesson['ch-ravine']}
+                onLesson={() => startLessonFromChapter('ch-ravine')}
+                demo={raceExperiment ? () => runExperiment(raceExperiment) : null}
+              />
+              {#if chRefs['ch-ravine']}
+                <div class="ch-refs">
+                  <span class="ch-refs-label">Further reading</span>
+                  {#each chRefs['ch-ravine'] as r}
+                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
+                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
+                      {r.label}
+                    </a>
+                  {/each}
+                </div>
+              {/if}
+            </section>
+
+            <section data-ch="ch-momentum" id="ch-momentum">
+              <h3><svelte:component this={chIcon['ch-momentum']} size={18} strokeWidth={2} /> Momentum &amp; Nesterov</h3>
+              {#each optTree.filter((o) => o.chapter === 'ch-momentum') as c (c.name)}
+                {@render optCard(c)}
+              {/each}
+
+              <ChapterCta
+                lessonId={chLesson['ch-momentum']}
+                onLesson={() => startLessonFromChapter('ch-momentum')}
+                demo={narrowValleyExperiment ? () => runExperiment(narrowValleyExperiment) : null}
+              />
+              {#if chRefs['ch-momentum']}
+                <div class="ch-refs">
+                  <span class="ch-refs-label">Further reading</span>
+                  {#each chRefs['ch-momentum'] as r}
+                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
+                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
+                      {r.label}
+                    </a>
+                  {/each}
+                </div>
+              {/if}
+            </section>
+
+            <section data-ch="ch-adaptive" id="ch-adaptive">
+              <h3><svelte:component this={chIcon['ch-adaptive']} size={18} strokeWidth={2} /> A learning rate per parameter</h3>
+              {#each optTree.filter((o) => o.chapter === 'ch-adaptive') as c (c.name)}
+                {@render optCard(c)}
+              {/each}
+
+              <ChapterCta
+                lessonId={chLesson['ch-adaptive']}
+                onLesson={() => startLessonFromChapter('ch-adaptive')}
+                demo={adagradFreezeExperiment ? () => runExperiment(adagradFreezeExperiment) : null}
+              />
+            </section>
+
+            <section data-ch="ch-adam" id="ch-adam">
+              <h3><svelte:component this={chIcon['ch-adam']} size={18} strokeWidth={2} /> Adam — and the fork</h3>
+              {#each optTree.filter((o) => o.chapter === 'ch-adam') as c (c.name)}
+                {@render optCard(c)}
+              {/each}
+
+              {#if rotatedRavineExperiment}
+                <ChapterCta demo={() => runExperiment(rotatedRavineExperiment)} demoLabel="Rotate the ravine 45°" />
+              {/if}
+            </section>
+
+            <section data-ch="ch-second-order" id="ch-second-order">
+              <h3><svelte:component this={chIcon['ch-second-order']} size={18} strokeWidth={2} /> Second order: Newton &amp; Sophia</h3>
+              {#each optTree.filter((o) => o.chapter === 'ch-second-order') as c (c.name)}
+                {@render optCard(c)}
+              {/each}
+
+              {#if chapterPresets['ch-second-order']}
+                <ChapterCta demo={() => runPreset('ch-second-order')} demoLabel={chapterPresets['ch-second-order'].title} />
+              {/if}
+            </section>
+
+            <section data-ch="ch-self-tuning" id="ch-self-tuning">
+              <h3><svelte:component this={chIcon['ch-self-tuning']} size={18} strokeWidth={2} /> The last knob</h3>
+              {#each optTree.filter((o) => o.chapter === 'ch-self-tuning') as c (c.name)}
+                {@render optCard(c)}
+              {/each}
+
 
               <div class="opt-frontier">
                 <div class="opt-frontier-title">The frontier — and why it isn’t in the picker</div>
@@ -2468,130 +2714,15 @@
                 </p>
               </div>
 
-              <ChapterCta
-                lessonId={chLesson['ch-optimizers']}
-                onLesson={() => startLessonFromChapter('ch-optimizers')}
-                demo={raceExperiment ? () => runExperiment(raceExperiment) : null}
-              />
-              {#if chRefs['ch-optimizers']}
-                <div class="ch-refs">
-                  <span class="ch-refs-label">Further reading</span>
-                  {#each chRefs['ch-optimizers'] as r}
-                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
-                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
-                      {r.label}
-                    </a>
-                  {/each}
-                </div>
+              {#if chapterPresets['ch-self-tuning']}
+                <ChapterCta demo={() => runPreset('ch-self-tuning')} demoLabel={chapterPresets['ch-self-tuning'].title} />
               {/if}
             </section>
 
-            <!-- ============== 9 · TRAINING LOSS ISN'T THE GOAL ============== -->
-            <section data-ch="ch-generalize" id="ch-generalize">
-              <h3><svelte:component this={chIcon['ch-generalize']} size={18} strokeWidth={2} /> Training loss isn’t the goal</h3>
-
-              <p>
-                Every chapter so far has worked to drive the <em>training</em> loss down. But that number
-                is only a stand-in for what we actually want. We don’t care about fitting the data we
-                already have — we care about predicting data we <strong>haven’t seen</strong>. Doing well
-                on new data is <strong>generalization</strong>, and it is the whole point.
-              </p>
-              <p>
-                The loss we minimize is the average error over the training set — the <strong>empirical
-                risk</strong> — but the real target is the average error over <em>all</em> future data,
-                the <strong>true risk</strong>. With limited or noisy data the two come apart. Push the
-                training loss too low and the model starts memorizing the quirks and noise of <em>this</em>
-                sample: training loss keeps falling while error on held-out data turns and climbs. That
-                divergence is <strong>overfitting</strong>.
-              </p>
-
-              <figure class="fig">
-                <svg viewBox="0 0 {genFig.W} {genFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                  <line x1={genFig.padL} y1={genFig.yBase} x2={genFig.x1} y2={genFig.yBase} class="fig-contour" style="stroke-opacity:0.35" />
-                  <line x1={genFig.padL} y1={genFig.padT} x2={genFig.padL} y2={genFig.yBase} class="fig-contour" style="stroke-opacity:0.35" />
-                  <line x1={genFig.stop.x} y1={genFig.stop.yTop} x2={genFig.stop.x} y2={genFig.yBase} stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="3,3" stroke-opacity="0.65" />
-                  <path d={genFig.testD} fill="none" stroke="#f59e0b" stroke-width="2.3" stroke-linecap="round" />
-                  <path d={genFig.trainD} fill="none" stroke="#10b981" stroke-width="2.3" stroke-linecap="round" />
-                  <circle cx={genFig.stop.x} cy={genFig.stop.y} r="3.6" fill="#f59e0b" stroke="#fff" stroke-width="1.2" />
-                  <text x={genFig.testEnd.x - 4} y={genFig.testEnd.y + 2} class="fig-svg-label" style="text-anchor:end;fill:#f59e0b">test loss</text>
-                  <text x={genFig.trainEnd.x - 4} y={genFig.trainEnd.y - 7} class="fig-svg-label" style="text-anchor:end;fill:#10b981">training loss</text>
-                  <text x={genFig.stop.x} y={genFig.stop.yTop - 3} class="fig-svg-label" style="fill:var(--color-text-tertiary)">early stop</text>
-                  <text x={genFig.padL - 6} y={genFig.padT + 4} class="fig-svg-label" style="text-anchor:end;fill:var(--color-text-tertiary)">loss</text>
-                  <text x={genFig.x1} y={genFig.yBase + 18} class="fig-svg-label" style="text-anchor:end;fill:var(--color-text-tertiary)">training time →</text>
-                </svg>
-                <figcaption class="fig-cap">
-                  Training loss (green) keeps falling; test loss (amber), measured on held-out data, bottoms
-                  out and then rises as the model begins fitting noise. The dip is where you’d want to stop.
-                </figcaption>
-              </figure>
-
-              <p>
-                Two fixes follow directly. The first is to <em>measure</em> the gap: hold out part of the
-                data as a <strong>test</strong> (or validation) set, and watch its loss alongside the
-                training loss — that is the second curve in the <strong>Loss History</strong> panel. The
-                second is <strong>early stopping</strong>: end training at the test-loss minimum rather
-                than the training-loss minimum. It is the simplest regularizer there is, and — for a
-                run started near zero — in the quadratic case it is provably close to an explicit
-                weight penalty (Bishop, 1995; Goodfellow et al., 2016, §7.8).
-              </p>
-              <p>
-                That penalty is <strong>regularization</strong>: instead of minimizing the loss alone, add
-                a term that prefers smaller, simpler parameters,
-              </p>
-              <div class="formula-display center">{@html texD(String.raw`\min_{\boldsymbol{\theta}}\;\; \mathcal{L}(\boldsymbol{\theta}) \;+\; \tfrac{\lambda}{2}\,\lVert \boldsymbol{\theta}\rVert^2`)}</div>
-              <p>
-                where {@html tex(String.raw`\lambda`)} sets how hard to pull toward zero. (An unrelated
-                {@html tex(String.raw`\lambda`)}, by the way — not the curvature
-                {@html tex(String.raw`\lambda_{\max}`)} from the learning-rate chapter. The alphabet is
-                small and the field is greedy.) For plain SGD the
-                gradient of that penalty is exactly <strong>weight decay</strong> —
-                {@html tex(String.raw`\boldsymbol{\theta} \leftarrow (1-\gamma\lambda)\,\boldsymbol{\theta} - \gamma\nabla\mathcal{L}`)}
-                — shrinking every weight a touch each step (Krogh &amp; Hertz, 1991). This is the same
-                {@html tex(String.raw`\lambda`)} you met on <strong>AdamW</strong>, which decouples the
-                decay from the adaptive scaling so it behaves like a true penalty again.
-              </p>
-              <p>
-                Geometry has the last word, and it loops back to the noise chapter. Not all minima
-                generalize equally: a <em>wide, flat</em> basin is forgiving — small shifts in the data
-                barely move the loss — while a <em>sharp</em> one is brittle. Flat minima tend to
-                generalize better (Hochreiter &amp; Schmidhuber, 1997), the restless noise of small-batch
-                SGD tends to settle into them, and very large batches tend to find sharper minima with a
-                measurable generalization gap (Keskar et al., 2017). So the real target was never the exact
-                bottom of the training bowl — it is a low, <em>wide</em> region that also sits low on data
-                you will never see. Optimization gets you down; generalization decides whether down was
-                worth reaching.
-              </p>
-              <aside class="hd-note">
-                <span class="hd-note-tag">In a billion dimensions</span>
-                <p>
-                  Two honest asterisks on this tidy story. First, “flat” is slippery: a network can
-                  be rescaled — same function, same predictions — while its measured sharpness
-                  changes arbitrarily, so naive flatness can’t be the whole answer (Dinh et al.,
-                  2017). Second, at scale good minima aren’t isolated dips like the ones drawn
-                  here: they connect into long low-loss valleys you can walk between without
-                  climbing (Garipov et al., 2018). The intuition survives — restless SGD prefers
-                  forgiving regions — but hold it as a compass, not a theorem.
-                </p>
-              </aside>
-              {#if chapterPresets['ch-generalize']}
-                <ChapterCta demo={() => runPreset('ch-generalize')} demoLabel={chapterPresets['ch-generalize'].title} />
-              {/if}
-              {#if chRefs['ch-generalize']}
-                <div class="ch-refs">
-                  <span class="ch-refs-label">Further reading</span>
-                  {#each chRefs['ch-generalize'] as r}
-                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
-                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
-                      {r.label}
-                    </a>
-                  {/each}
-                </div>
-              {/if}
-            </section>
 
             <!-- ============== 10 · THE PROBLEMS ============== -->
             <section data-ch="ch-problems" id="ch-problems">
-              <div class="part-label">Part IV · The zoo</div>
+              <div class="part-label">Part V · The zoo</div>
               <h3><svelte:component this={chIcon['ch-problems']} size={18} strokeWidth={2} /> The landscape zoo</h3>
               <p>
                 Every problem here has at most two parameters — the three 1D warm-ups use just {@html tex(String.raw`\alpha`)} —
