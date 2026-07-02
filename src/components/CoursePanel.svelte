@@ -24,6 +24,7 @@
     restartCourse
   } from '../utils/lessons';
   import { GraduationCap, X, ArrowRight, RotateCcw, ChevronLeft, ChevronRight, Play, Eye } from 'lucide-svelte';
+  import { exerciseFor } from '../content/registry';
   import { fly } from 'svelte/transition';
 
   $: cs = $courseStore;
@@ -175,6 +176,9 @@
       <div class="card-head" class:grab={!dragging} role="group" on:pointerdown={onHeaderDown} title="Drag to move">
         <span class="badge">Lesson {cs.idx + 1}/{lessons.length}</span>
         <span class="title">{lesson.title}</span>
+        {#if exerciseFor(lesson.id)}
+          <span class="ex-ref" title="This lesson's number in the guide's exercise spine — the same number the book uses.">{exerciseFor(lesson.id)?.label}</span>
+        {/if}
         <button class="close-x" on:click={closeCourse} aria-label="Close course"><X size={16} strokeWidth={2.4} /></button>
       </div>
 
@@ -339,6 +343,21 @@
 
   .card-head.grab { cursor: grab; }
   .course-card.dragging .card-head { cursor: grabbing; }
+
+  /* The canonical exercise number — the spine shared with the guide/book. */
+  .ex-ref {
+    flex-shrink: 0;
+    margin-left: auto;
+    margin-right: 0.4rem;
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--color-text-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    padding: 0.08rem 0.4rem;
+    white-space: nowrap;
+  }
 
   .badge {
     display: inline-flex;

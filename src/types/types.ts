@@ -26,6 +26,7 @@ export type ProblemType =
   | 'ar2-rollout'
   | 'tiny-net'
   | 'stretched-bowl'
+  | 'rotated-valley'
   | 'rosenbrock'
   | 'saddle-point'
   | 'himmelblau'
