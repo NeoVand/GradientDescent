@@ -28,8 +28,8 @@ export type Block =
   | { kind: 'display'; formula: FormulaKey; center?: boolean }
   /** The imperative recipe blockquote — "Nudge. Measure. Divide." */
   | { kind: 'recipe'; text: Rich }
-  /** A bulleted list (the ▸-marker knob-bullets style). */
-  | { kind: 'list'; items: Rich[] }
+  /** A bulleted list: ▸-marker knob style (default), or the plain viz-list. */
+  | { kind: 'list'; items: Rich[]; variant?: 'viz' }
   /** A titled concept box, optionally with a small illustration beside it. */
   | { kind: 'concept'; title: string; text: Rich; fig?: string }
   /**

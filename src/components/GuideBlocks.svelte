@@ -71,7 +71,7 @@
   {:else if b.kind === 'recipe'}
     <blockquote class="recipe">{@html richToHtml(b.text, dark)}</blockquote>
   {:else if b.kind === 'list'}
-    <ul class="knob-bullets">
+    <ul class={b.variant === 'viz' ? 'viz-list' : 'knob-bullets'}>
       {#each b.items as item}<li>{@html richToHtml(item, dark)}</li>{/each}
     </ul>
   {:else if b.kind === 'conceptOverlay'}
