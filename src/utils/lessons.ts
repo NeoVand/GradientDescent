@@ -14,6 +14,7 @@ import {
   datasetStore,
   parametersStore,
   trainingStore,
+  raceConfigStore,
   recordInitialHistory,
   resetOptimizerState,
   clearCoach
@@ -41,6 +42,12 @@ export interface Lesson {
   explain: string;
   /** What the Run step launches: a training run (default) or a race. */
   kind?: 'train' | 'race';
+  /**
+   * For race lessons: the staged lineup and budget, applied to the (persisted)
+   * raceConfigStore at launch — so the race matches what the intro promises,
+   * whatever the visitor's saved race settings are.
+   */
+  race?: { enabled: OptimizerId[]; maxSteps?: number; stepsPerSecond?: number };
   setup: () => void;
 }
 
@@ -168,13 +175,12 @@ export const lessons: Lesson[] = [
     explain:
       'On stretched valleys GD bounces between the steep walls while inching along the floor. Momentum accumulates velocity along the consistent direction and damps the zig-zag; the adaptive methods rescale each parameter. Watch who crosses the line.',
     kind: 'race',
+    race: { enabled: ['gd', 'momentum', 'rmsprop', 'adam'], maxSteps: 500, stepsPerSecond: 60 },
     setup: () =>
       scenario({
         problem: 'exponential-decay',
         seed: 23,
-        marker: { a: -1.35, b: 1.35 },
-        totalSteps: 500,
-        stepsPerSecond: 60
+        marker: { a: -1.35, b: 1.35 }
       })
   },
   {
@@ -359,8 +365,14 @@ export function launchLesson() {
   if (!s.active || s.phase !== 'predict' || s.answer === null) return;
   courseStore.set({ ...s, phase: 'running' });
   const lesson = lessons[s.idx];
-  if (lesson.kind === 'race') startRace();
-  else startTraining();
+  if (lesson.kind === 'race') {
+    if (lesson.race) {
+      raceConfigStore.setLineup(lesson.race.enabled);
+      if (lesson.race.maxSteps) raceConfigStore.setMaxSteps(lesson.race.maxSteps);
+      if (lesson.race.stepsPerSecond) raceConfigStore.setSpeed(lesson.race.stepsPerSecond);
+    }
+    startRace();
+  } else startTraining();
 }
 
 /** Reveal → next lesson (or the completion card after the last one). */
