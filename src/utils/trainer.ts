@@ -400,7 +400,7 @@ function evaluateRun(steps: number) {
       showCoach('success', `🏆 Challenge beaten — basin in ${basinSteps} ${stepWord(basinSteps)} (target ≤ ${challenge.target}).`, 0);
     } else if (verdict === 'converged') {
       challengeStore.set({ ...challenge, status: 'missed' });
-      showCoach('warn', `Reached the basin in ${basinSteps} ${stepWord(basinSteps)} — the target is ≤ ${challenge.target}. Tune γ, μ, or the optimizer and try again.`);
+      showCoach('warn', `Reached the basin in ${basinSteps} ${stepWord(basinSteps)} — the target is ≤ ${challenge.target}. Tune $\\gamma$, $\\mu$, or the optimizer and try again.`);
     } else {
       challengeStore.set({ ...challenge, status: 'missed' });
       showCoach('warn', `No convergence within ${steps} steps — the challenge wants the basin in ≤ ${challenge.target}. Try a different setup.`);
@@ -410,22 +410,22 @@ function evaluateRun(steps: number) {
 
   if (verdict === 'converged') {
     if (startedInBasin) {
-      showCoach('success', `Still in the basin — this run started at the bottom (‖∇ℒ‖ = ${fmtMag}). Reset for a fresh start.`);
+      showCoach('success', `Still in the basin — this run started at the bottom ($\\lVert\\nabla\\mathcal{L}\\rVert$ = ${fmtMag}). Reset for a fresh start.`);
     } else {
-      showCoach('success', `Converged — entered the basin after ${basinSteps} ${stepWord(basinSteps)} (‖∇ℒ‖ = ${fmtMag} at the end).`);
+      showCoach('success', `Converged — entered the basin after ${basinSteps} ${stepWord(basinSteps)} ($\\lVert\\nabla\\mathcal{L}\\rVert$ = ${fmtMag} at the end).`);
     }
     return;
   }
   if (verdict === 'stalled') {
     showCoach(
       'warn',
-      `Stalled after ${steps} steps: ‖∇ℒ‖ ≈ ${fmtMag} and the loss has flatlined short of the basin — a local minimum or plateau. Momentum, a larger γ, or a fresh start can help.`
+      `Stalled after ${steps} steps: $\\lVert\\nabla\\mathcal{L}\\rVert \\approx$ ${fmtMag} and the loss has flatlined short of the basin — a local minimum or plateau. Momentum, a larger $\\gamma$, or a fresh start can help.`
     );
     return;
   }
 
   if (stillDescending) {
-    showCoach('info', 'Out of steps while still descending — Train again to continue, or raise γ.');
+    showCoach('info', 'Out of steps while still descending — Train again to continue, or raise $\\gamma$.');
   }
 }
 
