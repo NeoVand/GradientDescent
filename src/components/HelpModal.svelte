@@ -2945,22 +2945,22 @@
   .reading-column :global(.concept-svg) { width: 100%; height: 120px; color: var(--color-text-tertiary); }
   .reading-column :global(.concept .caption) { fill: var(--color-text-tertiary); font-size: 11px; font-family: inherit; }
 
-  .concept-bg-overlay {
+  .reading-column :global(.concept-bg-overlay) {
     display: grid;
     grid-template-columns: 1fr 52%;
     position: relative;
     padding: 0;
     overflow: hidden;
   }
-  .concept-bg-svg { position: absolute; inset: 0; width: 100%; height: 100%; color: var(--color-text-secondary); pointer-events: none; }
-  .concept-fade {
+  .reading-column :global(.concept-bg-svg) { position: absolute; inset: 0; width: 100%; height: 100%; color: var(--color-text-secondary); pointer-events: none; }
+  .reading-column :global(.concept-fade) {
     position: absolute; inset: 0; pointer-events: none;
     background: linear-gradient(to right, transparent 0%, transparent 33%, var(--color-bg-tertiary) 50%, var(--color-bg-tertiary) 100%);
   }
-  .concept-text-overlay { grid-column: 2; position: relative; padding: 1.1rem 1.35rem; z-index: 1; align-self: center; }
-  .concept-text-overlay h4 { margin-top: 0; }
-  .concept-text-overlay p { margin-bottom: 0.6rem; }
-  .concept-text-overlay p:last-child { margin-bottom: 0; }
+  .reading-column :global(.concept-text-overlay) { grid-column: 2; position: relative; padding: 1.1rem 1.35rem; z-index: 1; align-self: center; }
+  .reading-column :global(.concept-text-overlay h4) { margin-top: 0; }
+  .reading-column :global(.concept-text-overlay p) { margin-bottom: 0.6rem; }
+  .reading-column :global(.concept-text-overlay p:last-child) { margin-bottom: 0; }
 
   /* ---------- Inline teaching figures ---------- */
   .fig { margin: 1.6rem 0; }
@@ -3082,7 +3082,7 @@
     color: var(--color-text-secondary); margin-bottom: 0.7rem;
   }
   .proof-p { font-size: 0.88rem; line-height: 1.65; margin: 0 0 0.7rem; }
-  .proof :global(.formula-display) { margin: 0.6rem 0; }
+  .reading-column :global(.proof .formula-display) { margin: 0.6rem 0; }
   .proof-fig { margin: 0.7rem 0 0.5rem; }
   .proof-fig svg { display: block; width: 100%; height: auto; }
   .proof-lbl { font-size: 10.5px; font-weight: 600; font-family: inherit; text-anchor: middle; }
@@ -3570,14 +3570,14 @@
     .hero-svg { height: 150px; }
     .hero-title { font-size: 1.3rem; }
     h3 { font-size: 1.25rem; }
-    p, li, .recipe { font-size: 0.95rem; }
+    .reading-column :global(p), li, .recipe { font-size: 0.95rem; }
 
-    .concept { grid-template-columns: 1fr; }
-    .concept-svg { height: 100px; }
-    .concept-bg-overlay { display: flex; flex-direction: column; }
-    .concept-bg-svg { position: relative; height: 110px; flex-shrink: 0; }
-    .concept-fade { display: none; }
-    .concept-text-overlay { position: relative; width: 100%; padding: 1rem 1.25rem; }
+    .reading-column :global(.concept) { grid-template-columns: 1fr; }
+    .reading-column :global(.concept-svg) { height: 100px; }
+    .reading-column :global(.concept-bg-overlay) { display: flex; flex-direction: column; }
+    .reading-column :global(.concept-bg-svg) { position: relative; height: 110px; flex-shrink: 0; }
+    .reading-column :global(.concept-fade) { display: none; }
+    .reading-column :global(.concept-text-overlay) { position: relative; width: 100%; padding: 1rem 1.25rem; }
 
     .problem-grid { grid-template-columns: 1fr; }
     .modal-footer { padding: 0 1rem; }
