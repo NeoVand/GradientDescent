@@ -217,10 +217,7 @@
   let ro: ResizeObserver | undefined;
 
   const BASE_PX = 16;   // measurement baseline
-  // The floor allows the complete update rules (Prodigy is the longest) to
-  // fit on typical laptop widths; below the floor, the viewport scrolls
-  // rather than clipping mid-formula.
-  const MIN_PX = 10;    // never smaller than this
+  const MIN_PX = 11.5;  // never smaller than this
   const MAX_PX = 23;    // never larger than this
 
   function fitFormulas() {
@@ -349,9 +346,7 @@
     min-height: 0;
     display: flex;
     align-items: center;
-    /* If even the floored font can't fit a row, scroll — never clip a formula. */
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow: hidden;
   }
 
   .formula-fit {
