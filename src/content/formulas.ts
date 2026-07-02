@@ -11,6 +11,7 @@ export const formulas = {
   gradientDefinition: String.raw`\nabla \mathcal{L} = \begin{bmatrix} \partial \mathcal{L}/\partial \alpha \\[2pt] \partial \mathcal{L}/\partial \beta \end{bmatrix}`,
   stepRule: String.raw`\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \nabla \mathcal{L}`,
   stability: String.raw`\gamma < \frac{2}{\lambda_{\max}}`,
+  regularizedLoss: String.raw`\min_{\boldsymbol{\theta}}\;\; \mathcal{L}(\boldsymbol{\theta}) \;+\; \tfrac{\lambda}{2}\,\lVert \boldsymbol{\theta}\rVert^2`,
   // The derivative chapter: nudge-and-divide, then let the nudge shrink.
   derivativeLimit: String.raw`\frac{d\mathcal{L}}{d\alpha} \;=\; \lim_{h \to 0}\; \frac{\mathcal{L}(\alpha + h) - \mathcal{L}(\alpha)}{h}`,
   partialDef: String.raw`\frac{\partial \mathcal{L}}{\partial \alpha} \;=\; \lim_{h \to 0}\; \frac{\mathcal{L}(\alpha + h,\; \beta) - \mathcal{L}(\alpha,\; \beta)}{h}`,

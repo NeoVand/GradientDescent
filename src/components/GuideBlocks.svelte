@@ -30,6 +30,7 @@
     figure,
     conceptFig,
     widget,
+    cards,
     demo,
     onLesson,
     onPreset
@@ -42,6 +43,8 @@
     conceptFig?: Snippet<[string]>;
     /** Renders an interactive island (widget blocks). */
     widget?: Snippet<[string]>;
+    /** Renders a family-tree chapter's optimizer-card slice (optcards blocks). */
+    cards?: Snippet<[string]>;
     /** Chapter-demo override when the CTA isn't the slug's chapterPreset. */
     demo?: { label: string; run: () => void };
     onLesson?: (slug: string) => void;
@@ -96,6 +99,13 @@
     </div>
   {:else if b.kind === 'widget'}
     {#if widget}{@render widget(b.id)}{/if}
+  {:else if b.kind === 'optcards'}
+    {#if cards}{@render cards(b.chapter)}{/if}
+  {:else if b.kind === 'frontier'}
+    <div class="opt-frontier">
+      <div class="opt-frontier-title">{b.title}</div>
+      <p>{@html richToHtml(b.text, dark)}</p>
+    </div>
   {:else if b.kind === 'concept'}
     <div class="concept">
       <div class="concept-text">

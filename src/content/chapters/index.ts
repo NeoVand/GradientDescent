@@ -14,6 +14,16 @@ import { chStep } from './ch-step';
 import { chGamma } from './ch-gamma';
 import { chCurvature } from './ch-curvature';
 import { chSchedule } from './ch-schedule';
+import { chNoise } from './ch-noise';
+import { chGeneralize } from './ch-generalize';
+import {
+  chRavine,
+  chMomentum,
+  chAdaptive,
+  chAdam,
+  chSecondOrder,
+  chSelfTuning
+} from './part4';
 
 export const chapterBlocks: Record<string, Block[]> = {
   'ch-bowl': chBowl,
@@ -24,5 +34,13 @@ export const chapterBlocks: Record<string, Block[]> = {
   'ch-step': chStep,
   'ch-gamma': chGamma,
   'ch-curvature': chCurvature,
-  'ch-schedule': chSchedule
+  'ch-schedule': chSchedule,
+  'ch-noise': chNoise,
+  'ch-generalize': chGeneralize,
+  'ch-ravine': chRavine,
+  'ch-momentum': chMomentum,
+  'ch-adaptive': chAdaptive,
+  'ch-adam': chAdam,
+  'ch-second-order': chSecondOrder,
+  'ch-self-tuning': chSelfTuning
 };
