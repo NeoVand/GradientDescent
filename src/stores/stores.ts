@@ -482,6 +482,9 @@ function createRaceConfigStore() {
 
   return {
     subscribe: store.subscribe,
+    /** Stage an exact lineup, kept in spec order — race lessons use this. */
+    setLineup: (ids: OptimizerId[]) =>
+      store.update(v => commit({ ...v, enabled: optimizerOrder.filter(x => ids.includes(x)) })),
     /** Add or remove an optimizer from the lineup (keeps `enabled` in spec order). */
     toggle: (id: OptimizerId) =>
       store.update(v => commit({
