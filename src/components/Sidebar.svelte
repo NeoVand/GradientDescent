@@ -1626,22 +1626,27 @@
         rgba(127, 127, 127, 0.25) 100%);
   }
 
-  /* The 2/λmax stability tick on the γ slider: a small red notch at the
-     exact rate past which plain GD diverges on this problem. */
+  /* The 2/λmax stability tick on the γ slider: a small caret under the
+     track — an axis mark, not an obstruction — at the exact rate past
+     which plain GD diverges on this problem. */
   .lr-slider-wrap {
     position: relative;
+    padding-bottom: 7px;
+    margin-bottom: -7px;
   }
   .lr-edge-tick {
     position: absolute;
-    top: 50%;
-    width: 3px;
-    height: 14px;
-    transform: translate(-50%, -50%);
-    border-radius: 2px;
-    background: #ef4444;
-    box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--color-bg-secondary, #0f172a) 85%, transparent);
+    top: calc(50% + 4px);
+    width: 0;
+    height: 0;
+    transform: translateX(-50%);
+    border-left: 3.5px solid transparent;
+    border-right: 3.5px solid transparent;
+    border-bottom: 5px solid color-mix(in srgb, #ef4444 80%, transparent);
     cursor: help;
-    z-index: 1;
+  }
+  .lr-edge-tick:hover {
+    border-bottom-color: #ef4444;
   }
 
   /* The knob takes the slider's own colour (--slider-color, set per slider);

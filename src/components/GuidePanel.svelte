@@ -42,6 +42,7 @@
     'circle-classifier': String.raw`P(\text{inside}) = \sigma\!\left(\frac{R^2 - (X-\alpha)^2 - (Y-\beta)^2}{\tau}\right)`,
     'source-localization': String.raw`\hat{S} = \frac{K}{(X-\alpha)^2 + (Y-\beta)^2 + \varepsilon}`,
     'mean-shift': String.raw`\hat{f}(\alpha,\beta) = \frac{1}{n}\sum_i \exp\!\left(-\frac{(X_i-\alpha)^2 + (Y_i-\beta)^2}{2\sigma^2}\right)`,
+    'stretched-bowl': String.raw`\text{pure surface}`,
     'rosenbrock': String.raw`\text{pure surface}`,
     'saddle-point': String.raw`\text{pure surface}`,
     'himmelblau': String.raw`\text{pure surface}`
@@ -73,6 +74,7 @@
     'circle-classifier': String.raw`\mathcal{L} = -\frac{1}{n} \sum_{i=1}^{n} \left[ C_i \log p_i + (1-C_i) \log(1-p_i) \right]`,
     'source-localization': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} (\hat{S}_i - S_i)^2`,
     'mean-shift': String.raw`\mathcal{L} = \frac{1}{n} \sum_{i=1}^{n} \left( 1 - \exp\!\left(-\frac{\|\mathbf{p}_i - \boldsymbol{c}\|^2}{2\sigma^2}\right) \right)`,
+    'stretched-bowl': String.raw`\mathcal{L} = 0.2\,\alpha^2 + 2\,\beta^2 \quad (\lambda_{\alpha} = 0.4,\; \lambda_{\beta} = 4,\; \kappa = 10)`,
     'rosenbrock': String.raw`\mathcal{L} = (1-\alpha)^2 + 100\,(\beta - \alpha^2)^2`,
     'saddle-point': String.raw`\mathcal{L} = \alpha^2 - \beta^2 + \tfrac{\beta^4}{8} + 2`,
     'himmelblau': String.raw`\mathcal{L} = (\alpha^2 + \beta - 11)^2 + (\alpha + \beta^2 - 7)^2`
@@ -98,6 +100,7 @@
     'circle-classifier': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{2}{n\tau} \sum_{i=1}^{n} (p_i - C_i) \begin{bmatrix} X_i - \alpha & Y_i - \beta \end{bmatrix}^\top`,
     'source-localization': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = \frac{4}{n} \sum_{i=1}^{n} (\hat{S}_i - S_i) \, \frac{\hat{S}_i}{d_i^2 + \varepsilon} \begin{bmatrix} X_i - \alpha & Y_i' - \beta \end{bmatrix}^\top`,
     'mean-shift': String.raw`\nabla_{\boldsymbol{\theta}} \mathcal{L} = -\frac{1}{n\sigma^2} \sum_{i=1}^{n} k_i \begin{bmatrix} X_i - \alpha & Y_i' - \beta \end{bmatrix}^\top`,
+    'stretched-bowl': String.raw`\nabla \mathcal{L} = \begin{bmatrix} 0.4\,\alpha & 4\,\beta \end{bmatrix}^\top`,
     'rosenbrock': String.raw`\nabla \mathcal{L} = \begin{bmatrix} -2(1-\alpha) - 400\,\alpha(\beta - \alpha^2) & 200\,(\beta - \alpha^2) \end{bmatrix}^\top`,
     'saddle-point': String.raw`\nabla \mathcal{L} = \begin{bmatrix} 2\alpha & -2\beta + \tfrac{\beta^3}{2} \end{bmatrix}^\top`,
     'himmelblau': String.raw`\nabla \mathcal{L} = \begin{bmatrix} 4\alpha u + 2v & 2u + 4\beta v \end{bmatrix}^\top, \;\; u = \alpha^2{+}\beta{-}11,\; v = \alpha{+}\beta^2{-}7`

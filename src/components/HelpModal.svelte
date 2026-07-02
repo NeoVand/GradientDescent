@@ -576,110 +576,122 @@
 
   // (The gradient chapter's 3-D bowl is a real WebGL scene — see GuideGradient3D.svelte.)
 
-  // Derivative figure A: secants through a shrinking nudge settling onto the
-  // tangent — the limit, drawn. Real y = x² geometry, not a sketch.
+  // Derivative figure A: chords through a shrinking nudge settling onto the
+  // tangent — the limit, drawn. Real y = x² geometry, not a sketch. Chords
+  // run point-to-point on the curve (no stray line ends); only the tangent
+  // extends, gently, past the anchor.
   const secantFig = (() => {
-    const W = 300, H = 148, a = 1.1;
-    const xMin = -0.4, xMax = 3.4, yMax = xMax * xMax;
-    const px = (x: number) => 16 + ((x - xMin) / (xMax - xMin)) * (W - 32);
-    const py = (y: number) => H - 14 - (y / yMax) * (H - 34);
+    const W = 300, H = 140, a = 1.0;
+    const xMin = -0.3, xMax = 3.2, yMax = xMax * xMax;
+    const px = (x: number) => 14 + ((x - xMin) / (xMax - xMin)) * (W - 28);
+    const py = (y: number) => H - 20 - (y / yMax) * (H - 40);
     const N = 48;
     const curve = 'M ' + Array.from({ length: N + 1 }, (_, i) => {
       const x = xMin + (i / N) * (xMax - xMin);
       return `${px(x).toFixed(1)},${py(x * x).toFixed(1)}`;
     }).join(' L ');
-    // A chord through (a, a²) and (a+h, (a+h)²) has slope 2a + h — watch the
-    // h die out of it. Extend each line a little past its two anchor points.
-    const line = (slope: number, x0: number, x1: number) => {
-      const y = (x: number) => a * a + slope * (x - a);
-      return { x1: px(x0), y1: py(y(x0)), x2: px(x1), y2: py(y(x1)) };
-    };
-    const secants = [1.7, 1.0, 0.5].map((h, i) => ({
-      ...line(2 * a + h, a - 0.55, a + h + 0.35),
-      hx: px(a + h), hy: py((a + h) * (a + h)),
-      o: 0.28 + i * 0.16
+    const at = (x: number) => ({ x: px(x), y: py(x * x) });
+    const chords = [1.9, 1.15, 0.6].map((h, i) => ({
+      x1: at(a).x, y1: at(a).y, x2: at(a + h).x, y2: at(a + h).y,
+      end: at(a + h), o: 0.3 + i * 0.18
     }));
-    const tangent = line(2 * a, a - 0.85, a + 1.35);
-    return { W, H, curve, secants, tangent, p: { x: px(a), y: py(a * a) } };
+    // The tangent (slope 2a), drawn a touch past the point on both sides.
+    const tan = (x: number) => a * a + 2 * a * (x - a);
+    const tangent = { x1: px(a - 0.75), y1: py(tan(a - 0.75)), x2: px(a + 1.15), y2: py(tan(a + 1.15)) };
+    return { W, H, curve, chords, tangent, p: at(a), pEnd: at(a + 1.9) };
   })();
 
   // Derivative figure B: the two partial-derivative slices of a real bowl
-  // z = 0.18x² + 0.36y², drawn in an isometric projection. Freezing β collapses
-  // the surface to the blue curve; freezing α to the amber one — each with its
-  // own tangent at the marked point.
+  // z = 0.16x² + 0.32y², drawn in the app's own 3-D language — a rim, two
+  // contour rings, and the two slice curves through the marked point, each
+  // with a short one-way tangent arrow. Freezing β gives the blue curve;
+  // freezing α the amber one.
   const sliceFig = (() => {
-    const W = 320, H = 172, cx = 160, cy = 112, sx = 22, sy = 11, sz = 20;
-    const z = (x: number, y: number) => 0.18 * x * x + 0.36 * y * y;
+    const W = 340, H = 176, cx = 170, cy = 112, sx = 24, sy = 10, sz = 34;
+    const z = (x: number, y: number) => 0.16 * x * x + 0.32 * y * y;
     const P = (x: number, y: number) => ({
       X: cx + (x - y) * sx,
       Y: cy + (x + y) * sy - z(x, y) * sz
     });
-    const path = (pts: { X: number; Y: number }[]) =>
-      'M ' + pts.map(q => `${q.X.toFixed(1)},${q.Y.toFixed(1)}`).join(' L ');
-    const sample = (f: (t: number) => { X: number; Y: number }, n = 32) =>
+    const path = (pts: { X: number; Y: number }[], close = false) =>
+      'M ' + pts.map(q => `${q.X.toFixed(1)},${q.Y.toFixed(1)}`).join(' L ') + (close ? ' Z' : '');
+    const span = (f: (t: number) => { X: number; Y: number }, n = 36) =>
       Array.from({ length: n + 1 }, (_, i) => f(-2 + (4 * i) / n));
-    const gridX = [-2, -1, 0, 1, 2].map(x0 => path(sample(y => P(x0, y))));
-    const gridY = [-2, -1, 0, 1, 2].map(y0 => path(sample(x => P(x, y0))));
-    const p0 = { x: 0.9, y: 0.6 };
-    const sliceA = path(sample(x => P(x, p0.y)));          // β frozen → vary α
-    const sliceB = path(sample(y => P(p0.x, y)));          // α frozen → vary β
-    // Tangent directions at p0, projected: d/dx → (1, 0, 0.36x); d/dy → (0, 1, 0.72y)
+    // The surface patch's four boundary edges: the back pair sits faint, the
+    // front pair carries the silhouette.
+    const edgeBack = [path(span(y => P(-2, y))), path(span(x => P(x, -2)))];
+    const edgeFront = [path(span(y => P(2, y))), path(span(x => P(x, 2)))];
+    // Two level rings (z = c), the same contour rings the live 3-D view draws.
+    const ring = (c: number) => path(Array.from({ length: 49 }, (_, i) => {
+      const t = (i / 48) * 2 * Math.PI;
+      return P(Math.sqrt(c / 0.16) * Math.cos(t), Math.sqrt(c / 0.32) * Math.sin(t));
+    }), true);
+    const rings = [ring(0.22), ring(0.58)];
+    const p0 = { x: 0.9, y: 0.55 };
+    const sliceA = path(span(x => P(x, p0.y)));            // β frozen → vary α
+    const sliceB = path(span(y => P(p0.x, y)));            // α frozen → vary β
     const pt = P(p0.x, p0.y);
-    const tanA = { dX: sx, dY: sy - 0.36 * p0.x * sz };
-    const tanB = { dX: -sx, dY: sy - 0.72 * p0.y * sz };
-    const norm = (v: { dX: number; dY: number }, len: number) => {
-      const m = Math.hypot(v.dX, v.dY);
-      return { dX: (v.dX / m) * len, dY: (v.dY / m) * len };
+    // One-way tangent arrows from the point, along each slice.
+    const arrow = (dX: number, dY: number, len: number, gap: number) => {
+      const m = Math.hypot(dX, dY);
+      return { x1: pt.X + (dX / m) * gap, y1: pt.Y + (dY / m) * gap,
+               x2: pt.X + (dX / m) * (gap + len), y2: pt.Y + (dY / m) * (gap + len) };
     };
-    const aA = norm(tanA, 34), aB = norm(tanB, 34);
-    return { W, H, gridX, gridY, sliceA, sliceB, pt,
-      arrA: { x1: pt.X - aA.dX, y1: pt.Y - aA.dY, x2: pt.X + aA.dX, y2: pt.Y + aA.dY },
-      arrB: { x1: pt.X - aB.dX, y1: pt.Y - aB.dY, x2: pt.X + aB.dX, y2: pt.Y + aB.dY } };
+    const arrA = arrow(sx, sy - 0.32 * p0.x * sz, 30, 7);        // d/dx
+    const arrB = arrow(-sx, sy - 0.64 * p0.y * sz, 30, 7);       // d/dy
+    return { W, H, edgeBack, edgeFront, rings, sliceA, sliceB, pt, arrA, arrB };
   })();
 
   // Curvature figure A: same slope underfoot, two different futures — a tight
-  // curve and a relaxed one sharing one tangent at the marked point.
+  // curve and a relaxed one sharing one tangent at the marked point. Curve
+  // ends are where the labels live, clear of all three lines.
   const bendFig = (() => {
-    const W = 300, H = 132, x0 = 150, y0 = 74, m = -0.5;
-    const mk = (c: number) => {
+    // Screen y grows DOWNWARD, so a loss curve that bends UP (positive λ)
+    // needs its quadratic term SUBTRACTED. Staged as a descent to the right:
+    // the sharp curve bottoms out and curls back up; the gentle one keeps
+    // rolling — same tangent at the marker.
+    const W = 300, H = 126, x0 = 104, y0 = 82, m = 0.35;
+    const mk = (c: number, lo: number, hi: number) => {
+      const f = (dx: number) => y0 + m * dx - c * dx * dx;
       const pts: string[] = [];
-      for (let dx = -95; dx <= 95; dx += 5) {
-        pts.push(`${(x0 + dx).toFixed(1)},${(y0 + m * dx + c * dx * dx).toFixed(1)}`);
-      }
-      return 'M ' + pts.join(' L ');
+      for (let dx = lo; dx <= hi; dx += 4) pts.push(`${(x0 + dx).toFixed(1)},${f(dx).toFixed(1)}`);
+      return { d: 'M ' + pts.join(' L '), end: { x: x0 + hi, y: f(hi) } };
     };
-    return { W, H, x0, y0,
-      sharp: mk(0.0072), gentle: mk(0.0016),
-      tan: { x1: x0 - 92, y1: y0 + m * -92, x2: x0 + 92, y2: y0 + m * 92 } };
+    const sharp = mk(0.0075, -78, 88);
+    const gentle = mk(0.0015, -92, 118);
+    return { W, H, x0, y0, sharp, gentle,
+      tan: { x1: x0 - 86, y1: y0 + m * -86, x2: x0 + 100, y2: y0 + m * 100 } };
   })();
 
   // Curvature figure B: the (1 − γλ) multiplier, run honestly. Four regimes of
   // real gradient descent on y = x², dots at α_k = (1−γλ)^k · α₀.
   const regimeFig = (() => {
-    const PW = 102, H = 118, pad = 10;
-    const panel = (gl: number, label: string, sub: string, i: number) => {
+    const PW = 110, H = 128, pad = 14;
+    const panel = (gl: number, a0: number, latex: string, word: string, i: number) => {
       const ox = i * PW;
       const px = (x: number) => ox + PW / 2 + x * (PW / 2 - pad);
-      const py = (y: number) => H - 22 - y * (H - 46);
+      const py = (y: number) => H - 34 - y * (H - 62);
       const N = 30;
       const curve = 'M ' + Array.from({ length: N + 1 }, (_, k) => {
-        const x = -1.15 + (2.3 * k) / N;
+        const x = -1.12 + (2.24 * k) / N;
         return `${px(x).toFixed(1)},${py(x * x).toFixed(1)}`;
       }).join(' L ');
       const dots: { x: number; y: number }[] = [];
-      let aK = -1;
-      for (let k = 0; k <= 6 && Math.abs(aK) <= 1.15; k++) {
+      let aK = a0;
+      for (let k = 0; k <= 6 && Math.abs(aK) <= 1.12; k++) {
         dots.push({ x: px(aK), y: py(aK * aK) });
         aK = (1 - gl) * aK;
       }
       const hops = 'M ' + dots.map(d => `${d.x.toFixed(1)},${d.y.toFixed(1)}`).join(' L ');
-      return { ox, curve, dots, hops, label, sub, lx: ox + PW / 2 };
+      return { ox, curve, dots, hops, latex, word, lx: ox + PW / 2 };
     };
-    return { W: PW * 4, H, panels: [
-      panel(0.35, 'γλ = 0.35', 'glide', 0),
-      panel(1.0, 'γλ = 1', 'one hop', 1),
-      panel(1.75, 'γλ = 1.75', 'bounce in', 2),
-      panel(2.2, 'γλ = 2.2', 'diverge', 3)
+    // The diverging run starts closer in, so its growing bounces stay on
+    // stage long enough to be seen growing.
+    return { W: PW * 4, H, PW, panels: [
+      panel(0.35, -1, String.raw`\gamma\lambda = 0.35`, 'glide', 0),
+      panel(1.0, -1, String.raw`\gamma\lambda = 1`, 'one hop', 1),
+      panel(1.75, -1, String.raw`\gamma\lambda = 1.75`, 'bounce in', 2),
+      panel(2.2, -0.5, String.raw`\gamma\lambda = 2.2`, 'diverge', 3)
     ] };
   })();
 
@@ -1332,19 +1344,25 @@
               </p>
               <figure class="fig">
                 <svg viewBox="0 0 {secantFig.W} {secantFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                  <path d={secantFig.curve} fill="none" stroke="#10b981" stroke-width="2.2" stroke-opacity="0.85" />
-                  {#each secantFig.secants as s}
-                    <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke="var(--color-text-tertiary)" stroke-width="1.3" stroke-opacity={s.o} stroke-dasharray="4,3" />
-                    <circle cx={s.hx} cy={s.hy} r="2.6" fill="var(--color-text-tertiary)" fill-opacity={s.o + 0.15} />
+                  <path d={secantFig.curve} fill="none" stroke="#10b981" stroke-width="1.6" stroke-opacity="0.65" />
+                  {#each secantFig.chords as s}
+                    <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke="var(--color-text-tertiary)" stroke-width="1" stroke-opacity={s.o} />
+                    <circle cx={s.end.x} cy={s.end.y} r="1.8" fill="var(--color-text-tertiary)" fill-opacity={s.o + 0.2} />
                   {/each}
-                  <line x1={secantFig.tangent.x1} y1={secantFig.tangent.y1} x2={secantFig.tangent.x2} y2={secantFig.tangent.y2} stroke="#3b82f6" stroke-width="2.2" />
-                  <circle cx={secantFig.p.x} cy={secantFig.p.y} r="4" fill="#f59e0b" stroke="#fff" stroke-width="1.4" />
-                  <text x={secantFig.p.x - 8} y={secantFig.p.y + 16} class="fig-svg-label">α</text>
-                  <text x={secantFig.tangent.x2 + 4} y={secantFig.tangent.y2 + 4} class="fig-svg-label" style="fill:#3b82f6">tangent</text>
-                  <text x={secantFig.secants[0].x2 - 20} y={secantFig.secants[0].y2 - 6} class="fig-svg-label">h shrinking</text>
+                  <line x1={secantFig.tangent.x1} y1={secantFig.tangent.y1} x2={secantFig.tangent.x2} y2={secantFig.tangent.y2} stroke="#3b82f6" stroke-width="1.7" stroke-opacity="0.95" />
+                  <circle cx={secantFig.p.x} cy={secantFig.p.y} r="3" fill="#f59e0b" stroke="#fff" stroke-width="1.2" />
+                  <foreignObject x={secantFig.p.x - 10} y={secantFig.p.y + 8} width="24" height="18">
+                    <span class="fig-tex">{@html tex(String.raw`\alpha`)}</span>
+                  </foreignObject>
+                  <foreignObject x={secantFig.pEnd.x - 16} y={secantFig.pEnd.y - 22} width="44" height="18">
+                    <span class="fig-tex dim">{@html tex(String.raw`\alpha + h`)}</span>
+                  </foreignObject>
+                  <foreignObject x={secantFig.p.x + 46} y={secantFig.p.y - 4} width="46" height="18">
+                    <span class="fig-tex dim">{@html tex(String.raw`h \to 0`)}</span>
+                  </foreignObject>
                 </svg>
                 <figcaption class="fig-cap">
-                  The limit, drawn: each dashed chord leans on the curve a nudge <em>h</em> away —
+                  The limit, drawn: each grey chord leans on the curve a nudge <em>h</em> away —
                   slope {@html tex(String.raw`2\alpha + h`)} on this parabola — and as <em>h</em>
                   shrinks, the chords tilt into the one blue line whose slope is exactly
                   {@html tex(String.raw`2\alpha`)}: the tangent. The derivative is where the chords
@@ -1367,19 +1385,30 @@
               </p>
               <figure class="fig">
                 <svg viewBox="0 0 {sliceFig.W} {sliceFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                  {#each sliceFig.gridX as d}
-                    <path {d} fill="none" stroke="var(--color-text-tertiary)" stroke-width="0.8" stroke-opacity="0.28" />
+                  <defs>
+                    <marker id="slice-a" viewBox="0 -4 8 8" refX="7" refY="0" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,-3.2 L7,0 L0,3.2" fill="#3b82f6" /></marker>
+                    <marker id="slice-b" viewBox="0 -4 8 8" refX="7" refY="0" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,-3.2 L7,0 L0,3.2" fill="#f59e0b" /></marker>
+                  </defs>
+                  {#each sliceFig.edgeBack as d}
+                    <path {d} fill="none" stroke="var(--color-text-tertiary)" stroke-width="0.9" stroke-opacity="0.28" />
                   {/each}
-                  {#each sliceFig.gridY as d}
-                    <path {d} fill="none" stroke="var(--color-text-tertiary)" stroke-width="0.8" stroke-opacity="0.28" />
+                  {#each sliceFig.rings as d}
+                    <path {d} fill="none" stroke="var(--color-text-tertiary)" stroke-width="0.9" stroke-opacity="0.35" />
                   {/each}
-                  <path d={sliceFig.sliceA} fill="none" stroke="#3b82f6" stroke-width="2.4" />
-                  <path d={sliceFig.sliceB} fill="none" stroke="#f59e0b" stroke-width="2.4" />
-                  <line x1={sliceFig.arrA.x1} y1={sliceFig.arrA.y1} x2={sliceFig.arrA.x2} y2={sliceFig.arrA.y2} stroke="#3b82f6" stroke-width="1.4" stroke-dasharray="4,3" />
-                  <line x1={sliceFig.arrB.x1} y1={sliceFig.arrB.y1} x2={sliceFig.arrB.x2} y2={sliceFig.arrB.y2} stroke="#f59e0b" stroke-width="1.4" stroke-dasharray="4,3" />
-                  <circle cx={sliceFig.pt.X} cy={sliceFig.pt.Y} r="4" fill="#f59e0b" stroke="#fff" stroke-width="1.4" />
-                  <text x={sliceFig.arrA.x2 + 5} y={sliceFig.arrA.y2 + 3} class="fig-svg-label" style="fill:#3b82f6">∂ℒ/∂α</text>
-                  <text x={sliceFig.arrB.x2 - 5} y={sliceFig.arrB.y2 - 5} class="fig-svg-label" style="fill:#f59e0b;text-anchor:end">∂ℒ/∂β</text>
+                  {#each sliceFig.edgeFront as d}
+                    <path {d} fill="none" stroke="var(--color-text-tertiary)" stroke-width="0.9" stroke-opacity="0.5" />
+                  {/each}
+                  <path d={sliceFig.sliceA} fill="none" stroke="#3b82f6" stroke-width="1.7" stroke-opacity="0.9" />
+                  <path d={sliceFig.sliceB} fill="none" stroke="#f59e0b" stroke-width="1.7" stroke-opacity="0.9" />
+                  <line x1={sliceFig.arrA.x1} y1={sliceFig.arrA.y1} x2={sliceFig.arrA.x2} y2={sliceFig.arrA.y2} stroke="#3b82f6" stroke-width="1.3" marker-end="url(#slice-a)" />
+                  <line x1={sliceFig.arrB.x1} y1={sliceFig.arrB.y1} x2={sliceFig.arrB.x2} y2={sliceFig.arrB.y2} stroke="#f59e0b" stroke-width="1.3" marker-end="url(#slice-b)" />
+                  <circle cx={sliceFig.pt.X} cy={sliceFig.pt.Y} r="3" fill="#f59e0b" stroke="#fff" stroke-width="1.2" />
+                  <foreignObject x={sliceFig.arrA.x2 + 6} y={sliceFig.arrA.y2 - 20} width="58" height="18">
+                    <span class="fig-tex" style="color:#3b82f6">{@html tex(String.raw`\partial\mathcal{L}/\partial\alpha`)}</span>
+                  </foreignObject>
+                  <foreignObject x={sliceFig.arrB.x2 - 64} y={sliceFig.arrB.y2 - 20} width="58" height="18">
+                    <span class="fig-tex" style="color:#f59e0b;display:block;text-align:right">{@html tex(String.raw`\partial\mathcal{L}/\partial\beta`)}</span>
+                  </foreignObject>
                 </svg>
                 <figcaption class="fig-cap">
                   The two partials, on a real bowl: freeze {@html tex(String.raw`\beta`)} and the
@@ -1553,15 +1582,21 @@
                   </p>
                 </div>
                 <svg class="concept-svg" viewBox="0 0 200 120">
-                  <line x1="26" y1="100" x2="186" y2="100" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-opacity="0.5" />
-                  <line x1="26" y1="100" x2="26" y2="12" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-opacity="0.5" />
-                  <line x1="26" y1="100" x2="128" y2="100" stroke="var(--color-text-tertiary)" stroke-width="1.2" stroke-dasharray="3,3" />
-                  <line x1="128" y1="100" x2="128" y2="32" stroke="var(--color-text-tertiary)" stroke-width="1.2" stroke-dasharray="3,3" />
-                  <line x1="26" y1="100" x2="128" y2="32" stroke="#f59e0b" stroke-width="2.4" />
-                  <path d="M 121,33.5 L 128,32 L 124.5,38.5" fill="none" stroke="#f59e0b" stroke-width="2.4" />
-                  <text x="77" y="113" class="caption" text-anchor="middle">3</text>
-                  <text x="137" y="70" class="caption">2</text>
-                  <text x="56" y="56" class="caption">‖v‖ = √13</text>
+                  <line x1="26" y1="100" x2="186" y2="100" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-opacity="0.4" />
+                  <line x1="26" y1="100" x2="26" y2="12" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-opacity="0.4" />
+                  <line x1="26" y1="100" x2="128" y2="100" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="3,3" stroke-opacity="0.7" />
+                  <line x1="128" y1="100" x2="128" y2="32" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="3,3" stroke-opacity="0.7" />
+                  <line x1="26" y1="100" x2="126" y2="33.3" stroke="#f59e0b" stroke-width="1.7" />
+                  <path d="M 120.5,34.5 L 128,32 L 124,39.5" fill="none" stroke="#f59e0b" stroke-width="1.7" />
+                  <foreignObject x="69" y="103" width="16" height="16">
+                    <span class="fig-tex dim">{@html tex('3')}</span>
+                  </foreignObject>
+                  <foreignObject x="134" y="60" width="16" height="16">
+                    <span class="fig-tex dim">{@html tex('2')}</span>
+                  </foreignObject>
+                  <foreignObject x="26" y="38" width="78" height="18">
+                    <span class="fig-tex">{@html tex(String.raw`\lVert\mathbf{v}\rVert = \sqrt{13}`)}</span>
+                  </foreignObject>
                 </svg>
               </div>
 
@@ -1810,17 +1845,22 @@
               </p>
               <figure class="fig">
                 <svg viewBox="0 0 {bendFig.W} {bendFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                  <line x1={bendFig.tan.x1} y1={bendFig.tan.y1} x2={bendFig.tan.x2} y2={bendFig.tan.y2} stroke="var(--color-text-tertiary)" stroke-width="1.3" stroke-dasharray="4,3" stroke-opacity="0.7" />
-                  <path d={bendFig.sharp} fill="none" stroke="#f43f5e" stroke-width="2.3" />
-                  <path d={bendFig.gentle} fill="none" stroke="#10b981" stroke-width="2.3" />
-                  <circle cx={bendFig.x0} cy={bendFig.y0} r="4" fill="#f59e0b" stroke="#fff" stroke-width="1.4" />
-                  <text x={bendFig.x0 + 68} y={bendFig.y0 - 40} class="fig-svg-label" style="fill:#f43f5e">big λ — tightens</text>
-                  <text x={bendFig.x0 + 74} y={bendFig.y0 - 12} class="fig-svg-label" style="fill:#10b981">small λ — relaxes</text>
+                  <line x1={bendFig.tan.x1} y1={bendFig.tan.y1} x2={bendFig.tan.x2} y2={bendFig.tan.y2} stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="3,3.5" stroke-opacity="0.55" />
+                  <path d={bendFig.sharp.d} fill="none" stroke="#f87171" stroke-width="1.6" stroke-opacity="0.9" />
+                  <path d={bendFig.gentle.d} fill="none" stroke="#34d399" stroke-width="1.6" stroke-opacity="0.9" />
+                  <circle cx={bendFig.x0} cy={bendFig.y0} r="3" fill="#f59e0b" stroke="#fff" stroke-width="1.2" />
+                  <foreignObject x={bendFig.sharp.end.x + 5} y={bendFig.sharp.end.y - 8} width="70" height="18">
+                    <span class="fig-tex" style="color:#f87171">{@html tex(String.raw`\lambda`)} large</span>
+                  </foreignObject>
+                  <foreignObject x={bendFig.gentle.end.x + 5} y={bendFig.gentle.end.y - 8} width="70" height="18">
+                    <span class="fig-tex" style="color:#34d399">{@html tex(String.raw`\lambda`)} small</span>
+                  </foreignObject>
                 </svg>
                 <figcaption class="fig-cap">
-                  Same slope underfoot — the dashed tangent is shared — but two different futures.
-                  The first derivative can’t tell these curves apart at the marker; the second one,
-                  {@html tex(String.raw`\lambda`)}, is exactly what does.
+                  Same slope underfoot — the dashed tangent is shared — but two different futures:
+                  the red curve tightens, the green one relaxes. The first derivative can’t tell
+                  them apart at the marker; the second one, {@html tex(String.raw`\lambda`)}, is
+                  exactly what does.
                 </figcaption>
               </figure>
 
@@ -1847,14 +1887,19 @@
               </div>
               <figure class="fig">
                 <svg viewBox="0 0 {regimeFig.W} {regimeFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                  {#each regimeFig.panels as pn}
-                    <path d={pn.curve} fill="none" stroke="#10b981" stroke-width="1.8" stroke-opacity="0.75" />
-                    <path d={pn.hops} fill="none" stroke="#f59e0b" stroke-width="1.2" stroke-opacity="0.75" />
+                  {#each regimeFig.panels as pn, i}
+                    {#if i > 0}
+                      <line x1={pn.ox} y1="10" x2={pn.ox} y2={regimeFig.H - 30} stroke="var(--color-border)" stroke-width="1" stroke-opacity="0.5" />
+                    {/if}
+                    <path d={pn.curve} fill="none" stroke="#10b981" stroke-width="1.4" stroke-opacity="0.6" />
+                    <path d={pn.hops} fill="none" stroke="#f59e0b" stroke-width="1" stroke-opacity="0.55" />
                     {#each pn.dots as dt, k}
-                      <circle cx={dt.x} cy={dt.y} r={k === 0 ? 3.2 : 2.4} fill="#f59e0b" fill-opacity={k === 0 ? 1 : 0.85} stroke={k === 0 ? '#fff' : 'none'} stroke-width="1" />
+                      <circle cx={dt.x} cy={dt.y} r={k === 0 ? 2.8 : 2} fill="#f59e0b" fill-opacity={k === 0 ? 1 : 0.8} stroke={k === 0 ? '#fff' : 'none'} stroke-width="1" />
                     {/each}
-                    <text x={pn.lx} y={regimeFig.H - 10} class="fig-svg-label" style="text-anchor:middle">{pn.label}</text>
-                    <text x={pn.lx} y={regimeFig.H - 0.5} class="fig-svg-label" style="text-anchor:middle;font-size:8.5px;opacity:0.75">{pn.sub}</text>
+                    <foreignObject x={pn.ox + 4} y={regimeFig.H - 27} width={regimeFig.PW - 8} height="27">
+                      <span class="fig-tex" style="display:block;text-align:center">{@html tex(pn.latex)}</span>
+                      <span class="fig-word" style="text-align:center;margin-top:2px">{pn.word}</span>
+                    </foreignObject>
                   {/each}
                 </svg>
                 <figcaption class="fig-cap">
@@ -3384,6 +3429,25 @@
     margin: 0.6rem 0;
   }
   .aside strong { color: var(--color-text-secondary); }
+
+  /* KaTeX labels inside SVG figures (via foreignObject) — the same math
+     type as the running text, so figures and prose can't drift apart. */
+  .modal-body :global(.fig-tex) {
+    display: inline-block;
+    font-size: 10.5px;
+    line-height: 1;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+  }
+  .modal-body :global(.fig-tex.dim) { color: var(--color-text-tertiary); }
+  .modal-body :global(.fig-tex .katex) { font-size: 1em; }
+  .modal-body :global(.fig-word) {
+    display: block;
+    font-size: 9px;
+    letter-spacing: 0.04em;
+    color: var(--color-text-tertiary);
+    white-space: nowrap;
+  }
 
   /* "In higher dimensions…" — the recurring honesty channel. Same badge and
      voice everywhere, so readers learn to expect the correction. */
