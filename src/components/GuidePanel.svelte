@@ -147,6 +147,10 @@
     : gradientFormulas[problemType];
   // The update rule tracks the selected optimizer
   $: updateFormula = optimizers[$optimizerStore.id].updateRuleLatex;
+  // Stacked (one-clause-per-row) rules top-align their label with the first
+  // row — centred, the label floats beside a middle row and reads as if the
+  // rows above belonged to the previous formula.
+  $: updateIsStacked = updateFormula.includes('\\begin{aligned}');
   
   // Render LaTeX when component mounts or problem changes
   function renderLatex() {
@@ -298,7 +302,7 @@
         <span class="latex-inline" bind:this={gradientFormulaElement}></span>
       </div>
 
-      <div class="equation-row">
+      <div class="equation-row" class:stacked={updateIsStacked}>
         <span class="equation-label">Update:</span>
         <span class="latex-inline" bind:this={updateFormulaElement}></span>
       </div>
@@ -363,6 +367,9 @@
     gap: 0.55em;
     white-space: nowrap;
   }
+  /* Multi-row (aligned) formulas: label sits in front of the FIRST row. */
+  .equation-row.stacked { align-items: flex-start; }
+  .equation-row.stacked .equation-label { padding-top: 0.45em; }
 
   .equation-label {
     font-weight: 600;
