@@ -6,6 +6,8 @@
  *   **...**          strong
  *   *...*            emphasis
  *   {g:...}          a knob symbol at first mention (em.g in-app; italic in print)
+ *   {blue:...}       ink for the app's blue −∇ℒ arrow (.ink-blue; plain bold in print)
+ *   {red:...}        ink for the app's red Δθ arrow (.ink-red; plain bold in print)
  *   {dark:...}       rendered only in dark mode
  *   {light:...}      rendered only in day mode — and always in print
  *
@@ -24,6 +26,7 @@ export type RichToken =
   | { t: 'strong'; children: RichToken[] }
   | { t: 'em'; children: RichToken[] }
   | { t: 'g'; children: RichToken[] }
+  | { t: 'ink'; color: 'blue' | 'red'; children: RichToken[] }
   | { t: 'theme'; mode: 'dark' | 'light'; children: RichToken[] };
 
 /** Find `close` at or after `from`, skipping over $...$ math spans. */
@@ -66,6 +69,8 @@ function findClosingBrace(src: string, from: number): number {
 
 const SPAN_OPENERS: { prefix: string; make: (children: RichToken[]) => RichToken }[] = [
   { prefix: '{g:', make: children => ({ t: 'g', children }) },
+  { prefix: '{blue:', make: children => ({ t: 'ink', color: 'blue', children }) },
+  { prefix: '{red:', make: children => ({ t: 'ink', color: 'red', children }) },
   { prefix: '{dark:', make: children => ({ t: 'theme', mode: 'dark', children }) },
   { prefix: '{light:', make: children => ({ t: 'theme', mode: 'light', children }) }
 ];
@@ -152,6 +157,9 @@ function tokensToHtml(tokens: RichToken[], dark: boolean): string {
         break;
       case 'g':
         html += `<em class="g">${tokensToHtml(tk.children, dark)}</em>`;
+        break;
+      case 'ink':
+        html += `<span class="ink-${tk.color}">${tokensToHtml(tk.children, dark)}</span>`;
         break;
       case 'theme':
         if ((tk.mode === 'dark') === dark) html += tokensToHtml(tk.children, dark);
