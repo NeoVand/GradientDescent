@@ -976,7 +976,47 @@
                  figure id + owns the caption; these snippets supply the drawing
                  (so figure styles stay in this component's scope). -->
             {#snippet conceptFig(id: string)}
-              {#if id === 'bowl-1d'}
+              {#if id === 'downhill-field'}
+                <svg class="concept-bg-svg" viewBox={`0 0 ${gradVizW} ${gradVizH}`} preserveAspectRatio="xMidYMid slice">
+                  <defs>
+                    <radialGradient id="grad-bowl-bg" cx="25%" cy="50%" r="55%">
+                      <stop offset="0%" stop-color="#fde047" stop-opacity="0.55" />
+                      <stop offset="45%" stop-color="#10b981" stop-opacity="0.22" />
+                      <stop offset="100%" stop-color="#10b981" stop-opacity="0" />
+                    </radialGradient>
+                    <marker id="grad-arrowhead" viewBox="0 -5 10 10" refX="8" refY="0" markerWidth="4" markerHeight="4" orient="auto">
+                      <path d="M0,-5L10,0L0,5" fill="currentColor" />
+                    </marker>
+                  </defs>
+                  <rect x="0" y="0" width={gradVizW} height={gradVizH} fill="url(#grad-bowl-bg)" />
+                  {#each gradFieldArrows as a}
+                    <line x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} stroke="currentColor" stroke-width={a.w} opacity={a.o} marker-end="url(#grad-arrowhead)" />
+                  {/each}
+                  <ellipse cx={gradVizCx} cy={gradVizCy} rx="10" ry="7" fill="none" stroke="#fff" stroke-opacity="0.55" stroke-width="1" />
+                  <ellipse cx={gradVizCx} cy={gradVizCy} rx="28" ry="20" fill="none" stroke="#fff" stroke-opacity="0.32" stroke-width="1" />
+                  <ellipse cx={gradVizCx} cy={gradVizCy} rx="55" ry="40" fill="none" stroke="#fff" stroke-opacity="0.18" stroke-width="1" />
+                  <circle cx={gradVizCx} cy={gradVizCy} r="6" fill="none" stroke="#f59e0b" stroke-width="1.5" />
+                  <circle cx={gradVizCx} cy={gradVizCy} r="3.5" fill="#f59e0b" stroke="#fff" stroke-width="1.5" />
+                </svg>
+              {:else if id === 'downhill-vector'}
+                <svg class="concept-svg" viewBox="0 0 200 120">
+                  <line x1="26" y1="100" x2="186" y2="100" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-opacity="0.4" />
+                  <line x1="26" y1="100" x2="26" y2="12" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-opacity="0.4" />
+                  <line x1="26" y1="100" x2="128" y2="100" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="3,3" stroke-opacity="0.7" />
+                  <line x1="128" y1="100" x2="128" y2="32" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="3,3" stroke-opacity="0.7" />
+                  <line x1="26" y1="100" x2="126" y2="33.3" stroke="#f59e0b" stroke-width="1.7" />
+                  <path d="M 120.5,34.5 L 128,32 L 124,39.5" fill="none" stroke="#f59e0b" stroke-width="1.7" />
+                  <foreignObject x="69" y="103" width="16" height="16">
+                    <span class="fig-tex dim">{@html tex('3')}</span>
+                  </foreignObject>
+                  <foreignObject x="134" y="60" width="16" height="16">
+                    <span class="fig-tex dim">{@html tex('2')}</span>
+                  </foreignObject>
+                  <foreignObject x="26" y="38" width="78" height="18">
+                    <span class="fig-tex">{@html tex(String.raw`\lVert\mathbf{v}\rVert = \sqrt{13}`)}</span>
+                  </foreignObject>
+                </svg>
+              {:else if id === 'bowl-1d'}
                 <svg class="concept-svg" viewBox="0 0 200 120">
                   <path d="M 20,15 Q 100,180 180,15" fill="none" stroke="#10b981" stroke-width="2.5" />
                   <circle cx="100" cy="98" r="6" fill="#f59e0b" stroke="#fff" stroke-width="2" />
@@ -986,8 +1026,140 @@
               {/if}
             {/snippet}
             {#snippet chFigure(id: string, cap: string)}
+              {#if id === 'downhill-proof'}
+                <figure class="proof-fig">
+                  <svg viewBox="0 0 420 156" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                    <defs>
+                      <marker id="pf-grad" viewBox="0 -5 10 10" refX="8" refY="0" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,-5L10,0L0,5" fill="#f59e0b" /></marker>
+                      <marker id="pf-u" viewBox="0 -5 10 10" refX="8" refY="0" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,-5L10,0L0,5" fill="var(--color-text-tertiary)" /></marker>
+                    </defs>
+                    <line x1="210" y1="16" x2="210" y2="146" class="fig-contour" style="stroke-opacity:0.16" />
+                    <!-- Panel A · the shadow (projection of ∇ℒ onto u) — centred in the left half -->
+                    <line x1="36" y1="112" x2="174" y2="112" stroke="var(--color-text-tertiary)" stroke-width="1.2" stroke-dasharray="3,3" stroke-opacity="0.6" marker-end="url(#pf-u)" />
+                    <line x1="36" y1="112" x2="130.5" y2="112" stroke="#3b82f6" stroke-width="4.5" stroke-linecap="round" />
+                    <line x1="130.5" y1="48.3" x2="130.5" y2="112" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="2.5,2.5" stroke-opacity="0.75" />
+                    <path d="M 123.5,112 L 123.5,105 L 130.5,105" fill="none" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-opacity="0.75" />
+                    <line x1="36" y1="112" x2="128.6" y2="49.5" stroke="#f59e0b" stroke-width="2.6" marker-end="url(#pf-grad)" />
+                    <path d="M 64,112 A 28,28 0 0 0 60.4,97.6" fill="none" stroke="var(--color-text-tertiary)" stroke-width="1.2" />
+                    <circle cx="36" cy="112" r="2.8" fill="var(--color-text-primary)" />
+                    <text x="134" y="46" class="proof-lbl" style="text-anchor:start;fill:#f59e0b">∇ℒ</text>
+                    <text x="178" y="116" class="proof-lbl" style="text-anchor:start;fill:var(--color-text-secondary)">u</text>
+                    <text x="72" y="105" class="proof-lbl" style="fill:var(--color-text-tertiary)">φ</text>
+                    <text x="83" y="128" class="proof-lbl" style="fill:#3b82f6">‖∇ℒ‖ cos φ</text>
+                    <!-- Panel B · rate vs angle is a cosine -->
+                    <line x1={proofCurve.x0 - 8} y1={proofCurve.yc} x2={proofCurve.x1 + 8} y2={proofCurve.yc} stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="3,3" stroke-opacity="0.45" />
+                    <path d={proofCurve.ascD} fill="none" stroke="#f59e0b" stroke-width="2.4" stroke-linecap="round" />
+                    <path d={proofCurve.descD} fill="none" stroke="#10b981" stroke-width="2.4" stroke-linecap="round" />
+                    <circle cx={proofCurve.p0.x} cy={proofCurve.p0.y} r="3.1" fill="#f59e0b" />
+                    <circle cx={proofCurve.p90.x} cy={proofCurve.p90.y} r="3.1" fill="var(--color-text-tertiary)" />
+                    <circle cx={proofCurve.p180.x} cy={proofCurve.p180.y} r="3.1" fill="#10b981" />
+                    <text x={proofCurve.p0.x - 3} y={proofCurve.p0.y - 8} class="proof-lbl" style="text-anchor:start;fill:#f59e0b">along ∇ℒ</text>
+                    <text x={proofCurve.p90.x} y={proofCurve.p90.y - 9} class="proof-lbl" style="fill:var(--color-text-tertiary)">contour · flat</text>
+                    <text x={proofCurve.p180.x + 3} y={proofCurve.p180.y + 13} class="proof-lbl" style="text-anchor:end;fill:#10b981">along −∇ℒ</text>
+                  </svg>
+                  <figcaption class="proof-figcap">{@html cap}</figcaption>
+                </figure>
+              {:else if id === 'gamma-regimes'}
+                <figure class="fig fig-lr">
+                  <div class="fig-triptych">
+                  {#each lrRegimes as g}
+                    <div class="fig-cell">
+                      <svg viewBox="0 0 150 150" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                        <ellipse cx={g.cx} cy={g.cy} rx="58" ry="46" class="fig-contour" style="stroke-opacity:0.10" />
+                        <ellipse cx={g.cx} cy={g.cy} rx="37" ry="29" class="fig-contour" style="stroke-opacity:0.16" />
+                        <ellipse cx={g.cx} cy={g.cy} rx="18" ry="14" class="fig-contour" style="stroke-opacity:0.24" />
+                        <circle cx={g.cx} cy={g.cy} r="3" fill="#10b981" />
+                        <path d={g.d} fill="none" stroke={g.color} stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" />
+                        {#each g.dots as d, i}
+                          {#if i > 0}<circle cx={d.x} cy={d.y} r="1.7" fill={g.color} />{/if}
+                        {/each}
+                        <circle cx={g.dots[0].x} cy={g.dots[0].y} r="4.2" fill="#f59e0b" stroke="#fff" stroke-width="1.2" />
+                      </svg>
+                      <div class="fig-cell-label" style="color:{g.color}">{g.label}</div>
+                      <div class="fig-cell-sub">{g.sub}</div>
+                    </div>
+                  {/each}
+                </div>
+                  <figcaption class="fig-cap">{@html cap}</figcaption>
+                </figure>
+              {:else}
               <figure class="fig">
-                {#if id === 'landscape-two-views'}
+                {#if id === 'derivative-secant'}
+                  <svg viewBox="0 0 {secantFig.W} {secantFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                  <defs>
+                    <marker id="sweep-head" viewBox="0 -4 8 8" refX="6.5" refY="0" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,-2.8 L6.5,0 L0,2.8" fill="none" stroke="var(--color-text-tertiary)" stroke-width="1.1" /></marker>
+                  </defs>
+                  <path d={secantFig.curve} fill="none" stroke="#10b981" stroke-width="1.6" stroke-opacity="0.65" />
+                  {#each secantFig.chords as s}
+                    <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke="var(--color-text-tertiary)" stroke-width="1" stroke-opacity={s.o} />
+                    <circle cx={s.end.x} cy={s.end.y} r="1.8" fill="var(--color-text-tertiary)" fill-opacity={s.o + 0.2} />
+                  {/each}
+                  <line x1={secantFig.tangent.x1} y1={secantFig.tangent.y1} x2={secantFig.tangent.x2} y2={secantFig.tangent.y2} stroke="#3b82f6" stroke-width="1.7" stroke-opacity="0.95" />
+                  <path d={secantFig.sweep} fill="none" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-opacity="0.75" marker-end="url(#sweep-head)" />
+                  <circle cx={secantFig.p.x} cy={secantFig.p.y} r="3" fill="#f59e0b" stroke="#fff" stroke-width="1.2" />
+                  <foreignObject x={secantFig.p.x - 10} y={secantFig.p.y + 8} width="24" height="22">
+                    <span class="fig-tex">{@html tex(String.raw`\alpha`)}</span>
+                  </foreignObject>
+                  <foreignObject x={secantFig.pEnd.x - 16} y={secantFig.pEnd.y - 24} width="44" height="22">
+                    <span class="fig-tex dim">{@html tex(String.raw`\alpha + h`)}</span>
+                  </foreignObject>
+                  <foreignObject x={secantFig.ctrl.x + 4} y={secantFig.ctrl.y - 8} width="46" height="22">
+                    <span class="fig-tex dim">{@html tex(String.raw`h \to 0`)}</span>
+                  </foreignObject>
+                </svg>
+                {:else if id === 'derivative-slices-3d'}
+                  <div class="fig-3d">
+                  {#await import('./GuideGradient3D.svelte') then m}
+                    <svelte:component this={m.default} variant="slices" />
+                  {/await}
+                  <div class="fig-3d-legend">
+                    <span><span class="leg-sw leg-blue"></span>{@html tex(String.raw`\beta`)} frozen — slope {@html tex(String.raw`\partial\mathcal{L}/\partial\alpha`)}</span>
+                    <span><span class="leg-sw leg-amber"></span>{@html tex(String.raw`\alpha`)} frozen — slope {@html tex(String.raw`\partial\mathcal{L}/\partial\beta`)}</span>
+                  </div>
+                  <div class="fig-3d-hint">drag to orbit</div>
+                </div>
+                {:else if id === 'downhill-3d'}
+                  <div class="fig-3d">
+                  {#await import('./GuideGradient3D.svelte') then m}
+                    <svelte:component this={m.default} />
+                  {/await}
+                  <div class="fig-3d-legend">
+                    <span><span class="leg-sw leg-amber"></span>{@html tex(String.raw`\nabla\mathcal{L}`)} — steepest ascent</span>
+                    <span><span class="leg-sw leg-emerald"></span>−{@html tex(String.raw`\nabla\mathcal{L}`)} — toward the basin</span>
+                  </div>
+                  <div class="fig-3d-hint">drag to orbit</div>
+                </div>
+                {:else if id === 'curvature-bend'}
+                  <svg viewBox="0 0 {bendFig.W} {bendFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                  <line x1={bendFig.tan.x1} y1={bendFig.tan.y1} x2={bendFig.tan.x2} y2={bendFig.tan.y2} stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="3,3.5" stroke-opacity="0.55" />
+                  <path d={bendFig.sharp.d} fill="none" stroke="#f87171" stroke-width="1.6" stroke-opacity="0.9" />
+                  <path d={bendFig.gentle.d} fill="none" stroke="#34d399" stroke-width="1.6" stroke-opacity="0.9" />
+                  <circle cx={bendFig.x0} cy={bendFig.y0} r="3" fill="#f59e0b" stroke="#fff" stroke-width="1.2" />
+                  <foreignObject x={bendFig.sharp.end.x + 5} y={bendFig.sharp.end.y - 8} width="70" height="18">
+                    <span class="fig-tex" style="color:#f87171">{@html tex(String.raw`\lambda`)} large</span>
+                  </foreignObject>
+                  <foreignObject x={bendFig.gentle.end.x + 5} y={bendFig.gentle.end.y - 8} width="70" height="18">
+                    <span class="fig-tex" style="color:#34d399">{@html tex(String.raw`\lambda`)} small</span>
+                  </foreignObject>
+                </svg>
+                {:else if id === 'curvature-regimes'}
+                  <svg viewBox="0 0 {regimeFig.W} {regimeFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                  {#each regimeFig.panels as pn, i}
+                    {#if i > 0}
+                      <line x1={pn.ox} y1="10" x2={pn.ox} y2={regimeFig.H - 30} stroke="var(--color-border)" stroke-width="1" stroke-opacity="0.5" />
+                    {/if}
+                    <path d={pn.curve} fill="none" stroke="#10b981" stroke-width="1.4" stroke-opacity="0.6" />
+                    <path d={pn.hops} fill="none" stroke="#f59e0b" stroke-width="1" stroke-opacity="0.55" />
+                    {#each pn.dots as dt, k}
+                      <circle cx={dt.x} cy={dt.y} r={k === 0 ? 2.8 : 2} fill="#f59e0b" fill-opacity={k === 0 ? 1 : 0.8} stroke={k === 0 ? '#fff' : 'none'} stroke-width="1" />
+                    {/each}
+                    <foreignObject x={pn.ox + 4} y={regimeFig.H - 27} width={regimeFig.PW - 8} height="27">
+                      <span class="fig-tex" style="display:block;text-align:center">{@html tex(pn.latex)}</span>
+                      <span class="fig-word" style="text-align:center;margin-top:2px">{pn.word}</span>
+                    </foreignObject>
+                  {/each}
+                </svg>
+                {:else if id === 'landscape-two-views'}
                   <svg viewBox="0 0 460 150" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
                   <defs>
                     <radialGradient id="lf-bowl" cx="50%" cy="50%" r="55%">
@@ -1050,6 +1222,24 @@
                 {/if}
                 <figcaption class="fig-cap">{@html cap}</figcaption>
               </figure>
+              {/if}
+            {/snippet}
+            {#snippet chWidget(id: string)}
+              {#if id === 'schedule-grid'}
+                <div class="schedule-grid">
+                {#each scheduleCurves as s (s.id)}
+                  <div class="schedule-card">
+                    <svg viewBox="0 0 {SCH_W} {SCH_H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                      <line x1={SCH_PAD} y1={SCH_H - SCH_PAD} x2={SCH_W - SCH_PAD} y2={SCH_H - SCH_PAD} class="sch-axis" />
+                      <line x1={SCH_PAD} y1={SCH_PAD} x2={SCH_PAD} y2={SCH_H - SCH_PAD} class="sch-axis" />
+                      <path d={s.d} fill="none" class="sch-curve" />
+                    </svg>
+                    <div class="schedule-name">{s.name}</div>
+                    <div class="schedule-desc">{s.desc}</div>
+                  </div>
+                {/each}
+              </div>
+              {/if}
             {/snippet}
 
             <section data-ch="ch-bowl" id="ch-bowl">
@@ -1074,766 +1264,37 @@
             <section data-ch="ch-derivative" id="ch-derivative">
               <div class="part-label">Part II · Walking downhill</div>
               <h3><svelte:component this={chIcon['ch-derivative']} size={18} strokeWidth={2} /> How steep, exactly?</h3>
-
-              <p>
-                Part I kept saying <em>slope</em> and trusted your legs to know what it meant. Before
-                the walking starts in earnest, let’s put a number on it — because the number is the
-                whole trick, and you can build it yourself with nothing but a subtraction and a
-                division.
-              </p>
-              <p>
-                Here is the move. Stand somewhere on a 1-D loss curve — say {@html tex(String.raw`\alpha = 2`)} on
-                <strong>Fit a Slope</strong>, whose loss happens to be {@html tex(String.raw`\mathcal{L}(\alpha)=\alpha^2`)}, so {@html tex(String.raw`\mathcal{L}(2)=4`)}.
-                <strong>Nudge</strong> the knob by some small amount <em>h</em>, and divide the
-                loss’s response by the nudge. Nudge by <em>h</em> = 0.1 and the loss climbs from
-                4 to 4.41 — a rise of 0.41 over a run of 0.1: ratio <strong>4.1</strong>. Try
-                <em>h</em> = 0.01: the ratio comes out 4.01. Try 0.001: <strong>4.001</strong>.
-                The nudges are vanishing, but the ratio isn’t wandering — it is
-                <em>settling</em>, and the number it settles on is 4.
-              </p>
-              <blockquote class="recipe">
-                Nudge. Measure the response. Divide. Then let the nudge shrink — the number the
-                ratio settles on is the <strong>derivative</strong>: the slope of the loss
-                <em>at a point</em>.
-              </blockquote>
-              <div class="formula-display center">{@html texD(formulas.derivativeLimit)}</div>
-              <p>
-                Read it slowly, once: the fraction is exactly the nudge-and-divide you just did, and
-                {@html tex(String.raw`\lim_{h \to 0}`)} (“the limit as <em>h</em> goes to zero”) is
-                the settling you just watched. Nothing else is hiding in there. The settling also
-                tells you something about the ground itself: zoom in far enough on any smooth curve
-                and it straightens into a line — the derivative is that line’s slope. Two chapters
-                from now, that “zoom until straight” picture carries a real proof on its back; and
-                its fine print — <em>the line only speaks for the ground right under you</em> —
-                grows up to become the learning rate’s whole story.
-              </p>
-              <figure class="fig">
-                <svg viewBox="0 0 {secantFig.W} {secantFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                  <defs>
-                    <marker id="sweep-head" viewBox="0 -4 8 8" refX="6.5" refY="0" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,-2.8 L6.5,0 L0,2.8" fill="none" stroke="var(--color-text-tertiary)" stroke-width="1.1" /></marker>
-                  </defs>
-                  <path d={secantFig.curve} fill="none" stroke="#10b981" stroke-width="1.6" stroke-opacity="0.65" />
-                  {#each secantFig.chords as s}
-                    <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke="var(--color-text-tertiary)" stroke-width="1" stroke-opacity={s.o} />
-                    <circle cx={s.end.x} cy={s.end.y} r="1.8" fill="var(--color-text-tertiary)" fill-opacity={s.o + 0.2} />
-                  {/each}
-                  <line x1={secantFig.tangent.x1} y1={secantFig.tangent.y1} x2={secantFig.tangent.x2} y2={secantFig.tangent.y2} stroke="#3b82f6" stroke-width="1.7" stroke-opacity="0.95" />
-                  <path d={secantFig.sweep} fill="none" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-opacity="0.75" marker-end="url(#sweep-head)" />
-                  <circle cx={secantFig.p.x} cy={secantFig.p.y} r="3" fill="#f59e0b" stroke="#fff" stroke-width="1.2" />
-                  <foreignObject x={secantFig.p.x - 10} y={secantFig.p.y + 8} width="24" height="22">
-                    <span class="fig-tex">{@html tex(String.raw`\alpha`)}</span>
-                  </foreignObject>
-                  <foreignObject x={secantFig.pEnd.x - 16} y={secantFig.pEnd.y - 24} width="44" height="22">
-                    <span class="fig-tex dim">{@html tex(String.raw`\alpha + h`)}</span>
-                  </foreignObject>
-                  <foreignObject x={secantFig.ctrl.x + 4} y={secantFig.ctrl.y - 8} width="46" height="22">
-                    <span class="fig-tex dim">{@html tex(String.raw`h \to 0`)}</span>
-                  </foreignObject>
-                </svg>
-                <figcaption class="fig-cap">
-                  The limit, drawn: each grey chord leans on the curve a nudge <em>h</em> away —
-                  slope {@html tex(String.raw`2\alpha + h`)} on this parabola — and as <em>h</em>
-                  shrinks, the chords tilt into the one blue line whose slope is exactly
-                  {@html tex(String.raw`2\alpha`)}: the tangent. The derivative is where the chords
-                  were heading all along.
-                </figcaption>
-              </figure>
-              <p>
-                Two knobs, same recipe, one new courtesy: with {@html tex(String.raw`\alpha`)} and {@html tex(String.raw`\beta`)} both live, nudge
-                <strong>one and freeze the other</strong>. The ratio you get is a
-                <strong>partial derivative</strong>, written with a curly
-                {@html tex(String.raw`\partial`)} — say it “partial”, and yes, it is the symbol on
-                this lab’s front door:
-              </p>
-              <div class="formula-display center">{@html texD(formulas.partialDef)}</div>
-              <p>
-                {@html tex(String.raw`\partial \mathcal{L}/\partial \alpha`)} reads: <em>nudge {@html tex(String.raw`\alpha`)},
-                hold {@html tex(String.raw`\beta`)} still, divide the response by the nudge.</em> Do it once per knob and you are
-                holding two numbers. Stacking those two numbers into a single arrow is exactly where
-                the next chapter begins.
-              </p>
-              <figure class="fig">
-                <div class="fig-3d">
-                  {#await import('./GuideGradient3D.svelte') then m}
-                    <svelte:component this={m.default} variant="slices" />
-                  {/await}
-                  <div class="fig-3d-legend">
-                    <span><span class="leg-sw leg-blue"></span>{@html tex(String.raw`\beta`)} frozen — slope {@html tex(String.raw`\partial\mathcal{L}/\partial\alpha`)}</span>
-                    <span><span class="leg-sw leg-amber"></span>{@html tex(String.raw`\alpha`)} frozen — slope {@html tex(String.raw`\partial\mathcal{L}/\partial\beta`)}</span>
-                  </div>
-                  <div class="fig-3d-hint">drag to orbit</div>
-                </div>
-                <figcaption class="fig-cap">
-                  “Hold the other knob still,” made literal: each translucent plane freezes one
-                  knob, and the surface passes through it as an <em>ordinary curve</em>. The blue
-                  cut’s slope at the marker is {@html tex(String.raw`\partial\mathcal{L}/\partial\alpha`)},
-                  the amber cut’s is {@html tex(String.raw`\partial\mathcal{L}/\partial\beta`)} —
-                  two ordinary derivatives, at right angles, on one surface. Drag to spin it.
-                </figcaption>
-              </figure>
-              <p class="aside">
-                <strong>How the app really does it:</strong> you could compute every slope by
-                literal nudging (the finite-difference recipe above — it’s how the curvature lens
-                works). But nudging carries a whisper of error, so each problem here ships a
-                hand-derived exact formula for its gradient instead — and the test suite trusts
-                nothing: every formula is re-checked against nudge-and-divide at many random
-                points. <em>Differentiate by hand, verify by nudge</em> — a professional habit
-                worth stealing.
-              </p>
-              {#if chapterPresets['ch-derivative']}
-                <ChapterCta demo={() => runPreset('ch-derivative')} demoLabel={chapterPresets['ch-derivative'].title} />
-              {/if}
-              {#if chRefs['ch-derivative']}
-                <div class="ch-refs">
-                  <span class="ch-refs-label">Further reading</span>
-                  {#each chRefs['ch-derivative'] as r}
-                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
-                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
-                      {r.label}
-                    </a>
-                  {/each}
-                </div>
-              {/if}
+              <GuideBlocks slug="ch-derivative" blocks={chapterBlocks['ch-derivative']} figure={chFigure} {conceptFig} onPreset={runPreset} onLesson={startLessonFromChapter} />
             </section>
 
             <!-- ============== 5 · WHICH WAY IS DOWNHILL ============== -->
             <section data-ch="ch-downhill" id="ch-downhill">
               <h3><svelte:component this={chIcon['ch-downhill']} size={18} strokeWidth={2} /> Which way is downhill?</h3>
-
-              <p>
-                Standing on a hillside in fog, you can still feel which way is down — the ground
-                tilts under your feet. That tilt is the <strong>slope</strong>. With two knobs there
-                are two slopes at once: how the loss changes as you nudge {@html tex(String.raw`\alpha`)}, and how it changes as
-                you nudge {@html tex(String.raw`\beta`)}. Bundle those two together and you get the <strong>gradient</strong>,
-                written <strong>{@html tex(String.raw`\nabla\mathcal{L}`)}</strong> (say “grad L”).
-              </p>
-              <p>
-                The gradient is an arrow, and it always points in the direction of <em>steepest
-                increase</em> — straight uphill. So to go <strong>down</strong>, you walk the
-                <strong>opposite</strong> way, along <strong>{@html tex(String.raw`-\nabla\mathcal{L}`)}</strong>. That negative gradient is
-                the single most important arrow in this whole app.
-              </p>
-              <p>
-                Why <em>steepest</em>? Picture standing on the slope and trying every direction you
-                could step. Each heading has its own rate of climb, and the gradient is simply the one
-                whose climb is fastest. Every other direction is a watered-down version of it: its
-                steepness is the gradient’s shadow cast onto that heading — full strength straight along
-                {@html tex(String.raw`\nabla\mathcal{L}`)}, and fading to <em>nothing</em> at a right angle to it. Those flat, right-angle
-                directions are exactly the <strong>contour lines</strong> on the map: walk along a
-                contour and the loss never changes, so the steepest way off it has to be square across
-                it. <em>The gradient is always perpendicular to the contours</em> — which is why the
-                field arrows below cut straight through the white loops rather than running along them.
-              </p>
-
-              <div class="concept concept-bg-overlay">
-                <svg class="concept-bg-svg" viewBox={`0 0 ${gradVizW} ${gradVizH}`} preserveAspectRatio="xMidYMid slice">
-                  <defs>
-                    <radialGradient id="grad-bowl-bg" cx="25%" cy="50%" r="55%">
-                      <stop offset="0%" stop-color="#fde047" stop-opacity="0.55" />
-                      <stop offset="45%" stop-color="#10b981" stop-opacity="0.22" />
-                      <stop offset="100%" stop-color="#10b981" stop-opacity="0" />
-                    </radialGradient>
-                    <marker id="grad-arrowhead" viewBox="0 -5 10 10" refX="8" refY="0" markerWidth="4" markerHeight="4" orient="auto">
-                      <path d="M0,-5L10,0L0,5" fill="currentColor" />
-                    </marker>
-                  </defs>
-                  <rect x="0" y="0" width={gradVizW} height={gradVizH} fill="url(#grad-bowl-bg)" />
-                  {#each gradFieldArrows as a}
-                    <line x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} stroke="currentColor" stroke-width={a.w} opacity={a.o} marker-end="url(#grad-arrowhead)" />
-                  {/each}
-                  <ellipse cx={gradVizCx} cy={gradVizCy} rx="10" ry="7" fill="none" stroke="#fff" stroke-opacity="0.55" stroke-width="1" />
-                  <ellipse cx={gradVizCx} cy={gradVizCy} rx="28" ry="20" fill="none" stroke="#fff" stroke-opacity="0.32" stroke-width="1" />
-                  <ellipse cx={gradVizCx} cy={gradVizCy} rx="55" ry="40" fill="none" stroke="#fff" stroke-opacity="0.18" stroke-width="1" />
-                  <circle cx={gradVizCx} cy={gradVizCy} r="6" fill="none" stroke="#f59e0b" stroke-width="1.5" />
-                  <circle cx={gradVizCx} cy={gradVizCy} r="3.5" fill="#f59e0b" stroke="#fff" stroke-width="1.5" />
-                </svg>
-                <div class="concept-fade"></div>
-                <div class="concept-text concept-text-overlay">
-                  <h4>The field of downhill arrows</h4>
-                  <p>
-                    Every faint arrow on the loss map is <strong>{@html tex(String.raw`-\nabla\mathcal{L}`)}</strong> at that spot — the
-                    steepest way down — and they all stream toward the basin. They are longer where
-                    the surface is steeper.
-                  </p>
-                  <p>
-                    On the marker itself, the <span class="ink-blue">blue arrow</span> is this same
-                    {@html tex(String.raw`-\nabla\mathcal{L}`)}: the steepest descent from exactly where you stand. (Its red partner arrives
-                    in the next chapter.)
-                  </p>
-                </div>
-              </div>
-
-              <aside class="hd-note">
-                <span class="hd-note-tag">In a billion dimensions</span>
-                <p>
-                  A quiet upgrade for later. With two knobs a contour is a loop — one thin line of
-                  “no change”. With {@html tex(String.raw`d`)} knobs it is a whole
-                  {@html tex(String.raw`(d-1)`)}-dimensional sheet: at any point there is a single
-                  steepest way up, and a vast flat wall of sideways directions that change nothing at
-                  all. The gradient’s job gets lonelier as {@html tex(String.raw`d`)} grows — one
-                  needle of change in a haystack of directions that don’t.
-                </p>
-              </aside>
-
-              <p>
-                Formally, the gradient is a column of <strong>partial derivatives</strong> — one
-                slope per parameter. Each entry answers a single, narrow question: <em>if I wiggle
-                only this knob and hold the other still, how fast does the loss change?</em> There is
-                nothing mystical in measuring one: nudge {@html tex(String.raw`\alpha`)} by a hair, see how far the loss moved, and
-                divide the change by the nudge. Do that once for {@html tex(String.raw`\alpha`)} and once for {@html tex(String.raw`\beta`)} and you have the two
-                numbers the gradient is built from.
-              </p>
-              <p class="aside">
-                Two knobs make that easy — but a real model has millions or billions, and nudging each
-                one in turn would be hopeless. They use <strong>backpropagation</strong> (reverse-mode
-                automatic differentiation): one backward sweep of the chain rule that hands back the
-                derivative for <em>every</em> parameter at once, at about the cost of a single forward
-                pass (Rumelhart, Hinton &amp; Williams, 1986; Baydin et al., 2018). The meaning is exactly
-                the {@html tex(String.raw`\nabla\mathcal{L}`)} here — it is just computed without ever
-                nudging anything.
-              </p>
-              <div class="formula-display">{@html texD(formulas.gradientDefinition)}</div>
-              <p>
-                Stack those two answers into a little arrow and you have {@html tex(String.raw`\nabla\mathcal{L}`)}. Its
-                <strong>direction</strong> is the steepest way uphill; its <strong>length</strong> is
-                how steep. That is why the field arrows stretch long on the steep walls and shrink to
-                almost nothing at the basin floor — at the very bottom there is no downhill left, so
-                the gradient, and the step it drives, fades to zero. The marker arriving and going
-                still <em>is</em> the gradient vanishing.
-              </p>
-
-              <p>
-                We keep calling {@html tex(String.raw`-\nabla\mathcal{L}`)} the <em>steepest</em> way down. That is not loose talk — and it is
-                worth seeing why, first in three dimensions, then in one short line of proof.
-              </p>
-              <figure class="fig">
-                <div class="fig-3d">
-                  {#await import('./GuideGradient3D.svelte') then m}
-                    <svelte:component this={m.default} />
-                  {/await}
-                  <div class="fig-3d-legend">
-                    <span><span class="leg-sw leg-amber"></span>{@html tex(String.raw`\nabla\mathcal{L}`)} — steepest ascent</span>
-                    <span><span class="leg-sw leg-emerald"></span>−{@html tex(String.raw`\nabla\mathcal{L}`)} — toward the basin</span>
-                  </div>
-                  <div class="fig-3d-hint">drag to orbit</div>
-                </div>
-                <figcaption class="fig-cap">
-                  The same idea in three dimensions: on the wall of the bowl,
-                  {@html tex(String.raw`\nabla\mathcal{L}`)} (amber) points straight up the steepest rise
-                  and −{@html tex(String.raw`\nabla\mathcal{L}`)} (emerald) straight down toward the basin —
-                  both perpendicular to the green level ring they sit on. Drag to spin it.
-                </figcaption>
-              </figure>
-
-              <div class="concept">
-                <div class="concept-text">
-                  <h4>An arrow is two numbers</h4>
-                  <p>
-                    Three tools before the proof. An arrow on the {@html tex(String.raw`(\alpha, \beta)`)}
-                    plane <em>is</em> its two components stacked — how far along
-                    {@html tex(String.raw`\alpha`)}, how far along {@html tex(String.raw`\beta`)};
-                    that is all the bracket notation means. Its <strong>length</strong>, written
-                    {@html tex(String.raw`\lVert\mathbf{v}\rVert`)}, is Pythagoras on those legs:
-                    for {@html tex(String.raw`\mathbf{v} = [3, 2]`)},
-                    {@html tex(String.raw`\lVert\mathbf{v}\rVert = \sqrt{3^2 + 2^2} = \sqrt{13}`)}.
-                    A <strong>unit vector</strong> has length exactly 1 — pure direction, no size.
-                    And the <strong>dot product</strong> multiplies matching components and adds:
-                    {@html tex(String.raw`\mathbf{v}\cdot\mathbf{u} = v_1 u_1 + v_2 u_2`)} — one
-                    number, and for a unit {@html tex(String.raw`\mathbf{u}`)} it is precisely the
-                    length of {@html tex(String.raw`\mathbf{v}`)}’s <em>shadow</em> on
-                    {@html tex(String.raw`\mathbf{u}`)}. That shadow is the whole proof below.
-                  </p>
-                </div>
-                <svg class="concept-svg" viewBox="0 0 200 120">
-                  <line x1="26" y1="100" x2="186" y2="100" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-opacity="0.4" />
-                  <line x1="26" y1="100" x2="26" y2="12" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-opacity="0.4" />
-                  <line x1="26" y1="100" x2="128" y2="100" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="3,3" stroke-opacity="0.7" />
-                  <line x1="128" y1="100" x2="128" y2="32" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="3,3" stroke-opacity="0.7" />
-                  <line x1="26" y1="100" x2="126" y2="33.3" stroke="#f59e0b" stroke-width="1.7" />
-                  <path d="M 120.5,34.5 L 128,32 L 124,39.5" fill="none" stroke="#f59e0b" stroke-width="1.7" />
-                  <foreignObject x="69" y="103" width="16" height="16">
-                    <span class="fig-tex dim">{@html tex('3')}</span>
-                  </foreignObject>
-                  <foreignObject x="134" y="60" width="16" height="16">
-                    <span class="fig-tex dim">{@html tex('2')}</span>
-                  </foreignObject>
-                  <foreignObject x="26" y="38" width="78" height="18">
-                    <span class="fig-tex">{@html tex(String.raw`\lVert\mathbf{v}\rVert = \sqrt{13}`)}</span>
-                  </foreignObject>
-                </svg>
-              </div>
-
-              <div class="proof">
-                <div class="proof-title">Why the negative gradient is exactly the steepest descent</div>
-                <p class="proof-p">
-                  Take a unit step in some direction {@html tex(String.raw`\mathbf{u}`)}. The loss changes
-                  at a rate equal to the gradient’s <em>shadow</em> on that direction — their dot product
-                  {@html tex(String.raw`\nabla\mathcal{L}\cdot\mathbf{u}`)}. Writing {@html tex(String.raw`\varphi`)}
-                  (“phi”) for the angle between {@html tex(String.raw`\mathbf{u}`)} and {@html tex(String.raw`\nabla\mathcal{L}`)},
-                  that shadow has length {@html tex(String.raw`\lVert\nabla\mathcal{L}\rVert\cos\varphi`)}:
-                </p>
-                <div class="formula-display center">{@html texD(formulas.directional)}</div>
-                <figure class="proof-fig">
-                  <svg viewBox="0 0 420 156" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                    <defs>
-                      <marker id="pf-grad" viewBox="0 -5 10 10" refX="8" refY="0" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,-5L10,0L0,5" fill="#f59e0b" /></marker>
-                      <marker id="pf-u" viewBox="0 -5 10 10" refX="8" refY="0" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,-5L10,0L0,5" fill="var(--color-text-tertiary)" /></marker>
-                    </defs>
-                    <line x1="210" y1="16" x2="210" y2="146" class="fig-contour" style="stroke-opacity:0.16" />
-                    <!-- Panel A · the shadow (projection of ∇ℒ onto u) — centred in the left half -->
-                    <line x1="36" y1="112" x2="174" y2="112" stroke="var(--color-text-tertiary)" stroke-width="1.2" stroke-dasharray="3,3" stroke-opacity="0.6" marker-end="url(#pf-u)" />
-                    <line x1="36" y1="112" x2="130.5" y2="112" stroke="#3b82f6" stroke-width="4.5" stroke-linecap="round" />
-                    <line x1="130.5" y1="48.3" x2="130.5" y2="112" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="2.5,2.5" stroke-opacity="0.75" />
-                    <path d="M 123.5,112 L 123.5,105 L 130.5,105" fill="none" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-opacity="0.75" />
-                    <line x1="36" y1="112" x2="128.6" y2="49.5" stroke="#f59e0b" stroke-width="2.6" marker-end="url(#pf-grad)" />
-                    <path d="M 64,112 A 28,28 0 0 0 60.4,97.6" fill="none" stroke="var(--color-text-tertiary)" stroke-width="1.2" />
-                    <circle cx="36" cy="112" r="2.8" fill="var(--color-text-primary)" />
-                    <text x="134" y="46" class="proof-lbl" style="text-anchor:start;fill:#f59e0b">∇ℒ</text>
-                    <text x="178" y="116" class="proof-lbl" style="text-anchor:start;fill:var(--color-text-secondary)">u</text>
-                    <text x="72" y="105" class="proof-lbl" style="fill:var(--color-text-tertiary)">φ</text>
-                    <text x="83" y="128" class="proof-lbl" style="fill:#3b82f6">‖∇ℒ‖ cos φ</text>
-                    <!-- Panel B · rate vs angle is a cosine -->
-                    <line x1={proofCurve.x0 - 8} y1={proofCurve.yc} x2={proofCurve.x1 + 8} y2={proofCurve.yc} stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="3,3" stroke-opacity="0.45" />
-                    <path d={proofCurve.ascD} fill="none" stroke="#f59e0b" stroke-width="2.4" stroke-linecap="round" />
-                    <path d={proofCurve.descD} fill="none" stroke="#10b981" stroke-width="2.4" stroke-linecap="round" />
-                    <circle cx={proofCurve.p0.x} cy={proofCurve.p0.y} r="3.1" fill="#f59e0b" />
-                    <circle cx={proofCurve.p90.x} cy={proofCurve.p90.y} r="3.1" fill="var(--color-text-tertiary)" />
-                    <circle cx={proofCurve.p180.x} cy={proofCurve.p180.y} r="3.1" fill="#10b981" />
-                    <text x={proofCurve.p0.x - 3} y={proofCurve.p0.y - 8} class="proof-lbl" style="text-anchor:start;fill:#f59e0b">along ∇ℒ</text>
-                    <text x={proofCurve.p90.x} y={proofCurve.p90.y - 9} class="proof-lbl" style="fill:var(--color-text-tertiary)">contour · flat</text>
-                    <text x={proofCurve.p180.x + 3} y={proofCurve.p180.y + 13} class="proof-lbl" style="text-anchor:end;fill:#10b981">along −∇ℒ</text>
-                  </svg>
-                  <figcaption class="proof-figcap">
-                    Left: the rate is {@html tex(String.raw`\nabla\mathcal{L}`)}’s shadow on <strong>u</strong>. Right: sweep <strong>u</strong>
-                    around and that shadow traces a cosine — biggest along {@html tex(String.raw`\nabla\mathcal{L}`)}, zero across a contour,
-                    most negative along {@html tex(String.raw`-\nabla\mathcal{L}`)}.
-                  </figcaption>
-                </figure>
-                <p class="proof-p">
-                  Because {@html tex(String.raw`\cos\varphi`)} only ever runs from +1 to −1, that rate is
-                  largest when {@html tex(String.raw`\mathbf{u}`)} lines up with {@html tex(String.raw`\nabla\mathcal{L}`)}
-                  (the fastest <em>rise</em>), exactly zero at a right angle (walking a contour — the loss
-                  holds still), and most negative along {@html tex(String.raw`-\nabla\mathcal{L}`)} (the
-                  fastest <em>fall</em>). No direction can beat it. <span class="proof-qed">∎</span>
-                </p>
-              </div>
-
-              <p>
-                One honest caveat to carry forward: the gradient is only the truth <em>right where you
-                stand.</em> Zoom in close enough and any smooth surface flattens into a tilted plane,
-                and {@html tex(String.raw`\nabla\mathcal{L}`)} is exactly that tilt — but step too far and the real ground curves away from the
-                plane you trusted. That gap between the slope underfoot and the surface a stride away is
-                the whole reason a step can be <em>too big</em>, and taming it is what the learning rate
-                exists to do.
-              </p>
-              <ChapterCta
-                lessonId={chLesson['ch-downhill']}
-                onLesson={() => startLessonFromChapter('ch-downhill')}
-                demo={chapterPresets['ch-downhill'] ? () => runPreset('ch-downhill') : null}
-              />
-              {#if chRefs['ch-downhill']}
-                <div class="ch-refs">
-                  <span class="ch-refs-label">Further reading</span>
-                  {#each chRefs['ch-downhill'] as r}
-                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
-                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
-                      {r.label}
-                    </a>
-                  {/each}
-                </div>
-              {/if}
+              <GuideBlocks slug="ch-downhill" blocks={chapterBlocks['ch-downhill']} figure={chFigure} {conceptFig} onPreset={runPreset} onLesson={startLessonFromChapter} />
             </section>
 
             <!-- ============== 4 · ONE STEP ============== -->
             <section data-ch="ch-step" id="ch-step">
               <h3><svelte:component this={chIcon['ch-step']} size={18} strokeWidth={2} /> One step of descent</h3>
-
-              <p>Now we can actually walk. One step of <strong>gradient descent</strong> is almost insultingly simple:</p>
-              <blockquote class="recipe">
-                Stand at your current {@html tex(String.raw`(\alpha, \beta)`)}. Look downhill — that’s <strong>{@html tex(String.raw`-\nabla\mathcal{L}`)}</strong>. Take a
-                step in that direction — <em class="g">{@html tex(String.raw`\gamma`)}</em> times as long as the slope is steep.
-                Repeat.
-              </blockquote>
-              <p>
-                In symbols, that is the rule the entire field is built on. We write <strong>{@html tex(String.raw`\theta`)}</strong>
-                (“theta”) as shorthand for the pair {@html tex(String.raw`(\alpha, \beta)`)} together:
-              </p>
-              <div class="formula-display center">{@html texD(formulas.stepRule)}</div>
-              <p>
-                Press <strong>Step</strong> to take exactly one of these; press <strong>Train</strong>
-                to take many in a row and watch the marker slide into a valley.
-              </p>
-              <p>
-                You’ll now notice a <span class="ink-red">red arrow</span> on the marker beside the
-                blue one. The blue arrow is the pure downhill direction; the
-                <strong>red arrow is the step the optimizer actually took</strong>. Early on they
-                almost agree. Once you add the tricks in Part IV, they’ll split apart — and
-                <em>that gap is the optimizer’s personality.</em>
-              </p>
-              <ChapterCta
-                lessonId={chLesson['ch-step']}
-                onLesson={() => startLessonFromChapter('ch-step')}
-                demo={chapterPresets['ch-step'] ? () => runPreset('ch-step') : null}
-              />
-              {#if chRefs['ch-step']}
-                <div class="ch-refs">
-                  <span class="ch-refs-label">Further reading</span>
-                  {#each chRefs['ch-step'] as r}
-                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
-                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
-                      {r.label}
-                    </a>
-                  {/each}
-                </div>
-              {/if}
+              <GuideBlocks slug="ch-step" blocks={chapterBlocks['ch-step']} figure={chFigure} {conceptFig} onPreset={runPreset} onLesson={startLessonFromChapter} />
             </section>
 
             <!-- ============== 5 · LEARNING RATE ============== -->
             <section data-ch="ch-gamma" id="ch-gamma">
               <h3><svelte:component this={chIcon['ch-gamma']} size={18} strokeWidth={2} /> The learning rate {@html tex(String.raw`\gamma`)}</h3>
-
-              <p>
-                There is one number you’ll reach for more than any other: <em class="g">{@html tex(String.raw`\gamma`)}</em>
-                (gamma), the <strong>learning rate</strong> — how big each step is. It’s a Goldilocks
-                dial.
-              </p>
-              <ul class="knob-bullets">
-                <li><strong>Too small:</strong> the marker creeps; it never reaches the bottom before the steps run out.</li>
-                <li><strong>Too big:</strong> it overshoots the valley floor and bounces up the far wall — loss leaps around, or rockets off to infinity. (The app catches this, stops, and explains what happened.)</li>
-                <li><strong>Just right:</strong> a smooth glide into the basin. Every problem ships with a sane default — but the fastest way to <em>feel</em> {@html tex(String.raw`\gamma`)} is to break it on purpose.</li>
-              </ul>
-              <p>
-                And “too big” is not vague — it has an exact edge. For a smooth bowl, gradient
-                descent settles only while {@html tex(String.raw`\gamma`)} stays below <strong>two divided by the sharpest bend
-                of the surface</strong>, a number written {@html tex(String.raw`\lambda_{\max}`)}. Careful with the word:
-                this is <em>not</em> the steepness you’ve been reading off the arrows (how tilted
-                the ground is) but a genuinely new quantity — how fast the tilt <em>itself</em>
-                changes as you walk. That is the <strong>curvature</strong>.
-              </p>
-              <div class="formula-display">{@html texD(formulas.stability)}</div>
-              <p>
-                Stay under that line and each step lands closer to the bottom than the last, so the
-                run converges. Cross it and the opposite compounds: every step overshoots a little
-                more than the one before, and the loss runs off to infinity. Where does the 2 come
-                from, and what exactly is bending? The <em>next chapter</em> builds curvature with
-                your own hands — the same nudge-and-divide trick, aimed at the slope this time —
-                and derives this edge in four honest lines.
-              </p>
-              <aside class="hd-note">
-                <span class="hd-note-tag">In a billion dimensions</span>
-                <p>
-                  For the clean bowls here, {@html tex(String.raw`\gamma > 2/\lambda_{\max}`)} means certain divergence — a
-                  theorem you can verify with a slider. The modern surprise: full-batch training of
-                  real networks was found to hover <em>right at</em> that edge — the curvature
-                  itself rises until {@html tex(String.raw`2/\lambda_{\max}`)} meets whatever {@html tex(String.raw`\gamma`)} you chose, and the loss
-                  then falls raggedly along the knife’s edge (Cohen et al., 2021, “edge of
-                  stability”). The law you can check on this bowl becomes, at scale, a strange
-                  equilibrium the theory is still catching up to.
-                </p>
-              </aside>
-              <p class="aside">
-                Sometimes the blow-up comes not from {@html tex(String.raw`\gamma`)} but from a freak gradient — a cliff in the
-                surface, or the deep, recurrent networks where gradients can <strong>explode</strong>.
-                The standard guard is <strong>gradient clipping</strong>: if the gradient’s length
-                exceeds a threshold {@html tex(String.raw`c`)}, rescale it back to that length before
-                stepping, {@html tex(String.raw`\nabla\mathcal{L} \leftarrow c\,\nabla\mathcal{L}/\lVert\nabla\mathcal{L}\rVert`)},
-                keeping its direction but capping its size (Pascanu et al., 2013). The opposite failure —
-                gradients that <strong>vanish</strong> on a flat plateau — just stalls a run, the quiet
-                trap from the landscape chapter.
-              </p>
-              <figure class="fig fig-lr">
-                <div class="fig-triptych">
-                  {#each lrRegimes as g}
-                    <div class="fig-cell">
-                      <svg viewBox="0 0 150 150" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                        <ellipse cx={g.cx} cy={g.cy} rx="58" ry="46" class="fig-contour" style="stroke-opacity:0.10" />
-                        <ellipse cx={g.cx} cy={g.cy} rx="37" ry="29" class="fig-contour" style="stroke-opacity:0.16" />
-                        <ellipse cx={g.cx} cy={g.cy} rx="18" ry="14" class="fig-contour" style="stroke-opacity:0.24" />
-                        <circle cx={g.cx} cy={g.cy} r="3" fill="#10b981" />
-                        <path d={g.d} fill="none" stroke={g.color} stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" />
-                        {#each g.dots as d, i}
-                          {#if i > 0}<circle cx={d.x} cy={d.y} r="1.7" fill={g.color} />{/if}
-                        {/each}
-                        <circle cx={g.dots[0].x} cy={g.dots[0].y} r="4.2" fill="#f59e0b" stroke="#fff" stroke-width="1.2" />
-                      </svg>
-                      <div class="fig-cell-label" style="color:{g.color}">{g.label}</div>
-                      <div class="fig-cell-sub">{g.sub}</div>
-                    </div>
-                  {/each}
-                </div>
-                <figcaption class="fig-cap">
-                  Gradient descent from the same start (orange) at three step sizes, on one bowl. Below the
-                  stability limit it settles — sluggishly, or briskly; cross the limit and every step
-                  overshoots a little more than the last.
-                </figcaption>
-              </figure>
-              <ChapterCta
-                lessonId={chLesson['ch-gamma']}
-                onLesson={() => startLessonFromChapter('ch-gamma')}
-                demo={chapterPresets['ch-gamma'] ? () => runPreset('ch-gamma') : null}
-              />
-              {#if chRefs['ch-gamma']}
-                <div class="ch-refs">
-                  <span class="ch-refs-label">Further reading</span>
-                  {#each chRefs['ch-gamma'] as r}
-                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
-                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
-                      {r.label}
-                    </a>
-                  {/each}
-                </div>
-              {/if}
+              <GuideBlocks slug="ch-gamma" blocks={chapterBlocks['ch-gamma']} figure={chFigure} {conceptFig} onPreset={runPreset} onLesson={startLessonFromChapter} />
             </section>
 
             <!-- ============== 8 · THE BEND OF THE BOWL ============== -->
             <section data-ch="ch-curvature" id="ch-curvature">
               <h3><svelte:component this={chIcon['ch-curvature']} size={18} strokeWidth={2} /> The bend of the bowl</h3>
-
-              <p>
-                The last chapter ended on a formula pulled out of a hat: stay under
-                {@html tex(String.raw`2/\lambda_{\max}`)}. This chapter earns it. What we need is
-                one more number at every point of the landscape — not how tilted the ground is, but
-                how quickly the tilt itself changes as you walk. The slope of the slope: the
-                <strong>curvature</strong>.
-              </p>
-              <p>
-                Feel the difference first. A wine glass and a soup bowl can be equally steep where
-                you stand — same slope — but descend a little and the glass <em>tightens</em> while
-                the bowl <em>relaxes</em>. Curvature is the rate of that tightening, and you already
-                own the tool that measures it: nudge {@html tex(String.raw`\alpha`)} and divide — only this time, watch how the
-                <em>slope</em> answers, not the loss. The derivative of the derivative, written
-                {@html tex(String.raw`\partial^2 \mathcal{L}/\partial \alpha^2`)} and, for the rest
-                of this chapter, called {@html tex(String.raw`\lambda`)}: big {@html tex(String.raw`\lambda`)}, sharp bend; small
-                {@html tex(String.raw`\lambda`)}, gentle one; zero, flat as a board.
-              </p>
-              <figure class="fig">
-                <svg viewBox="0 0 {bendFig.W} {bendFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                  <line x1={bendFig.tan.x1} y1={bendFig.tan.y1} x2={bendFig.tan.x2} y2={bendFig.tan.y2} stroke="var(--color-text-tertiary)" stroke-width="1" stroke-dasharray="3,3.5" stroke-opacity="0.55" />
-                  <path d={bendFig.sharp.d} fill="none" stroke="#f87171" stroke-width="1.6" stroke-opacity="0.9" />
-                  <path d={bendFig.gentle.d} fill="none" stroke="#34d399" stroke-width="1.6" stroke-opacity="0.9" />
-                  <circle cx={bendFig.x0} cy={bendFig.y0} r="3" fill="#f59e0b" stroke="#fff" stroke-width="1.2" />
-                  <foreignObject x={bendFig.sharp.end.x + 5} y={bendFig.sharp.end.y - 8} width="70" height="18">
-                    <span class="fig-tex" style="color:#f87171">{@html tex(String.raw`\lambda`)} large</span>
-                  </foreignObject>
-                  <foreignObject x={bendFig.gentle.end.x + 5} y={bendFig.gentle.end.y - 8} width="70" height="18">
-                    <span class="fig-tex" style="color:#34d399">{@html tex(String.raw`\lambda`)} small</span>
-                  </foreignObject>
-                </svg>
-                <figcaption class="fig-cap">
-                  Same slope underfoot — the dashed tangent is shared — but two different futures:
-                  the red curve tightens, the green one relaxes. The first derivative can’t tell
-                  them apart at the marker; the second one, {@html tex(String.raw`\lambda`)}, is
-                  exactly what does.
-                </figcaption>
-              </figure>
-
-              <div class="proof">
-                <div class="proof-title">Where the 2 comes from — in four lines</div>
-                <p class="proof-p">
-                  Take the cleanest bowl there is: {@html tex(String.raw`\mathcal{L} = \tfrac{1}{2}\lambda\alpha^2`)},
-                  curvature {@html tex(String.raw`\lambda`)} everywhere, minimum at zero. Its slope at {@html tex(String.raw`\alpha`)} is
-                  {@html tex(String.raw`\lambda\alpha`)}, so one step of gradient descent is
-                </p>
-                <div class="formula-display center">{@html texD(formulas.contraction)}</div>
-                <p class="proof-p">
-                  Every step <em>multiplies the distance to the bottom</em> by the same factor
-                  {@html tex(String.raw`(1-\gamma\lambda)`)} — and that one multiplier is the whole
-                  story. While {@html tex(String.raw`\gamma\lambda < 1`)} the factor sits between 0
-                  and 1: a smooth glide in. At {@html tex(String.raw`\gamma\lambda = 1`)} the factor
-                  is 0 — you land at the bottom in <em>one hop</em> ({@html tex(String.raw`\gamma = 1/\lambda`)} is this bowl’s own
-                  perfect learning rate). Between 1 and 2 the factor is negative but small:
-                  overshoot to the far wall, yet closer each bounce. At exactly 2, you bounce
-                  between two mirror points forever. And past 2 every bounce lands
-                  <em>higher</em> than the last — divergence. There is the edge, and there is
-                  the 2. <span class="proof-qed">∎</span>
-                </p>
-              </div>
-              <figure class="fig">
-                <svg viewBox="0 0 {regimeFig.W} {regimeFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                  {#each regimeFig.panels as pn, i}
-                    {#if i > 0}
-                      <line x1={pn.ox} y1="10" x2={pn.ox} y2={regimeFig.H - 30} stroke="var(--color-border)" stroke-width="1" stroke-opacity="0.5" />
-                    {/if}
-                    <path d={pn.curve} fill="none" stroke="#10b981" stroke-width="1.4" stroke-opacity="0.6" />
-                    <path d={pn.hops} fill="none" stroke="#f59e0b" stroke-width="1" stroke-opacity="0.55" />
-                    {#each pn.dots as dt, k}
-                      <circle cx={dt.x} cy={dt.y} r={k === 0 ? 2.8 : 2} fill="#f59e0b" fill-opacity={k === 0 ? 1 : 0.8} stroke={k === 0 ? '#fff' : 'none'} stroke-width="1" />
-                    {/each}
-                    <foreignObject x={pn.ox + 4} y={regimeFig.H - 27} width={regimeFig.PW - 8} height="27">
-                      <span class="fig-tex" style="display:block;text-align:center">{@html tex(pn.latex)}</span>
-                      <span class="fig-word" style="text-align:center;margin-top:2px">{pn.word}</span>
-                    </foreignObject>
-                  {/each}
-                </svg>
-                <figcaption class="fig-cap">
-                  The multiplier, run for real: amber dots are actual gradient-descent iterates on
-                  {@html tex(String.raw`\mathcal{L} = \tfrac{1}{2}\lambda\alpha^2`)}, starting from
-                  the ringed point. Glide, one-hop, shrinking bounce, growing bounce — four values
-                  of {@html tex(String.raw`\gamma\lambda`)}, one factor {@html tex(String.raw`(1-\gamma\lambda)`)}.
-                </figcaption>
-              </figure>
-
-              <p>
-                Now open the second knob. At any point of a real landscape the surface bends by a
-                <em>different amount in different directions</em> — along a valley’s floor, barely;
-                across it, sharply. The honest bookkeeping is a small table of bendings called the
-                <strong>Hessian</strong>:
-              </p>
-              <div class="formula-display center">{@html texD(formulas.hessianMatrix)}</div>
-              <p>
-                Don’t let the box intimidate you. The two diagonal entries are exactly the
-                {@html tex(String.raw`\partial^2`)} curvatures you just built, one per knob; the
-                corner entry (the same number twice) records the <em>twist</em> — how nudging one
-                knob changes the <em>other</em> knob’s slope. Four numbers, and together they pin
-                down the little bowl that best fits the surface right where you stand. Zoom in on
-                any smooth landscape and that fitted bowl <em>is</em> the landscape — the same way
-                the fitted line was, one derivative ago.
-              </p>
-              <p class="aside">
-                <strong>Meet the whole family.</strong> Stack one output’s slopes into a column and
-                you have the <strong>gradient</strong>. Give the machine <em>many</em> outputs — a
-                network predicting a hundred things at once — and each output brings its own row of
-                slopes; the full table is the <strong>Jacobian</strong>, the gradient’s big sibling.
-                And the Hessian you just met? Differentiate each entry of the gradient and stack the
-                results: <em>the Hessian is exactly the Jacobian of the gradient.</em> One move —
-                nudge, divide, tabulate — wearing three sizes.
-              </p>
-              <p>
-                A stretched or twisted bowl still has a <strong>gentlest</strong> direction and a
-                <strong>sharpest</strong> one — turn it in your hands until you face them. Their two
-                bendings are called {@html tex(String.raw`\lambda_{\min}`)} and
-                {@html tex(String.raw`\lambda_{\max}`)}, and the last chapter’s speed limit can now
-                be read honestly: the <em>sharpest</em> bend polices {@html tex(String.raw`\gamma`)} — that is
-                {@html tex(String.raw`\gamma < 2/\lambda_{\max}`)} — while your progress along the
-                <em>gentlest</em> direction is paid at the rate
-                {@html tex(String.raw`(1 - \gamma\lambda_{\min})`)} per step. One {@html tex(String.raw`\gamma`)}, two masters.
-              </p>
-              <p>
-                How badly can the two masters disagree? Take their ratio:
-              </p>
-              <div class="formula-display center">{@html texD(formulas.kappa)}</div>
-              <p>
-                the <strong>condition number</strong>. {@html tex(String.raw`\kappa = 1`)} is a perfectly round bowl: any safe {@html tex(String.raw`\gamma`)}
-                lands you in a few hops. {@html tex(String.raw`\kappa = 10`)} means the sharp direction forces a {@html tex(String.raw`\gamma`)} so timid that
-                the gentle direction keeps about 80% of its remaining distance <em>every step</em>.
-                Ravines, trenches, the long crawl — they are all this one number wearing different
-                landscapes, and Part IV’s entire optimizer family tree is organised around
-                outwitting it.
-              </p>
-              <p class="look">
-                The app will show you the Hessian live. In the Loss &amp; Gradient panel’s header,
-                switch on the <strong>curvature lens</strong>: the ellipse drawn at the marker
-                <em>is</em> the fitted bowl seen from above — long axis the gentle bend, short axis
-                the sharp one — with {@html tex(String.raw`\kappa`)} read out beside it. On a saddle, the direction that curves
-                <em>down</em> turns red and dashed: the escape route.
-              </p>
-              <aside class="hd-note">
-                <span class="hd-note-tag">In a billion dimensions</span>
-                <p>
-                  Up there the ravine doesn’t just stretch — it multiplies. A real network’s loss
-                  has millions of curvature directions, and measured spectra show a vast, nearly
-                  flat bulk hugging zero plus a handful of steep outliers: less a valley than a
-                  canyon system with a few sheer walls and endless soft floor. Condition numbers in
-                  the wild reach 10⁵ and beyond, so the crawl this chapter proved isn’t a corner
-                  case — it is the default condition of deep learning. That is why every method in
-                  Part IV ships in every deep-learning library.
-                </p>
-              </aside>
-              {#if chapterPresets['ch-curvature']}
-                <ChapterCta demo={() => runPreset('ch-curvature')} demoLabel={chapterPresets['ch-curvature'].title} />
-              {/if}
-              {#if chRefs['ch-curvature']}
-                <div class="ch-refs">
-                  <span class="ch-refs-label">Further reading</span>
-                  {#each chRefs['ch-curvature'] as r}
-                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
-                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
-                      {r.label}
-                    </a>
-                  {/each}
-                </div>
-              {/if}
+              <GuideBlocks slug="ch-curvature" blocks={chapterBlocks['ch-curvature']} figure={chFigure} {conceptFig} onPreset={runPreset} onLesson={startLessonFromChapter} />
             </section>
 
             <!-- ============== 9 · SCHEDULING THE LEARNING RATE ============== -->
             <section data-ch="ch-schedule" id="ch-schedule">
               <h3><svelte:component this={chIcon['ch-schedule']} size={18} strokeWidth={2} /> Scheduling the learning rate</h3>
-              <p>
-                The learning rate just handed us a single, unavoidable compromise: a <strong>large</strong>
-                {@html tex(String.raw`\gamma`)} covers ground fast but overshoots the floor; a <strong>small</strong> {@html tex(String.raw`\gamma`)} lands precisely
-                but crawls to get there. You don’t actually have to choose. Stop treating {@html tex(String.raw`\gamma`)} as one frozen
-                number and <strong>schedule</strong> it — large early to cover ground, small late to settle
-                cleanly — and you get both halves of the bargain. The <strong>Schedule</strong> control
-                beneath the learning rate does exactly that: it multiplies your base {@html tex(String.raw`\gamma`)} by a factor that
-                changes on every step of the run.
-              </p>
-              <p>
-                The four schedules trace four different shapes for that factor over a run — flat, then
-                three ways of bleeding {@html tex(String.raw`\gamma`)} away as the steps tick by:
-              </p>
-              <div class="schedule-grid">
-                {#each scheduleCurves as s (s.id)}
-                  <div class="schedule-card">
-                    <svg viewBox="0 0 {SCH_W} {SCH_H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                      <line x1={SCH_PAD} y1={SCH_H - SCH_PAD} x2={SCH_W - SCH_PAD} y2={SCH_H - SCH_PAD} class="sch-axis" />
-                      <line x1={SCH_PAD} y1={SCH_PAD} x2={SCH_PAD} y2={SCH_H - SCH_PAD} class="sch-axis" />
-                      <path d={s.d} fill="none" class="sch-curve" />
-                    </svg>
-                    <div class="schedule-name">{s.name}</div>
-                    <div class="schedule-desc">{s.desc}</div>
-                  </div>
-                {/each}
-              </div>
-              <p>
-                <strong>Constant</strong> holds {@html tex(String.raw`\gamma`)} start to finish — the honest baseline, and always the
-                compromise above. <strong>Step decay</strong> keeps {@html tex(String.raw`\gamma`)} flat, then cuts it by a fixed factor
-                at set milestones (here ×0.3 a third of the way in, and again at two-thirds). It leaves the
-                loss curve’s most recognizable fingerprint: a long plateau, then a sudden <em>cliff</em>
-                the instant {@html tex(String.raw`\gamma`)} drops and the smaller step resolves detail the larger one skated over. For
-                most of deep learning’s history, that staircase trained nearly every network.
-              </p>
-              <p>
-                <strong>Cosine</strong> does the same work without the jolts — {@html tex(String.raw`\gamma`)} eases down the first half
-                of a cosine from full strength to a small floor (about 5%): gentle at first, fastest
-                through the middle, feather-light by the end. Lingering near full strength early is
-                the point — the run banks its fast progress before precision matters. With no brutal
-                transition it then simply settles, which is why cosine annealing is the modern default. <strong>Warmup + cosine</strong> bolts a short
-                on-ramp onto the front: {@html tex(String.raw`\gamma`)} starts near zero and climbs over the first tenth before the
-                cosine takes over. That protects the opening, where a run <em>begins</em> at a random,
-                often dreadful point and one full-size step could fling the marker off the map — so it is
-                now standard for training large models from scratch.
-              </p>
-              <p>
-                One practical wrinkle: each shape stretches to fit the run, and at 1× the decay only
-                finishes on the run’s very last step — so you never get to watch the <em>settled</em>
-                tail. The <strong>Decay speed</strong> slider — it appears whenever a non-constant
-                schedule is active on a finite run (in ∞ mode there is no horizon, so schedules switch
-                off) — compresses the whole schedule into a fraction of the run, so at <em>4×</em> it
-                finishes annealing a quarter of the way in and the rest of the run shows you the
-                landing. Turn it up and read the result off the dotted {@html tex(String.raw`\gamma(t)`)} line in the loss chart.
-              </p>
-              <p>
-                Scheduling has a second, deeper payoff that only lands once gradients turn <em>noisy</em>
-                — the subject of the next part. A {@html tex(String.raw`\gamma`)} bled toward zero is the one thing that pulls a restless
-                run in to a clean stop. And one optimizer you’ll meet there, <strong>Lion</strong>, takes a
-                fixed-size step and so cannot settle <em>at all</em> on a constant {@html tex(String.raw`\gamma`)}: it just orbits the
-                minimum forever. It is the purest illustration of why schedules exist — switch it to cosine
-                and the orbit closes to a point.
-              </p>
-              {#if scheduleExperiment}
-                <ChapterCta demo={() => runExperiment(scheduleExperiment)} demoLabel="Watch Lion orbit, then land" />
-              {/if}
-              {#if chRefs['ch-schedule']}
-                <div class="ch-refs">
-                  <span class="ch-refs-label">Further reading</span>
-                  {#each chRefs['ch-schedule'] as r}
-                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
-                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
-                      {r.label}
-                    </a>
-                  {/each}
-                </div>
-              {/if}
+              <GuideBlocks slug="ch-schedule" blocks={chapterBlocks['ch-schedule']} figure={chFigure} {conceptFig} widget={chWidget} demo={scheduleExperiment ? { label: 'Watch Lion orbit, then land', run: () => runExperiment(scheduleExperiment) } : undefined} onPreset={runPreset} onLesson={startLessonFromChapter} />
             </section>
 
             <!-- ============== 7 · NOISE / SGD ============== -->
@@ -2875,16 +2336,16 @@
     font-style: italic;
   }
 
-  ul { margin: 0.5rem 0 1rem 0; padding-left: 1.4rem; }
-  li { margin: 0.5rem 0; font-size: 1.0rem; line-height: 1.6; color: var(--color-text-secondary); }
-  li strong { color: var(--color-text-primary); }
+  .reading-column :global(ul) { margin: 0.5rem 0 1rem 0; padding-left: 1.4rem; }
+  .reading-column :global(li) { margin: 0.5rem 0; font-size: 1.0rem; line-height: 1.6; color: var(--color-text-secondary); }
+  .reading-column :global(li strong) { color: var(--color-text-primary); }
 
   .reading-column :global(em.g) { font-family: Georgia, serif; font-style: italic; color: #10b981; font-weight: 500; }
-  .ink-blue { color: #3b82f6; font-weight: 600; }
-  .ink-red { color: #ef4444; font-weight: 600; }
+  .reading-column :global(.ink-blue) { color: #3b82f6; font-weight: 600; }
+  .reading-column :global(.ink-red) { color: #ef4444; font-weight: 600; }
 
   /* ---------- Recipe blockquote ---------- */
-  .recipe {
+  .reading-column :global(.recipe) {
     margin: 0 0 1rem 0;
     padding: 0.85rem 1.1rem;
     border-left: 2px solid var(--color-border);
@@ -2894,7 +2355,7 @@
     line-height: 1.65;
     color: var(--color-text-secondary);
   }
-  .recipe strong { color: var(--color-text-primary); }
+  .reading-column :global(.recipe strong) { color: var(--color-text-primary); }
 
   /* ---------- Go deeper ---------- */
   /* ---------- Schedule preview cards ---------- */
@@ -3070,24 +2531,24 @@
   }
 
   /* ---------- Proof callout (the steepest-descent argument) ---------- */
-  .proof {
+  .reading-column :global(.proof) {
     margin: 1.6rem 0;
     border: 1px solid var(--color-border);
     border-radius: 10px;
     background: var(--color-bg-tertiary);
     padding: 1rem 1.2rem;
   }
-  .proof-title {
+  .reading-column :global(.proof-title) {
     font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
     color: var(--color-text-secondary); margin-bottom: 0.7rem;
   }
-  .proof-p { font-size: 0.88rem; line-height: 1.65; margin: 0 0 0.7rem; }
+  .reading-column :global(.proof-p) { font-size: 0.88rem; line-height: 1.65; margin: 0 0 0.7rem; }
   .reading-column :global(.proof .formula-display) { margin: 0.6rem 0; }
   .proof-fig { margin: 0.7rem 0 0.5rem; }
   .proof-fig svg { display: block; width: 100%; height: auto; }
   .proof-lbl { font-size: 10.5px; font-weight: 600; font-family: inherit; text-anchor: middle; }
   .proof-figcap { font-size: 0.76rem; line-height: 1.5; text-align: left; color: var(--color-text-tertiary); margin-top: 0.5rem; }
-  .proof-qed { color: #10b981; font-weight: 700; margin-left: 0.15rem; }
+  .reading-column :global(.proof-qed) { color: #10b981; font-weight: 700; margin-left: 0.15rem; }
 
   /* ---------- Formulas ---------- */
   .reading-column :global(.formula-display) {
@@ -3112,13 +2573,13 @@
   .opt-formula::-webkit-scrollbar-track { background: transparent; }
 
   /* ---------- Knob bullets ---------- */
-  .knob-bullets { padding-left: 0; list-style: none; }
-  .knob-bullets li {
+  .reading-column :global(.knob-bullets) { padding-left: 0; list-style: none; }
+  .reading-column :global(.knob-bullets li) {
     position: relative;
     padding-left: 1.1rem;
     font-size: 0.95rem;
   }
-  .knob-bullets li::before {
+  .reading-column :global(.knob-bullets li::before) {
     content: '';
     position: absolute;
     left: 0; top: 0.65em;
@@ -3570,7 +3031,7 @@
     .hero-svg { height: 150px; }
     .hero-title { font-size: 1.3rem; }
     h3 { font-size: 1.25rem; }
-    .reading-column :global(p), li, .recipe { font-size: 0.95rem; }
+    .reading-column :global(p), .reading-column :global(li), .reading-column :global(.recipe) { font-size: 0.95rem; }
 
     .reading-column :global(.concept) { grid-template-columns: 1fr; }
     .reading-column :global(.concept-svg) { height: 100px; }

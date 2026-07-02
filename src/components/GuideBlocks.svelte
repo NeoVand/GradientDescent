@@ -29,15 +29,21 @@
     blocks,
     figure,
     conceptFig,
+    widget,
+    demo,
     onLesson,
     onPreset
   }: {
     slug: string;
     blocks: Block[];
-    /** Renders a full <figure class="fig"> for an id, given the caption HTML. */
+    /** Renders a full <figure> for an id, given the caption HTML. */
     figure?: Snippet<[string, string]>;
-    /** Renders the small illustration inside a concept box. */
+    /** Renders the illustration inside a concept box (or an overlay's backdrop). */
     conceptFig?: Snippet<[string]>;
+    /** Renders an interactive island (widget blocks). */
+    widget?: Snippet<[string]>;
+    /** Chapter-demo override when the CTA isn't the slug's chapterPreset. */
+    demo?: { label: string; run: () => void };
     onLesson?: (slug: string) => void;
     onPreset?: (slug: string) => void;
   } = $props();
@@ -58,7 +64,38 @@
   {:else if b.kind === 'look'}
     <p class="look">{@html richToHtml(b.text, dark)}</p>
   {:else if b.kind === 'display'}
-    <div class="formula-display">{@html texD(formulas[b.formula])}</div>
+    <div class="formula-display" class:center={b.center}>{@html texD(formulas[b.formula])}</div>
+  {:else if b.kind === 'recipe'}
+    <blockquote class="recipe">{@html richToHtml(b.text, dark)}</blockquote>
+  {:else if b.kind === 'list'}
+    <ul class="knob-bullets">
+      {#each b.items as item}<li>{@html richToHtml(item, dark)}</li>{/each}
+    </ul>
+  {:else if b.kind === 'conceptOverlay'}
+    <div class="concept concept-bg-overlay">
+      {#if conceptFig}{@render conceptFig(b.fig)}{/if}
+      <div class="concept-fade"></div>
+      <div class="concept-text concept-text-overlay">
+        <h4>{b.title}</h4>
+        {#each b.paras as t}<p>{@html richToHtml(t, dark)}</p>{/each}
+      </div>
+    </div>
+  {:else if b.kind === 'proof'}
+    {@const lastP = b.blocks.reduce((acc, x, i) => (x.kind === 'p' ? i : acc), -1)}
+    <div class="proof">
+      <div class="proof-title">{b.title}</div>
+      {#each b.blocks as pb, i}
+        {#if pb.kind === 'p'}
+          <p class="proof-p">{@html richToHtml(pb.text, dark)}{#if i === lastP}{' '}<span class="proof-qed">∎</span>{/if}</p>
+        {:else if pb.kind === 'display'}
+          <div class="formula-display center">{@html texD(formulas[pb.formula])}</div>
+        {:else if pb.kind === 'figure'}
+          {#if figure}{@render figure(pb.id, richToHtml(pb.caption, dark))}{/if}
+        {/if}
+      {/each}
+    </div>
+  {:else if b.kind === 'widget'}
+    {#if widget}{@render widget(b.id)}{/if}
   {:else if b.kind === 'concept'}
     <div class="concept">
       <div class="concept-text">
@@ -77,12 +114,12 @@
   {/if}
 {/each}
 
-{#if lessonId || preset}
+{#if lessonId || preset || demo}
   <ChapterCta
     {lessonId}
     onLesson={lessonId && onLesson ? () => onLesson(slug) : null}
-    demo={preset && onPreset ? () => onPreset(slug) : null}
-    demoLabel={preset?.title ?? 'Watch a quick demo'}
+    demo={demo ? demo.run : preset && onPreset ? () => onPreset(slug) : null}
+    demoLabel={demo?.label ?? preset?.title ?? 'Watch a quick demo'}
   />
 {/if}
 {#if chRefs[slug]}

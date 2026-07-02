@@ -83,6 +83,12 @@ describe('richToHtml', () => {
     expect(html).toContain('<em class="g">');
   });
 
+  it('renders ink spans for the app arrows', () => {
+    expect(richToHtml('the {blue:blue arrow} and its {red:red partner}', true)).toBe(
+      'the <span class="ink-blue">blue arrow</span> and its <span class="ink-red">red partner</span>'
+    );
+  });
+
   it('picks the matching theme span only', () => {
     const src = 'the {dark:bright}{light:deep-coloured} dimple';
     expect(richToHtml(src, true)).toBe('the bright dimple');
