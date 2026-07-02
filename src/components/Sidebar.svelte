@@ -10,7 +10,8 @@
    * intents.
    */
 
-  import { selectedProblem, datasetStore, trainingStore, historyStore, optimizerStore, resetOptimizerState, raceStore, customModelStore } from '../stores/stores';
+  import { selectedProblem, datasetStore, trainingStore, historyStore, optimizerStore, resetOptimizerState, raceStore, customModelStore, currentProblemConfig } from '../stores/stores';
+  import { computeHessian, eigenSym2 } from '../utils/hessian';
   import type { ProblemType, ScheduleId, DataPoint } from '../types/types';
   import { REGRESSION_LABELS, CLASSIFICATION_LABELS, formulaIsValid, type RegressionModel, type ClassificationModel } from '../utils/customModel';
   import { problemConfigs } from '../utils/problems';
@@ -373,6 +374,29 @@
 
   $: lrSliderPos =
     ((Math.log10(Math.max(1e-4, Math.min(1, learningRate))) - LR_LOG_MIN) / (LR_LOG_MAX - LR_LOG_MIN)) * 100;
+
+  // The stability edge for plain gradient descent, γ = 2/λmax, measured at
+  // the problem's own minimum — the guide's curvature chapter derives it,
+  // and this tick lets the reader FIND it on the slider. Skipped for custom
+  // problems (finite-difference-of-finite-difference curvature is too noisy).
+  $: stabilityEdge = (() => {
+    const cfg = $currentProblemConfig;
+    if (!cfg?.trueParameters || cfg.type.startsWith('custom')) return null;
+    const train = $datasetStore.data.filter(d => d.isTraining);
+    if (train.length === 0 && !cfg.noData) return null;
+    try {
+      const eig = eigenSym2(computeHessian(cfg, train, cfg.trueParameters));
+      const lmax = Math.max(Math.abs(eig.lambda1), Math.abs(eig.lambda2));
+      if (!Number.isFinite(lmax) || lmax <= 0) return null;
+      const edge = 2 / lmax;
+      return edge >= 1.5e-4 && edge <= 1 ? edge : null;
+    } catch {
+      return null;
+    }
+  })();
+  $: edgeTickPos = stabilityEdge === null
+    ? null
+    : ((Math.log10(stabilityEdge) - LR_LOG_MIN) / (LR_LOG_MAX - LR_LOG_MIN)) * 100;
 
   // ---------- Informative slider colors ----------
   // Each control speaks its own color: γ heats up from safe emerald to
@@ -744,17 +768,26 @@
         <div class="row-spring"></div>
         <span class="row-value" style="color: {lrColor}">{formatLearningRate(learningRate)}</span>
       </div>
-      <input
-        id="learning-rate"
-        class="hyper-slider"
-        type="range"
-        min="0"
-        max="100"
-        step="0.5"
-        value={lrSliderPos}
-        style="--fill: {lrSliderPos}%; --slider-color: {lrColor}"
-        on:input={handleLrSlider}
-      />
+      <div class="lr-slider-wrap">
+        <input
+          id="learning-rate"
+          class="hyper-slider"
+          type="range"
+          min="0"
+          max="100"
+          step="0.5"
+          value={lrSliderPos}
+          style="--fill: {lrSliderPos}%; --slider-color: {lrColor}"
+          on:input={handleLrSlider}
+        />
+        {#if edgeTickPos !== null && stabilityEdge !== null}
+          <span
+            class="lr-edge-tick"
+            style="left: {edgeTickPos}%"
+            use:tooltip={`Stability edge at this problem's minimum: γ = 2/λ<sub>max</sub> ≈ ${formatLearningRate(stabilityEdge)}<br/><span style="opacity:0.8;font-size:0.7rem">Past this line plain gradient descent must diverge — the guide's curvature chapter shows why</span>`}
+          ></span>
+        {/if}
+      </div>
     </div>
 
     <!-- LR Schedule -->
@@ -1591,6 +1624,24 @@
         var(--slider-color, #10b981) var(--fill, 0%),
         rgba(127, 127, 127, 0.25) var(--fill, 0%),
         rgba(127, 127, 127, 0.25) 100%);
+  }
+
+  /* The 2/λmax stability tick on the γ slider: a small red notch at the
+     exact rate past which plain GD diverges on this problem. */
+  .lr-slider-wrap {
+    position: relative;
+  }
+  .lr-edge-tick {
+    position: absolute;
+    top: 50%;
+    width: 3px;
+    height: 14px;
+    transform: translate(-50%, -50%);
+    border-radius: 2px;
+    background: #ef4444;
+    box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--color-bg-secondary, #0f172a) 85%, transparent);
+    cursor: help;
+    z-index: 1;
   }
 
   /* The knob takes the slider's own colour (--slider-color, set per slider);
