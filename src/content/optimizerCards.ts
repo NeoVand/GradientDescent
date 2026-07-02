@@ -23,6 +23,8 @@ export type OptChapter = {
   act?: { no: string; title: string; intro?: string };
   /** "In a billion dimensions…" honesty note — where the 2-D picture misleads. */
   hd?: string;
+  /** Optimizer id whose real source the card can reveal (src/optim/optimizers). */
+  code?: string;
 };
 
 export const optTree: OptChapter[] = [
@@ -30,6 +32,7 @@ export const optTree: OptChapter[] = [
     act: { no: 'Act I', title: 'Follow the slope', intro: 'The whole story starts with a single move — and then spends 170 years repairing it. It helps to read what follows as a conversation between methods: <em>here is the flaw, here is the fix, here is the new flaw the fix introduced.</em>' },
     year: '1847',
     name: 'Gradient Descent',
+    code: 'gd',
     by: 'Augustin-Louis Cauchy',
     idea:
       'Cauchy, grinding through astronomical calculations by hand, writes down the move everything else builds on: measure the slope, step the other way. A century and a half later it is still the backbone of all of machine learning — and the baseline every later trick is trying to beat.',
@@ -50,6 +53,7 @@ export const optTree: OptChapter[] = [
   {
     year: '1964',
     name: 'Momentum',
+    code: 'momentum',
     lead: 'Armed with that one little tool, the first cure almost designs itself. If a single gradient is a gust of wind, a moving average of them is the <em>prevailing</em> wind — exactly what a marker rattling across a ravine is missing: a memory of which way is consistently downhill.',
     by: 'Boris Polyak — the "heavy ball"',
     idea:
@@ -61,6 +65,7 @@ export const optTree: OptChapter[] = [
   {
     year: '1983',
     name: 'Nesterov',
+    code: 'nesterov',
     lead: 'But a heavy ball has a temper. The very inertia that carries it along the valley floor also carries it clean past the bottom, so it has to double back and climb — momentum’s gift and its flaw are the same thing. The next fix is almost philosophical: <em>look before you leap.</em>',
     by: 'Yurii Nesterov — accelerated gradient',
     idea:
@@ -72,6 +77,7 @@ export const optTree: OptChapter[] = [
     act: { no: 'Act III', title: 'A learning rate per parameter', intro: 'Momentum fought the ravine by smoothing across <em>time</em>. Here is a different attack on the same wall: leave time alone and give every <em>parameter</em> its own step size, so the cramped direction and the roomy one stop having to share a single learning rate.' },
     year: '2011',
     name: 'AdaGrad',
+    code: 'adagrad',
     by: 'Duchi, Hazan & Singer',
     idea:
       'A different failure: one shared $\\gamma$ is wrong when the two parameters need very different step sizes. The cure: give each its own. Divide a parameter’s step by the running size of its own past gradients — so a parameter that rarely moves takes bold steps while a busy one calms down. The running size is a sum of past squared gradients $s$, and the step becomes $\\gamma\\,\\nabla\\mathcal{L}/(\\sqrt{s}+\\varepsilon)$. This made it the workhorse of sparse problems like word embeddings.',
@@ -83,6 +89,7 @@ export const optTree: OptChapter[] = [
   {
     year: '2012',
     name: 'RMSProp',
+    code: 'rmsprop',
     lead: 'AdaGrad’s generosity was also its undoing. Because it never forgets a single past gradient, its memory only ever grows — and a step divided by a forever-growing number can only shrink, until the marker freezes mid-journey. What if it could <em>forget?</em>',
     by: 'Geoffrey Hinton — never formally published; the world cites a Coursera slide',
     idea:
@@ -93,6 +100,7 @@ export const optTree: OptChapter[] = [
   {
     year: '2012',
     name: 'AdaDelta',
+    code: 'adadelta',
     lead: 'Forgetting kept the steps alive, and for most people that closed the case. But Matthew Zeiler, squinting at the very same update that very same year, caught something nobody else had: the equation was, quite literally, <em>dimensionally wrong.</em>',
     by: 'Matthew Zeiler — same year, same fix, one step further',
     idea:
@@ -105,6 +113,7 @@ export const optTree: OptChapter[] = [
     act: { no: 'Act IV', title: 'Put the two together', intro: 'Two good ideas are now on the table — momentum’s smoothing of the gradient, and a per-parameter step size. They mend different halves of the ravine and they do not get in each other’s way, so the obvious move is to use <strong>both at once</strong>. That move became the most widely used optimizer in deep learning.' },
     year: '2014',
     name: 'Adam',
+    code: 'adam',
     by: 'Kingma & Ba — "adaptive moments"',
     idea:
       'The merger the whole trunk builds to: take Momentum’s moving average of gradients (decay $\\beta_1$) AND RMSProp’s moving average of squared gradients (decay $\\beta_2$), and use them together. One honest detail: both averages start at zero and read too low at first, so each is divided by $1-\\beta^t$ to correct that early bias — giving the bias-corrected $\\hat{\\mathbf m}$ and $\\hat s$ that the update below pits against each other. The result became the workhorse of modern deep learning — its paper is now one of the most-cited in all of science — and the launch point for every branch that follows.',
@@ -115,6 +124,7 @@ export const optTree: OptChapter[] = [
   {
     year: '2016',
     name: 'Nadam',
+    code: 'nadam',
     lead: 'Adam looked like the end of the road — robust, popular, everywhere at once. It wasn’t. Within a couple of years three different people each tugged on a single loose thread, and one careful refinement at a time, sanded it smoother. The first of them had been paying very close attention back in Act II.',
     by: 'Timothy Dozat — Nesterov-accelerated Adam',
     idea:
@@ -125,6 +135,7 @@ export const optTree: OptChapter[] = [
   {
     year: '2017',
     name: 'AdamW',
+    code: 'adamw',
     lead: 'The second thread was the one that mattered most in practice — and it had been hiding in plain sight inside nearly every training run on Earth. The culprit was a line everyone trusted without a second glance: <em>weight decay.</em>',
     by: 'Loshchilov & Hutter — the actual default today',
     idea:
@@ -136,6 +147,7 @@ export const optTree: OptChapter[] = [
   {
     year: '2019',
     name: 'RAdam',
+    code: 'radam',
     lead: 'The third thread was the quietest of all. For years practitioners had patched a rough spot in Adam’s opening steps with a hand-tuned <em>warmup</em>, half-superstition — runs just blew up without it, and nobody could say exactly why. What if that warmup could be <em>derived</em> instead of guessed?',
     by: 'Liu et al. — Adam’s warmup, automated',
     idea:
@@ -148,6 +160,7 @@ export const optTree: OptChapter[] = [
     act: { no: 'Branch', title: 'Sign steps', intro: 'The first fork throws away the piece everyone had been copying — the adaptive square-root rescaling — and asks what is left when a step is nothing but a direction and a single fixed size.' },
     year: '2023',
     name: 'Lion',
+    code: 'lion',
     by: 'Chen et al. (Google) — found by program search, not designed',
     idea:
       'Adam scaled the step by gradient history. Lion throws that out and takes a different shape — and it wasn’t invented by a person: a program searched the space of optimizers and this fell out. The name is a fitting backronym — EvoLved Sign Momentum. Keep one momentum buffer, blend it with the fresh gradient, and step by the $\\operatorname{sign}$ of the result — so every step is the same size $\\gamma$ on each axis, no matter how steep or flat. That makes it light (one buffer, no squared-gradient term) and competitive with Adam on big vision and language models. The catch is the very thing that makes it clean: a step that never shrinks can’t settle by itself.',
@@ -160,6 +173,7 @@ export const optTree: OptChapter[] = [
     act: { no: 'Branch', title: 'Use curvature', intro: 'A second fork goes the opposite way: instead of dropping information, it adds some. Every method so far reads only the <em>slope</em>; this branch also reads how the slope is <strong>bending</strong>.' },
     year: '1680s',
     name: 'Newton',
+    code: 'newton',
     by: 'Isaac Newton — the original, three centuries early',
     idea:
       'The branch that reaches back furthest — and the method every optimizer above is a cheap stand-in for. They all read only the slope $\\nabla\\mathcal{L}$. Newton also reads the CURVATURE: fit a quadratic bowl to the surface right here (the Hessian $\\mathbf H$) and jump straight to that bowl’s bottom, $-\\mathbf H^{-1}\\nabla\\mathcal{L}$. On a real bowl that nails the minimum in ONE step, with no learning rate to tune. This app already draws that jump — it is the violet Newton ghost in the curvature lens. So why isn’t it everywhere? $\\mathbf H$ is $N\\times N$ for $N$ parameters: trivial for our 2, ruinous for a billion. And away from a convex bowl $-\\mathbf H^{-1}\\nabla\\mathcal{L}$ can aim uphill, so this app runs the damped form real implementations use: near saddles and flats the curvature is propped up and the jump reined in toward a plain gradient step. (The $\\gamma$ in the formula is a safety throttle — pure Newton is $\\gamma = 1$, which is what this app keeps.)',
@@ -171,6 +185,7 @@ export const optTree: OptChapter[] = [
   {
     year: '2023',
     name: 'Sophia',
+    code: 'sophia',
     lead: 'Newton’s method is the king nobody can afford — exact, and ruinously expensive, all because of that one beautiful matrix. So the question for the age of billion-parameter models is blunt: can you keep the <em>idea</em> and throw away the bill?',
     by: 'Liu et al. — Newton, cut down to fit an LLM',
     idea:
@@ -183,6 +198,7 @@ export const optTree: OptChapter[] = [
     act: { no: 'Branch', title: 'Tune itself', intro: 'The last fork aims at the one knob nothing has managed to remove. Even the adaptive methods still made you choose $\\gamma$; this branch tries to read it straight off the problem.' },
     year: '2024',
     name: 'Prodigy',
+    code: 'prodigy',
     by: 'Mishchenko & Defazio — the learning rate, removed',
     idea:
       'Every method so far still made you pick $\\gamma$. This branch deletes that last knob. The insight: the ideal step size is set by how far the start is from the solution — a distance $d$. You don’t know $d$, so Prodigy estimates it live, ramping a tiny seed upward from how the gradients line up with how far you’ve already travelled ($\\langle g,\\, x_0 - x\\rangle$), and scales an Adam step by it. Set nothing and watch the marker creep, then accelerate as $d$ finds its level — the learning rate, discovered rather than tuned. Prodigy sharpens the same lab’s earlier D-Adaptation, and the parameter-free idea is taken seriously: a sibling schedule-free method from these authors won the self-tuning track of MLCommons’ 2024 AlgoPerf benchmark.',
