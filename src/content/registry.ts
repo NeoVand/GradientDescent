@@ -31,7 +31,8 @@ export const guideParts: GuidePart[] = [
       { slug: 'ch-derivative', title: 'How steep, exactly?' },
       { slug: 'ch-downhill', title: 'Which way is downhill?' },
       { slug: 'ch-step', title: 'One step of descent' },
-      { slug: 'ch-gamma', title: 'The learning rate γ' },
+      // Title carries $math$ micro-syntax; renderers pass it through mathText.
+      { slug: 'ch-gamma', title: 'The learning rate $\\gamma$' },
       { slug: 'ch-curvature', title: 'The bend of the bowl' },
       { slug: 'ch-schedule', title: 'Scheduling the learning rate' }
     ]

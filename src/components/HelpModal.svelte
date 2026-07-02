@@ -104,6 +104,10 @@
   const escHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const mathText = (src: string) =>
     src.split(/\$([^$]+)\$/).map((seg, i) => (i % 2 === 1 ? tex(seg) : escHtml(seg))).join('');
+  // Same, but for our own trusted content strings that carry real markup
+  // (<em>, <strong>) alongside $math$ — no escaping, math still KaTeX'd.
+  const mathHtml = (src: string) =>
+    src.split(/\$([^$]+)\$/).map((seg, i) => (i % 2 === 1 ? tex(seg) : seg)).join('');
 
   // ---------- The table of contents (drives the rail + scroll-spy) ----------
   // Built from the registry: parts and chapters in reading order, numbers
@@ -572,6 +576,113 @@
 
   // (The gradient chapter's 3-D bowl is a real WebGL scene — see GuideGradient3D.svelte.)
 
+  // Derivative figure A: secants through a shrinking nudge settling onto the
+  // tangent — the limit, drawn. Real y = x² geometry, not a sketch.
+  const secantFig = (() => {
+    const W = 300, H = 148, a = 1.1;
+    const xMin = -0.4, xMax = 3.4, yMax = xMax * xMax;
+    const px = (x: number) => 16 + ((x - xMin) / (xMax - xMin)) * (W - 32);
+    const py = (y: number) => H - 14 - (y / yMax) * (H - 34);
+    const N = 48;
+    const curve = 'M ' + Array.from({ length: N + 1 }, (_, i) => {
+      const x = xMin + (i / N) * (xMax - xMin);
+      return `${px(x).toFixed(1)},${py(x * x).toFixed(1)}`;
+    }).join(' L ');
+    // A chord through (a, a²) and (a+h, (a+h)²) has slope 2a + h — watch the
+    // h die out of it. Extend each line a little past its two anchor points.
+    const line = (slope: number, x0: number, x1: number) => {
+      const y = (x: number) => a * a + slope * (x - a);
+      return { x1: px(x0), y1: py(y(x0)), x2: px(x1), y2: py(y(x1)) };
+    };
+    const secants = [1.7, 1.0, 0.5].map((h, i) => ({
+      ...line(2 * a + h, a - 0.55, a + h + 0.35),
+      hx: px(a + h), hy: py((a + h) * (a + h)),
+      o: 0.28 + i * 0.16
+    }));
+    const tangent = line(2 * a, a - 0.85, a + 1.35);
+    return { W, H, curve, secants, tangent, p: { x: px(a), y: py(a * a) } };
+  })();
+
+  // Derivative figure B: the two partial-derivative slices of a real bowl
+  // z = 0.18x² + 0.36y², drawn in an isometric projection. Freezing β collapses
+  // the surface to the blue curve; freezing α to the amber one — each with its
+  // own tangent at the marked point.
+  const sliceFig = (() => {
+    const W = 320, H = 172, cx = 160, cy = 112, sx = 22, sy = 11, sz = 20;
+    const z = (x: number, y: number) => 0.18 * x * x + 0.36 * y * y;
+    const P = (x: number, y: number) => ({
+      X: cx + (x - y) * sx,
+      Y: cy + (x + y) * sy - z(x, y) * sz
+    });
+    const path = (pts: { X: number; Y: number }[]) =>
+      'M ' + pts.map(q => `${q.X.toFixed(1)},${q.Y.toFixed(1)}`).join(' L ');
+    const sample = (f: (t: number) => { X: number; Y: number }, n = 32) =>
+      Array.from({ length: n + 1 }, (_, i) => f(-2 + (4 * i) / n));
+    const gridX = [-2, -1, 0, 1, 2].map(x0 => path(sample(y => P(x0, y))));
+    const gridY = [-2, -1, 0, 1, 2].map(y0 => path(sample(x => P(x, y0))));
+    const p0 = { x: 0.9, y: 0.6 };
+    const sliceA = path(sample(x => P(x, p0.y)));          // β frozen → vary α
+    const sliceB = path(sample(y => P(p0.x, y)));          // α frozen → vary β
+    // Tangent directions at p0, projected: d/dx → (1, 0, 0.36x); d/dy → (0, 1, 0.72y)
+    const pt = P(p0.x, p0.y);
+    const tanA = { dX: sx, dY: sy - 0.36 * p0.x * sz };
+    const tanB = { dX: -sx, dY: sy - 0.72 * p0.y * sz };
+    const norm = (v: { dX: number; dY: number }, len: number) => {
+      const m = Math.hypot(v.dX, v.dY);
+      return { dX: (v.dX / m) * len, dY: (v.dY / m) * len };
+    };
+    const aA = norm(tanA, 34), aB = norm(tanB, 34);
+    return { W, H, gridX, gridY, sliceA, sliceB, pt,
+      arrA: { x1: pt.X - aA.dX, y1: pt.Y - aA.dY, x2: pt.X + aA.dX, y2: pt.Y + aA.dY },
+      arrB: { x1: pt.X - aB.dX, y1: pt.Y - aB.dY, x2: pt.X + aB.dX, y2: pt.Y + aB.dY } };
+  })();
+
+  // Curvature figure A: same slope underfoot, two different futures — a tight
+  // curve and a relaxed one sharing one tangent at the marked point.
+  const bendFig = (() => {
+    const W = 300, H = 132, x0 = 150, y0 = 74, m = -0.5;
+    const mk = (c: number) => {
+      const pts: string[] = [];
+      for (let dx = -95; dx <= 95; dx += 5) {
+        pts.push(`${(x0 + dx).toFixed(1)},${(y0 + m * dx + c * dx * dx).toFixed(1)}`);
+      }
+      return 'M ' + pts.join(' L ');
+    };
+    return { W, H, x0, y0,
+      sharp: mk(0.0072), gentle: mk(0.0016),
+      tan: { x1: x0 - 92, y1: y0 + m * -92, x2: x0 + 92, y2: y0 + m * 92 } };
+  })();
+
+  // Curvature figure B: the (1 − γλ) multiplier, run honestly. Four regimes of
+  // real gradient descent on y = x², dots at α_k = (1−γλ)^k · α₀.
+  const regimeFig = (() => {
+    const PW = 102, H = 118, pad = 10;
+    const panel = (gl: number, label: string, sub: string, i: number) => {
+      const ox = i * PW;
+      const px = (x: number) => ox + PW / 2 + x * (PW / 2 - pad);
+      const py = (y: number) => H - 22 - y * (H - 46);
+      const N = 30;
+      const curve = 'M ' + Array.from({ length: N + 1 }, (_, k) => {
+        const x = -1.15 + (2.3 * k) / N;
+        return `${px(x).toFixed(1)},${py(x * x).toFixed(1)}`;
+      }).join(' L ');
+      const dots: { x: number; y: number }[] = [];
+      let aK = -1;
+      for (let k = 0; k <= 6 && Math.abs(aK) <= 1.15; k++) {
+        dots.push({ x: px(aK), y: py(aK * aK) });
+        aK = (1 - gl) * aK;
+      }
+      const hops = 'M ' + dots.map(d => `${d.x.toFixed(1)},${d.y.toFixed(1)}`).join(' L ');
+      return { ox, curve, dots, hops, label, sub, lx: ox + PW / 2 };
+    };
+    return { W: PW * 4, H, panels: [
+      panel(0.35, 'γλ = 0.35', 'glide', 0),
+      panel(1.0, 'γλ = 1', 'one hop', 1),
+      panel(1.75, 'γλ = 1.75', 'bounce in', 2),
+      panel(2.2, 'γλ = 2.2', 'diverge', 3)
+    ] };
+  })();
+
   // Proof figure, right panel: the rate of change ‖∇ℒ‖cosφ as the direction u
   // sweeps from along ∇ℒ (φ=0, max) through a contour (φ=90°, zero) to −∇ℒ
   // (φ=180°, min). A plain cosine — the claim, plotted.
@@ -795,7 +906,7 @@
               {:else}
                 <button class="toc-item" class:active={activeId === t.id} on:click={() => goTo(t.id!)}>
                   <span class="toc-ic"><svelte:component this={chIcon[t.id!]} size={16} strokeWidth={2} /></span>
-                  <span class="toc-title">{t.title}</span>
+                  <span class="toc-title">{@html mathText(t.title ?? '')}</span>
                 </button>
               {/if}
             {/each}
@@ -873,16 +984,16 @@
                 machine’s guesses line up with reality.
               </p>
               <p>
-                Here every machine has exactly <strong>two</strong> knobs, called <em class="g">α</em>
-                and <em class="g">β</em> (alpha and beta). Together they are the model’s
+                Here every machine has exactly <strong>two</strong> knobs, called <em class="g">{@html tex(String.raw`\alpha`)}</em>
+                and <em class="g">{@html tex(String.raw`\beta`)}</em> (alpha and beta). Together they are the model’s
                 <strong>parameters</strong> — the numbers that decide how it behaves. Choose values
-                for α and β and the model makes a <strong>prediction</strong> for every input.
+                for {@html tex(String.raw`\alpha`)} and {@html tex(String.raw`\beta`)} and the model makes a <strong>prediction</strong> for every input.
                 Compare those predictions with the real answers and you get the <strong>loss</strong>:
                 one number for how wrong the model is right now. Lower is better; a perfect fit sits
                 near zero.
               </p>
               <p>
-                That is the whole game — <em>find the α and β that make the loss as small as
+                That is the whole game — <em>find the {@html tex(String.raw`\alpha`)} and {@html tex(String.raw`\beta`)} that make the loss as small as
                 possible.</em> The orange marker is your current guess. Drag it around the
                 <strong>Loss &amp; Gradient</strong> panel, press <strong>Train</strong>, and watch
                 the number fall.
@@ -907,11 +1018,19 @@
 
               <p>
                 We can write that “how wrong” down exactly. For most fits here the loss is the
-                <strong>mean squared error</strong>: take each prediction <em>ŷ</em>, subtract the
+                <strong>mean squared error</strong>: take each prediction <em>{@html tex(String.raw`\hat{y}`)}</em>, subtract the
                 true value <em>y</em>, square the gap so that overshooting and undershooting both
                 count as wrong, and average over all <em>n</em> data points.
               </p>
               <div class="formula-display">{@html texD(formulas.lossDefinition)}</div>
+              <p class="aside">
+                <strong>Reading the symbols</strong> — your first formula, decoded once and for
+                all: {@html tex(String.raw`\Sigma`)} (capital sigma) means “add up one copy per
+                data point” — a for-loop, in Greek; the subscript {@html tex(String.raw`i`)} names
+                <em>which</em> data point; and the hat on {@html tex(String.raw`\hat{y}`)} marks a
+                <em>prediction</em> (say “y-hat” — bare {@html tex(String.raw`y`)} is always the
+                truth). Every formula in this book is built from pieces this small.
+              </p>
               <p>
                 The squaring is the quiet hero here: it punishes a big miss far more than a small one,
                 and it makes the loss a smooth, rounded <em>bowl</em> rather than a creased tent — and
@@ -921,17 +1040,27 @@
                 Squared error is the right “how wrong” when the answer is a <em>number</em>. But several
                 problems here ask a <em>yes/no</em> question — is this point inside the circle? on which
                 side of the line? — and there the model outputs a <strong>probability</strong>
-                {@html tex(String.raw`\hat{y}\in(0,1)`)} that the answer is “yes.” The natural loss then
-                is <strong>cross-entropy</strong> (log-loss):
+                {@html tex(String.raw`\hat{y}\in(0,1)`)} that the answer is “yes” (read
+                {@html tex(String.raw`(0,1)`)} as “any number strictly between 0 and 1” — not a
+                coordinate pair). Where does a probability come from? The model computes a plain
+                score — any number at all — and squashes it through the S-shaped
+                <strong>sigmoid</strong> {@html tex(String.raw`\sigma`)}, which bends the whole
+                number line smoothly into {@html tex(String.raw`(0,1)`)}: hugely positive scores
+                land near 1, hugely negative near 0, a score of zero at an honest ½. You will spot
+                {@html tex(String.raw`\sigma`)} doing exactly this in the zoo’s classifier
+                formulas. The natural loss for a probability is <strong>cross-entropy</strong>
+                (log-loss):
               </p>
               <div class="formula-display">{@html texD(String.raw`\mathcal{L} = -\big[\,y\,\log \hat{y} + (1-y)\,\log(1-\hat{y})\,\big]`)}</div>
               <p>
                 It is gentle when the model is confidently right and brutal when it is confidently wrong:
                 predict {@html tex(String.raw`\hat{y}=0.99`)} while the truth is {@html tex(String.raw`y=0`)}
-                and {@html tex(String.raw`-\log(1-\hat{y})`)} rockets toward infinity. It is precisely the
-                negative log-likelihood of a coin-flip (Bernoulli) model — which is why it, not squared
-                error, is the standard loss for classification: squared error for numbers, cross-entropy
-                for categories.
+                and the penalty is already {@html tex(String.raw`-\log(0.01) \approx 4.6`)} — and it
+                climbs toward infinity as the confidence approaches certainty. In plain words,
+                cross-entropy scores the model by <em>how much probability it placed on what
+                actually happened</em> (statisticians call that quantity the likelihood; this loss
+                is its negative logarithm) — which is why it, not squared error, is the standard
+                loss for classification: squared error for numbers, cross-entropy for categories.
               </p>
               {#if chapterPresets['ch-bowl']}
                 <ChapterCta demo={() => runPreset('ch-bowl')} demoLabel={chapterPresets['ch-bowl'].title} />
@@ -955,10 +1084,10 @@
 
               <p>
                 Here is the move that makes everything visual. The loss is not one fixed number —
-                it is a number <em>for every possible setting of the knobs.</em> Pick one (α, β) and
+                it is a number <em>for every possible setting of the knobs.</em> Pick one {@html tex(String.raw`(\alpha, \beta)`)} and
                 you get a loss. Nudge to a nearby pair and you get a slightly different loss. Sweep
                 across <strong>all</strong> pairs and those losses trace out a <strong>surface</strong>:
-                a landscape floating above the flat plane of every possible α and β.
+                a landscape floating above the flat plane of every possible {@html tex(String.raw`\alpha`)} and {@html tex(String.raw`\beta`)}.
               </p>
               <p>
                 Low places in that landscape are good models; high places are bad ones.
@@ -1121,6 +1250,14 @@
                 not dodging bad valleys — a finding (Dauphin et al., 2014) that reshaped how the field
                 thinks about non-convex optimization.
               </p>
+              <p class="aside">
+                <strong>“Convex”?</strong> A surface is <strong>convex</strong> when it is one bowl
+                everywhere: stretch a straight rope between any two points on it and the rope never
+                dips below the surface. One basin, no traps — the world where optimization comes
+                with clean guarantees, and the word you’ll meet on several optimizer cards. This
+                chapter is about what happens when that promise breaks (<em>non-convex</em>) —
+                which is where deep learning lives.
+              </p>
               <aside class="hd-note">
                 <span class="hd-note-tag">In a billion dimensions</span>
                 <p>
@@ -1168,8 +1305,8 @@
                 division.
               </p>
               <p>
-                Here is the move. Stand somewhere on a 1-D loss curve — say α = 2 on
-                <strong>Fit a Slope</strong>, whose loss happens to be ℒ(α) = α², so ℒ(2) = 4.
+                Here is the move. Stand somewhere on a 1-D loss curve — say {@html tex(String.raw`\alpha = 2`)} on
+                <strong>Fit a Slope</strong>, whose loss happens to be {@html tex(String.raw`\mathcal{L}(\alpha)=\alpha^2`)}, so {@html tex(String.raw`\mathcal{L}(2)=4`)}.
                 <strong>Nudge</strong> the knob by some small amount <em>h</em>, and divide the
                 loss’s response by the nudge. Nudge by <em>h</em> = 0.1 and the loss climbs from
                 4 to 4.41 — a rise of 0.41 over a run of 0.1: ratio <strong>4.1</strong>. Try
@@ -1193,8 +1330,29 @@
                 its fine print — <em>the line only speaks for the ground right under you</em> —
                 grows up to become the learning rate’s whole story.
               </p>
+              <figure class="fig">
+                <svg viewBox="0 0 {secantFig.W} {secantFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                  <path d={secantFig.curve} fill="none" stroke="#10b981" stroke-width="2.2" stroke-opacity="0.85" />
+                  {#each secantFig.secants as s}
+                    <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke="var(--color-text-tertiary)" stroke-width="1.3" stroke-opacity={s.o} stroke-dasharray="4,3" />
+                    <circle cx={s.hx} cy={s.hy} r="2.6" fill="var(--color-text-tertiary)" fill-opacity={s.o + 0.15} />
+                  {/each}
+                  <line x1={secantFig.tangent.x1} y1={secantFig.tangent.y1} x2={secantFig.tangent.x2} y2={secantFig.tangent.y2} stroke="#3b82f6" stroke-width="2.2" />
+                  <circle cx={secantFig.p.x} cy={secantFig.p.y} r="4" fill="#f59e0b" stroke="#fff" stroke-width="1.4" />
+                  <text x={secantFig.p.x - 8} y={secantFig.p.y + 16} class="fig-svg-label">α</text>
+                  <text x={secantFig.tangent.x2 + 4} y={secantFig.tangent.y2 + 4} class="fig-svg-label" style="fill:#3b82f6">tangent</text>
+                  <text x={secantFig.secants[0].x2 - 20} y={secantFig.secants[0].y2 - 6} class="fig-svg-label">h shrinking</text>
+                </svg>
+                <figcaption class="fig-cap">
+                  The limit, drawn: each dashed chord leans on the curve a nudge <em>h</em> away —
+                  slope {@html tex(String.raw`2\alpha + h`)} on this parabola — and as <em>h</em>
+                  shrinks, the chords tilt into the one blue line whose slope is exactly
+                  {@html tex(String.raw`2\alpha`)}: the tangent. The derivative is where the chords
+                  were heading all along.
+                </figcaption>
+              </figure>
               <p>
-                Two knobs, same recipe, one new courtesy: with α and β both live, nudge
+                Two knobs, same recipe, one new courtesy: with {@html tex(String.raw`\alpha`)} and {@html tex(String.raw`\beta`)} both live, nudge
                 <strong>one and freeze the other</strong>. The ratio you get is a
                 <strong>partial derivative</strong>, written with a curly
                 {@html tex(String.raw`\partial`)} — say it “partial”, and yes, it is the symbol on
@@ -1202,11 +1360,37 @@
               </p>
               <div class="formula-display center">{@html texD(formulas.partialDef)}</div>
               <p>
-                {@html tex(String.raw`\partial \mathcal{L}/\partial \alpha`)} reads: <em>nudge α,
-                hold β still, divide the response by the nudge.</em> Do it once per knob and you are
+                {@html tex(String.raw`\partial \mathcal{L}/\partial \alpha`)} reads: <em>nudge {@html tex(String.raw`\alpha`)},
+                hold {@html tex(String.raw`\beta`)} still, divide the response by the nudge.</em> Do it once per knob and you are
                 holding two numbers. Stacking those two numbers into a single arrow is exactly where
                 the next chapter begins.
               </p>
+              <figure class="fig">
+                <svg viewBox="0 0 {sliceFig.W} {sliceFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                  {#each sliceFig.gridX as d}
+                    <path {d} fill="none" stroke="var(--color-text-tertiary)" stroke-width="0.8" stroke-opacity="0.28" />
+                  {/each}
+                  {#each sliceFig.gridY as d}
+                    <path {d} fill="none" stroke="var(--color-text-tertiary)" stroke-width="0.8" stroke-opacity="0.28" />
+                  {/each}
+                  <path d={sliceFig.sliceA} fill="none" stroke="#3b82f6" stroke-width="2.4" />
+                  <path d={sliceFig.sliceB} fill="none" stroke="#f59e0b" stroke-width="2.4" />
+                  <line x1={sliceFig.arrA.x1} y1={sliceFig.arrA.y1} x2={sliceFig.arrA.x2} y2={sliceFig.arrA.y2} stroke="#3b82f6" stroke-width="1.4" stroke-dasharray="4,3" />
+                  <line x1={sliceFig.arrB.x1} y1={sliceFig.arrB.y1} x2={sliceFig.arrB.x2} y2={sliceFig.arrB.y2} stroke="#f59e0b" stroke-width="1.4" stroke-dasharray="4,3" />
+                  <circle cx={sliceFig.pt.X} cy={sliceFig.pt.Y} r="4" fill="#f59e0b" stroke="#fff" stroke-width="1.4" />
+                  <text x={sliceFig.arrA.x2 + 5} y={sliceFig.arrA.y2 + 3} class="fig-svg-label" style="fill:#3b82f6">∂ℒ/∂α</text>
+                  <text x={sliceFig.arrB.x2 - 5} y={sliceFig.arrB.y2 - 5} class="fig-svg-label" style="fill:#f59e0b;text-anchor:end">∂ℒ/∂β</text>
+                </svg>
+                <figcaption class="fig-cap">
+                  The two partials, on a real bowl: freeze {@html tex(String.raw`\beta`)} and the
+                  whole surface collapses to the <span class="ink-blue">blue slice</span>, an
+                  ordinary curve whose slope at the marker is
+                  {@html tex(String.raw`\partial\mathcal{L}/\partial\alpha`)}; freeze
+                  {@html tex(String.raw`\alpha`)} instead and you get the amber slice and
+                  {@html tex(String.raw`\partial\mathcal{L}/\partial\beta`)}. Two ordinary
+                  derivatives, at right angles, on one surface.
+                </figcaption>
+              </figure>
               <p class="aside">
                 <strong>How the app really does it:</strong> you could compute every slope by
                 literal nudging (the finite-difference recipe above — it’s how the curvature lens
@@ -1239,14 +1423,14 @@
               <p>
                 Standing on a hillside in fog, you can still feel which way is down — the ground
                 tilts under your feet. That tilt is the <strong>slope</strong>. With two knobs there
-                are two slopes at once: how the loss changes as you nudge α, and how it changes as
-                you nudge β. Bundle those two together and you get the <strong>gradient</strong>,
-                written <strong>∇ℒ</strong> (say “grad L”).
+                are two slopes at once: how the loss changes as you nudge {@html tex(String.raw`\alpha`)}, and how it changes as
+                you nudge {@html tex(String.raw`\beta`)}. Bundle those two together and you get the <strong>gradient</strong>,
+                written <strong>{@html tex(String.raw`\nabla\mathcal{L}`)}</strong> (say “grad L”).
               </p>
               <p>
                 The gradient is an arrow, and it always points in the direction of <em>steepest
                 increase</em> — straight uphill. So to go <strong>down</strong>, you walk the
-                <strong>opposite</strong> way, along <strong>−∇ℒ</strong>. That negative gradient is
+                <strong>opposite</strong> way, along <strong>{@html tex(String.raw`-\nabla\mathcal{L}`)}</strong>. That negative gradient is
                 the single most important arrow in this whole app.
               </p>
               <p>
@@ -1254,7 +1438,7 @@
                 could step. Each heading has its own rate of climb, and the gradient is simply the one
                 whose climb is fastest. Every other direction is a watered-down version of it: its
                 steepness is the gradient’s shadow cast onto that heading — full strength straight along
-                ∇ℒ, and fading to <em>nothing</em> at a right angle to it. Those flat, right-angle
+                {@html tex(String.raw`\nabla\mathcal{L}`)}, and fading to <em>nothing</em> at a right angle to it. Those flat, right-angle
                 directions are exactly the <strong>contour lines</strong> on the map: walk along a
                 contour and the loss never changes, so the steepest way off it has to be square across
                 it. <em>The gradient is always perpendicular to the contours</em> — which is why the
@@ -1287,13 +1471,13 @@
                 <div class="concept-text concept-text-overlay">
                   <h4>The field of downhill arrows</h4>
                   <p>
-                    Every faint arrow on the loss map is <strong>−∇ℒ</strong> at that spot — the
+                    Every faint arrow on the loss map is <strong>{@html tex(String.raw`-\nabla\mathcal{L}`)}</strong> at that spot — the
                     steepest way down — and they all stream toward the basin. They are longer where
                     the surface is steeper.
                   </p>
                   <p>
                     On the marker itself, the <span class="ink-blue">blue arrow</span> is this same
-                    −∇ℒ: the steepest descent from exactly where you stand. (Its red partner arrives
+                    {@html tex(String.raw`-\nabla\mathcal{L}`)}: the steepest descent from exactly where you stand. (Its red partner arrives
                     in the next chapter.)
                   </p>
                 </div>
@@ -1303,8 +1487,8 @@
                 Formally, the gradient is a column of <strong>partial derivatives</strong> — one
                 slope per parameter. Each entry answers a single, narrow question: <em>if I wiggle
                 only this knob and hold the other still, how fast does the loss change?</em> There is
-                nothing mystical in measuring one: nudge α by a hair, see how far the loss moved, and
-                divide the change by the nudge. Do that once for α and once for β and you have the two
+                nothing mystical in measuring one: nudge {@html tex(String.raw`\alpha`)} by a hair, see how far the loss moved, and
+                divide the change by the nudge. Do that once for {@html tex(String.raw`\alpha`)} and once for {@html tex(String.raw`\beta`)} and you have the two
                 numbers the gradient is built from.
               </p>
               <p class="aside">
@@ -1318,7 +1502,7 @@
               </p>
               <div class="formula-display">{@html texD(formulas.gradientDefinition)}</div>
               <p>
-                Stack those two answers into a little arrow and you have ∇ℒ. Its
+                Stack those two answers into a little arrow and you have {@html tex(String.raw`\nabla\mathcal{L}`)}. Its
                 <strong>direction</strong> is the steepest way uphill; its <strong>length</strong> is
                 how steep. That is why the field arrows stretch long on the steep walls and shrink to
                 almost nothing at the basin floor — at the very bottom there is no downhill left, so
@@ -1327,7 +1511,7 @@
               </p>
 
               <p>
-                We keep calling −∇ℒ the <em>steepest</em> way down. That is not loose talk — and it is
+                We keep calling {@html tex(String.raw`-\nabla\mathcal{L}`)} the <em>steepest</em> way down. That is not loose talk — and it is
                 worth seeing why, first in three dimensions, then in one short line of proof.
               </p>
               <figure class="fig">
@@ -1348,6 +1532,38 @@
                   both perpendicular to the green level ring they sit on. Drag to spin it.
                 </figcaption>
               </figure>
+
+              <div class="concept">
+                <div class="concept-text">
+                  <h4>An arrow is two numbers</h4>
+                  <p>
+                    Three tools before the proof. An arrow on the {@html tex(String.raw`(\alpha, \beta)`)}
+                    plane <em>is</em> its two components stacked — how far along
+                    {@html tex(String.raw`\alpha`)}, how far along {@html tex(String.raw`\beta`)};
+                    that is all the bracket notation means. Its <strong>length</strong>, written
+                    {@html tex(String.raw`\lVert\mathbf{v}\rVert`)}, is Pythagoras on those legs:
+                    for {@html tex(String.raw`\mathbf{v} = [3, 2]`)},
+                    {@html tex(String.raw`\lVert\mathbf{v}\rVert = \sqrt{3^2 + 2^2} = \sqrt{13}`)}.
+                    A <strong>unit vector</strong> has length exactly 1 — pure direction, no size.
+                    And the <strong>dot product</strong> multiplies matching components and adds:
+                    {@html tex(String.raw`\mathbf{v}\cdot\mathbf{u} = v_1 u_1 + v_2 u_2`)} — one
+                    number, and for a unit {@html tex(String.raw`\mathbf{u}`)} it is precisely the
+                    length of {@html tex(String.raw`\mathbf{v}`)}’s <em>shadow</em> on
+                    {@html tex(String.raw`\mathbf{u}`)}. That shadow is the whole proof below.
+                  </p>
+                </div>
+                <svg class="concept-svg" viewBox="0 0 200 120">
+                  <line x1="26" y1="100" x2="186" y2="100" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-opacity="0.5" />
+                  <line x1="26" y1="100" x2="26" y2="12" stroke="var(--color-text-tertiary)" stroke-width="1" stroke-opacity="0.5" />
+                  <line x1="26" y1="100" x2="128" y2="100" stroke="var(--color-text-tertiary)" stroke-width="1.2" stroke-dasharray="3,3" />
+                  <line x1="128" y1="100" x2="128" y2="32" stroke="var(--color-text-tertiary)" stroke-width="1.2" stroke-dasharray="3,3" />
+                  <line x1="26" y1="100" x2="128" y2="32" stroke="#f59e0b" stroke-width="2.4" />
+                  <path d="M 121,33.5 L 128,32 L 124.5,38.5" fill="none" stroke="#f59e0b" stroke-width="2.4" />
+                  <text x="77" y="113" class="caption" text-anchor="middle">3</text>
+                  <text x="137" y="70" class="caption">2</text>
+                  <text x="56" y="56" class="caption">‖v‖ = √13</text>
+                </svg>
+              </div>
 
               <div class="proof">
                 <div class="proof-title">Why the negative gradient is exactly the steepest descent</div>
@@ -1390,9 +1606,9 @@
                     <text x={proofCurve.p180.x + 3} y={proofCurve.p180.y + 13} class="proof-lbl" style="text-anchor:end;fill:#10b981">along −∇ℒ</text>
                   </svg>
                   <figcaption class="proof-figcap">
-                    Left: the rate is ∇ℒ’s shadow on <strong>u</strong>. Right: sweep <strong>u</strong>
-                    around and that shadow traces a cosine — biggest along ∇ℒ, zero across a contour,
-                    most negative along −∇ℒ.
+                    Left: the rate is {@html tex(String.raw`\nabla\mathcal{L}`)}’s shadow on <strong>u</strong>. Right: sweep <strong>u</strong>
+                    around and that shadow traces a cosine — biggest along {@html tex(String.raw`\nabla\mathcal{L}`)}, zero across a contour,
+                    most negative along {@html tex(String.raw`-\nabla\mathcal{L}`)}.
                   </figcaption>
                 </figure>
                 <p class="proof-p">
@@ -1407,7 +1623,7 @@
               <p>
                 One honest caveat to carry forward: the gradient is only the truth <em>right where you
                 stand.</em> Zoom in close enough and any smooth surface flattens into a tilted plane,
-                and ∇ℒ is exactly that tilt — but step too far and the real ground curves away from the
+                and {@html tex(String.raw`\nabla\mathcal{L}`)} is exactly that tilt — but step too far and the real ground curves away from the
                 plane you trusted. That gap between the slope underfoot and the surface a stride away is
                 the whole reason a step can be <em>too big</em>, and taming it is what the learning rate
                 exists to do.
@@ -1436,13 +1652,13 @@
 
               <p>Now we can actually walk. One step of <strong>gradient descent</strong> is almost insultingly simple:</p>
               <blockquote class="recipe">
-                Stand at your current (α, β). Look downhill — that’s <strong>−∇ℒ</strong>. Take a
-                step in that direction — <em class="g">γ</em> times as long as the slope is steep.
+                Stand at your current {@html tex(String.raw`(\alpha, \beta)`)}. Look downhill — that’s <strong>{@html tex(String.raw`-\nabla\mathcal{L}`)}</strong>. Take a
+                step in that direction — <em class="g">{@html tex(String.raw`\gamma`)}</em> times as long as the slope is steep.
                 Repeat.
               </blockquote>
               <p>
-                In symbols, that is the rule the entire field is built on. We write <strong>θ</strong>
-                (“theta”) as shorthand for the pair (α, β) together:
+                In symbols, that is the rule the entire field is built on. We write <strong>{@html tex(String.raw`\theta`)}</strong>
+                (“theta”) as shorthand for the pair {@html tex(String.raw`(\alpha, \beta)`)} together:
               </p>
               <div class="formula-display center">{@html texD(formulas.stepRule)}</div>
               <p>
@@ -1476,22 +1692,22 @@
 
             <!-- ============== 5 · LEARNING RATE ============== -->
             <section data-ch="ch-gamma" id="ch-gamma">
-              <h3><svelte:component this={chIcon['ch-gamma']} size={18} strokeWidth={2} /> The learning rate γ</h3>
+              <h3><svelte:component this={chIcon['ch-gamma']} size={18} strokeWidth={2} /> The learning rate {@html tex(String.raw`\gamma`)}</h3>
 
               <p>
-                There is one number you’ll reach for more than any other: <em class="g">γ</em>
+                There is one number you’ll reach for more than any other: <em class="g">{@html tex(String.raw`\gamma`)}</em>
                 (gamma), the <strong>learning rate</strong> — how big each step is. It’s a Goldilocks
                 dial.
               </p>
               <ul class="knob-bullets">
                 <li><strong>Too small:</strong> the marker creeps; it never reaches the bottom before the steps run out.</li>
                 <li><strong>Too big:</strong> it overshoots the valley floor and bounces up the far wall — loss leaps around, or rockets off to infinity. (The app catches this, stops, and explains what happened.)</li>
-                <li><strong>Just right:</strong> a smooth glide into the basin. Every problem ships with a sane default — but the fastest way to <em>feel</em> γ is to break it on purpose.</li>
+                <li><strong>Just right:</strong> a smooth glide into the basin. Every problem ships with a sane default — but the fastest way to <em>feel</em> {@html tex(String.raw`\gamma`)} is to break it on purpose.</li>
               </ul>
               <p>
                 And “too big” is not vague — it has an exact edge. For a smooth bowl, gradient
-                descent settles only while γ stays below <strong>two divided by the sharpest bend
-                of the surface</strong>, a number written λ<sub>max</sub>. Careful with the word:
+                descent settles only while {@html tex(String.raw`\gamma`)} stays below <strong>two divided by the sharpest bend
+                of the surface</strong>, a number written {@html tex(String.raw`\lambda_{\max}`)}. Careful with the word:
                 this is <em>not</em> the steepness you’ve been reading off the arrows (how tilted
                 the ground is) but a genuinely new quantity — how fast the tilt <em>itself</em>
                 changes as you walk. That is the <strong>curvature</strong>.
@@ -1508,17 +1724,17 @@
               <aside class="hd-note">
                 <span class="hd-note-tag">In a billion dimensions</span>
                 <p>
-                  For the clean bowls here, γ &gt; 2/λ<sub>max</sub> means certain divergence — a
+                  For the clean bowls here, {@html tex(String.raw`\gamma > 2/\lambda_{\max}`)} means certain divergence — a
                   theorem you can verify with a slider. The modern surprise: full-batch training of
                   real networks was found to hover <em>right at</em> that edge — the curvature
-                  itself rises until 2/λ<sub>max</sub> meets whatever γ you chose, and the loss
+                  itself rises until {@html tex(String.raw`2/\lambda_{\max}`)} meets whatever {@html tex(String.raw`\gamma`)} you chose, and the loss
                   then falls raggedly along the knife’s edge (Cohen et al., 2021, “edge of
                   stability”). The law you can check on this bowl becomes, at scale, a strange
                   equilibrium the theory is still catching up to.
                 </p>
               </aside>
               <p class="aside">
-                Sometimes the blow-up comes not from γ but from a freak gradient — a cliff in the
+                Sometimes the blow-up comes not from {@html tex(String.raw`\gamma`)} but from a freak gradient — a cliff in the
                 surface, or the deep, recurrent networks where gradients can <strong>explode</strong>.
                 The standard guard is <strong>gradient clipping</strong>: if the gradient’s length
                 exceeds a threshold {@html tex(String.raw`c`)}, rescale it back to that length before
@@ -1586,18 +1802,33 @@
                 Feel the difference first. A wine glass and a soup bowl can be equally steep where
                 you stand — same slope — but descend a little and the glass <em>tightens</em> while
                 the bowl <em>relaxes</em>. Curvature is the rate of that tightening, and you already
-                own the tool that measures it: nudge α and divide — only this time, watch how the
+                own the tool that measures it: nudge {@html tex(String.raw`\alpha`)} and divide — only this time, watch how the
                 <em>slope</em> answers, not the loss. The derivative of the derivative, written
                 {@html tex(String.raw`\partial^2 \mathcal{L}/\partial \alpha^2`)} and, for the rest
-                of this chapter, called {@html tex(String.raw`\lambda`)}: big λ, sharp bend; small
-                λ, gentle one; zero, flat as a board.
+                of this chapter, called {@html tex(String.raw`\lambda`)}: big {@html tex(String.raw`\lambda`)}, sharp bend; small
+                {@html tex(String.raw`\lambda`)}, gentle one; zero, flat as a board.
               </p>
+              <figure class="fig">
+                <svg viewBox="0 0 {bendFig.W} {bendFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                  <line x1={bendFig.tan.x1} y1={bendFig.tan.y1} x2={bendFig.tan.x2} y2={bendFig.tan.y2} stroke="var(--color-text-tertiary)" stroke-width="1.3" stroke-dasharray="4,3" stroke-opacity="0.7" />
+                  <path d={bendFig.sharp} fill="none" stroke="#f43f5e" stroke-width="2.3" />
+                  <path d={bendFig.gentle} fill="none" stroke="#10b981" stroke-width="2.3" />
+                  <circle cx={bendFig.x0} cy={bendFig.y0} r="4" fill="#f59e0b" stroke="#fff" stroke-width="1.4" />
+                  <text x={bendFig.x0 + 68} y={bendFig.y0 - 40} class="fig-svg-label" style="fill:#f43f5e">big λ — tightens</text>
+                  <text x={bendFig.x0 + 74} y={bendFig.y0 - 12} class="fig-svg-label" style="fill:#10b981">small λ — relaxes</text>
+                </svg>
+                <figcaption class="fig-cap">
+                  Same slope underfoot — the dashed tangent is shared — but two different futures.
+                  The first derivative can’t tell these curves apart at the marker; the second one,
+                  {@html tex(String.raw`\lambda`)}, is exactly what does.
+                </figcaption>
+              </figure>
 
               <div class="proof">
                 <div class="proof-title">Where the 2 comes from — in four lines</div>
                 <p class="proof-p">
                   Take the cleanest bowl there is: {@html tex(String.raw`\mathcal{L} = \tfrac{1}{2}\lambda\alpha^2`)},
-                  curvature λ everywhere, minimum at zero. Its slope at α is
+                  curvature {@html tex(String.raw`\lambda`)} everywhere, minimum at zero. Its slope at {@html tex(String.raw`\alpha`)} is
                   {@html tex(String.raw`\lambda\alpha`)}, so one step of gradient descent is
                 </p>
                 <div class="formula-display center">{@html texD(formulas.contraction)}</div>
@@ -1606,7 +1837,7 @@
                   {@html tex(String.raw`(1-\gamma\lambda)`)} — and that one multiplier is the whole
                   story. While {@html tex(String.raw`\gamma\lambda < 1`)} the factor sits between 0
                   and 1: a smooth glide in. At {@html tex(String.raw`\gamma\lambda = 1`)} the factor
-                  is 0 — you land at the bottom in <em>one hop</em> (γ = 1/λ is this bowl’s own
+                  is 0 — you land at the bottom in <em>one hop</em> ({@html tex(String.raw`\gamma = 1/\lambda`)} is this bowl’s own
                   perfect learning rate). Between 1 and 2 the factor is negative but small:
                   overshoot to the far wall, yet closer each bounce. At exactly 2, you bounce
                   between two mirror points forever. And past 2 every bounce lands
@@ -1614,6 +1845,25 @@
                   the 2. <span class="proof-qed">∎</span>
                 </p>
               </div>
+              <figure class="fig">
+                <svg viewBox="0 0 {regimeFig.W} {regimeFig.H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                  {#each regimeFig.panels as pn}
+                    <path d={pn.curve} fill="none" stroke="#10b981" stroke-width="1.8" stroke-opacity="0.75" />
+                    <path d={pn.hops} fill="none" stroke="#f59e0b" stroke-width="1.2" stroke-opacity="0.75" />
+                    {#each pn.dots as dt, k}
+                      <circle cx={dt.x} cy={dt.y} r={k === 0 ? 3.2 : 2.4} fill="#f59e0b" fill-opacity={k === 0 ? 1 : 0.85} stroke={k === 0 ? '#fff' : 'none'} stroke-width="1" />
+                    {/each}
+                    <text x={pn.lx} y={regimeFig.H - 10} class="fig-svg-label" style="text-anchor:middle">{pn.label}</text>
+                    <text x={pn.lx} y={regimeFig.H - 0.5} class="fig-svg-label" style="text-anchor:middle;font-size:8.5px;opacity:0.75">{pn.sub}</text>
+                  {/each}
+                </svg>
+                <figcaption class="fig-cap">
+                  The multiplier, run for real: amber dots are actual gradient-descent iterates on
+                  {@html tex(String.raw`\mathcal{L} = \tfrac{1}{2}\lambda\alpha^2`)}, starting from
+                  the ringed point. Glide, one-hop, shrinking bounce, growing bounce — four values
+                  of {@html tex(String.raw`\gamma\lambda`)}, one factor {@html tex(String.raw`(1-\gamma\lambda)`)}.
+                </figcaption>
+              </figure>
 
               <p>
                 Now open the second knob. At any point of a real landscape the surface bends by a
@@ -1631,23 +1881,32 @@
                 any smooth landscape and that fitted bowl <em>is</em> the landscape — the same way
                 the fitted line was, one derivative ago.
               </p>
+              <p class="aside">
+                <strong>Meet the whole family.</strong> Stack one output’s slopes into a column and
+                you have the <strong>gradient</strong>. Give the machine <em>many</em> outputs — a
+                network predicting a hundred things at once — and each output brings its own row of
+                slopes; the full table is the <strong>Jacobian</strong>, the gradient’s big sibling.
+                And the Hessian you just met? Differentiate each entry of the gradient and stack the
+                results: <em>the Hessian is exactly the Jacobian of the gradient.</em> One move —
+                nudge, divide, tabulate — wearing three sizes.
+              </p>
               <p>
                 A stretched or twisted bowl still has a <strong>gentlest</strong> direction and a
                 <strong>sharpest</strong> one — turn it in your hands until you face them. Their two
                 bendings are called {@html tex(String.raw`\lambda_{\min}`)} and
                 {@html tex(String.raw`\lambda_{\max}`)}, and the last chapter’s speed limit can now
-                be read honestly: the <em>sharpest</em> bend polices γ — that is
+                be read honestly: the <em>sharpest</em> bend polices {@html tex(String.raw`\gamma`)} — that is
                 {@html tex(String.raw`\gamma < 2/\lambda_{\max}`)} — while your progress along the
                 <em>gentlest</em> direction is paid at the rate
-                {@html tex(String.raw`(1 - \gamma\lambda_{\min})`)} per step. One γ, two masters.
+                {@html tex(String.raw`(1 - \gamma\lambda_{\min})`)} per step. One {@html tex(String.raw`\gamma`)}, two masters.
               </p>
               <p>
                 How badly can the two masters disagree? Take their ratio:
               </p>
               <div class="formula-display center">{@html texD(formulas.kappa)}</div>
               <p>
-                the <strong>condition number</strong>. κ = 1 is a perfectly round bowl: any safe γ
-                lands you in a few hops. κ = 10 means the sharp direction forces a γ so timid that
+                the <strong>condition number</strong>. {@html tex(String.raw`\kappa = 1`)} is a perfectly round bowl: any safe {@html tex(String.raw`\gamma`)}
+                lands you in a few hops. {@html tex(String.raw`\kappa = 10`)} means the sharp direction forces a {@html tex(String.raw`\gamma`)} so timid that
                 the gentle direction keeps about 80% of its remaining distance <em>every step</em>.
                 Ravines, trenches, the long crawl — they are all this one number wearing different
                 landscapes, and Part III’s entire optimizer family tree is organised around
@@ -1657,7 +1916,7 @@
                 The app will show you the Hessian live. In the Loss &amp; Gradient panel’s header,
                 switch on the <strong>curvature lens</strong>: the ellipse drawn at the marker
                 <em>is</em> the fitted bowl seen from above — long axis the gentle bend, short axis
-                the sharp one — with κ read out beside it. On a saddle, the direction that curves
+                the sharp one — with {@html tex(String.raw`\kappa`)} read out beside it. On a saddle, the direction that curves
                 <em>down</em> turns red and dashed: the escape route.
               </p>
               <aside class="hd-note">
@@ -1693,16 +1952,16 @@
               <h3><svelte:component this={chIcon['ch-schedule']} size={18} strokeWidth={2} /> Scheduling the learning rate</h3>
               <p>
                 The learning rate just handed us a single, unavoidable compromise: a <strong>large</strong>
-                γ covers ground fast but overshoots the floor; a <strong>small</strong> γ lands precisely
-                but crawls to get there. You don’t actually have to choose. Stop treating γ as one frozen
+                {@html tex(String.raw`\gamma`)} covers ground fast but overshoots the floor; a <strong>small</strong> {@html tex(String.raw`\gamma`)} lands precisely
+                but crawls to get there. You don’t actually have to choose. Stop treating {@html tex(String.raw`\gamma`)} as one frozen
                 number and <strong>schedule</strong> it — large early to cover ground, small late to settle
                 cleanly — and you get both halves of the bargain. The <strong>Schedule</strong> control
-                beneath the learning rate does exactly that: it multiplies your base γ by a factor that
+                beneath the learning rate does exactly that: it multiplies your base {@html tex(String.raw`\gamma`)} by a factor that
                 changes on every step of the run.
               </p>
               <p>
                 The four schedules trace four different shapes for that factor over a run — flat, then
-                three ways of bleeding γ away as the steps tick by:
+                three ways of bleeding {@html tex(String.raw`\gamma`)} away as the steps tick by:
               </p>
               <div class="schedule-grid">
                 {#each scheduleCurves as s (s.id)}
@@ -1718,20 +1977,20 @@
                 {/each}
               </div>
               <p>
-                <strong>Constant</strong> holds γ start to finish — the honest baseline, and always the
-                compromise above. <strong>Step decay</strong> keeps γ flat, then cuts it by a fixed factor
+                <strong>Constant</strong> holds {@html tex(String.raw`\gamma`)} start to finish — the honest baseline, and always the
+                compromise above. <strong>Step decay</strong> keeps {@html tex(String.raw`\gamma`)} flat, then cuts it by a fixed factor
                 at set milestones (here ×0.3 a third of the way in, and again at two-thirds). It leaves the
                 loss curve’s most recognizable fingerprint: a long plateau, then a sudden <em>cliff</em>
-                the instant γ drops and the smaller step resolves detail the larger one skated over. For
+                the instant {@html tex(String.raw`\gamma`)} drops and the smaller step resolves detail the larger one skated over. For
                 most of deep learning’s history, that staircase trained nearly every network.
               </p>
               <p>
-                <strong>Cosine</strong> does the same work without the jolts — γ eases down the first half
+                <strong>Cosine</strong> does the same work without the jolts — {@html tex(String.raw`\gamma`)} eases down the first half
                 of a cosine from full strength to a small floor (about 5%): gentle at first, fastest
                 through the middle, feather-light by the end. Lingering near full strength early is
                 the point — the run banks its fast progress before precision matters. With no brutal
                 transition it then simply settles, which is why cosine annealing is the modern default. <strong>Warmup + cosine</strong> bolts a short
-                on-ramp onto the front: γ starts near zero and climbs over the first tenth before the
+                on-ramp onto the front: {@html tex(String.raw`\gamma`)} starts near zero and climbs over the first tenth before the
                 cosine takes over. That protects the opening, where a run <em>begins</em> at a random,
                 often dreadful point and one full-size step could fling the marker off the map — so it is
                 now standard for training large models from scratch.
@@ -1743,13 +2002,13 @@
                 schedule is active on a finite run (in ∞ mode there is no horizon, so schedules switch
                 off) — compresses the whole schedule into a fraction of the run, so at <em>4×</em> it
                 finishes annealing a quarter of the way in and the rest of the run shows you the
-                landing. Turn it up and read the result off the dotted γ(t) line in the loss chart.
+                landing. Turn it up and read the result off the dotted {@html tex(String.raw`\gamma(t)`)} line in the loss chart.
               </p>
               <p>
                 Scheduling has a second, deeper payoff that only lands once gradients turn <em>noisy</em>
-                — the subject of the next part. A γ bled toward zero is the one thing that pulls a restless
+                — the subject of the next part. A {@html tex(String.raw`\gamma`)} bled toward zero is the one thing that pulls a restless
                 run in to a clean stop. And one optimizer you’ll meet there, <strong>Lion</strong>, takes a
-                fixed-size step and so cannot settle <em>at all</em> on a constant γ: it just orbits the
+                fixed-size step and so cannot settle <em>at all</em> on a constant {@html tex(String.raw`\gamma`)}: it just orbits the
                 minimum forever. It is the purest illustration of why schedules exist — switch it to cosine
                 and the orbit closes to a point.
               </p>
@@ -1797,7 +2056,9 @@
                 faint <strong>fan</strong> of arrows opens at the marker: each ray is the gradient a
                 different random batch would have handed you, so the <em>width of the fan is the noise
                 itself.</em> The fewer points in the batch, the wider it spreads — and it spreads in a
-                very specific way. The error of an average shrinks only with the <em>square root</em>
+                very specific way — the same law that steadies dice: average four rolls and the
+                result wobbles about half as much as a single roll. The error of an average
+                shrinks only with the <em>square root</em>
                 of how many samples go into it, so a batch of 4 is roughly twice as steady as a batch
                 of 1, and you need 16 to halve the noise again. That is the law of diminishing returns
                 behind every batch-size choice: a batch of 32 already looks almost as calm as the full
@@ -1808,7 +2069,7 @@
                 <p>
                   At scale this √n law becomes an economic one. The useful ratio is noise to
                   signal: below a problem-specific <em>critical batch size</em>, doubling the batch
-                  lets you (roughly) double γ for the same trajectory — the linear-scaling rule
+                  lets you (roughly) double {@html tex(String.raw`\gamma`)} for the same trajectory — the linear-scaling rule
                   behind giant training runs; above it, extra data per step buys calm the run no
                   longer needs (Goyal et al., 2017; McCandlish et al., 2018). Bigger is not better —
                   bigger is <em>quieter</em>, and quiet has a price and a ceiling.
@@ -1826,10 +2087,10 @@
                 The bill comes due at the <em>end</em>. Because the gradient never goes quiet, SGD never
                 fully stops: near the bottom it stops descending and starts <strong>orbiting</strong>,
                 buzzing around the minimum inside a small <strong>noise ball</strong> whose radius grows
-                with both the step size γ and the width of the fan. On the loss curve it shows up as a
+                with both the step size {@html tex(String.raw`\gamma`)} and the width of the fan. On the loss curve it shows up as a
                 fuzzy <em>band</em> rather than a clean line that flatlines — the run has arrived, but it
                 can’t hold still. This is where the <strong>schedule</strong> from the last chapter earns
-                its keep: a γ bled toward zero draws that ball in tight, turning the restless buzz into a
+                its keep: a {@html tex(String.raw`\gamma`)} bled toward zero draws that ball in tight, turning the restless buzz into a
                 soft landing. Under noise, decay isn’t a luxury — it is <em>how a stochastic run converges
                 at all.</em>
               </p>
@@ -1850,7 +2111,7 @@
                 </svg>
                 <figcaption class="fig-cap">
                   Under noisy gradients the run never quite stops — it orbits the minimum in a cloud whose
-                  radius grows with γ (left). Bleed γ toward zero and the cloud draws in to a point (right):
+                  radius grows with {@html tex(String.raw`\gamma`)} (left). Bleed {@html tex(String.raw`\gamma`)} toward zero and the cloud draws in to a point (right):
                   the schedule, doing its quiet job.
                 </figcaption>
               </figure>
@@ -1882,7 +2143,7 @@
               <h3><svelte:component this={chIcon['ch-optimizers']} size={18} strokeWidth={2} /> The optimizer family tree</h3>
               <p>
                 Plain gradient descent has one recurring nemesis: the <strong>ravine</strong> — a
-                valley far steeper across than along. The γ that’s safe on the steep walls is
+                valley far steeper across than along. The {@html tex(String.raw`\gamma`)} that’s safe on the steep walls is
                 hopeless along the gentle floor, so the marker rattles wall to wall. Every optimizer
                 in the picker is a patch for that pain (or the new pain the last patch created) —
                 170 years of <em>fix what just broke</em>: a single trunk of fixes that, once it
@@ -2090,9 +2351,9 @@
                 {/if}
                 {#if c.act}
                   <div class="opt-act"><span class="act-no">{c.act.no}</span><span class="act-title">{c.act.title}</span></div>
-                  {#if c.act.intro}<p class="opt-act-intro">{@html c.act.intro}</p>{/if}
+                  {#if c.act.intro}<p class="opt-act-intro">{@html mathHtml(c.act.intro)}</p>{/if}
                 {/if}
-                {#if c.lead}<p class="opt-lead">{@html c.lead}</p>{/if}
+                {#if c.lead}<p class="opt-lead">{@html mathHtml(c.lead)}</p>{/if}
                 {@const cite = OPT_CITE[c.name]}
                 {@const authors = cite?.people ?? (cite?.person ? [{ name: cite.person, img: cite.img, credit: cite.credit }] : [])}
                 <div class="opt-card" class:prereq-card={c.prereq}>
@@ -2183,7 +2444,7 @@
                   <em>matrix</em> and precondition <em>across</em> it: Muon (<em>momentum
                   orthogonalized by Newton–Schulz</em>) straightens the momentum matrix, Shampoo and
                   SOAP whiten it. With only two independent numbers,
-                  α and β, there is no matrix to exploit — strip the structure away and they collapse
+                  {@html tex(String.raw`\alpha`)} and {@html tex(String.raw`\beta`)}, there is no matrix to exploit — strip the structure away and they collapse
                   to methods already in the list. That matrix structure is exactly why they scale to
                   billions of parameters, and exactly why a two-parameter sandbox is the wrong stage
                   for them. To meet them you have to leave the playground — which is a fair note to
@@ -2317,7 +2578,7 @@
               <div class="part-label">Part IV · The zoo</div>
               <h3><svelte:component this={chIcon['ch-problems']} size={18} strokeWidth={2} /> The landscape zoo</h3>
               <p>
-                Every problem here has at most two parameters — the three 1D warm-ups use just α —
+                Every problem here has at most two parameters — the three 1D warm-ups use just {@html tex(String.raw`\alpha`)} —
                 and a loss surface you can see live. Each surface tells a different story, from a
                 single clean bowl to four-way ties and exploding cliffs, and each ships with a
                 curated default learning rate and view (and, where it helps, momentum).
@@ -2366,8 +2627,8 @@
               <h3><svelte:component this={chIcon['ch-panels']} size={18} strokeWidth={2} /> Reading the panels</h3>
               <ul class="viz-list">
                 <li><strong>Data plot</strong> — the data points and the current model. For curve fits, blue solid is the current fit and green dashed is the truth. For 2D problems, the orange marker shows your parameters directly on the plot.</li>
-                <li><strong>Loss &amp; Gradient</strong> — the loss landscape seen from above: the vivid end of the colour scale marks low loss (bright in night mode, deep in day mode — the colour bar shows which), thin contours join equal-loss points, and the field arrows are −∇ℒ. On the marker, the <span class="ink-blue">blue arrow</span> is steepest descent and the <span class="ink-red">red arrow</span> is the step actually taken. Drag the marker to teleport.</li>
-                <li><strong>Loss History</strong> — train and test loss versus step. A clean decline is healthy; spikes mean you’re overshooting (too much γ or μ); a persistent train/test gap hints at overfitting.</li>
+                <li><strong>Loss &amp; Gradient</strong> — the loss landscape seen from above: the vivid end of the colour scale marks low loss (bright in night mode, deep in day mode — the colour bar shows which), thin contours join equal-loss points, and the field arrows are {@html tex(String.raw`-\nabla\mathcal{L}`)}. On the marker, the <span class="ink-blue">blue arrow</span> is steepest descent and the <span class="ink-red">red arrow</span> is the step actually taken. Drag the marker to teleport.</li>
+                <li><strong>Loss History</strong> — train and test loss versus step. A clean decline is healthy; spikes mean you’re overshooting (too much {@html tex(String.raw`\gamma`)} or {@html tex(String.raw`\mu`)}); a persistent train/test gap hints at overfitting.</li>
               </ul>
             </section>
 
@@ -2391,7 +2652,7 @@
       </div>
 
       <footer class="modal-footer">
-        <p>Built with ∂ by <strong>Neo Mohsenvand</strong></p>
+        <p>Built with {@html tex(String.raw`\partial`)} by <strong>Neo Mohsenvand</strong></p>
         <a class="github-link" href="https://github.com/NeoVand/GradientDescent" target="_blank" rel="noopener noreferrer" aria-label="View source on GitHub">
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
