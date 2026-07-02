@@ -18,7 +18,7 @@
     Target, Radio, ScatterChart, Brain,
     Compass, Rocket, Zap, GraduationCap,
     BookOpen, FlaskConical, Layers, Map, Play, Pause, RotateCcw, Keyboard,
-    FileText, MountainSnow, TrendingUpDown
+    FileText, MountainSnow, TrendingUpDown, Ruler, Gauge
   } from 'lucide-svelte';
   import katex from 'katex';
   import 'katex/dist/katex.min.css';
@@ -743,6 +743,7 @@
 
   const chIcon: Record<string, any> = {
     'ch-bowl': BookOpen, 'ch-landscape': Mountain, 'ch-shapes': MountainSnow,
+    'ch-derivative': Ruler, 'ch-curvature': Gauge,
     'ch-downhill': TrendingDown,
     'ch-step': Compass, 'ch-gamma': Zap, 'ch-optimizers': Rocket, 'ch-noise': Waves,
     'ch-schedule': Activity, 'ch-generalize': TrendingUpDown,
@@ -1126,9 +1127,84 @@
               {/if}
             </section>
 
-            <!-- ============== 4 · WHICH WAY IS DOWNHILL ============== -->
-            <section data-ch="ch-downhill" id="ch-downhill">
+            <!-- ============== 4 · HOW STEEP, EXACTLY? ============== -->
+            <section data-ch="ch-derivative" id="ch-derivative">
               <div class="part-label">Part II · Walking downhill</div>
+              <h3><svelte:component this={chIcon['ch-derivative']} size={18} strokeWidth={2} /> How steep, exactly?</h3>
+
+              <p>
+                Part I kept saying <em>slope</em> and trusted your legs to know what it meant. Before
+                the walking starts in earnest, let’s put a number on it — because the number is the
+                whole trick, and you can build it yourself with nothing but a subtraction and a
+                division.
+              </p>
+              <p>
+                Here is the move. Stand somewhere on a 1-D loss curve — say α = 2 on
+                <strong>Fit a Slope</strong>, whose loss happens to be ℒ(α) = α², so ℒ(2) = 4.
+                <strong>Nudge</strong> the knob by some small amount <em>h</em>, and divide the
+                loss’s response by the nudge. Nudge by <em>h</em> = 0.1 and the loss climbs from
+                4 to 4.41 — a rise of 0.41 over a run of 0.1: ratio <strong>4.1</strong>. Try
+                <em>h</em> = 0.01: the ratio comes out 4.01. Try 0.001: <strong>4.001</strong>.
+                The nudges are vanishing, but the ratio isn’t wandering — it is
+                <em>settling</em>, and the number it settles on is 4.
+              </p>
+              <blockquote class="recipe">
+                Nudge. Measure the response. Divide. Then let the nudge shrink — the number the
+                ratio settles on is the <strong>derivative</strong>: the slope of the loss
+                <em>at a point</em>.
+              </blockquote>
+              <div class="formula-display center">{@html texD(formulas.derivativeLimit)}</div>
+              <p>
+                Read it slowly, once: the fraction is exactly the nudge-and-divide you just did, and
+                {@html tex(String.raw`\lim_{h \to 0}`)} (“the limit as <em>h</em> goes to zero”) is
+                the settling you just watched. Nothing else is hiding in there. The settling also
+                tells you something about the ground itself: zoom in far enough on any smooth curve
+                and it straightens into a line — the derivative is that line’s slope. Two chapters
+                from now, that “zoom until straight” picture carries a real proof on its back; and
+                its fine print — <em>the line only speaks for the ground right under you</em> —
+                grows up to become the learning rate’s whole story.
+              </p>
+              <p>
+                Two knobs, same recipe, one new courtesy: with α and β both live, nudge
+                <strong>one and freeze the other</strong>. The ratio you get is a
+                <strong>partial derivative</strong>, written with a curly
+                {@html tex(String.raw`\partial`)} — say it “partial”, and yes, it is the symbol on
+                this lab’s front door:
+              </p>
+              <div class="formula-display center">{@html texD(formulas.partialDef)}</div>
+              <p>
+                {@html tex(String.raw`\partial \mathcal{L}/\partial \alpha`)} reads: <em>nudge α,
+                hold β still, divide the response by the nudge.</em> Do it once per knob and you are
+                holding two numbers. Stacking those two numbers into a single arrow is exactly where
+                the next chapter begins.
+              </p>
+              <p class="aside">
+                <strong>How the app really does it:</strong> you could compute every slope by
+                literal nudging (the finite-difference recipe above — it’s how the curvature lens
+                works). But nudging carries a whisper of error, so each problem here ships a
+                hand-derived exact formula for its gradient instead — and the test suite trusts
+                nothing: every formula is re-checked against nudge-and-divide at many random
+                points. <em>Differentiate by hand, verify by nudge</em> — a professional habit
+                worth stealing.
+              </p>
+              {#if chapterPresets['ch-derivative']}
+                <ChapterCta demo={() => runPreset('ch-derivative')} demoLabel={chapterPresets['ch-derivative'].title} />
+              {/if}
+              {#if chRefs['ch-derivative']}
+                <div class="ch-refs">
+                  <span class="ch-refs-label">Further reading</span>
+                  {#each chRefs['ch-derivative'] as r}
+                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
+                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
+                      {r.label}
+                    </a>
+                  {/each}
+                </div>
+              {/if}
+            </section>
+
+            <!-- ============== 5 · WHICH WAY IS DOWNHILL ============== -->
+            <section data-ch="ch-downhill" id="ch-downhill">
               <h3><svelte:component this={chIcon['ch-downhill']} size={18} strokeWidth={2} /> Which way is downhill?</h3>
 
               <p>
@@ -1384,25 +1460,34 @@
                 <li><strong>Just right:</strong> a smooth glide into the basin. Every problem ships with a sane default — but the fastest way to <em>feel</em> γ is to break it on purpose.</li>
               </ul>
               <p>
-                There’s even a sharp edge to it: push γ past roughly <strong>two divided by the
-                steepness of the valley</strong> and the steps grow instead of shrink, and the run
-                diverges. That “steepness” is the <strong>curvature</strong> — and outwitting it is
-                what the optimizer family tree in Part III is built for.
-              </p>
-
-              <p>
-                That edge is not vague — it has an exact location. For a smooth bowl, gradient descent
-                only settles when γ stays below <strong>two divided by the largest curvature</strong>,
-                written λ<sub>max</sub> (the steepest second derivative of the surface — how sharply
-                the slope itself is bending).
+                And “too big” is not vague — it has an exact edge. For a smooth bowl, gradient
+                descent settles only while γ stays below <strong>two divided by the sharpest bend
+                of the surface</strong>, a number written λ<sub>max</sub>. Careful with the word:
+                this is <em>not</em> the steepness you’ve been reading off the arrows (how tilted
+                the ground is) but a genuinely new quantity — how fast the tilt <em>itself</em>
+                changes as you walk. That is the <strong>curvature</strong>.
               </p>
               <div class="formula-display">{@html texD(formulas.stability)}</div>
               <p>
-                Stay under that line and each step lands closer to the bottom than the last, so the run
-                converges. Cross it and the opposite happens: every step overshoots a little more than
-                the one before, the bounce compounds, and the loss runs off to infinity. That single
-                number — the curvature — is the villain the optimizer family tree is built to outwit.
+                Stay under that line and each step lands closer to the bottom than the last, so the
+                run converges. Cross it and the opposite compounds: every step overshoots a little
+                more than the one before, and the loss runs off to infinity. Where does the 2 come
+                from, and what exactly is bending? The <em>next chapter</em> builds curvature with
+                your own hands — the same nudge-and-divide trick, aimed at the slope this time —
+                and derives this edge in four honest lines.
               </p>
+              <aside class="hd-note">
+                <span class="hd-note-tag">In a billion dimensions</span>
+                <p>
+                  For the clean bowls here, γ &gt; 2/λ<sub>max</sub> means certain divergence — a
+                  theorem you can verify with a slider. The modern surprise: full-batch training of
+                  real networks was found to hover <em>right at</em> that edge — the curvature
+                  itself rises until 2/λ<sub>max</sub> meets whatever γ you chose, and the loss
+                  then falls raggedly along the knife’s edge (Cohen et al., 2021, “edge of
+                  stability”). The law you can check on this bowl becomes, at scale, a strange
+                  equilibrium the theory is still catching up to.
+                </p>
+              </aside>
               <p class="aside">
                 Sometimes the blow-up comes not from γ but from a freak gradient — a cliff in the
                 surface, or the deep, recurrent networks where gradients can <strong>explode</strong>.
@@ -1457,7 +1542,124 @@
               {/if}
             </section>
 
-            <!-- ============== 6 · SCHEDULING THE LEARNING RATE ============== -->
+            <!-- ============== 8 · THE BEND OF THE BOWL ============== -->
+            <section data-ch="ch-curvature" id="ch-curvature">
+              <h3><svelte:component this={chIcon['ch-curvature']} size={18} strokeWidth={2} /> The bend of the bowl</h3>
+
+              <p>
+                The last chapter ended on a formula pulled out of a hat: stay under
+                {@html tex(String.raw`2/\lambda_{\max}`)}. This chapter earns it. What we need is
+                one more number at every point of the landscape — not how tilted the ground is, but
+                how quickly the tilt itself changes as you walk. The slope of the slope: the
+                <strong>curvature</strong>.
+              </p>
+              <p>
+                Feel the difference first. A wine glass and a soup bowl can be equally steep where
+                you stand — same slope — but descend a little and the glass <em>tightens</em> while
+                the bowl <em>relaxes</em>. Curvature is the rate of that tightening, and you already
+                own the tool that measures it: nudge α and divide — only this time, watch how the
+                <em>slope</em> answers, not the loss. The derivative of the derivative, written
+                {@html tex(String.raw`\partial^2 \mathcal{L}/\partial \alpha^2`)} and, for the rest
+                of this chapter, called {@html tex(String.raw`\lambda`)}: big λ, sharp bend; small
+                λ, gentle one; zero, flat as a board.
+              </p>
+
+              <div class="proof">
+                <div class="proof-title">Where the 2 comes from — in four lines</div>
+                <p class="proof-p">
+                  Take the cleanest bowl there is: {@html tex(String.raw`\mathcal{L} = \tfrac{1}{2}\lambda\alpha^2`)},
+                  curvature λ everywhere, minimum at zero. Its slope at α is
+                  {@html tex(String.raw`\lambda\alpha`)}, so one step of gradient descent is
+                </p>
+                <div class="formula-display center">{@html texD(formulas.contraction)}</div>
+                <p class="proof-p">
+                  Every step <em>multiplies the distance to the bottom</em> by the same factor
+                  {@html tex(String.raw`(1-\gamma\lambda)`)} — and that one multiplier is the whole
+                  story. While {@html tex(String.raw`\gamma\lambda < 1`)} the factor sits between 0
+                  and 1: a smooth glide in. At {@html tex(String.raw`\gamma\lambda = 1`)} the factor
+                  is 0 — you land at the bottom in <em>one hop</em> (γ = 1/λ is this bowl’s own
+                  perfect learning rate). Between 1 and 2 the factor is negative but small:
+                  overshoot to the far wall, yet closer each bounce. At exactly 2, you bounce
+                  between two mirror points forever. And past 2 every bounce lands
+                  <em>higher</em> than the last — divergence. There is the edge, and there is
+                  the 2. <span class="proof-qed">∎</span>
+                </p>
+              </div>
+
+              <p>
+                Now open the second knob. At any point of a real landscape the surface bends by a
+                <em>different amount in different directions</em> — along a valley’s floor, barely;
+                across it, sharply. The honest bookkeeping is a small table of bendings called the
+                <strong>Hessian</strong>:
+              </p>
+              <div class="formula-display center">{@html texD(formulas.hessianMatrix)}</div>
+              <p>
+                Don’t let the box intimidate you. The two diagonal entries are exactly the
+                {@html tex(String.raw`\partial^2`)} curvatures you just built, one per knob; the
+                corner entry (the same number twice) records the <em>twist</em> — how nudging one
+                knob changes the <em>other</em> knob’s slope. Four numbers, and together they pin
+                down the little bowl that best fits the surface right where you stand. Zoom in on
+                any smooth landscape and that fitted bowl <em>is</em> the landscape — the same way
+                the fitted line was, one derivative ago.
+              </p>
+              <p>
+                A stretched or twisted bowl still has a <strong>gentlest</strong> direction and a
+                <strong>sharpest</strong> one — turn it in your hands until you face them. Their two
+                bendings are called {@html tex(String.raw`\lambda_{\min}`)} and
+                {@html tex(String.raw`\lambda_{\max}`)}, and the last chapter’s speed limit can now
+                be read honestly: the <em>sharpest</em> bend polices γ — that is
+                {@html tex(String.raw`\gamma < 2/\lambda_{\max}`)} — while your progress along the
+                <em>gentlest</em> direction is paid at the rate
+                {@html tex(String.raw`(1 - \gamma\lambda_{\min})`)} per step. One γ, two masters.
+              </p>
+              <p>
+                How badly can the two masters disagree? Take their ratio:
+              </p>
+              <div class="formula-display center">{@html texD(formulas.kappa)}</div>
+              <p>
+                the <strong>condition number</strong>. κ = 1 is a perfectly round bowl: any safe γ
+                lands you in a few hops. κ = 10 means the sharp direction forces a γ so timid that
+                the gentle direction keeps about 80% of its remaining distance <em>every step</em>.
+                Ravines, trenches, the long crawl — they are all this one number wearing different
+                landscapes, and Part III’s entire optimizer family tree is organised around
+                outwitting it.
+              </p>
+              <p class="look">
+                The app will show you the Hessian live. In the Loss &amp; Gradient panel’s header,
+                switch on the <strong>curvature lens</strong>: the ellipse drawn at the marker
+                <em>is</em> the fitted bowl seen from above — long axis the gentle bend, short axis
+                the sharp one — with κ read out beside it. On a saddle, the direction that curves
+                <em>down</em> turns red and dashed: the escape route.
+              </p>
+              <aside class="hd-note">
+                <span class="hd-note-tag">In a billion dimensions</span>
+                <p>
+                  Up there the ravine doesn’t just stretch — it multiplies. A real network’s loss
+                  has millions of curvature directions, and measured spectra show a vast, nearly
+                  flat bulk hugging zero plus a handful of steep outliers: less a valley than a
+                  canyon system with a few sheer walls and endless soft floor. Condition numbers in
+                  the wild reach 10⁵ and beyond, so the crawl this chapter proved isn’t a corner
+                  case — it is the default condition of deep learning. That is why every method in
+                  Part III ships in every deep-learning library.
+                </p>
+              </aside>
+              {#if chapterPresets['ch-curvature']}
+                <ChapterCta demo={() => runPreset('ch-curvature')} demoLabel={chapterPresets['ch-curvature'].title} />
+              {/if}
+              {#if chRefs['ch-curvature']}
+                <div class="ch-refs">
+                  <span class="ch-refs-label">Further reading</span>
+                  {#each chRefs['ch-curvature'] as r}
+                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
+                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
+                      {r.label}
+                    </a>
+                  {/each}
+                </div>
+              {/if}
+            </section>
+
+            <!-- ============== 9 · SCHEDULING THE LEARNING RATE ============== -->
             <section data-ch="ch-schedule" id="ch-schedule">
               <h3><svelte:component this={chIcon['ch-schedule']} size={18} strokeWidth={2} /> Scheduling the learning rate</h3>
               <p>
@@ -2055,7 +2257,7 @@
             <!-- ============== 10 · THE PROBLEMS ============== -->
             <section data-ch="ch-problems" id="ch-problems">
               <div class="part-label">Part IV · The zoo</div>
-              <h3><svelte:component this={chIcon['ch-problems']} size={18} strokeWidth={2} /> The 22 landscapes</h3>
+              <h3><svelte:component this={chIcon['ch-problems']} size={18} strokeWidth={2} /> The landscape zoo</h3>
               <p>
                 Every problem here has at most two parameters — the three 1D warm-ups use just α —
                 and a loss surface you can see live. Each surface tells a different story, from a
@@ -2863,6 +3065,32 @@
     margin: 0.6rem 0;
   }
   .aside strong { color: var(--color-text-secondary); }
+
+  /* "In higher dimensions…" — the recurring honesty channel. Same badge and
+     voice everywhere, so readers learn to expect the correction. */
+  .hd-note {
+    margin: 0.9rem 0;
+    padding: 0.65rem 0.9rem 0.7rem 1rem;
+    border-left: 3px solid #8b5cf6;
+    border-radius: 0 10px 10px 0;
+    background: color-mix(in srgb, #8b5cf6 7%, transparent);
+  }
+  .hd-note-tag {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #8b5cf6;
+    margin-bottom: 0.25rem;
+  }
+  .hd-note-tag::before { content: '∞ '; font-weight: 600; }
+  .hd-note p {
+    margin: 0;
+    font-size: 0.865rem;
+    line-height: 1.55;
+    color: var(--color-text-secondary);
+  }
 
   /* The trunk → branches transition that introduces the post-Adam fork. */
   .opt-lead {

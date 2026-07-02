@@ -223,6 +223,28 @@ export const chapterPresets: Record<string, Experiment> = {
       ttl: 15000
     }
   }),
+  'ch-derivative': scenarioExperiment({
+    id: 'preset-derivative',
+    title: 'Feel the slope settle',
+    blurb: '',
+    state: { problem: 'slope-1d', optimizer: 'gd', marker: { a: 2.0, b: 0 } },
+    coach: {
+      kind: 'info',
+      text: 'Don’t train yet — read the curve. The dashed line under the marker is the tangent: the derivative made visible. Nudge α with the ← → keys and watch the slope change; walk toward the bottom and it flattens toward zero.',
+      ttl: 16000
+    }
+  }),
+  'ch-curvature': scenarioExperiment({
+    id: 'preset-curvature',
+    title: 'Read κ off the lens',
+    blurb: '',
+    state: { problem: 'stretched-bowl', optimizer: 'gd', lens: true, run: true },
+    coach: {
+      kind: 'info',
+      text: 'The lens ellipse IS the local bowl: long axis the gentle bend (λ = 0.4), short axis the sharp one (λ = 4), so κ = 10. Watch β snap to the floor while α crawls. Then find the edge: γ = 0.45 bounces in, γ = 0.55 blows up — the theory says the line is at exactly 0.5.',
+      ttl: 18000
+    }
+  }),
   'ch-downhill': scenarioExperiment({
     id: 'preset-downhill',
     title: 'Show the downhill arrows',
