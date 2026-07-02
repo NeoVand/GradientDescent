@@ -114,7 +114,7 @@ export const optTree: OptChapter[] = [
     by: 'Matthew Zeiler — same year, same fix, one step further',
     idea:
       'RMSProp’s twin, born the same year against the same AdaGrad flaw — but Zeiler spotted a deeper oddity: a raw gradient step has the wrong units. AdaDelta divides by $\\mathrm{RMS}[\\nabla\\mathcal{L}]$ like RMSProp, then multiplies by the RMS of its OWN recent steps. That second memory hands the step $\\theta$’s own units — the very thing a raw gradient step lacks, and exactly what Newton’s $\\mathbf H^{-1}\\nabla\\mathcal{L}$ buys with curvature — so no unit-carrying $\\gamma$ is needed and the learning rate falls out of the math entirely: there is nothing left to set but the decay $\\rho$.',
-    formula: String.raw`\Delta\boldsymbol{\theta} = -\frac{\sqrt{\mathbf{u}+\varepsilon}}{\sqrt{\mathbf{s}+\varepsilon}}\,\nabla \mathcal{L}, \qquad \mathbf{u} \leftarrow \rho\,\mathbf{u} + (1-\rho)\,\Delta\boldsymbol{\theta}^2`,
+    formula: String.raw`\mathbf{s} \leftarrow \rho\,\mathbf{s} + (1-\rho)(\nabla \mathcal{L})^2, \;\; \Delta\boldsymbol{\theta} = -\frac{\sqrt{\mathbf{u}+\varepsilon}}{\sqrt{\mathbf{s}+\varepsilon}}\,\nabla \mathcal{L}, \;\; \mathbf{u} \leftarrow \rho\,\mathbf{u} + (1-\rho)\,\Delta\boldsymbol{\theta}^2`,
     fix: 'no learning rate to tune — it sizes its own steps',
     brk: 'one knob fewer, but no $\\gamma$ to crank when you DO want it faster'
   },
@@ -127,7 +127,7 @@ export const optTree: OptChapter[] = [
     by: 'Kingma & Ba — "adaptive moments"',
     idea:
       'The merger the whole trunk builds to: take Momentum’s moving average of gradients (decay $\\beta_1$) AND RMSProp’s moving average of squared gradients (decay $\\beta_2$), and use them together. One honest detail: both averages start at zero and read too low at first, so each is divided by $1-\\beta^t$ to correct that early bias — giving the bias-corrected $\\hat{\\mathbf{m}}$ and $\\hat{\\mathbf{s}}$ that the update below pits against each other. The result became the workhorse of modern deep learning — its paper is now one of the most-cited in all of science — and the launch point for every branch that follows.',
-    formula: String.raw`\hat{\mathbf{m}} = \frac{\mathbf{m}}{1-\beta_1^t}, \quad \hat{\mathbf{s}} = \frac{\mathbf{s}}{1-\beta_2^t}, \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \frac{\hat{\mathbf{m}}}{\sqrt{\hat{\mathbf{s}}} + \varepsilon}`,
+    formula: String.raw`\mathbf{m} \leftarrow \beta_1 \mathbf{m} + (1-\beta_1)\,\nabla \mathcal{L}, \;\; \mathbf{s} \leftarrow \beta_2 \mathbf{s} + (1-\beta_2)(\nabla \mathcal{L})^2, \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \frac{\hat{\mathbf{m}}}{\sqrt{\hat{\mathbf{s}}} + \varepsilon}`,
     fix: 'robust out of the box almost everywhere',
     brk: 'not perfect — three later papers each sand down one rough edge'
   },
@@ -152,7 +152,7 @@ export const optTree: OptChapter[] = [
     by: 'Loshchilov & Hutter — the actual default today',
     idea:
       'The refinement that matters most: nearly every large model — GPT, BERT, the lot — trains with AdamW, not plain Adam. Weight decay gently pulls every parameter toward zero to curb overfitting; Adam folded that pull into the gradient, where its adaptive $\\sqrt{\\hat{\\mathbf{s}}}$ scaling then distorted it. AdamW decouples them — the $\\lambda\\boldsymbol\\theta$ decay lands straight on $\\boldsymbol\\theta$, outside the scaling. One honest caveat here: these toy losses carry no overfitting to regularize, so $\\lambda$ shows up as a literal, visible pull of the marker toward the origin. Crank it and watch the fit drift inward; set $\\lambda$ to 0 and you are back to exact Adam.',
-    formula: String.raw`\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\left(\frac{\hat{\mathbf{m}}}{\sqrt{\hat{\mathbf{s}}} + \varepsilon} + \lambda\,\boldsymbol{\theta}\right)`,
+    formula: String.raw`\mathbf{m} \leftarrow \beta_1 \mathbf{m} + (1-\beta_1)\,\nabla \mathcal{L}, \;\; \mathbf{s} \leftarrow \beta_2 \mathbf{s} + (1-\beta_2)(\nabla \mathcal{L})^2, \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\left(\frac{\hat{\mathbf{m}}}{\sqrt{\hat{\mathbf{s}}} + \varepsilon} + \lambda\,\boldsymbol{\theta}\right)`,
     fix: 'decoupled decay — why it’s the real-world default',
     brk: 'with no overfitting to fight here, $\\lambda$ is a pull toward 0 more than a regularizer'
   },
@@ -164,8 +164,8 @@ export const optTree: OptChapter[] = [
     lead: 'The third thread was the quietest of all. For years practitioners had patched a rough spot in Adam’s opening steps with a hand-tuned <em>warmup</em>, half-superstition — runs just blew up without it, and nobody could say exactly why. What if that warmup could be <em>derived</em> instead of guessed?',
     by: 'Liu et al. — Adam’s warmup, automated',
     idea:
-      'The third refinement closes a quieter Adam wart. In the first handful of steps Adam has barely any squared-gradient history, so its $\\sqrt{\\hat{\\mathbf{s}}}$ scaling is pure noise — the practitioner’s fix was a hand-tuned warmup that crept the rate up by hand. RAdam computes how trustworthy that variance actually is (a number $\\rho_t$) and, until it can be trusted, just skips the scaling and takes a plain momentum step. A rectification factor then eases the adaptive part in. Warmup, but derived rather than guessed — nothing to tune.',
-    formula: String.raw`\rho_t = \rho_\infty - \frac{2t\,\beta_2^{t}}{1-\beta_2^{t}}, \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, r_t\,\frac{\hat{\mathbf{m}}}{\sqrt{\hat{\mathbf{s}}}+\varepsilon}\;\;(\rho_t > 4)`,
+      'The third refinement closes a quieter Adam wart. In the first handful of steps Adam has barely any squared-gradient history, so its $\\sqrt{\\hat{\\mathbf{s}}}$ scaling is pure noise — the practitioner’s fix was a hand-tuned warmup that crept the rate up by hand. RAdam computes how trustworthy that variance actually is (a number $\\rho_t$) and, until it can be trusted, just skips the scaling and takes a plain momentum step. A rectification factor $r_t$ — near zero at first, easing toward one — then lets the adaptive part in. Warmup, but derived rather than guessed — nothing to tune.',
+    formula: String.raw`\mathbf{m} \leftarrow \beta_1 \mathbf{m} + (1-\beta_1)\,\nabla \mathcal{L}, \;\; \mathbf{s} \leftarrow \beta_2 \mathbf{s} + (1-\beta_2)(\nabla \mathcal{L})^2, \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, r_t\,\frac{\hat{\mathbf{m}}}{\sqrt{\hat{\mathbf{s}}} + \varepsilon}`,
     fix: 'an automatic warmup — no schedule to hand-tune',
     brk: 'only smooths the opening steps; past warmup it just is Adam'
   },
@@ -206,7 +206,7 @@ export const optTree: OptChapter[] = [
     by: 'Liu et al. — Newton, cut down to fit an LLM',
     idea:
       'Newton’s curvature is unbeatable and unaffordable; Sophia keeps the affordable part. Drop the full Hessian for just its DIAGONAL — one curvature number $\\mathbf h$ per parameter, no matrix to invert — and precondition the momentum by it. Then the safety move: CLIP every coordinate’s step to $\\pm\\rho$ (Sophia’s own $\\rho$, a clip radius — no relation to RMSProp’s decay; the alphabet is small and the field is greedy). Where the diagonal estimate is tiny or noisy (and $\\mathbf m/\\mathbf h$ would blow up) the clip bounds the move; where it’s solid, the step stays curvature-scaled. Its paper reports GPT-2-scale pretraining in roughly half the steps Adam needs — a headline later independent benchmarks have contested — but either way, it is second-order thinking made cheap enough to try.',
-    formula: String.raw`\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\,\operatorname{clip}\!\left(\frac{\mathbf{m}}{\max(\mathbf{h},\varepsilon)},\,\rho\right)`,
+    formula: String.raw`\mathbf{m} \leftarrow \beta_1 \mathbf{m} + (1-\beta_1)\,\nabla \mathcal{L}, \;\; \mathbf{h} \leftarrow \beta_2 \mathbf{h} + (1-\beta_2)\,\operatorname{diag}(\mathbf{H}), \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\,\operatorname{clip}\!\left(\frac{\mathbf{m}}{\max(\mathbf{h},\varepsilon)},\,\rho\right)`,
     fix: 'diagonal curvature + a clip — second-order on a budget',
     brk: 'only the diagonal: blind to the off-axis stretch Newton corrects'
   },
@@ -219,7 +219,7 @@ export const optTree: OptChapter[] = [
     by: 'Mishchenko & Defazio — the learning rate, removed',
     idea:
       'Every method so far still made you pick $\\gamma$. This branch deletes that last knob. The insight: the ideal step size is set by how far the start is from the solution — a distance $d$. You don’t know $d$, so Prodigy estimates it live, ramping a tiny seed upward from how the gradients line up with how far you’ve already travelled ($\\langle g,\\, x_0 - x\\rangle$ — in the formula, $r$ and $\\mathbf{w}$ are two running tallies of exactly that alignment), and scales an Adam step by it. Set nothing and watch the marker creep, then accelerate as $d$ finds its level — the learning rate, discovered rather than tuned. Prodigy sharpens the same lab’s earlier D-Adaptation, and the parameter-free idea is taken seriously: a sibling schedule-free method from these authors won the self-tuning track of MLCommons’ 2024 AlgoPerf benchmark.',
-    formula: String.raw`d \leftarrow \max\!\left(d,\, \frac{r}{\lVert \mathbf{w}\rVert_1}\right), \qquad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, d\,\frac{\mathbf{m}}{\sqrt{\mathbf{s}} + d\,\varepsilon}`,
+    formula: String.raw`\mathbf{m} \leftarrow \beta_1 \mathbf{m} + (1-\beta_1)\, d\,\nabla \mathcal{L}, \;\; \mathbf{s} \leftarrow \beta_2 \mathbf{s} + (1-\beta_2)\, d^2 (\nabla \mathcal{L})^2, \;\; d \leftarrow \max\!\left(d,\, \frac{r}{\lVert \mathbf{w}\rVert_1}\right), \;\; \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, d\,\frac{\mathbf{m}}{\sqrt{\mathbf{s}} + d\,\varepsilon}`,
     fix: 'no learning rate to choose — it finds its own',
     brk: 'the estimate only climbs, so a bad early ramp can overshoot'
   }

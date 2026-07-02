@@ -24,7 +24,7 @@ export const nadam: CoreOptimizer<NadamState> = {
   id: 'nadam',
   name: 'Nadam',
   description: 'Adam with Nesterov look-ahead on the momentum',
-  updateRuleLatex: String.raw`\bar{\mathbf{m}} = \beta_1 \hat{\mathbf{m}} + \frac{(1{-}\beta_1)\nabla \mathcal{L}}{1-\beta_1^t}, \quad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \frac{\bar{\mathbf{m}}}{\sqrt{\hat{\mathbf{s}}} + \varepsilon}`,
+  updateRuleLatex: String.raw`\bar{\mathbf{m}} = \beta_1 \hat{\mathbf{m}} + \frac{(1-\beta_1)\nabla \mathcal{L}}{1-\beta_1^t}, \quad \boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \gamma\, \frac{\bar{\mathbf{m}}}{\sqrt{\hat{\mathbf{s}}} + \varepsilon}`,
   hyperparams: [BETA1_SPEC, BETA2_SPEC],
   fixedLearningRate: 0.1,
   init: (d) => ({ m: zeros(d), v: zeros(d), t: 0 }),
