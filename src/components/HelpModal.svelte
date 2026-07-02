@@ -32,6 +32,7 @@
   import { schedules, scheduleOrder } from '../utils/schedules';
   import { optimizers, optimizerOrder, defaultHyper, type OptimizerId } from '../utils/optimizers';
   import GuideVizLayers from './GuideVizLayers.svelte';
+  import GuideBlocks from './GuideBlocks.svelte';
   import ChapterCta from './ChapterCta.svelte';
   import { enterCourseFromChapter, startCourseIntro } from '../utils/lessons';
   import {
@@ -44,6 +45,7 @@
   import { problemCards } from '../content/problemCards';
   import { chRefs } from '../content/chapterRefs';
   import { guideParts, guideChapters, chapterLesson, resolveChapterSlug } from '../content/registry';
+  import { chapterBlocks } from '../content/chapters';
 
   // Day/dark for the guide's heatmap figures (ravine + race). The figures were
   // authored for dark; day flips to "dark basins on light" (see tintGridURL).
@@ -970,151 +972,23 @@
             </div>
 
             <!-- ============== 1 · THE BOWL ============== -->
-            <section data-ch="ch-bowl" id="ch-bowl">
-              <div class="part-label">Part I · The landscape</div>
-              <h3><svelte:component this={chIcon['ch-bowl']} size={18} strokeWidth={2} /> The bottom of a bowl</h3>
-
-              <p>
-                Everything in this lab is one idea wearing many costumes: a machine has a few
-                <strong>knobs</strong>, and <em>learning</em> means turning those knobs until the
-                machine’s guesses line up with reality.
-              </p>
-              <p>
-                Here every machine has exactly <strong>two</strong> knobs, called <em class="g">{@html tex(String.raw`\alpha`)}</em>
-                and <em class="g">{@html tex(String.raw`\beta`)}</em> (alpha and beta). Together they are the model’s
-                <strong>parameters</strong> — the numbers that decide how it behaves. Choose values
-                for {@html tex(String.raw`\alpha`)} and {@html tex(String.raw`\beta`)} and the model makes a <strong>prediction</strong> for every input.
-                Compare those predictions with the real answers and you get the <strong>loss</strong>:
-                one number for how wrong the model is right now. Lower is better; a perfect fit sits
-                near zero.
-              </p>
-              <p>
-                That is the whole game — <em>find the {@html tex(String.raw`\alpha`)} and {@html tex(String.raw`\beta`)} that make the loss as small as
-                possible.</em> The orange marker is your current guess. Drag it around the
-                <strong>Loss &amp; Gradient</strong> panel, press <strong>Train</strong>, and watch
-                the number fall.
-              </p>
-
-              <div class="concept">
-                <div class="concept-text">
-                  <h4>Why a “bowl”?</h4>
-                  <p>
-                    For a simple fit, the loss is smallest at one best setting and grows as you move
-                    away in any direction — a valley with a single lowest point. Slide along it and
-                    the loss traces a bowl shape; the marker just wants to roll to the bottom.
-                  </p>
-                </div>
+            <!-- App-side visuals for migrated block chapters: the block names a
+                 figure id + owns the caption; these snippets supply the drawing
+                 (so figure styles stay in this component's scope). -->
+            {#snippet conceptFig(id: string)}
+              {#if id === 'bowl-1d'}
                 <svg class="concept-svg" viewBox="0 0 200 120">
                   <path d="M 20,15 Q 100,180 180,15" fill="none" stroke="#10b981" stroke-width="2.5" />
                   <circle cx="100" cy="98" r="6" fill="#f59e0b" stroke="#fff" stroke-width="2" />
                   <text x="100" y="118" class="caption" text-anchor="middle">minimum</text>
                   <text x="40" y="38" class="caption">loss ↑</text>
                 </svg>
-              </div>
-
-              <p>
-                We can write that “how wrong” down exactly. For most fits here the loss is the
-                <strong>mean squared error</strong>: take each prediction <em>{@html tex(String.raw`\hat{y}`)}</em>, subtract the
-                true value <em>y</em>, square the gap so that overshooting and undershooting both
-                count as wrong, and average over all <em>n</em> data points.
-              </p>
-              <div class="formula-display">{@html texD(formulas.lossDefinition)}</div>
-              <p class="aside">
-                <strong>Reading the symbols</strong> — your first formula, decoded once and for
-                all: {@html tex(String.raw`\Sigma`)} (capital sigma) means “add up one copy per
-                data point” — a for-loop, in Greek; the subscript {@html tex(String.raw`i`)} names
-                <em>which</em> data point; and the hat on {@html tex(String.raw`\hat{y}`)} marks a
-                <em>prediction</em> (say “y-hat” — bare {@html tex(String.raw`y`)} is always the
-                truth). Every formula in this book is built from pieces this small.
-              </p>
-              <p>
-                The squaring is the quiet hero here: it punishes a big miss far more than a small one,
-                and it makes the loss a smooth, rounded <em>bowl</em> rather than a creased tent — and
-                a smooth bowl is exactly what lets us roll downhill in the chapters ahead.
-              </p>
-              <p>
-                Squared error is the right “how wrong” when the answer is a <em>number</em>. But several
-                problems here ask a <em>yes/no</em> question — is this point inside the circle? on which
-                side of the line? — and there the model outputs a <strong>probability</strong>
-                {@html tex(String.raw`\hat{y}\in(0,1)`)} that the answer is “yes” (read
-                {@html tex(String.raw`(0,1)`)} as “any number strictly between 0 and 1” — not a
-                coordinate pair). Where does a probability come from? The model computes a plain
-                score — any number at all — and squashes it through the S-shaped
-                <strong>sigmoid</strong> {@html tex(String.raw`\sigma`)}, which bends the whole
-                number line smoothly into {@html tex(String.raw`(0,1)`)}: hugely positive scores
-                land near 1, hugely negative near 0, a score of zero at an honest ½. You will spot
-                {@html tex(String.raw`\sigma`)} doing exactly this in the zoo’s classifier
-                formulas. The natural loss for a probability is <strong>cross-entropy</strong>
-                (log-loss):
-              </p>
-              <div class="formula-display">{@html texD(String.raw`\mathcal{L} = -\big[\,y\,\log \hat{y} + (1-y)\,\log(1-\hat{y})\,\big]`)}</div>
-              <p>
-                It is gentle when the model is confidently right and brutal when it is confidently wrong:
-                predict {@html tex(String.raw`\hat{y}=0.99`)} while the truth is {@html tex(String.raw`y=0`)}
-                and the penalty is already {@html tex(String.raw`-\log(0.01) \approx 4.6`)} — and it
-                climbs toward infinity as the confidence approaches certainty. In plain words,
-                cross-entropy scores the model by <em>how much probability it placed on what
-                actually happened</em> (statisticians call that quantity the likelihood; this loss
-                is its negative logarithm) — which is why it, not squared error, is the standard
-                loss for classification: squared error for numbers, cross-entropy for categories.
-              </p>
-              {#if chapterPresets['ch-bowl']}
-                <ChapterCta demo={() => runPreset('ch-bowl')} demoLabel={chapterPresets['ch-bowl'].title} />
               {/if}
-              {#if chRefs['ch-bowl']}
-                <div class="ch-refs">
-                  <span class="ch-refs-label">Further reading</span>
-                  {#each chRefs['ch-bowl'] as r}
-                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
-                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
-                      {r.label}
-                    </a>
-                  {/each}
-                </div>
-              {/if}
-            </section>
-
-            <!-- ============== 2 · LOSS IS A LANDSCAPE ============== -->
-            <section data-ch="ch-landscape" id="ch-landscape">
-              <h3><svelte:component this={chIcon['ch-landscape']} size={18} strokeWidth={2} /> Loss is a landscape</h3>
-
-              <p>
-                Here is the move that makes everything visual. The loss is not one fixed number —
-                it is a number <em>for every possible setting of the knobs.</em> Pick one {@html tex(String.raw`(\alpha, \beta)`)} and
-                you get a loss. Nudge to a nearby pair and you get a slightly different loss. Sweep
-                across <strong>all</strong> pairs and those losses trace out a <strong>surface</strong>:
-                a landscape floating above the flat plane of every possible {@html tex(String.raw`\alpha`)} and {@html tex(String.raw`\beta`)}.
-              </p>
-              <p>
-                Low places in that landscape are good models; high places are bad ones.
-                <em>Training is simply walking downhill on this surface</em>, and the orange marker
-                is you, standing somewhere on it.
-              </p>
-              <p>
-                The <strong>Loss &amp; Gradient</strong> panel is a map of that landscape seen from
-                straight above. {#if gDark}<strong>Brighter colours are lower</strong> (better) loss;
-                dark is high.{:else}<strong>Deeper, richer colours are lower</strong> (better) loss;
-                the pale wash is high.{/if} (The panel’s colour bar always shows which end is low.)
-                The thin loops are <strong>contour lines</strong> — exactly like a
-                hiking map: each loop joins points of equal loss, and loops bunched tightly together
-                mean a steep slope. Flip the panel to <strong>3D</strong> and the same map lifts into
-                real hills and valleys you can rotate.
-              </p>
-              <aside class="hd-note">
-                <span class="hd-note-tag">In a billion dimensions</span>
-                <p>
-                  One luxury to savor while you have it: this app draws the <em>entire, exact</em>
-                  loss surface, because two knobs are all there are. A real network’s surface lives
-                  in a billion dimensions, so every landscape picture you will ever see of one is a
-                  two-dimensional <em>slice</em> — pick two directions, sweep them, plot. And raw
-                  slices lie: scaling tricks inside networks stretch some directions and shrink
-                  others, so honest pictures need careful normalization (that is the “filter
-                  normalization” of Li et al., 2018, in the reading list below). Here, and almost
-                  nowhere else, what you see is the whole truth.
-                </p>
-              </aside>
+            {/snippet}
+            {#snippet chFigure(id: string, cap: string)}
               <figure class="fig">
-                <svg viewBox="0 0 460 150" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                {#if id === 'landscape-two-views'}
+                  <svg viewBox="0 0 460 150" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
                   <defs>
                     <radialGradient id="lf-bowl" cx="50%" cy="50%" r="55%">
                       <stop offset="0%" stop-color="#fde047" stop-opacity="0.5" />
@@ -1143,67 +1017,8 @@
                   <circle cx={landscapeFig.cx} cy={landscapeFig.baseY} r="3.5" fill="#f59e0b" stroke="#fff" stroke-width="1" />
                   <text x={landscapeFig.cx} y="142" class="fig-svg-label">the surface — from the side</text>
                 </svg>
-                <figcaption class="fig-cap">
-                  The same loss, two ways: the flat contour map (left) is exactly the 3-D surface (right)
-                  seen from straight above. Each ring joins points of equal loss; the bright dimple is the
-                  basin every run is trying to reach.
-                </figcaption>
-              </figure>
-              <p class="look">
-                Look at the Loss &amp; Gradient panel right now: the {gDark ? 'bright' : 'deep-coloured'}
-                dimple at the centre of the rings is where the loss is lowest, and the marker is
-                trying to reach it.
-              </p>
-              {#if chapterPresets['ch-landscape']}
-                <ChapterCta demo={() => runPreset('ch-landscape')} demoLabel={chapterPresets['ch-landscape'].title} />
-              {/if}
-              {#if chRefs['ch-landscape']}
-                <div class="ch-refs">
-                  <span class="ch-refs-label">Further reading</span>
-                  {#each chRefs['ch-landscape'] as r}
-                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
-                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
-                      {r.label}
-                    </a>
-                  {/each}
-                </div>
-              {/if}
-            </section>
-
-            <!-- ============== 3 · WHEN THE BOWL ISN'T A BOWL ============== -->
-            <section data-ch="ch-shapes" id="ch-shapes">
-              <h3><svelte:component this={chIcon['ch-shapes']} size={18} strokeWidth={2} /> When the bowl isn’t a bowl</h3>
-
-              <p>
-                So far the landscape has been one tidy bowl with a single lowest point. That is the
-                exception, not the rule. A real loss surface can ripple with many dips, rise into
-                ridges, and stretch into near-flat plains — and each of those features changes what
-                gradient descent does.
-              </p>
-              <p>
-                A dip lower than everything around it is a <strong>local minimum</strong>; the single
-                lowest dip anywhere is the <strong>global minimum</strong> — the answer we actually want.
-                Gradient descent only ever feels the slope <em>under its feet</em>, so it cannot tell the
-                two apart: it rolls into whatever valley it is already in and stops. Each minimum owns a
-                <strong>basin of attraction</strong> — the starting points that drain into it — and the
-                ridge between two basins is the watershed. That is why <em>where you start</em> can matter
-                as much as how you step: move the first guess across a ridge and the run ends somewhere
-                else entirely, which is what makes <strong>initialization</strong> a real design choice.
-              </p>
-              <aside class="hd-note">
-                <span class="hd-note-tag">In a billion dimensions</span>
-                <p>
-                  Up there, “where you start” changes meaning. Set a million knobs to small random
-                  numbers and every start lands on a thin shell, almost exactly the same distance
-                  from the origin — and any two random starts are nearly perpendicular to each
-                  other. So real initialization science is not about picking the right basin; it is
-                  about picking the right <em>scale</em> (the Xavier and He rules), so the first
-                  gradients come out neither vanishing nor explosive.
-                </p>
-              </aside>
-
-              <figure class="fig">
-                <svg viewBox="0 0 460 188" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                {:else if id === 'shapes-basins-saddle'}
+                  <svg viewBox="0 0 460 188" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
                   <defs>
                     <marker id="shp-arw" viewBox="0 -5 10 10" refX="7.5" refY="0" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,-5L10,0L0,5" fill="var(--color-text-secondary)" /></marker>
                   </defs>
@@ -1232,76 +1047,27 @@
                     <text x={shapesFig.cxS} y={shapesFig.SH + 14} class="fig-svg-label" style="fill:var(--color-text-tertiary)">saddle point</text>
                   </g>
                 </svg>
-                <figcaption class="fig-cap">
-                  Left: a 1-D loss with a shallow local minimum and a deep global one, split by a ridge —
-                  the amber start drains into the shallow basin, the emerald start (just across the ridge)
-                  into the deep one. Right: a 2-D saddle, downhill <em>into</em> the centre along one axis
-                  and <em>out</em> along the other — the gradient is zero there, yet it is no minimum.
-                </figcaption>
+                {/if}
+                <figcaption class="fig-cap">{@html cap}</figcaption>
               </figure>
+            {/snippet}
 
-              <p>
-                There is a subtler trap than a local minimum. A <strong>saddle point</strong> is a spot
-                where the ground curves <em>down</em> one way and <em>up</em> another — a mountain pass.
-                The gradient there is zero, exactly as at a minimum
-                ({@html tex(String.raw`\nabla\mathcal{L} = \mathbf{0}`)}), so a method that watches only
-                the slope can grind almost to a halt even though one step sideways would keep it falling.
-                Broad, gentle <strong>plateaus</strong>, where the gradient nearly vanishes, slow a run the
-                same way — more quietly.
-              </p>
-              <p>
-                In two dimensions, bad local minima look like the main hazard. In the millions of
-                dimensions a real model lives in, the reverse holds: critical points are
-                <em>overwhelmingly</em> saddles, and almost every true minimum sits close to the global
-                one in value. The hard part of training a large network is escaping saddles and plateaus,
-                not dodging bad valleys — a finding (Dauphin et al., 2014; Choromanska et al., 2015)
-                that reshaped how the field thinks about non-convex optimization. A confession about
-                this playground, then: with two knobs, dodging the wrong valley really <em>is</em> the
-                game, and several landscapes in the zoo are built to punish a bad start. Keep the
-                basin picture — just know that at scale the enemy is the long flat crawl, not the
-                wrong valley.
-              </p>
-              <p class="aside">
-                <strong>“Convex”?</strong> A surface is <strong>convex</strong> when it is one bowl
-                everywhere: stretch a straight rope between any two points on it and the rope never
-                dips below the surface. One basin, no traps — the world where optimization comes
-                with clean guarantees, and the word you’ll meet on several optimizer cards. This
-                chapter is about what happens when that promise breaks (<em>non-convex</em>) —
-                which is where deep learning lives.
-              </p>
-              <aside class="hd-note">
-                <span class="hd-note-tag">In a billion dimensions</span>
-                <p>
-                  Here is <em>why</em> saddles take over up there. At a flat spot the surface
-                  curves independently along each of the <em>d</em> directions, and a minimum needs
-                  every single one to curve <em>up</em>. With two knobs that’s two coin flips; with
-                  a million it’s a million — so a random flat spot is all but certain to curve down
-                  somewhere, and “somewhere down” is exactly a saddle. The mountain pass isn’t the
-                  rare case at scale; it’s nearly the only case.
-                </p>
-              </aside>
-              <p>
-                This is the backdrop for Parts III and IV. Plain descent stalls on saddles, crawls
-                across plateaus, and settles in the first basin it finds. The momentum, noise, and
-                curvature tricks ahead are, in large part, ways to keep moving when the slope alone
-                is no longer enough to go on.
-              </p>
-              <ChapterCta
-                lessonId={chLesson['ch-shapes']}
-                onLesson={() => startLessonFromChapter('ch-shapes')}
-                demo={chapterPresets['ch-shapes'] ? () => runPreset('ch-shapes') : null}
-              />
-              {#if chRefs['ch-shapes']}
-                <div class="ch-refs">
-                  <span class="ch-refs-label">Further reading</span>
-                  {#each chRefs['ch-shapes'] as r}
-                    <a class="opt-cite-link" href={r.href} target="_blank" rel="noopener noreferrer">
-                      {#if r.kind === 'paper'}<FileText size={11} strokeWidth={2.2} />{:else}<BookOpen size={11} strokeWidth={2.2} />{/if}
-                      {r.label}
-                    </a>
-                  {/each}
-                </div>
-              {/if}
+            <section data-ch="ch-bowl" id="ch-bowl">
+              <div class="part-label">Part I · The landscape</div>
+              <h3><svelte:component this={chIcon['ch-bowl']} size={18} strokeWidth={2} /> The bottom of a bowl</h3>
+              <GuideBlocks slug="ch-bowl" blocks={chapterBlocks['ch-bowl']} figure={chFigure} {conceptFig} onPreset={runPreset} onLesson={startLessonFromChapter} />
+            </section>
+
+            <!-- ============== 2 · LOSS IS A LANDSCAPE ============== -->
+            <section data-ch="ch-landscape" id="ch-landscape">
+              <h3><svelte:component this={chIcon['ch-landscape']} size={18} strokeWidth={2} /> Loss is a landscape</h3>
+              <GuideBlocks slug="ch-landscape" blocks={chapterBlocks['ch-landscape']} figure={chFigure} {conceptFig} onPreset={runPreset} onLesson={startLessonFromChapter} />
+            </section>
+
+            <!-- ============== 3 · WHEN THE BOWL ISN'T A BOWL ============== -->
+            <section data-ch="ch-shapes" id="ch-shapes">
+              <h3><svelte:component this={chIcon['ch-shapes']} size={18} strokeWidth={2} /> When the bowl isn’t a bowl</h3>
+              <GuideBlocks slug="ch-shapes" blocks={chapterBlocks['ch-shapes']} figure={chFigure} {conceptFig} onPreset={runPreset} onLesson={startLessonFromChapter} />
             </section>
 
             <!-- ============== 4 · HOW STEEP, EXACTLY? ============== -->
@@ -3085,23 +2851,23 @@
   }
   h3 :global(svg) { color: #10b981; flex-shrink: 0; }
 
-  h4 {
+  .reading-column :global(h4) {
     margin: 0 0 0.5rem 0;
     font-size: 1rem;
     font-weight: 600;
     color: var(--color-text-primary);
   }
 
-  p {
+  .reading-column :global(p) {
     margin: 0 0 1rem 0;
     font-size: 1.0rem;
     line-height: 1.72;
     color: var(--color-text-secondary);
   }
-  p:last-child { margin-bottom: 0; }
-  p strong { color: var(--color-text-primary); font-weight: 600; }
+  .reading-column :global(p:last-child) { margin-bottom: 0; }
+  .reading-column :global(p strong) { color: var(--color-text-primary); font-weight: 600; }
 
-  .look {
+  .reading-column :global(.look) {
     font-size: 0.9rem;
     color: var(--color-text-tertiary);
     border-left: 2px solid var(--color-border);
@@ -3113,7 +2879,7 @@
   li { margin: 0.5rem 0; font-size: 1.0rem; line-height: 1.6; color: var(--color-text-secondary); }
   li strong { color: var(--color-text-primary); }
 
-  em.g { font-family: Georgia, serif; font-style: italic; color: #10b981; font-weight: 500; }
+  .reading-column :global(em.g) { font-family: Georgia, serif; font-style: italic; color: #10b981; font-weight: 500; }
   .ink-blue { color: #3b82f6; font-weight: 600; }
   .ink-red { color: #ef4444; font-weight: 600; }
 
@@ -3162,7 +2928,7 @@
   @media (max-width: 560px) { .schedule-grid { grid-template-columns: repeat(2, 1fr); } }
 
   /* ---------- Concept blocks ---------- */
-  .concept {
+  .reading-column :global(.concept) {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 190px;
     gap: 1.25rem;
@@ -3173,11 +2939,11 @@
     border: 1px solid var(--color-border);
     margin: 1.25rem 0;
   }
-  .concept-text { min-width: 0; }
-  .concept-text h4 { color: #10b981; margin-bottom: 0.5rem; font-size: 1rem; }
-  .concept-text p { font-size: 0.9rem; margin-bottom: 0; }
-  .concept-svg { width: 100%; height: 120px; color: var(--color-text-tertiary); }
-  .concept :global(.caption) { fill: var(--color-text-tertiary); font-size: 11px; font-family: inherit; }
+  .reading-column :global(.concept-text) { min-width: 0; }
+  .reading-column :global(.concept-text h4) { color: #10b981; margin-bottom: 0.5rem; font-size: 1rem; }
+  .reading-column :global(.concept-text p) { font-size: 0.9rem; margin-bottom: 0; }
+  .reading-column :global(.concept-svg) { width: 100%; height: 120px; color: var(--color-text-tertiary); }
+  .reading-column :global(.concept .caption) { fill: var(--color-text-tertiary); font-size: 11px; font-family: inherit; }
 
   .concept-bg-overlay {
     display: grid;
@@ -3324,7 +3090,7 @@
   .proof-qed { color: #10b981; font-weight: 700; margin-left: 0.15rem; }
 
   /* ---------- Formulas ---------- */
-  .formula-display {
+  .reading-column :global(.formula-display) {
     background: rgba(16, 185, 129, 0.08);
     border: 1px solid rgba(16, 185, 129, 0.22);
     border-radius: 8px;
@@ -3333,8 +3099,8 @@
     overflow-x: auto;
     overflow-y: hidden;
   }
-  .formula-display.center { text-align: center; }
-  .formula-display :global(.katex) { color: var(--color-text-primary); }
+  .reading-column :global(.formula-display.center) { text-align: center; }
+  .reading-column :global(.formula-display .katex) { color: var(--color-text-primary); }
 
   /* Wide formulas may scroll sideways; keep the scrollbar thin and themed,
      and never let overflow-x:auto spawn a stray vertical scrollbar. */
@@ -3509,22 +3275,22 @@
     border-top: 1px solid var(--color-border);
   }
   .opt-cite-who { font-size: 0.72rem; color: var(--color-text-tertiary); font-style: italic; margin-right: auto; }
-  .opt-cite-link {
+  .reading-column :global(.opt-cite-link) {
     display: inline-flex; align-items: center; gap: 0.3rem;
     font-size: 0.72rem; font-weight: 600;
     color: var(--color-text-secondary);
     text-decoration: none;
     transition: color 0.15s ease;
   }
-  .opt-cite-link:hover { color: #10b981; }
-  .opt-cite-link :global(svg) { opacity: 0.75; }
+  .reading-column :global(.opt-cite-link:hover) { color: #10b981; }
+  .reading-column :global(.opt-cite-link svg) { opacity: 0.75; }
   /* Per-chapter "Further reading" row — same link styling as a card citation. */
-  .ch-refs {
+  .reading-column :global(.ch-refs) {
     display: flex; align-items: baseline; gap: 0.4rem 0.9rem; flex-wrap: wrap;
     margin-top: 1.6rem; padding-top: 0.6rem;
     border-top: 1px solid var(--color-border);
   }
-  .ch-refs-label {
+  .reading-column :global(.ch-refs-label) {
     font-size: 0.625rem; font-weight: 700;
     letter-spacing: 0.08em; text-transform: uppercase;
     color: var(--color-text-tertiary);
@@ -3549,7 +3315,7 @@
   .opt-fix { color: #10b981; }
   .opt-break { color: #f59e0b; }
 
-  .aside {
+  .reading-column :global(.aside) {
     font-size: 0.875rem;
     color: var(--color-text-tertiary);
     font-style: italic;
@@ -3557,7 +3323,7 @@
     padding-left: 0.85rem;
     margin: 0.6rem 0;
   }
-  .aside strong { color: var(--color-text-secondary); }
+  .reading-column :global(.aside strong) { color: var(--color-text-secondary); }
 
   /* KaTeX labels inside SVG figures (via foreignObject) — the same math
      type as the running text, so figures and prose can't drift apart.
@@ -3583,14 +3349,14 @@
 
   /* "In higher dimensions…" — the recurring honesty channel. Same badge and
      voice everywhere, so readers learn to expect the correction. */
-  .hd-note {
+  .reading-column :global(.hd-note) {
     margin: 0.9rem 0;
     padding: 0.65rem 0.9rem 0.7rem 1rem;
     border-left: 3px solid #8b5cf6;
     border-radius: 0 10px 10px 0;
     background: color-mix(in srgb, #8b5cf6 7%, transparent);
   }
-  .hd-note-tag {
+  .reading-column :global(.hd-note-tag) {
     display: block;
     font-size: 0.68rem;
     font-weight: 700;
@@ -3599,8 +3365,8 @@
     color: #8b5cf6;
     margin-bottom: 0.25rem;
   }
-  .hd-note-tag::before { content: '∞ '; font-weight: 600; }
-  .hd-note p {
+  .reading-column :global(.hd-note-tag::before) { content: '∞ '; font-weight: 600; }
+  .reading-column :global(.hd-note p) {
     margin: 0;
     font-size: 0.865rem;
     line-height: 1.55;
