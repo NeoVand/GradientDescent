@@ -15,7 +15,7 @@
    */
 
   import {
-    X,
+    X, List,
     Activity, Mountain, TrendingUp, TrendingDown, Percent, Waves,
     Target, Radio, ScatterChart, Brain,
     Compass, Rocket, Zap, GraduationCap,
@@ -148,6 +148,24 @@
     bodyEl?.querySelector(`section[data-ch="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  // ---------- Phone chapter navigation ----------
+  // The rail is hidden on phones, so a header button opens the same table of
+  // contents as a full-height sheet. Jumps are instant — smooth-scrolling a
+  // forty-thousand-pixel book would take an age on a phone.
+  let showToc = false;
+  $: if (!isOpen) showToc = false;
+  function goToFromSheet(id: string) {
+    showToc = false;
+    activeId = id;
+    // Explicit 'instant': the container's CSS smooth-scroll gets cancelled by
+    // the book's continuously-animating figures, silently going nowhere.
+    bodyEl?.querySelector(`section[data-ch="${id}"]`)?.scrollIntoView({ behavior: 'instant', block: 'start' });
+  }
+  // Opening the sheet lands you on where you are in the book.
+  function revealActive(node: HTMLElement) {
+    node.querySelector('.sheet-item.active')?.scrollIntoView({ block: 'center' });
+  }
+
   // Auto-hiding scrollbar for the TOC rail: flag it as scrolling, then clear
   // the flag a beat after the last scroll event so the bar fades back out.
   let tocScrolling = false;
@@ -174,9 +192,12 @@
       const jump = () => {
         if (!bodyEl) return;
         if (target === chapters[0].slug) {
-          bodyEl.scrollTop = 0;
+          // A rAF queued in a backgrounded tab can fire long after opening —
+          // never yank a reader who has already navigated back to the cover.
+          if (bodyEl.scrollTop > 4) return;
+          bodyEl.scrollTo({ top: 0, behavior: 'instant' });
         } else {
-          bodyEl.querySelector(`section[data-ch="${target}"]`)?.scrollIntoView({ block: 'start' });
+          bodyEl.querySelector(`section[data-ch="${target}"]`)?.scrollIntoView({ behavior: 'instant', block: 'start' });
         }
         onScroll();
       };
@@ -885,14 +906,35 @@
           <h2>Gradient Lab</h2>
           <span class="book-tag">The Guide</span>
         </div>
-        <button class="close-btn" on:click={onClose} aria-label="Close guide">
-          <X size={22} strokeWidth={2} />
-        </button>
+        <div class="header-actions">
+          <button class="toc-btn" class:open={showToc} on:click={() => (showToc = !showToc)} aria-label={showToc ? 'Hide contents' : 'Show contents'} aria-expanded={showToc}>
+            <List size={20} strokeWidth={2.25} />
+          </button>
+          <button class="close-btn" on:click={onClose} aria-label="Close guide">
+            <X size={22} strokeWidth={2} />
+          </button>
+        </div>
       </div>
 
       <div class="reading-progress" aria-hidden="true">
         <div class="reading-progress-fill" style="transform: scaleX({progress})"></div>
       </div>
+
+      <!-- ---------------- Phone contents sheet ---------------- -->
+      {#if showToc}
+        <div class="toc-sheet" use:revealActive aria-label="Table of contents">
+          {#each toc as t}
+            {#if t.part}
+              <div class="sheet-part">{t.part}</div>
+            {:else}
+              <button class="sheet-item" class:active={activeId === t.id} on:click={() => goToFromSheet(t.id!)}>
+                <span class="sheet-ic"><svelte:component this={chIcon[t.id!]} size={16} strokeWidth={2} /></span>
+                <span class="sheet-title">{@html mathText(t.title ?? '')}</span>
+              </button>
+            {/if}
+          {/each}
+        </div>
+      {/if}
 
       <div class="reading-shell">
         <!-- ---------------- Table of contents rail ---------------- -->
@@ -1743,6 +1785,8 @@
     z-index: 10000;
     padding: 2rem;
     animation: fadeIn 0.2s ease;
+    /* A drag that starts on the dimmed rim must not scroll the app behind. */
+    touch-action: none;
   }
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
@@ -1810,6 +1854,10 @@
     padding: 0.18rem 0.45rem;
     margin-left: 0.1rem;
   }
+  .header-actions { display: flex; align-items: center; gap: 0.15rem; flex-shrink: 0; }
+  /* Contents button + sheet: phone-only affordances (the rail covers desktop). */
+  .toc-btn { display: none; }
+  .toc-sheet { display: none; }
   .close-btn {
     width: 32px; height: 32px;
     flex-shrink: 0;
@@ -1931,6 +1979,9 @@
     overflow-y: auto;
     min-width: 0;
     scroll-behavior: smooth;
+    /* Reaching the end of the book must not hand the scroll to the app behind. */
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
   }
   .modal-body::-webkit-scrollbar { width: 9px; }
   .modal-body::-webkit-scrollbar-track { background: var(--color-bg-secondary); }
@@ -2717,9 +2768,47 @@
     .modal-icon { font-size: 1.5rem; }
     .book-tag { display: none; }
 
-    /* Drop the rail; the reading column takes the full width. */
+    /* Drop the rail; the reading column takes the full width. The header's
+       contents button opens the same TOC as a full-height sheet instead. */
     .toc { display: none; }
     .reading-column { padding: calc(var(--bar-h) + 0.9rem) 1.1rem calc(var(--bar-h) + 1rem); max-width: 100%; }
+
+    .toc-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 38px; height: 38px; padding: 0;
+      border: none; border-radius: 8px; background: transparent;
+      color: var(--color-text-secondary); cursor: pointer;
+    }
+    .toc-btn.open { color: #10b981; background: rgba(16, 185, 129, 0.12); }
+
+    .toc-sheet {
+      display: block;
+      position: absolute;
+      top: calc(var(--bar-h) + 2px); left: 0; right: 0; bottom: 0;
+      z-index: 5; /* over the reading shell and the frosted footer */
+      background: var(--color-bg-secondary);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      padding: 0.6rem 0.8rem calc(0.9rem + env(safe-area-inset-bottom));
+    }
+    .sheet-part {
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 0.64rem; font-weight: 700;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: #10b981;
+      padding: 1rem 0.6rem 0.3rem;
+    }
+    .sheet-part:first-child { padding-top: 0.4rem; }
+    .sheet-item {
+      display: flex; align-items: center; justify-content: flex-start; gap: 0.65rem;
+      width: 100%; min-height: 44px; padding: 0.4rem 0.6rem;
+      border: none; border-radius: 9px; background: transparent;
+      color: var(--color-text-secondary); text-align: left; cursor: pointer;
+    }
+    .sheet-item.active { background: rgba(16, 185, 129, 0.12); color: var(--color-text-primary); }
+    .sheet-ic { display: inline-flex; flex-shrink: 0; color: #10b981; }
+    .sheet-title { font-size: 0.92rem; font-weight: 500; line-height: 1.3; }
 
     .hero-svg { height: 150px; }
     .hero-title { font-size: 1.3rem; }

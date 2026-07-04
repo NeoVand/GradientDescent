@@ -1325,26 +1325,40 @@
     color: #ef4444;
   }
 
-  /* Tool-shaped cursors: the pointer itself says what a click will do */
+  /* Tool-shaped cursors: the pointer itself says what a click will do. Each
+     mirrors its toolbar icon — solid flat shape for train, unfilled dashed
+     outline for test — with the plus pushed to the far corner, clear of the
+     shape. Solid shapes carry a halo in the plot background colour (white on
+     light, #060913 on dark): invisible against the canvas, a clean separating
+     gap when crossing points. Dashed outlines need no halo — their gaps let
+     the background through. Hotspot at the shape centre, where the point
+     will land. */
   svg.tool-train {
-    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='5.5' fill='%233b82f6' stroke='white' stroke-width='1.5'/%3E%3Cpath d='M18.5 2.5v6M15.5 5.5h6' stroke='%233b82f6' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 12 12, crosshair;
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='10' cy='14' r='5.5' fill='%233b82f6' stroke='white' stroke-width='1.5'/%3E%3Cpath d='M19.5 1.75v5.5M16.75 4.5h5.5' stroke='%233b82f6' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 10 14, crosshair;
+  }
+
+  :global([data-theme='dark']) svg.tool-train {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='10' cy='14' r='5.5' fill='%233b82f6' stroke='%23060913' stroke-width='1.5'/%3E%3Cpath d='M19.5 1.75v5.5M16.75 4.5h5.5' stroke='%233b82f6' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 10 14, crosshair;
   }
 
   svg.tool-test {
-    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='5.5' fill='rgba(16,185,129,0.3)' stroke='%2310b981' stroke-width='2' stroke-dasharray='3 2'/%3E%3Cpath d='M18.5 2.5v6M15.5 5.5h6' stroke='%2310b981' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 12 12, crosshair;
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='10' cy='14' r='5.5' fill='none' stroke='%2310b981' stroke-width='2' stroke-dasharray='3 2'/%3E%3Cpath d='M19.5 1.75v5.5M16.75 4.5h5.5' stroke='%2310b981' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 10 14, crosshair;
   }
 
   /* Class-editor cursors: colour = class (blue/green), fill = split
      (solid train / dashed test). These 2-class selectors out-specify the
      plain train/test cursors above. class-0 train reuses the blue circle. */
   svg.tool-c0.tool-test {
-    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='5.5' fill='rgba(59,130,246,0.3)' stroke='%233b82f6' stroke-width='2' stroke-dasharray='3 2'/%3E%3Cpath d='M18.5 2.5v6M15.5 5.5h6' stroke='%233b82f6' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 12 12, crosshair;
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='10' cy='14' r='5.5' fill='none' stroke='%233b82f6' stroke-width='2' stroke-dasharray='3 2'/%3E%3Cpath d='M19.5 1.75v5.5M16.75 4.5h5.5' stroke='%233b82f6' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 10 14, crosshair;
   }
   svg.tool-c1.tool-train {
-    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Crect x='6.5' y='6.5' width='11' height='11' fill='%2310b981' stroke='white' stroke-width='1.5'/%3E%3Cpath d='M18.5 2.5v6M15.5 5.5h6' stroke='%2310b981' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 12 12, crosshair;
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Crect x='4.5' y='8.5' width='11' height='11' fill='%2310b981' stroke='white' stroke-width='1.5'/%3E%3Cpath d='M19.5 1.75v5.5M16.75 4.5h5.5' stroke='%2310b981' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 10 14, crosshair;
+  }
+  :global([data-theme='dark']) svg.tool-c1.tool-train {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Crect x='4.5' y='8.5' width='11' height='11' fill='%2310b981' stroke='%23060913' stroke-width='1.5'/%3E%3Cpath d='M19.5 1.75v5.5M16.75 4.5h5.5' stroke='%2310b981' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 10 14, crosshair;
   }
   svg.tool-c1.tool-test {
-    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Crect x='6.5' y='6.5' width='11' height='11' fill='rgba(16,185,129,0.3)' stroke='%2310b981' stroke-width='2' stroke-dasharray='3 2'/%3E%3Cpath d='M18.5 2.5v6M15.5 5.5h6' stroke='%2310b981' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 12 12, crosshair;
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Crect x='4.5' y='8.5' width='11' height='11' fill='none' stroke='%2310b981' stroke-width='2' stroke-dasharray='3 2'/%3E%3Cpath d='M19.5 1.75v5.5M16.75 4.5h5.5' stroke='%2310b981' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 10 14, crosshair;
   }
 
   /* The same lucide eraser glyph as the toolbar button, in the erase-red.
