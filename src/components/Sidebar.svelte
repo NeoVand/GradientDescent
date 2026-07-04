@@ -125,6 +125,18 @@
     showProblemDropdown = false;
     showOptimizerDropdown = false;
   }
+  $: anyDropdownOpen = showProblemDropdown || showOptimizerDropdown;
+
+  // The mobile drawer is CSS-transformed, which hijacks position:fixed — the
+  // transformed ancestor becomes the containing block, so the "fixed" pickers
+  // scrolled along with the drawer and their backdrop only covered the drawer
+  // box, letting touch-drags scroll the app behind them. Rehoming the popover
+  // to #app (the Svelte mount target, so delegated events keep firing) makes
+  // fixed mean the real viewport on every screen size.
+  function portalToApp(node: HTMLElement) {
+    (document.getElementById('app') ?? document.body).appendChild(node);
+    return { destroy: () => node.remove() };
+  }
 
   // Both the problem and optimizer lists can outgrow their dropdown: a thin
   // scrollbar plus soft dark fades at the edges signal "there's more" in that
@@ -459,7 +471,7 @@
   $: batchPos = (batchIndex(batchSize) / (batchSizeSteps.length - 1)) * 100;
 </script>
 
-<div class="sidebar-stack">
+<div class="sidebar-stack" class:dropdown-open={anyDropdownOpen}>
   <div class="panel top-panel">
     <h1>
       <span class="app-icon">∂</span>
@@ -497,7 +509,7 @@
       </button>
 
       {#if showProblemDropdown}
-        <div class="problem-dropdown" style={dropStyle(problemDropPos)}>
+        <div class="problem-dropdown" style={dropStyle(problemDropPos)} use:portalToApp>
           <div class="dropdown-scroll" style="max-height: {problemDropPos.maxH}px" bind:this={problemScrollEl} on:scroll={updateDropdownFades}>
             {#each problemGroups as group}
               <div class="dropdown-group-label">{group.label}</div>
@@ -706,7 +718,7 @@
       </button>
 
       {#if showOptimizerDropdown}
-        <div class="problem-dropdown" style={dropStyle(optimizerDropPos)}>
+        <div class="problem-dropdown" style={dropStyle(optimizerDropPos)} use:portalToApp>
           <div class="dropdown-scroll" style="max-height: {optimizerDropPos.maxH}px" bind:this={optimizerScrollEl} on:scroll={updateDropdownFades}>
             {#each optimizerGroups as group}
               <div class="dropdown-group-label">{group.label}</div>
@@ -987,7 +999,7 @@
 
 <!-- Closes the fixed-positioned pickers on an outside click -->
 {#if showProblemDropdown || showOptimizerDropdown}
-  <button class="dropdown-backdrop" aria-label="Close menu" on:click={closeDropdowns}></button>
+  <button class="dropdown-backdrop" aria-label="Close menu" on:click={closeDropdowns} use:portalToApp></button>
 {/if}
 
 {#if showRaceSettings}
@@ -1364,6 +1376,8 @@
 
   /* Fixed-positioned (top/left/width set inline from the trigger's rect) so it
      escapes the scrolling control list instead of being clipped by it. */
+  /* Portaled to #app, so these z-indexes clear the mobile drawer (z 100)
+     and its backdrop (z 90) as well as the desktop panels. */
   .problem-dropdown {
     position: fixed;
     background: var(--color-bg-secondary);
@@ -1371,7 +1385,7 @@
     border-radius: 9px;
     overflow: hidden;
     box-shadow: 0 10px 28px var(--color-shadow);
-    z-index: 200;
+    z-index: 250;
   }
   .dropdown-backdrop {
     position: fixed;
@@ -1380,8 +1394,11 @@
     border: none;
     padding: 0;
     margin: 0;
-    z-index: 199;
+    z-index: 240;
     cursor: default;
+    /* A drag on the backdrop closes nothing and scrolls nothing. */
+    touch-action: none;
+    overscroll-behavior: contain;
   }
 
   /* Scroll container: deliberately shorter than the list (the cut lands
@@ -1393,6 +1410,9 @@
     /* Keep wheel scrolling inside the list — without this it chains into the
        sidebar, whose scroll handler would snap the dropdown shut mid-scroll. */
     overscroll-behavior: contain;
+    /* Touch: vertical pans on the list scroll the list, nothing else. */
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
     scrollbar-color: rgba(16, 185, 129, 0.35) transparent;
   }
@@ -1989,5 +2009,9 @@
        and the burger-✕ toggle — the in-drawer header would just repeat both. */
     .top-panel h1 { display: none; }
     .sidebar-content { margin-top: 0; }
+    /* While a picker popover is open, the drawer holds still behind it —
+       otherwise a stray drag scrolls the list out from under the popover. */
+    .sidebar-stack.dropdown-open .sidebar-content { overflow-y: hidden; }
+    :global(aside.sidebar:has(.sidebar-stack.dropdown-open)) { overflow-y: hidden; }
   }
 </style>
