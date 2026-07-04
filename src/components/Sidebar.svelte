@@ -1985,5 +1985,9 @@
     .run-panel { height: auto; }
     .panel { padding: 0.75rem; }
     .drawer-collapse { display: flex; }
+    /* The drawer opens under the app top bar, which already shows the title
+       and the burger-✕ toggle — the in-drawer header would just repeat both. */
+    .top-panel h1 { display: none; }
+    .sidebar-content { margin-top: 0; }
   }
 </style>

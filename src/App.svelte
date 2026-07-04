@@ -31,7 +31,7 @@ import CoursePanel from './components/CoursePanel.svelte';
   import { startTraining, stopTraining, stepOnce, resetRun, runEndStore, applyProblem } from './utils/trainer';
   import { applyUrlState, encodeStateUrl } from './utils/urlState';
   import { enterCourseFromChapter, lessons } from './utils/lessons';
-  import { Sun, Moon, Compass, Menu, Share2, GraduationCap, Maximize, Minimize, Play, Pause } from 'lucide-svelte';
+  import { Sun, Moon, Compass, Menu, X, Share2, GraduationCap, Maximize, Minimize, Play, Pause } from 'lucide-svelte';
 
   // The main app orchestrates all our components and manages the overall layout.
   // We use CSS Grid for a responsive, flexible layout that adapts to different screen sizes.
@@ -45,7 +45,7 @@ import CoursePanel from './components/CoursePanel.svelte';
   let drawerOpen = false;
 
   function closeDrawer() { drawerOpen = false; }
-  function openDrawer() { drawerOpen = true; }
+  function toggleDrawer() { drawerOpen = !drawerOpen; }
 
   // ---------- Full screen (browser Fullscreen API) ----------
   let isFullscreen = false;
@@ -303,8 +303,12 @@ import CoursePanel from './components/CoursePanel.svelte';
 
 <!-- Mobile top bar: only visible on small screens -->
 <header class="mobile-topbar">
-  <button class="topbar-btn menu-btn" on:click={openDrawer} aria-label="Open controls">
-    <Menu size={22} strokeWidth={2.5} />
+  <button class="topbar-btn menu-btn" on:click={toggleDrawer} aria-label={drawerOpen ? 'Close controls' : 'Open controls'}>
+    {#if drawerOpen}
+      <X size={22} strokeWidth={2.5} />
+    {:else}
+      <Menu size={22} strokeWidth={2.5} />
+    {/if}
   </button>
   <h1 class="topbar-title"><span class="topbar-mark">∂</span> <span class="topbar-name">Gradient Lab</span></h1>
   <!-- Train straight from the main view: no need to open the controls drawer
@@ -822,6 +826,9 @@ import CoursePanel from './components/CoursePanel.svelte';
       flex-direction: column;
       height: 100dvh;
       min-height: 0;
+      /* Shared by the top bar, the drawer, and its backdrop so the drawer can
+         slide in UNDER the bar — keeping the burger visible as a close toggle. */
+      --mobile-topbar-h: 54px;
     }
 
     main {
@@ -842,6 +849,8 @@ import CoursePanel from './components/CoursePanel.svelte';
       position: sticky;
       top: 0;
       z-index: 50;
+      height: var(--mobile-topbar-h);
+      box-sizing: border-box;
       padding: 0.4rem 0.5rem;
       background-color: var(--color-bg-primary);
       border-bottom: 1px solid var(--color-border);
@@ -993,12 +1002,13 @@ import CoursePanel from './components/CoursePanel.svelte';
       display: none;
     }
 
-    /* Sidebar becomes an off-canvas drawer */
+    /* Sidebar becomes an off-canvas drawer. It slides in BELOW the top bar so
+       the burger stays visible (and toggles the drawer closed again). */
     .sidebar {
       position: fixed;
-      top: 0;
+      top: var(--mobile-topbar-h);
       left: 0;
-      height: 100dvh;
+      height: calc(100dvh - var(--mobile-topbar-h));
       width: 86%;
       max-width: 340px;
       transform: translateX(-100%);
@@ -1009,6 +1019,9 @@ import CoursePanel from './components/CoursePanel.svelte';
       padding: 0.75rem;
       background-color: var(--color-bg-primary);
       overflow-y: auto;
+      /* Drawer scrolling stays in the drawer — never chains to the app behind. */
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
     }
     .sidebar.drawer-open {
       transform: translateX(0);
@@ -1017,11 +1030,17 @@ import CoursePanel from './components/CoursePanel.svelte';
     .drawer-backdrop {
       display: block;
       position: fixed;
-      inset: 0;
+      top: var(--mobile-topbar-h);
+      left: 0;
+      right: 0;
+      bottom: 0;
       background: rgba(0, 0, 0, 0.45);
       z-index: 90;
       animation: fadeIn 0.2s ease;
       border: none;
+      /* A touch-drag on the dimmed area must not scroll the app behind it. */
+      touch-action: none;
+      overscroll-behavior: contain;
     }
 
     @keyframes fadeIn {
