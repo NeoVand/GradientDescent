@@ -949,7 +949,13 @@
       <button
         class="train-button"
         class:training={isTraining}
-        on:click={() => (isTraining ? stopTraining() : startTraining())}
+        on:click={() => {
+          if (isTraining) { stopTraining(); return; }
+          startTraining();
+          // On a phone the drawer covers the plots — step aside so the run is
+          // actually visible. (A no-op on desktop, where the rail is static.)
+          onClose?.();
+        }}
         style="--progress: {trainingProgress}%;"
         data-tour="run-train"
       >
@@ -993,7 +999,10 @@
 {/if}
 
 {#if showRaceSettings}
-  <RaceSettingsModal onClose={() => (showRaceSettings = false)} />
+  <RaceSettingsModal
+    onClose={() => (showRaceSettings = false)}
+    onRaceStart={() => onClose?.()}
+  />
 {/if}
 
 <style>

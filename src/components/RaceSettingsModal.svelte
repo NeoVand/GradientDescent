@@ -20,6 +20,9 @@
   import type { ProblemType, ScheduleId } from '../types/types';
 
   export let onClose: () => void;
+  // Fired when the race actually launches (not on plain dismissal) — the
+  // mobile drawer listens so it can step aside and show the race.
+  export let onRaceStart: (() => void) | null = null;
 
   $: cfg = $raceConfigStore;
   $: problem = $selectedProblem;
@@ -87,6 +90,7 @@
 
   function raceNow() {
     startRace();
+    onRaceStart?.();
     onClose();
   }
   function onKey(e: KeyboardEvent) {
