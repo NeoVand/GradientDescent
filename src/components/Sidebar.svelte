@@ -18,6 +18,7 @@
   import { optimizers, optimizerGroups, type OptimizerId } from '../utils/optimizers';
   import { schedules, scheduleOrder } from '../utils/schedules';
   import { tooltip } from '../utils/tooltip';
+  import { portalToApp } from '../utils/portal';
   import {
     startTraining,
     stopTraining,
@@ -126,17 +127,6 @@
     showOptimizerDropdown = false;
   }
   $: anyDropdownOpen = showProblemDropdown || showOptimizerDropdown;
-
-  // The mobile drawer is CSS-transformed, which hijacks position:fixed — the
-  // transformed ancestor becomes the containing block, so the "fixed" pickers
-  // scrolled along with the drawer and their backdrop only covered the drawer
-  // box, letting touch-drags scroll the app behind them. Rehoming the popover
-  // to #app (the Svelte mount target, so delegated events keep firing) makes
-  // fixed mean the real viewport on every screen size.
-  function portalToApp(node: HTMLElement) {
-    (document.getElementById('app') ?? document.body).appendChild(node);
-    return { destroy: () => node.remove() };
-  }
 
   // Both the problem and optimizer lists can outgrow their dropdown: a thin
   // scrollbar plus soft dark fades at the edges signal "there's more" in that

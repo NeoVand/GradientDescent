@@ -1347,11 +1347,16 @@
     cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Crect x='6.5' y='6.5' width='11' height='11' fill='rgba(16,185,129,0.3)' stroke='%2310b981' stroke-width='2' stroke-dasharray='3 2'/%3E%3Cpath d='M18.5 2.5v6M15.5 5.5h6' stroke='%2310b981' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 12 12, crosshair;
   }
 
-  /* The same lucide eraser glyph as the toolbar button, in the erase-red, with
-     a white halo so it reads on both the light and dark plot backgrounds.
-     Hotspot at the eraser's tip. */
+  /* The same lucide eraser glyph as the toolbar button, in the erase-red.
+     The halo matches the plot background (white on light, #060913 on dark) so
+     it stays invisible against the canvas and only shows as a thin separating
+     edge when the cursor crosses a data point. Hotspot at the eraser's tip. */
   svg.tool-erase {
     cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg stroke='white' stroke-width='3.4' opacity='0.9'%3E%3Cpath d='m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21'/%3E%3Cpath d='M22 21H7'/%3E%3Cpath d='m5 11 9 9'/%3E%3C/g%3E%3Cg stroke='%23ef4444' stroke-width='2'%3E%3Cpath d='m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21'/%3E%3Cpath d='M22 21H7'/%3E%3Cpath d='m5 11 9 9'/%3E%3C/g%3E%3C/svg%3E") 6 20, pointer;
+  }
+
+  :global([data-theme='dark']) svg.tool-erase {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg stroke='%23060913' stroke-width='3.4' opacity='0.85'%3E%3Cpath d='m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21'/%3E%3Cpath d='M22 21H7'/%3E%3Cpath d='m5 11 9 9'/%3E%3C/g%3E%3Cg stroke='%23ef4444' stroke-width='2'%3E%3Cpath d='m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21'/%3E%3Cpath d='M22 21H7'/%3E%3Cpath d='m5 11 9 9'/%3E%3C/g%3E%3C/svg%3E") 6 20, pointer;
   }
 
   /* ---------- In-plot point legend (mirrors the landscape's corner keys) ---------- */

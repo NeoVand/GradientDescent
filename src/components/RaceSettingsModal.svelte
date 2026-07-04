@@ -8,6 +8,7 @@
    * Overrides are sparse — an untouched value falls back to the active problem's
    * curated default.
    */
+  import { onDestroy } from 'svelte';
   import { Flag, X, RotateCcw, Play, Zap, Info, RefreshCw, Gauge, Timer, Layers } from 'lucide-svelte';
   import { raceConfigStore, selectedProblem, type RaceConfig } from '../stores/stores';
   import { optimizers, optimizerGroups, type OptimizerId } from '../utils/optimizers';
@@ -15,6 +16,7 @@
   import { schedules, scheduleOrder } from '../utils/schedules';
   import { hyperMeta } from '../utils/hyperMeta';
   import { tooltip } from '../utils/tooltip';
+  import { portalToApp } from '../utils/portal';
   import type { ProblemType, ScheduleId } from '../types/types';
 
   export let onClose: () => void;
@@ -23,11 +25,26 @@
   $: problem = $selectedProblem;
   $: selectedCount = cfg.enabled.length;
 
+  // Phones get a re-imagined single-column bottom sheet (lineup chips, then
+  // the focused optimizer's tuning, then race-wide params); wider screens keep
+  // the two-column panel exactly as it is.
+  const phoneMq = typeof window !== 'undefined' ? window.matchMedia('(max-width: 560px)') : null;
+  let isPhone = phoneMq?.matches ?? false;
+  const onMqChange = (e: MediaQueryListEvent) => (isPhone = e.matches);
+  phoneMq?.addEventListener('change', onMqChange);
+  onDestroy(() => phoneMq?.removeEventListener('change', onMqChange));
+
   // The optimizer whose parameters are shown on the right. Initialised lazily
   // to the first selected one; never auto-reset (you can tune a benched method).
   let active: OptimizerId | null = null;
   $: if (active === null) active = cfg.enabled[0] ?? 'gd';
   $: activeOpt = active ? optimizers[active] : null;
+
+  // On the phone the tuning pills only list the enabled lineup, so the focus
+  // must follow it — benched tuning stays a desktop affordance.
+  $: if (isPhone && active && cfg.enabled.length > 0 && !cfg.enabled.includes(active)) {
+    active = cfg.enabled[0];
+  }
 
   // ---- Learning-rate log mapping (mirrors the sidebar γ slider) ----
   const LR_LOG_MIN = -4, LR_LOG_MAX = 0;
@@ -79,41 +96,11 @@
 
 <svelte:window on:keydown={onKey} />
 
-<button class="rs-backdrop" aria-label="Close race settings" on:click={onClose}></button>
-<div class="rs-modal" role="dialog" aria-modal="true" aria-label="Race settings">
-  <header class="rs-head">
-    <span class="rs-title"><Flag size={16} strokeWidth={2.5} /> Race settings</span>
-    <button class="rs-x" on:click={onClose} aria-label="Close"><X size={18} strokeWidth={2.5} /></button>
-  </header>
-
-  <div class="rs-cols">
-    <!-- ░░░ Left: the lineup ░░░ -->
-    <div class="rs-lineup">
-      <div class="rs-col-label">Lineup <span class="rs-count">{selectedCount}</span></div>
-      {#each optimizerGroups as group}
-        <div class="rs-subgroup">{group.label}</div>
-        {#each group.ids as id}
-          {@const on = cfg.enabled.includes(id)}
-          <div class="rs-opt" class:active={active === id}>
-            <button
-              class="rs-check" class:on aria-pressed={on}
-              aria-label={(on ? 'Remove ' : 'Add ') + optimizers[id].name}
-              style="--c: {RACE_COLORS[id]}"
-              on:click={() => raceConfigStore.toggle(id)}
-            >{#if on}<span class="rs-check-dot"></span>{/if}</button>
-            <button class="rs-opt-name" on:click={() => (active = id)}>
-              <span class="rs-dot" style="background: {RACE_COLORS[id]}"></span>
-              <span class="rs-name">{optimizers[id].name}</span>
-              {#if overridden(id, cfg)}<span class="rs-edited" title="Custom parameters">•</span>{/if}
-            </button>
-          </div>
-        {/each}
-      {/each}
-    </div>
-
-    <!-- ░░░ Right: race params + the focused optimizer ░░░ -->
-    <div class="rs-detail">
-      <div class="rs-col-label">Race</div>
+<!-- Portaled to #app: opened from inside the mobile drawer, whose transform
+     would otherwise hijack these fixed boxes (off-centre modal, backdrop
+     shrunk to the drawer). -->
+<button class="rs-backdrop" aria-label="Close race settings" on:click={onClose} use:portalToApp></button>
+{#snippet raceParams()}
       <div class="rs-ctl">
         <div class="rs-ctl-row">
           <span class="rs-ctl-icon"><RefreshCw size={15} strokeWidth={2} /></span>
@@ -170,8 +157,9 @@
           on:input={(e) => raceConfigStore.setBatchSize(batchSteps[parseInt(e.currentTarget.value)])}
         />
       </div>
+{/snippet}
 
-      <!-- The focused optimizer's parameters -->
+{#snippet activeParams()}
       {#if active && activeOpt}
         <div class="rs-detail-head">
           <span class="rs-dot" style="background: {RACE_COLORS[active]}"></span>
@@ -221,8 +209,89 @@
           <p class="rs-note">No hyperparameters — only the learning rate.</p>
         {/if}
       {/if}
+{/snippet}
+
+<div class="rs-modal" class:rs-sheet={isPhone} role="dialog" aria-modal="true" aria-label="Race settings" use:portalToApp>
+  <header class="rs-head">
+    <span class="rs-title"><Flag size={16} strokeWidth={2.5} /> Race settings</span>
+    <button class="rs-x" on:click={onClose} aria-label="Close"><X size={18} strokeWidth={2.5} /></button>
+  </header>
+
+  {#if isPhone}
+    <!-- ░░░ Phone: one thumb-friendly column — lineup chips, then the focused
+         optimizer's tuning right where you tapped, then race-wide params. ░░░ -->
+    <div class="rs-sheet-body">
+      <div class="rs-col-label">Lineup <span class="rs-count">{selectedCount}</span></div>
+      <div class="rs-chips">
+        {#each optimizerGroups as group}
+          {#each group.ids as id}
+            {@const on = cfg.enabled.includes(id)}
+            <button
+              class="rs-chip" class:on aria-pressed={on}
+              style="--c: {RACE_COLORS[id]}"
+              on:click={() => raceConfigStore.toggle(id)}
+            >
+              <span class="rs-dot" style="background: {RACE_COLORS[id]}"></span>
+              <span>{optimizers[id].name}</span>
+              {#if overridden(id, cfg)}<span class="rs-edited">•</span>{/if}
+            </button>
+          {/each}
+        {/each}
+      </div>
+
+      <div class="rs-col-label rs-gap-top">Tune</div>
+      {#if selectedCount > 0}
+        <div class="rs-pills" role="tablist" aria-label="Optimizer to tune">
+          {#each cfg.enabled as id}
+            <button class="rs-pill" class:on={active === id} style="--c: {RACE_COLORS[id]}" on:click={() => (active = id)}>
+              <span class="rs-dot" style="background: {RACE_COLORS[id]}"></span>
+              {optimizers[id].name}
+            </button>
+          {/each}
+        </div>
+        {@render activeParams()}
+      {:else}
+        <p class="rs-note">Add optimizers to the lineup above to tune them.</p>
+      {/if}
+
+      <div class="rs-col-label rs-gap-top">Race</div>
+      {@render raceParams()}
     </div>
-  </div>
+  {:else}
+    <div class="rs-cols">
+      <!-- ░░░ Left: the lineup ░░░ -->
+      <div class="rs-lineup">
+        <div class="rs-col-label">Lineup <span class="rs-count">{selectedCount}</span></div>
+        {#each optimizerGroups as group}
+          <div class="rs-subgroup">{group.label}</div>
+          {#each group.ids as id}
+            {@const on = cfg.enabled.includes(id)}
+            <div class="rs-opt" class:active={active === id}>
+              <button
+                class="rs-check" class:on aria-pressed={on}
+                aria-label={(on ? 'Remove ' : 'Add ') + optimizers[id].name}
+                style="--c: {RACE_COLORS[id]}"
+                on:click={() => raceConfigStore.toggle(id)}
+              >{#if on}<span class="rs-check-dot"></span>{/if}</button>
+              <button class="rs-opt-name" on:click={() => (active = id)}>
+                <span class="rs-dot" style="background: {RACE_COLORS[id]}"></span>
+                <span class="rs-name">{optimizers[id].name}</span>
+                {#if overridden(id, cfg)}<span class="rs-edited" title="Custom parameters">•</span>{/if}
+              </button>
+            </div>
+          {/each}
+        {/each}
+      </div>
+
+      <!-- ░░░ Right: race params + the focused optimizer ░░░ -->
+      <div class="rs-detail">
+        <div class="rs-col-label">Race</div>
+        {@render raceParams()}
+        <!-- The focused optimizer's parameters -->
+        {@render activeParams()}
+      </div>
+    </div>
+  {/if}
 
   <footer class="rs-foot">
     <button class="rs-reset-all" on:click={() => raceConfigStore.reset()}>Reset all</button>
@@ -242,7 +311,9 @@
   .rs-modal {
     position: fixed; z-index: 201;
     top: 50%; left: 50%; transform: translate(-50%, -50%);
-    width: min(680px, calc(100vw - 1.5rem)); max-height: 88vh;
+    /* dvh: on phones 88vh can outgrow the *visible* viewport once the
+       browser chrome collapses — dvh tracks what's actually on screen. */
+    width: min(680px, calc(100vw - 1.5rem)); max-height: min(88vh, calc(100dvh - 1.5rem));
     display: flex; flex-direction: column;
     background: var(--color-bg-secondary);
     border: 1px solid var(--color-border);
@@ -266,9 +337,13 @@
   .rs-cols { display: flex; min-height: 0; flex: 1; }
   .rs-lineup {
     width: 44%; flex-shrink: 0; overflow-y: auto;
+    overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
     padding: 0.7rem 0.8rem 1rem; border-right: 1px solid var(--color-border);
   }
-  .rs-detail { flex: 1; min-width: 0; overflow-y: auto; padding: 0.7rem 0.9rem 1rem; }
+  .rs-detail {
+    flex: 1; min-width: 0; overflow-y: auto; padding: 0.7rem 0.9rem 1rem;
+    overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  }
 
   .rs-col-label {
     display: flex; align-items: baseline; gap: 0.4rem;
@@ -404,10 +479,69 @@
     background: var(--color-border); border-radius: 999px; border: 2px solid transparent; background-clip: content-box;
   }
 
-  /* Stack to one column on narrow screens. */
+  /* ---------- Phone: a bottom sheet with its own one-column layout ----------
+     (Paired with the isPhone template branch; ≥561px renders .rs-cols and
+     none of these classes, so the desktop panel is untouched.) */
+  .rs-modal.rs-sheet {
+    top: auto; left: 0; bottom: 0; transform: none;
+    width: 100%; max-width: 100%;
+    max-height: calc(100dvh - 66px);
+    border-radius: 18px 18px 0 0;
+    border-left: none; border-right: none; border-bottom: none;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .rs-sheet-body {
+    flex: 1; min-height: 0; overflow-y: auto;
+    overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+    padding: 0.75rem 0.9rem 1rem;
+  }
+  .rs-gap-top { margin-top: 1.15rem; }
+
+  /* Lineup: a compact wrap of toggle chips — tap to add/remove. */
+  .rs-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .rs-chip {
+    display: inline-flex; align-items: center; gap: 0.38rem;
+    min-height: 40px; padding: 0.3rem 0.7rem;
+    border: 1.5px solid var(--color-border); border-radius: 999px;
+    background: transparent; color: var(--color-text-secondary);
+    font-size: 0.78rem; font-weight: 600; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+  }
+  .rs-chip.on {
+    border-color: var(--c);
+    background: color-mix(in srgb, var(--c) 16%, transparent);
+    color: var(--color-text-primary);
+  }
+  .rs-chip .rs-dot { opacity: 0.55; }
+  .rs-chip.on .rs-dot { opacity: 1; }
+
+  /* Tune: the enabled lineup as a swipeable pill row; the focused
+     optimizer's sliders render directly beneath. */
+  .rs-pills {
+    display: flex; gap: 0.4rem; overflow-x: auto;
+    padding-bottom: 0.35rem; margin-bottom: 0.55rem;
+    overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .rs-pills::-webkit-scrollbar { display: none; }
+  .rs-pill {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    min-height: 36px; padding: 0.25rem 0.65rem; flex-shrink: 0;
+    border: 1.5px solid var(--color-border); border-radius: 999px;
+    background: transparent; color: var(--color-text-secondary);
+    font-size: 0.75rem; font-weight: 600; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+  }
+  .rs-pill.on {
+    border-color: var(--c);
+    background: color-mix(in srgb, var(--c) 20%, transparent);
+    color: var(--color-text-primary);
+  }
+
   @media (max-width: 560px) {
-    .rs-cols { flex-direction: column; overflow-y: auto; }
-    .rs-lineup { width: auto; border-right: none; border-bottom: 1px solid var(--color-border); overflow: visible; }
-    .rs-detail { overflow: visible; }
+    /* Slider thumbs sized for thumbs. */
+    .rs-slider { height: 8px; }
+    .rs-slider::-webkit-slider-thumb { width: 22px; height: 22px; }
+    .rs-slider::-moz-range-thumb { width: 22px; height: 22px; }
   }
 </style>
