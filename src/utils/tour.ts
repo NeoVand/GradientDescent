@@ -81,6 +81,12 @@ const RAW_STEPS: RawStep[] = [
 function visible(sel: string): boolean {
   const el = document.querySelector(`[data-tour="${sel}"]`);
   if (!el) return false;
+  // Anchors inside a closed mobile drawer are off screen by intent, but a
+  // rect check can catch them mid-slide — ask the drawer, not the geometry.
+  const drawer = el.closest('aside.sidebar');
+  if (drawer && window.matchMedia('(max-width: 768px)').matches && !drawer.classList.contains('drawer-open')) {
+    return false;
+  }
   const r = el.getBoundingClientRect();
   if (r.width === 0 || r.height === 0) return false;
   // Reject anchors scrolled/transformed fully off the viewport (e.g. the

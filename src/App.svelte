@@ -72,6 +72,12 @@ import CoursePanel from './components/CoursePanel.svelte';
     // never touch first paint. The tour filters itself to on-screen anchors,
     // so on mobile it reduces to the always-visible plots.
     const { runTour } = await import('./utils/tour');
+    if (drawerOpen) {
+      // The tour snapshots anchor positions when it builds its steps — let
+      // the drawer finish sliding away or its anchors still read as visible.
+      closeDrawer();
+      await new Promise((r) => setTimeout(r, 300));
+    }
     runTour();
   }
 
