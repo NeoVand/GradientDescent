@@ -2003,5 +2003,9 @@
        otherwise a stray drag scrolls the list out from under the popover. */
     .sidebar-stack.dropdown-open .sidebar-content { overflow-y: hidden; }
     :global(aside.sidebar:has(.sidebar-stack.dropdown-open)) { overflow-y: hidden; }
+    /* Knobs sized for thumbs, not pointers. */
+    .section input[type='range'] { height: 8px; }
+    .section input[type='range']::-webkit-slider-thumb { width: 22px; height: 22px; }
+    .section input[type='range']::-moz-range-thumb { width: 22px; height: 22px; }
   }
 </style>

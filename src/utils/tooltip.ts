@@ -47,9 +47,18 @@ export function tooltip(node: HTMLElement, content: string | null | undefined) {
     document.body.appendChild(el);
     position();
     openTip = { hide };
+    // Touch has no mouseleave: a tapped-open tooltip would otherwise stick
+    // around until the next synthesized hover. Any press outside the trigger
+    // dismisses it (capture phase, so it beats stopPropagation'd handlers).
+    document.addEventListener('pointerdown', onOutsidePress, true);
+  }
+
+  function onOutsidePress(e: PointerEvent) {
+    if (!node.contains(e.target as Node)) hide();
   }
 
   function hide() {
+    document.removeEventListener('pointerdown', onOutsidePress, true);
     el?.remove();
     el = null;
     if (openTip?.hide === hide) openTip = null;
